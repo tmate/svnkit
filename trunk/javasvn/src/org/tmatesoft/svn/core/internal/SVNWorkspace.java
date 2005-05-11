@@ -1714,7 +1714,7 @@ public class SVNWorkspace implements ISVNWorkspace {
     private void doRevert(ISVNDirectoryEntry parent, ISVNEntry entry,
             boolean dirsOnly, boolean recursive) throws SVNException {
         boolean restored = !entry.isDirectory() && entry.isMissing();
-        if (entry.isDirectory() && recursive) {
+        if (entry.isDirectory() && !entry.isScheduledForAddition() && recursive) {
             Collection namesList = new LinkedList();
             for (Iterator children = entry.asDirectory().childEntries(); children
                     .hasNext();) {
