@@ -363,6 +363,10 @@ public class FSDirEntry extends FSEntry implements ISVNDirectoryEntry {
             myChildEntries.remove(childName);
             myChildren.remove(childName);
             if (child.isDirectory()) {
+                for(Iterator children = child.asDirectory().childEntries(); children.hasNext();) {
+                    ISVNEntry ch = (ISVNEntry) children.next();
+                    child.asDirectory().revert(ch.getName());
+                }
                 File adminArea = getAdminArea().getAdminArea(child);
                 FSUtil.deleteAll(adminArea);
             }
