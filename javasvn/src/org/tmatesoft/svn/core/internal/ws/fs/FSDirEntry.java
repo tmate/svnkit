@@ -127,6 +127,20 @@ public class FSDirEntry extends FSEntry implements ISVNDirectoryEntry {
         }
         return false;
     }
+
+    public boolean isScheduledForAddition() throws SVNException {
+        File file = getRootEntry().getWorkingCopyFile(this);
+        boolean missing = !FSUtil.isFileOrSymlinkExists(file);
+        if (!isMissing() || getRootEntry() == this) {
+            return super.isScheduledForAddition();
+        }
+        FSDirEntry parent = (FSDirEntry) getRootEntry().locateEntry(PathUtil.removeTail(getPath()));
+        if (parent != null) {
+            Map entry = parent.getChildEntry(getName());
+            return entry != null && SVNProperty.SCHEDULE_ADD.equals(entry.get(SVNProperty.SCHEDULE));
+        }
+        return false;
+    }
     
     public boolean isObstructed() {
         return super.isObstructed() || 
@@ -705,6 +719,7 @@ public class FSDirEntry extends FSEntry implements ISVNDirectoryEntry {
         DebugLog.log("DELETING: " + name + " from " + getPath());
         ISVNEntry entry = getChild(name);
         if (entry == null) {
+            DebugLog.log("entry not found: " + name);
             // force file deletion
             if (moved) {
                 DebugLog.log("DELETING UNMANAGED CHILD: " + name + " from " + getPath());
@@ -723,8 +738,13 @@ public class FSDirEntry extends FSEntry implements ISVNDirectoryEntry {
                 }
                 deleteChild(name, storeInfo);
             } else {
-                myChildEntries.remove(name);
-                myChildren.remove(name);
+                if (!FSUtil.isFileOrSymlinkExists(getRootEntry().getWorkingCopyFile(entry))) {
+                    // missing, but scheduled for addition.
+                    deleteChild(entry.getName(), entry.getPropertyValue(SVNProperty.DELETED) != null);
+                } else {
+                    myChildEntries.remove(name);
+                    myChildren.remove(name);
+                }
             }
             return entry;
         }
