@@ -949,6 +949,9 @@ public class SVNWorkspace implements ISVNWorkspace {
 
     public long commit(SVNCommitPacket packet, boolean keepLocks, String message)
             throws SVNException {
+        if (packet == null) {
+            return -1;
+        }
         final SVNStatus[] statuses = packet.getStatuses();
         return commitPaths(getPathsFromStatuses(statuses), message, keepLocks,
                 null);

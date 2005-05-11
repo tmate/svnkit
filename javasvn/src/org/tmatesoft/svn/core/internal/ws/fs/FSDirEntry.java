@@ -113,6 +113,20 @@ public class FSDirEntry extends FSEntry implements ISVNDirectoryEntry {
             myDeletedEntries.put(name, map);
         }        
     }
+
+    public boolean isScheduledForDeletion() throws SVNException {
+        File file = getRootEntry().getWorkingCopyFile(this);
+        boolean missing = !FSUtil.isFileOrSymlinkExists(file);
+        if (!missing || getRootEntry() == this) {
+            return super.isScheduledForDeletion();
+        }
+        FSDirEntry parent = (FSDirEntry) getRootEntry().locateEntry(PathUtil.removeTail(getPath()));
+        if (parent != null) {
+            Map entry = parent.getChildEntry(getName());
+            return entry != null && SVNProperty.SCHEDULE_DELETE.equals(entry.get(SVNProperty.SCHEDULE));
+        }
+        return false;
+    }
     
     public boolean isObstructed() {
         return super.isObstructed() || 
