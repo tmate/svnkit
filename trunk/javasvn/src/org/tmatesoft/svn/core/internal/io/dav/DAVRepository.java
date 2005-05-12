@@ -492,7 +492,11 @@ class DAVRepository extends SVNRepository {
         }
         // it was a relative path relative to location path.
         // decode??
-        path = PathUtil.append(getLocation().getPath(), path);
+        if ("".equals(path)) {
+            path = getLocation().getPath();
+        } else {
+            path = PathUtil.append(getLocation().getPath(), path);
+        }
         if (path.charAt(0) != '/') {
             path = '/' + path;            
         }

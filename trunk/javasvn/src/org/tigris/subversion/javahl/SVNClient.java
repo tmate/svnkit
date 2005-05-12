@@ -333,12 +333,9 @@ public class SVNClient implements SVNClientInterface {
         };
         
         if (isURL(path)) {
+            DebugLog.log("logMessages called for " + path);
             try {
                 String target = "";
-                if (!path.endsWith("/")) {
-                    target = PathUtil.tail(path);
-                    path = PathUtil.removeTail(path);
-                }
                 SVNRepository repository = createRepository(path);
                 long revStart = getRevisionNumber(revisionStart, repository, null, null);
                 long revEnd = getRevisionNumber(revisionEnd, repository, null, null);
