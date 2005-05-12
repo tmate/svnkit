@@ -37,7 +37,7 @@ import org.xml.sax.helpers.DefaultHandler;
 /**
  * @author Alexander Kitaev
  */
-class DAVConnection {
+public class DAVConnection {
     
     private SVNRepositoryLocation myLocation;
     private HttpConnection myHttpConnection;
