@@ -24,7 +24,11 @@ import org.tmatesoft.svn.cli.SVNCommand;
 import org.tmatesoft.svn.core.ISVNWorkspace;
 import org.tmatesoft.svn.core.SVNProperty;
 import org.tmatesoft.svn.core.SVNStatus;
+import org.tmatesoft.svn.core.io.SVNDirEntry;
 import org.tmatesoft.svn.core.io.SVNException;
+import org.tmatesoft.svn.core.io.SVNLock;
+import org.tmatesoft.svn.core.io.SVNNodeKind;
+import org.tmatesoft.svn.core.io.SVNRepository;
 import org.tmatesoft.svn.util.DebugLog;
 import org.tmatesoft.svn.util.SVNUtil;
 
@@ -44,6 +48,45 @@ public class InfoCommand extends SVNCommand {
         final boolean recursive = getCommandLine().hasArgument(SVNArgument.RECURSIVE);
         if (recursive) {
             throw new SVNException("Recursive currently not supported!");
+        }
+        if (getCommandLine().hasURLs()) {
+            String url = getCommandLine().getURL(0);
+            SVNRepository repos = createRepository(url);
+            String revisionStr = (String) getCommandLine().getArgumentValue(SVNArgument.REVISION);
+            long revision = -1;
+            if (revisionStr != null) {
+                try {
+                    revision = Long.parseLong(revisionStr);
+                } catch (NumberFormatException nfe) {
+                    revision = -1;
+                }
+            }
+            SVNDirEntry info = repos.info("", revision);
+            
+            out.println("URL: " + url);
+            out.println("Repository Root: " + repos.getRepositoryRoot());
+            out.println("Repository UUID: " + repos.getRepositoryUUID());
+            out.println("Revision: " + info.getRevision());
+            out.println("Node Kind: " + (info.getKind() == SVNNodeKind.DIR ? "directory" : "file"));
+            out.println("Last Changed Author: " + (info.getAuthor() == null ? "" : info.getAuthor()));
+            out.println("Last Changed Date: " + OUT_FORMAT.format(info.getDate()));
+            out.println("Last Changed Rev: " + info.getRevision());
+            // lock.
+            SVNLock lock = repos.getLock("");
+            if (lock != null) {
+                print("Lock Token: " + lock.getID(), out);
+                if (lock.getOwner() != null) {
+                    print("Lock Owner: " + lock.getOwner(), out);
+                }
+                if (lock.getCreationDate() != null) {
+                    print("Lock Created: " + OUT_FORMAT.format(lock.getCreationDate()), out);
+                }
+                if (lock.getComment() != null) {
+                    print("Lock Comment:\n" + lock.getComment() + "\n", out);
+                }
+            }
+            return;
+            
         }
 
         final String absolutePath = getCommandLine().getPathAt(0);
