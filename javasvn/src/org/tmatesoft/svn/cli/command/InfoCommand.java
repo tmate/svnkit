@@ -49,8 +49,63 @@ public class InfoCommand extends SVNCommand {
         if (recursive) {
             throw new SVNException("Recursive currently not supported!");
         }
-        if (getCommandLine().hasURLs()) {
-            String url = getCommandLine().getURL(0);
+        for (int i = 0; i < getCommandLine().getPathCount(); i++) {
+
+            final String absolutePath = getCommandLine().getPathAt(i);
+            final ISVNWorkspace workspace = createWorkspace(absolutePath, false);
+            final String relativePath = SVNUtil.getWorkspacePath(workspace, new File(absolutePath).getAbsolutePath());
+            final SVNStatus status = workspace.status(relativePath, false);
+
+            print("Path: " + getOutputPath(absolutePath), out);
+            if (!status.isDirectory()) {
+                print("Name: " + getName(status), out);
+            }
+            print("URL: " + getLocation(workspace, status), out);
+            if (isNormal(status)) {
+                print("Repository UUID: " + getUUID(workspace, status), out);
+            }
+
+            print("Revision: " + status.getWorkingCopyRevision(), out);
+            print("Node Kind: " + getNodeKind(status), out);
+            print("Schedule: " + getSchedule(status), out);
+            if (isNormal(status)) {
+                print("Last Changed Author: " + status.getAuthor(), out);
+                print("Last Changed Rev: " + status.getRevision(), out);
+                print("Last Changed Date: " + getCommittedDate(workspace, relativePath), out);
+                if (getTextLastUpdate(workspace, relativePath) != null) {
+                    print("Text Last Updated: " + getTextLastUpdate(workspace, relativePath), out);
+                }
+                if (getPropertiesDate(workspace, relativePath) != null) {
+                    print("Properties Last Updated: " + getPropertiesDate(workspace, relativePath), out);
+                }
+                if (getChecksum(workspace, relativePath) != null) {
+                    print("Checksum: " + getChecksum(workspace, relativePath), out);
+                }
+            }
+            if (status.isAddedWithHistory()) {
+                print("Copied From URL: " + workspace.getPropertyValue(relativePath, SVNProperty.COPYFROM_URL), out);
+                print("Copied From Rev: " + workspace.getPropertyValue(relativePath, SVNProperty.COPYFROM_REVISION), out);
+            }
+            String locktoken = workspace.getPropertyValue(relativePath, SVNProperty.LOCK_TOKEN);
+            String lockowner = workspace.getPropertyValue(relativePath, SVNProperty.LOCK_OWNER);
+            String lockdate = workspace.getPropertyValue(relativePath, SVNProperty.LOCK_CREATION_DATE);
+            String lockcomment = workspace.getPropertyValue(relativePath, SVNProperty.LOCK_COMMENT);
+            if (locktoken != null) {
+                print("Lock Token: " + locktoken, out);
+                if (lockowner != null) {
+                    print("Lock Owner: " + lockowner, out);
+                }
+                if (lockdate != null) {
+                    print("Lock Created: " + formatDate(lockdate), out);
+                }
+                if (lockcomment != null) {
+                    print("Lock Comment:\n" + lockcomment + "\n", out);
+                }
+            }
+        }
+
+        for (int i = 0; i < getCommandLine().getURLCount(); i++) {
+            String url = getCommandLine().getURL(i);
             SVNRepository repos = createRepository(url);
             String revisionStr = (String) getCommandLine().getArgumentValue(SVNArgument.REVISION);
             long revision = -1;
@@ -84,60 +139,6 @@ public class InfoCommand extends SVNCommand {
                 if (lock.getComment() != null) {
                     print("Lock Comment:\n" + lock.getComment() + "\n", out);
                 }
-            }
-            return;
-            
-        }
-
-        final String absolutePath = getCommandLine().getPathAt(0);
-        final ISVNWorkspace workspace = createWorkspace(absolutePath, false);
-        final String relativePath = SVNUtil.getWorkspacePath(workspace, new File(absolutePath).getAbsolutePath());
-        final SVNStatus status = workspace.status(relativePath, false);
-
-        print("Path: " + getOutputPath(absolutePath), out);
-        if (!status.isDirectory()) {
-            print("Name: " + getName(status), out);
-        }
-        print("URL: " + getLocation(workspace, status), out);
-        if (isNormal(status)) {
-            print("Repository UUID: " + getUUID(workspace, status), out);
-        }
-
-        print("Revision: " + status.getWorkingCopyRevision(), out);
-        print("Node Kind: " + getNodeKind(status), out);
-        print("Schedule: " + getSchedule(status), out);
-        if (isNormal(status)) {
-            print("Last Changed Author: " + status.getAuthor(), out);
-            print("Last Changed Rev: " + status.getRevision(), out);
-            print("Last Changed Date: " + getCommittedDate(workspace, relativePath), out);
-            if (getTextLastUpdate(workspace, relativePath) != null) {
-                print("Text Last Updated: " + getTextLastUpdate(workspace, relativePath), out);
-            }
-            if (getPropertiesDate(workspace, relativePath) != null) {
-                print("Properties Last Updated: " + getPropertiesDate(workspace, relativePath), out);
-            }
-            if (getChecksum(workspace, relativePath) != null) {
-                print("Checksum: " + getChecksum(workspace, relativePath), out);
-            }
-        }
-        if (status.isAddedWithHistory()) {
-            print("Copied From URL: " + workspace.getPropertyValue(relativePath, SVNProperty.COPYFROM_URL), out);
-            print("Copied From Rev: " + workspace.getPropertyValue(relativePath, SVNProperty.COPYFROM_REVISION), out);
-        }
-        String locktoken = workspace.getPropertyValue(relativePath, SVNProperty.LOCK_TOKEN);
-        String lockowner = workspace.getPropertyValue(relativePath, SVNProperty.LOCK_OWNER);
-        String lockdate = workspace.getPropertyValue(relativePath, SVNProperty.LOCK_CREATION_DATE);
-        String lockcomment = workspace.getPropertyValue(relativePath, SVNProperty.LOCK_COMMENT);
-        if (locktoken != null) {
-            print("Lock Token: " + locktoken, out);
-            if (lockowner != null) {
-                print("Lock Owner: " + lockowner, out);
-            }
-            if (lockdate != null) {
-                print("Lock Created: " + formatDate(lockdate), out);
-            }
-            if (lockcomment != null) {
-                print("Lock Comment:\n" + lockcomment + "\n", out);
             }
         }
     }
