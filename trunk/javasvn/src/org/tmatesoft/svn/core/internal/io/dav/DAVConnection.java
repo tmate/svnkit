@@ -117,13 +117,16 @@ public class DAVConnection {
             return null;
         }
         String comment = handler.getComment();
+        String owner = (String) rc.getResponseHeader().get("X-SVN-Lock-Owner");
         String created = (String) rc.getResponseHeader().get("X-SVN-Creation-Date");
         Date createdDate = created != null ? TimeUtil.parseDate(created) : null;
         path = PathUtil.decode(info.baselinePath);
         if (!path.startsWith("/")) {
             path = "/" + path;
         }
-        return new SVNLock(path, id, null, comment, createdDate, null);
+        DebugLog.log("lock owner: " + owner);
+        DebugLog.log("lock comment: " + comment);
+        return new SVNLock(path, id, owner, comment, createdDate, null);
     }
 
     public SVNLock[] doGetLocks(String path) throws SVNException {
