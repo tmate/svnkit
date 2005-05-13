@@ -1576,6 +1576,7 @@ public class SVNWorkspace implements ISVNWorkspace {
     public void unlock(String path, boolean force) throws SVNException {
         try {
             ISVNEntry entry = locateEntry(path);
+            ISVNEntry parent = locateParentEntry(path);
             if (entry == null) {
                 throw new SVNException("no versioned entry at '" + path + "'");
             }
@@ -1595,8 +1596,12 @@ public class SVNWorkspace implements ISVNWorkspace {
             entry.setPropertyValue(SVNProperty.LOCK_TOKEN, null);
             entry.setPropertyValue(SVNProperty.LOCK_COMMENT, null);
             entry.setPropertyValue(SVNProperty.LOCK_CREATION_DATE, null);
-            entry.setPropertyValue(SVNProperty.LOCK_OWNER, null);
-            entry.save();
+            entry.setPropertyValue(SVNProperty.LOCK_OWNER, null);            
+            if (!entry.isDirectory()) {
+                parent.save(false);
+            } else {
+                entry.save();
+            }
         } finally {
             getRoot().dispose();
         }
