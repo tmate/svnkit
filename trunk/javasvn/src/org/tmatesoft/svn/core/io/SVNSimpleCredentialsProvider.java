@@ -78,9 +78,9 @@ public class SVNSimpleCredentialsProvider implements ISVNCredentialsProvider {
 	 * before ever making a request. In Subversion, the server “pulls” credentials by
 	 * challenging the client at the appropriate moment, rather than the client
 	 * “pushing” them. 
-	 * </p>
-     * @version 1.0
-     * @author TMate Software Ltd.
+	 * 
+     * @version 	1.0
+     * @author 		TMate Software Ltd.
      */
     public static class SimpleCredentials implements ISVNSSHCredentials {
         private String myPassword;

@@ -13,7 +13,12 @@
 package org.tmatesoft.svn.core.io;
 
 /**
- * @author Alexander Kitaev
+ * <p>
+ * 
+ * </p>
+ * @version 1.0
+ * @author TMate Software Ltd.
+ * @see SVNLogEntry
  */
 public class SVNLogEntryPath {
     
