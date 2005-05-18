@@ -18,6 +18,8 @@ import java.util.Map;
 import java.util.regex.Pattern;
 
 /**
+ * <p>
+ * The abstract 
  * @author TMate Software Ltd.
  */
 public abstract class SVNRepositoryFactory {

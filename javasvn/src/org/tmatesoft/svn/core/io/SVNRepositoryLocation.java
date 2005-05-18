@@ -27,14 +27,14 @@ import org.tmatesoft.svn.util.PathUtil;
  * </ol>
  * Regardless of the way you do it you always ought to provide a necessary URL. 
  * There are the following URL schemas:
- * <ol>
+ * <ul>
  * <li>file:/// - to access the repository locally, e.g. file:///path/to/repos
  * <li>http:// or https:// (with SSL encryption)-
  * to access the repository via the WebDAV protocol to Subversion-aware Apach
  * Server
  * <li>svn:// - to access the repository via the custom standalone protocol
  * <li>svn+ssh:// - the same as svn:// but through a SSH tunnel
- * </ol>
+ * </ul>
  * Specifying a URL you can also point the definite port to go out through, e.g.
  * http://host:8080/path/to/repos. If you don't, then a default one will be used
  * for the current protocol.
@@ -175,6 +175,7 @@ public class SVNRepositoryLocation {
     public int getPort() {
         return myPort;
     }
+
     /**
      * <p>
      * Represents a <code>SVNRepositoryLocation</code> object as a URL string 
@@ -184,7 +185,7 @@ public class SVNRepositoryLocation {
      * @see #toCanonicalForm()
      * @return URL string representation of this object 
      */
-    public String toString() {
+    public String toString(){
         if (myAsString != null) {
             return myAsString;
         }
@@ -201,12 +202,11 @@ public class SVNRepositoryLocation {
         return sb.toString();
     }
     /**
-     * <p>
      * Represents a <code>SVNRepositoryLocation</code> object as a complete URL
      * string (including a port number). 
-     * </p>
-     * @see #toString()
-     * @return canonical URL string representation of this object 
+     * 
+     * @return 			canonical URL string representation of this object 
+     * @see 			#toString()
      */
     public String toCanonicalForm() {
         StringBuffer sb = new StringBuffer();
