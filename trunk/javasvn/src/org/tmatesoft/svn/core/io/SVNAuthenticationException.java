@@ -15,7 +15,10 @@ package org.tmatesoft.svn.core.io;
 import java.util.Collection;
 
 /**
- * @author TMate Software Ltd.
+ * An exception class that 
+ * @version	1.0
+ * @author 	TMate Software Ltd.
+ * @see		SVNException
  */
 public class SVNAuthenticationException extends SVNException {
 

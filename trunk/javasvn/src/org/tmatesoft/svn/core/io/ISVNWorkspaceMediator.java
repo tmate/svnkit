@@ -17,7 +17,9 @@ import java.io.InputStream;
 import java.io.OutputStream;
 
 /**
- * @author TMate Software Ltd.
+ * @version	1.0
+ * @author 	TMate Software Ltd.
+ * 
  */
 public interface ISVNWorkspaceMediator {
     /**

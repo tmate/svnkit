@@ -20,7 +20,8 @@ package org.tmatesoft.svn.core.io;
  * <p>
  * Since a Subversion repository can be configured to demand a client's 
  * authentication to perform his request, the client in this case must provide
- * such information about himself (account name & password).    
+ * such information about himself (account name & password) else his request will
+ * be denied.    
  * 
  * <p>
  * This interface implementation is supplied to an <code>SVNRepository</code>
@@ -28,7 +29,7 @@ package org.tmatesoft.svn.core.io;
  * Later on the Repository Access Layer inner engine retrieves this provider from
  * the <code>SVNRepository</code> and calling the provider's interface methods
  * obtains all the client's credentials (<code>ISVNCredentials</code> 
- * implementations) provided.
+ * implementations) provided (if any).
  * 
  * @version 1.0
  * @author 	TMate Software Ltd.
@@ -39,16 +40,42 @@ package org.tmatesoft.svn.core.io;
  * @see 	SVNRepository#getCredentialsProvider()
  */
 public interface ISVNCredentialsProvider {
-	/**
-	 * Gets the next
-	 * @param realm
-	 * @return
+	
+    /**
+	 * Gets the next provided client's credentials (if any). 
+	 * @param realm		a name that defines which authentication namespace of the 
+	 * 					repository will be used when connecting to it 
+	 * @return			next client's credentials as an implementation of the 
+	 * 					<code>ISVNCredentials</code> interface
+	 * @see				ISVNCredentials
 	 */
 	public ISVNCredentials nextCredentials(String realm);
 	
+	/**
+	 * Notifies that the given <code>credentials</code>  were accepted
+	 * by the repository server (the user was authenticated successfully).
+	 * 
+	 * @param credentials	client's credentials that were accepted by the server
+	 * @see					#notAccepted(ISVNCredentials, String)	
+	 */
 	public void accepted(ISVNCredentials credentials);
-
+	
+	/**
+	 * Notifies that the given <code>credentials</code> were not accepted by the
+	 * repository server and provides a failure reason string (the user wasn't 
+	 * authenticated).
+	 * 
+	 * @param credentials		client's credentials which were declined by the 
+	 * 							repository server
+	 * @param failureReason		the string that describes why it has happend
+	 * @see						#accepted(ISVNCredentials)
+	 */
 	public void notAccepted(ISVNCredentials credentials, String failureReason);
     
+	/**
+	 * Resets to the very begginning of the container of all the credentials (if
+	 * more than one) provided by the client. 
+	 *
+	 */
     public void reset();
 }

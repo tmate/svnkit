@@ -16,23 +16,25 @@ import java.util.Date;
 
 
 /**
+ * <code>SVNDirEntry</code> represents a directory entry informational wrapper.
+ * 
  * <p>
  * Every directory or file added, updated, deleted (and so on) needs to be versioned.
  * This class provides such an informational wrapper for every entry ever handled by the
  * repository. All the versioned repository contents are considered as directory entries,
- * since all the files and directories are located inside the Subversion repository root directory.
+ * since all the files and directories are located inside the Subversion repository root 
+ * directory.
+ * 
+ * <p>
  * <code>SVNDirEntry</code> is responsible for keeping an entry name, 
  * entry kind (is it a file or directory or maybe unknown type), entry size (in bytes);
  * it knows if the entry has any properties, it remembers the date when the entry was created and 
  * its first revision when it appeared in the repository as well as the last person who updated
  * the item. All this information is binded together in one class.
- * </p>
- * <p>
- * It is similar to the Subversion native type <code>svn_dirent_t</code>. 
- * </p>
+ * 
  * @version 1.0
- * @author TMate Software Ltd.
- * @see ISVNDirEntryHandler
+ * @author 	TMate Software Ltd.
+ * @see 	ISVNDirEntryHandler
  */
 public class SVNDirEntry {
 

@@ -17,7 +17,8 @@ import java.io.OutputStream;
 import org.tmatesoft.svn.core.diff.SVNDiffWindow;
 
 /**
- * @author Alexander Kitaev
+ * @version	1.0
+ * @author 	TMate Software Ltd.
  */
 public interface ISVNDiffHandler {
     
