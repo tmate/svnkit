@@ -19,7 +19,7 @@ import java.util.Map;
  * <p>
  * The class <code>SVNLogEntry</code> incapsulates log information provided for every
  * commit operation. This information includes:
- * <ol>
+ * <ul>
  * <li>revision number the repository was committed to;
  * <li>person who made the commit;
  * <li>date (generally moment in time) when the commit was performed;
@@ -27,7 +27,7 @@ import java.util.Map;
  * <li>map collection that contains all the paths of the entries which were
  * changed at the commit. Map keys are the paths themselves and values are
  * <code>SVNLogEntryPath</code> instances. 
- * </ol>
+ * </ul>
  * </p>
  * <p>
  * Instances of <code>SVNLogEntry</code> are passed to

@@ -16,12 +16,12 @@ package org.tmatesoft.svn.core.io;
  * <p>
  * The final class <code>SVNNodeKind</code> incapsulates the kind of a versioned node
  * stored in the Subversion repository. This can be:
- * <ol>
+ * <ul>
  * <li>a directory - the node is a directory
  * <li>a file      - the node is a file
  * <li>none        - the versioned node is absent (does not exist)
  * <li>unknown     - the node kind can not be recognized
- * </ol>
+ * </ul>
  * <code>SVNNodeKind</code> items are used to describe directory
  * entry type.
  * </p> 
