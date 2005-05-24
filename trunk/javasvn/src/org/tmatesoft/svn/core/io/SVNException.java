@@ -113,7 +113,7 @@ public class SVNException extends Exception {
     
     /**
      * Constructs an <code>SVNException</code> provided an <code>SVNError</code>
-     * instances that is used to store information of an error occured during a 
+     * instance that is used to store information of an error occured during a 
      * repository server's response to a client's command.
      * 
      * @param error		an error occured during a server's response
@@ -150,9 +150,9 @@ public class SVNException extends Exception {
     }
     
     /**
-     * Gets an error describing message provided for this object.
+     * Gets an error description message provided for this object.
      * 
-     * @return	exception description message
+     * @return	an exception description message
      */
     public String getMessage() {
         if (myErrors == null || myErrors.length == 0) {

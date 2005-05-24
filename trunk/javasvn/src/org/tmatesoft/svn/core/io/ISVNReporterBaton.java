@@ -27,9 +27,9 @@ public interface ISVNReporterBaton {
     /**
      * Used by an implementor to make reports about a working copy. 
      * 
-     * @param reporter 		a reporter to describe a working copy
-     * @throws 				SVNException
-     * @see					ISVNReporter 
+     * @param  reporter 		a reporter to describe a working copy
+     * @throws SVNException
+     * @see						ISVNReporter 
      */
     public void report(ISVNReporter reporter) throws SVNException;
 

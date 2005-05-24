@@ -41,9 +41,10 @@ public class SVNLocationEntry {
     }
     
     /**
-     * Get the file pathway (relative to the URL used to create {@link SVNRepository}).
+     * Get the file path (relative to the <code>URL</code> used to create 
+     * an {@link SVNRepository}).
      * 
-     * @return pathway in the repository.
+     * @return a file pathway in the repository.
      */
     public String getPath() {
         return myPath;
