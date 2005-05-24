@@ -7,7 +7,6 @@ import java.util.Date;
 
 
 /**
- * <p>
  * The public class <code>SVNLock</code> incapsulates information about a 
  * file lock in a repository. A Subversion repository user can lock any 
  * versioned file in a repository, thus preventing someone else from 

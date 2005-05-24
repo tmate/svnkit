@@ -22,6 +22,8 @@ import org.tmatesoft.svn.core.diff.ISVNDeltaConsumer;
  * the repository . 
  * 
  * <p>
+ * <b>In update-like operations:</b>
+ * <p>
  * When having the working copy revisions described to the server (by making reports
  * with the help of <code>ISVNReporter</code> from within 
  * {@link ISVNReporterBaton#report(ISVNReporter) ISVNReporterBaton.report()}) the
@@ -29,6 +31,12 @@ import org.tmatesoft.svn.core.diff.ISVNDeltaConsumer;
  * starts performing the client's requested operation. This means the server sends
  * commands to the client's Repository Access Layer which parses them and translates
  * to appropriate calls of <code>ISVNEditor</code>'s methods.
+ * 
+ * <p>
+ * <b>In a commit:</b>
+ * <p>
+ * A commit editor is used to describe a repository server all changes done against
+ * the BASE-revision of the working copy.
  * 
  * @version 1.0
  * @author  TMate Software Ltd.
@@ -207,10 +215,18 @@ public interface ISVNEditor extends ISVNDeltaConsumer {
     
     /**
      * Applies a text delta (if any) to the currently "opened" file which contents 
-     * differ from its origin in the repository.
+     * differ from its origin in the repository. To be sure that the delta will
+     * be applied correctly the server must make certain of the working copy file
+     * contents are the same which the delta was evaluated upon. So, the server
+     * transmits a checksum which the client side will compare with its own one 
+     * evaluated upon the file contents. If both match each other - the delta
+     * is applied, else - possibly file contents were corrupted, an exception is
+     * thrown. 
+     * 
+     * 
      *  
-     * @param  baseChecksum		
-     * @throws SVNException
+     * @param  baseChecksum		a server's checksum for the file to be modified
+     * @throws SVNException		server's and client's checksums differ
      */
     public void applyTextDelta(String baseChecksum) throws SVNException;
     
@@ -225,10 +241,15 @@ public interface ISVNEditor extends ISVNDeltaConsumer {
     
     /**
      * "Closes" the currently opened file fixing all changes in its properties
-     * and/or contents.
+     * and/or contents. If this file was applied any delta the server is to check
+     * if it was modified properly. It sends a checksum evaluated upon post-diffed
+     * file contents to the client's side where this checksum is compared with the
+     * one evaluated upon the working copy file contents. If they match each other
+     * then the file state is ok, otherwise its contents could have been possibly
+     * corrupted, an exception is thrown.
      * 
-     * @param  textChecksum
-     * @throws SVNException
+     * @param  textChecksum		a server's checksum for the modified file 
+     * @throws SVNException		server's and client's checksums differ
      */
     public void closeFile(String textChecksum) throws SVNException;
     

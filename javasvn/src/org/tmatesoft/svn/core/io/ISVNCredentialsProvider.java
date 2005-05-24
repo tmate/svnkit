@@ -18,10 +18,15 @@ package org.tmatesoft.svn.core.io;
  * Access Layer to authenticate them. 
  * 
  * <p>
- * Since a Subversion repository can be configured to demand a client's 
- * authentication to perform his request, the client in this case must provide
- * such information about himself (account name & password) else his request will
- * be denied.    
+ * When the server process receives a client request, it typically demands that the
+ * client identify itself. It issues an authentication challenge to the client, and
+ * the client responds by providing <b>credentials</b> back to the server. Once 
+ * authentication is complete, the server responds with the original information
+ * the client asked for. Notice that this system is different from systems like 
+ * <i>CVS</i>, where the client pre-emptively offers credentials 
+ * (“logs in”) to the server before ever making a request. In <i>Subversion</i>, 
+ * the server “pulls” credentials by challenging the client at the appropriate 
+ * moment, rather than the client “pushing” them. 
  * 
  * <p>
  * This interface implementation is supplied to an <code>SVNRepository</code>

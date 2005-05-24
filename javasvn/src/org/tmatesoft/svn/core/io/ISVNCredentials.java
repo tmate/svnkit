@@ -22,10 +22,6 @@ package org.tmatesoft.svn.core.io;
  * authentication information per one repository account (name/password) and provides
  * it via implemented methods.
  * 
- * <p>
- * Also clients' authentication credentials can be encrypted before being passed to
- * a repository server (see {@link ISVNSSHCredentials}). 
- * 
  * @version 1.0
  * @author  TMate Software Ltd.
  * @see 	ISVNCredentialsProvider
@@ -35,14 +31,14 @@ package org.tmatesoft.svn.core.io;
  */
 public interface ISVNCredentials {
 	/**
-	 * Gets a user account name.
+	 * Gets a user's account name.
 	 * 
 	 * @return user's name 
 	 */
 	public String getName();
 	
 	/**
-	 * Gets a user account password.
+	 * Gets a user's account password.
 	 * 
 	 * @return user's password
 	 */

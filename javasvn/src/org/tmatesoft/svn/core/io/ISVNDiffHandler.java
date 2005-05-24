@@ -17,6 +17,7 @@ import java.io.OutputStream;
 import org.tmatesoft.svn.core.diff.SVNDiffWindow;
 
 /**
+ * D
  * @version	1.0
  * @author 	TMate Software Ltd.
  */

@@ -45,17 +45,19 @@ public class SVNDirEntry {
     private long myFirstRevision;
     private Date myCreatedDate;
     private String myLastAuthor;
+    
     /**
-     * <p>
-     * The constructor.
-     * </p>
-     * @param name the entry name
-     * @param kind the node kind for the entry
-     * @param size the entry size in bytes
+     * Constructs an instance of <code>SVNDirEntry</code> given a directory entry's 
+     * name, kind, size, flag saying if it has properties, revision when it was last
+     * modified, creation date, and the name of a person who last modified it.
+     * 
+     * @param name 			the entry name
+     * @param kind 			the node kind for the entry
+     * @param size 			the entry size in bytes
      * @param hasProperties if the entry has properties
      * @param firstRevision the first revision of the entry
-     * @param createdDate the date the entry was created at
-     * @param lastAuthor the person who was the recent to update the entry
+     * @param createdDate 	the date the entry was created at
+     * @param lastAuthor 	the person who was the recent to update the entry
      */
     public SVNDirEntry(String name, SVNNodeKind kind, long size,
             		   boolean hasProperties, long firstRevision, Date createdDate,
@@ -68,89 +70,89 @@ public class SVNDirEntry {
         myCreatedDate = createdDate;
         myLastAuthor = lastAuthor;
     }
+    
     /**
-     * <p>
-     * Get the the directory entry name
-     * </p>
-     * @return entry name
+     * Gets the the directory entry name
+     * 
+     * @return 	the name of this entry
      */
     public String getName() {
         return myName;
     }
+    
     /**
-     * <p>
      * Retrieves the entry syze in bytes.
-     * </p>
-     * @return entry size
+     * 
+     * @return 	the size of this entry in bytes
      */
     public long size() {
         return mySize;
     }
+    
     /**
-     * <p>
      * Tells if the entry has any properties.
-     * </p>
-     * @return true if has, false otherwise
+     * 
+     * @return 	<code>true</code> if has, <code>false</code> - otherwise
      */
     public boolean hasProperties() {
         return myHasProperties;
     }
+    
     /**
-     * <p>
      * Retrieves the entry node kind - whether it's a directory or file, for instance.
-     * </p>
-     * @return  node kind 
-     * @see SVNNodeKind
+     * 
+     * @return  the node kind of this entry 
+     * @see 	SVNNodeKind
      */
     public SVNNodeKind getKind() {
         return myKind;
     }
+    
     /**
-     * <p>
-     * The date the entry was created at.
-     * </p>
-     * @return creation date
+     * Returns the date the entry was created at.
+     * 
+     * @return 	the creation date
      */
     public Date getDate() {
         return myCreatedDate;
     }
+    
     /**
-     * <p>
-     * Retrieves the first revision
-     * at which the entry appeared in the repository.
-     * </p>
-     * @return the repository number 
+     * Retrieves the revision
+     * at which the entry was last modified in the repository.
+     * 
+     * @return 	the last-modified revision number of this entry 
      */
     public long getRevision() {
         return myFirstRevision;
     }
+    
     /**
-     * <p>
      * Retrieves the name of the person who was the last to update
      * this entry in the repository.
-     * </p>
-     * @return the last author name.
+     * 
+     * @return 	the last author's name.
      */
     public String getAuthor() {
         return myLastAuthor;
     }
+    
     /**
-     * <p>
-     * Sets <code>name</code> for the entry. 
-     * </p>
-     * @param name directory entry name. 
+     * Sets a <code>name</code> for the entry. 
+     * 
+     * @param name 	a directory entry name. 
      */
     public void setName(String name) {
         myName = name;
     }
+    
     /**
-     * <p>
      * Represents the current <code>SVNDirEntry</code> object as a string
      * like this way: "name=MyFile.txt, kind=<file>, size=1024, 
      * hasProperties=true, creation-rev=1, lastAuthor=Eric, 
      * creation-date=2004.07.10 AD at 15:08:56 PDT".
-     * </p>
-     * @return string representation of this directory entry.
+     * 
+     * @return 	a string representation of this directory entry.
      */
     public String toString() {
         StringBuffer result = new StringBuffer();
