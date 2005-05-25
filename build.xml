@@ -239,7 +239,8 @@
                  windowtitle="JavaDoc :: Documentation :: Pure Java Subversion (SVN) Client Library"
                  breakiterator="yes"
         >
-            <packageset dir="javasvn/src">
+        	<link href="http://java.sun.com/j2se/1.4.2/docs/api/"/>
+        	<packageset dir="javasvn/src">
                 <include name="**" />
                 <exclude name="**/internal/**" />
             </packageset>
