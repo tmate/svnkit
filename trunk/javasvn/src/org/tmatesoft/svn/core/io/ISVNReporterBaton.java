@@ -14,9 +14,9 @@ package org.tmatesoft.svn.core.io;
 
 /**
  * This interface is provided when manipulating with a working copy (updating it,
- * getting its status, checking it out from a repository). Used to make reports
- * by calling appropriate methods of {@link ISVNReporter} to describe a working copy
- * entries (their revision numbers, locations, etc.)
+ * getting its status, checking it out from a repository). Used to make reports to a 
+ * repository server by calling appropriate methods of {@link ISVNReporter} to 
+ * describe revisions of working copy entries.
  * 
  * @version 1.0
  * @author 	TMate Software Ltd.
