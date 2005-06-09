@@ -93,6 +93,7 @@ import org.tmatesoft.svn.util.DebugLog;
  * @author 		TMate Software Ltd.
  * @see 		SVNRepositoryLocation
  * @see			SVNRepositoryFactory
+ * @see 		org.tmatesoft.svn.core.internal.io.dav.DAVRepositoryFactory
  */
 
 public abstract class SVNRepository {
@@ -184,6 +185,18 @@ public abstract class SVNRepository {
      * @return 	the repository root <code>URL</code>
      */
     public String getRepositoryRoot() {
+        try {
+            return getRepositoryRoot(false);
+        } catch (SVNException e) {
+            // will not be thrown.
+        }
+        return null;
+    }
+
+    public String getRepositoryRoot(boolean forceConnection) throws SVNException {
+        if (forceConnection && myRepositoryRoot == null) {
+            testConnection();
+        }
         return myRepositoryRoot;
     }
 
@@ -301,7 +314,7 @@ public abstract class SVNRepository {
      * @param  properties 	a <code>Map</code> instance to receive the revision 
      * 						properties
      * @return 				a hash map containing unversioned revision properties
-     * @throws SVNException if the <code>revision</code> number is invalid (&lt;0) or
+     * @throws SVNException if the <code>revision</code> number is invalid (&lt0) or
      * 						if there's no such <code>revision</code> at all.
      * 						Also if a failure in connection occured or the user 
      * 						authentication failed (see 
@@ -325,7 +338,7 @@ public abstract class SVNRepository {
      * 							to modify revision properties (it's done by default
      * 							when a repository is created) or an appropriate 
      * 							provided hook program (if any) failed;
-     * 							if <code>revision</code> is invalid (&lt;0) or doesn't 
+     * 							if <code>revision</code> is invalid (&lt0) or doesn't 
      * 							exist at all; if a failure in connection occured or the
      * 							user's authentification failed
      * 							(see {@link SVNAuthenticationException}).
@@ -343,7 +356,7 @@ public abstract class SVNRepository {
      * @param 	propertyName 	a property name
      * @return 					a revision property value or <code>null</code> if 
      * 							there's no such value
-     * @throws 	SVNException	if the <code>revision</code> number is invalid (&lt;0) or
+     * @throws 	SVNException	if the <code>revision</code> number is invalid (&lt0) or
      * 							if there's no such <code>revision</code> at all.
      * 							Also if a failure in connection occured or the user's 
      * 							authentication failed (see 
@@ -362,10 +375,7 @@ public abstract class SVNRepository {
      * @param  revision			a revision number which the <code>path</code> is under
      * @return 					the node kind for the given <code>path</code> at the given 
      * 							<code>revision</code>
-     * @throws SVNException  	if the <code>revision</code> number is invalid (&lt;0) or
-     * 							if there's no such <code>revision</code> at all. If there's
-     * 							no such <code>path</code> in that <code>revision</code>.
-     * 							Also if a failure in connection occured or the user's 
+     * @throws SVNException  	if a failure in connection occured or the user's 
      * 							authentication failed (see 
      * 							{@link SVNAuthenticationException}).
      */
@@ -393,7 +403,7 @@ public abstract class SVNRepository {
      * @param properties 		a map collection to receive the file properties
      * @param contents 			<code>OutputStream</code> to write the file contents to
      * @return 					the size of the file in bytes
-     * @throws SVNException		if the <code>revision</code> number is invalid (&lt;0) or
+     * @throws SVNException		if the <code>revision</code> number is invalid (&lt0) or
      * 							if there's no such <code>revision</code> at all. If 
      * 							there's	no such <code>path</code> in that 
      * 							<code>revision</code>. Also if a failure in connection 
@@ -416,10 +426,8 @@ public abstract class SVNRepository {
      * 						values. <code>properties</code> can be <code>null</code> 
      * 						when not interested in directory properties.
      * @param  handler 		a handler to process a next found directory entry
-     * @return 				the number of directory enries
-     * @throws SVNException	if the <code>revision</code> number is invalid (&lt;0) or
-     * 						if there's no such <code>revision</code> at all. If there's
-     * 						no such <code>path</code> in that <code>revision</code>.
+     * @return 				the revision of the directory
+     * @throws SVNException	If there's no such <code>path</code> in that <code>revision</code>.
      * 						Also if a failure in connection occured or the user's 
      * 						authentication failed (see 
      * 						{@link SVNAuthenticationException}).
@@ -588,8 +596,6 @@ public abstract class SVNRepository {
     }
     
     /**
-     * 
-     * revision and returns them as a <code>Collection</code> instance.
      * The same as {@link #getDir(String, long, Map, ISVNDirEntryHandler)} except for
      * it just collects all the directory entries found and returns them in a 
      * <code>Collection</code>.  
@@ -793,6 +799,7 @@ public abstract class SVNRepository {
      * @see 					ISVNEditor
 	 */
     public abstract void diff(String url, long revision, String target, boolean ignoreAncestry, boolean recursive, ISVNReporterBaton reporter, ISVNEditor editor) throws SVNException;
+    public abstract void diff(String url, long targetRevision, long revision, String target, boolean ignoreAncestry, boolean recursive, ISVNReporterBaton reporter, ISVNEditor editor) throws SVNException;
     
     /**
      * Asks the Repository Access (RA) Layer to update a working copy.
@@ -1003,7 +1010,7 @@ public abstract class SVNRepository {
     /**
      * Ask the Repository Access Layer to inform about an entry located at a 
      * <code>path</code> under a specified <code>revision</code>. If the 
-     * <code>revision</code> is invalid (&lt;0) it is assigned to the HEAD-revision 
+     * <code>revision</code> is invalid (&lt0) it is assigned to the HEAD-revision 
      * (the latest revision of the repository).
      * 
      * @param  path			an entry path (relative to a repository location path)
@@ -1026,7 +1033,7 @@ public abstract class SVNRepository {
 	 * {@link ISVNEditor#openRoot(long) ISVNEditor.openRoot(revision)}.
 	 * 
 	 * <p>
-	 * <code>locks</code>, if non-<code>null</code>, is a <code>Map</code> which
+	 * <code>locks</code>, if non-<code>null</code>, is a <code>Map<code> which
  	 * keys are locked paths in a working copy and each value for a key is a lock 
  	 * token (its identifier, in other words).  The server checks that the
  	 * correct token is provided for each committed, locked path. <code>locks</code> 
@@ -1252,7 +1259,7 @@ public abstract class SVNRepository {
     }
     
     /**
-     * Checks if the <code>revision</code> number is invalid (that is &lt;0); 
+     * Checks if the <code>revision</code> number is invalid (that is &lt 0); 
      * 
      * @param revision 		the revision number to be checked for invalidity.
      * @return 				<code>true</code> if <code>revision</code> is invalid,
@@ -1263,7 +1270,7 @@ public abstract class SVNRepository {
     }    
     
     /**
-     * Says if the <code>revision</code> number is valid (i.e. &gt; or == 0); 
+     * Says if the <code>revision</code> number is valid (i.e. &gt or == 0); 
      * 
      * @param revision 	the revision number to be checked for validity
      * @return 			<code>true</code> if valid, <code>false</code> otherwise
@@ -1289,7 +1296,7 @@ public abstract class SVNRepository {
     
     /**
      * This assertion method checks if the revision number can be assumed as valid.
-     * Note that only numbers &gt; or = 0 can be applied for revisioning! 
+     * Note that only numbers &gt or = 0 can be applied for revisioning! 
      * 
      * @param  revision 		the revision number to be checked for validity.  
      * @throws SVNException		

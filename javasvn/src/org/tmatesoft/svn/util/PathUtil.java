@@ -21,10 +21,17 @@ import java.util.StringTokenizer;
 import org.tmatesoft.svn.core.internal.ws.fs.FSUtil;
 
 /**
- * @author Alexander Kitaev
+ * @author TMate Software Ltd.
  */
 public class PathUtil {
-    
+    /**
+     * Determines if the path string contains no entry name. 
+     * 
+     * <p>
+     * That is if the path is one of the following: <code>null</code>, "" or "/".
+     * 
+     * @param path 	a path to be checked  
+     */
     public static final boolean isEmpty(String path) {
         return path == null || "".equals(path.trim()) || "/".equals(path.trim());
     }
@@ -53,6 +60,14 @@ public class PathUtil {
         return path + '/' + segment;
     }
     
+    /**
+     * Returns the substring that is the last entry from this path string without 
+     * leading or trailing slashes. For example, <code>tail(<i>"/some/path/"</i>)</code>
+     * will return <i>"path"</i>.
+     * 
+     * @param  path		a path string which last entry name is to be cut out
+     * @return			the entry name itself 
+     */
     public static String tail(String path) {
         path = removeTrailingSlash(path);
         int index = path.lastIndexOf('/');
@@ -80,7 +95,15 @@ public class PathUtil {
         }
         return path;
     }
-
+    
+    /**
+     * Removes the last trailing slash (if any) from the path string.
+     * For example, <code>removeTralingSlash(<i>"some/path/"</i>)</code> will return
+     * <i>"some/path"</i>.
+     * 
+     * @param  path		a path string 		
+     * @return			the same path string without the last '/'
+     */
     public static final String removeTrailingSlash(String path) {
         if (isEmpty(path)) {
             return path;

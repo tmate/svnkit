@@ -43,7 +43,7 @@ public class DAVEditorHandler extends BasicDAVDeltaHandler {
         buffer.append("<?xml version=\"1.0\" encoding=\"utf-8\"?>\n");
         buffer.append("<S:update-report send-all=\"true\" xmlns:S=\"svn:\">\n");
         buffer.append("<S:src-path>");
-        buffer.append(url);
+        buffer.append(DAVUtil.xmlEncode(url));
         buffer.append("</S:src-path>\n");
         if (targetRevision >= 0) {
             buffer.append("<S:target-revision>");
@@ -52,12 +52,12 @@ public class DAVEditorHandler extends BasicDAVDeltaHandler {
         }
         if (target != null) {
             buffer.append("<S:update-target>");
-            buffer.append(target);
+            buffer.append(DAVUtil.xmlEncode(target));
             buffer.append("</S:update-target>\n");
         }
         if (dstPath != null) {
             buffer.append("<S:dst-path>");
-            buffer.append(dstPath);
+            buffer.append(DAVUtil.xmlEncode(dstPath));
             buffer.append("</S:dst-path>\n");
         }
         if (!recurse) {
@@ -116,7 +116,7 @@ public class DAVEditorHandler extends BasicDAVDeltaHandler {
                     String linkedPath = repository.getPath();
                     DAVBaselineInfo info = DAVUtil.getBaselineInfo(connection, linkedPath, revision, false, false, null);
 
-                    String switchUrl = info.baselinePath;
+                    String switchUrl = PathUtil.decode(info.baselinePath);
                     DebugLog.log("REPORTING LINKED PATH: " + switchUrl);
                     report.append("linkpath=\"");
                     // switched path relative to connection root.
@@ -271,7 +271,7 @@ public class DAVEditorHandler extends BasicDAVDeltaHandler {
             }
             String value = cdata.toString();
             if ("base64".equals(myEncoding)) {
-                value = new String(Base64.base64ToByteArray(cdata, null));                
+                value = new String(Base64.base64ToByteArray(new StringBuffer(cdata.toString().trim()), null));                
             }
             if (isDir(myPath)) {
                 myEditor.changeDirProperty(myPropertyName, value);

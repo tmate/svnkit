@@ -28,6 +28,8 @@ import org.tmatesoft.svn.core.io.SVNException;
 import org.tmatesoft.svn.core.io.SVNNodeKind;
 import org.tmatesoft.svn.core.io.SVNRepository;
 import org.tmatesoft.svn.core.io.SVNRepositoryLocation;
+import org.tmatesoft.svn.core.wc.SVNRevision;
+import org.tmatesoft.svn.core.wc.SVNUpdateClient;
 import org.tmatesoft.svn.util.DebugLog;
 import org.tmatesoft.svn.util.PathUtil;
 import org.tmatesoft.svn.util.SVNUtil;
@@ -192,24 +194,15 @@ public class CopyCommand extends SVNCommand {
     private void runRemoteToLocal(final PrintStream out, PrintStream err) throws SVNException {
         final String srcURL = getCommandLine().getURL(0);
         String destPathParent = getCommandLine().getPathAt(0);
-        destPathParent = destPathParent.replace(File.separatorChar, '/');
-        if (matchTabsInPath(PathUtil.decode(srcURL), err) || matchTabsInPath(getCommandLine().getPathAt(0), err)) {
-            return;
+        long revNumber = parseRevision(getCommandLine(), null, null);
+        SVNRevision revision = SVNRevision.HEAD;
+        if (revNumber >= 0) {
+            revision = SVNRevision.create(revNumber);
         }
-
-        long revision = -1;
-        if (getCommandLine().hasArgument(SVNArgument.REVISION)) {
-            String revStr = (String) getCommandLine().getArgumentValue(SVNArgument.REVISION);
-            revision = Long.parseLong(revStr);
-        }
-        DebugLog.log("workspace id is : " + destPathParent);
-        final ISVNWorkspace ws = createWorkspace(destPathParent);
-        DebugLog.log("workspace root is : " + ws.getID());
-        String wsPath = SVNUtil.getWorkspacePath(ws, destPathParent);
-        DebugLog.log("workspace path is : " + wsPath);
-        ws.copy(SVNRepositoryLocation.parseURL(srcURL), wsPath, revision);
+        SVNUpdateClient updater = new SVNUpdateClient(getCredentialsProvider(), new SVNCommandEventProcessor(out, err, true));
+        updater.doCopy(srcURL, new File(destPathParent), revision);
     }
-
+    
     private void runLocalToRemote(final PrintStream out, PrintStream err) throws SVNException {
         final String dstURL = getCommandLine().getURL(0);
         String srcPath = getCommandLine().getPathAt(0);

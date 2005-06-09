@@ -187,7 +187,7 @@ public class SVNCommitUtil {
                     ISVNEntry child = (ISVNEntry) children.next();
                     DebugLog.log("HV: processing " + entryPath + " => collecting child: " + child.getPath() );
                     long childRevision = SVNProperty.longValue(child.getPropertyValue(SVNProperty.REVISION));
-                    if (copy) {
+                    if (copy && child.getPropertyValue(SVNProperty.COPIED) != null) {
                         DebugLog.log("HV: processing unmodified copied child " + child.getPath() );
                         if (child.getPropertyValue(SVNProperty.COPYFROM_URL) == null) { 
                             String parentCopyFromURL = root.getPropertyValue(SVNProperty.COPYFROM_URL);
@@ -384,6 +384,7 @@ public class SVNCommitUtil {
                     child.setPropertyValue(SVNProperty.COMMITTED_REVISION, null);
                     editor.openFile(childPath, revision);
                     child.sendChangedProperties(editor);
+                    DebugLog.log("contents modified: " + child.asFile().isContentsModified());
                     if (child.asFile().isContentsModified()) {
                         digest = child.asFile().generateDelta(editor);
                     }

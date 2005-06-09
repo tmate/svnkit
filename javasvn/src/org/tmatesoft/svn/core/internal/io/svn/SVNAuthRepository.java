@@ -292,7 +292,9 @@ public class SVNAuthRepository extends SVNRepository {
         while(true) {
             try {
                 myDelegate.setCredentials(credentials);
+                DebugLog.log("calling update");
                 myDelegate.update(revision, target, recursive, reporter, editor);
+                DebugLog.log("called");
                 accept(provider, credentials);
                 return;
             } catch (SVNAuthenticationException e) {
@@ -443,6 +445,22 @@ public class SVNAuthRepository extends SVNRepository {
             try {
                 myDelegate.setCredentials(credentials);
                 return myDelegate.info(path, revision);
+            } catch (SVNAuthenticationException e) {
+                notAccept(provider, credentials, e.getMessage());
+                credentials = nextCredentials(provider, e.getMessage());
+            }
+        }
+    }
+
+    public void diff(String url, long targetRevision, long revision, String target, boolean ignoreAncestry, boolean recursive, ISVNReporterBaton reporter, ISVNEditor editor) throws SVNException {
+        ISVNCredentials credentials = null;
+        ISVNCredentialsProvider provider = initProvider();
+        while(true) {
+            try {
+                myDelegate.setCredentials(credentials);
+                myDelegate.diff(url, targetRevision, revision, target, ignoreAncestry, recursive, reporter, editor);
+                accept(provider, credentials);
+                return;
             } catch (SVNAuthenticationException e) {
                 notAccept(provider, credentials, e.getMessage());
                 credentials = nextCredentials(provider, e.getMessage());

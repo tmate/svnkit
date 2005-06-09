@@ -49,6 +49,8 @@ public class SVNProperty {
     public static final String CONFLICT_WRK = SVN_ENTRY_PREFIX + "conflict-wrk";
     public static final String PROP_REJECT_FILE = SVN_ENTRY_PREFIX + "prop-reject-file";
     public static final String DELETED = SVN_ENTRY_PREFIX + "deleted";
+    public static final String ABSENT = SVN_ENTRY_PREFIX + "absent";
+    public static final String INCOMPLETE = SVN_ENTRY_PREFIX + "incomplete";
     public static final String CORRUPTED = SVN_ENTRY_PREFIX + "corrupted";
     public static final String WC_URL = SVN_WC_PREFIX + "ra_dav:version-url";
     
@@ -115,6 +117,20 @@ public class SVNProperty {
     }
     public static String toString(long i) {
         return Long.toString(i);
+    }
+    
+    public static String shortPropertyName(String longName) {
+        if (longName == null) {
+            return null;
+        }
+        if (longName.startsWith(SVNProperty.SVN_ENTRY_PREFIX)) {
+            return longName.substring(SVNProperty.SVN_ENTRY_PREFIX.length());
+        } else if (longName.startsWith(SVNProperty.SVN_WC_PREFIX)) {
+            return longName.substring(SVNProperty.SVN_WC_PREFIX.length());
+        } else if (longName.startsWith(SVNProperty.SVN_PREFIX)) {
+            return longName.substring(SVNProperty.SVN_PREFIX.length());
+        }
+        return longName;
     }
     
 }

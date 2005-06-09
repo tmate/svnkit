@@ -20,6 +20,7 @@ import java.util.Map;
 import java.util.Set;
 
 import org.tmatesoft.svn.core.io.SVNException;
+import org.tmatesoft.svn.core.wc.SVNRevision;
 import org.tmatesoft.svn.util.DebugLog;
 import org.tmatesoft.svn.util.SVNAssert;
 
@@ -34,6 +35,8 @@ public class SVNCommandLine {
     private List myPaths;
     private List myURLs;
     private List myPathURLs;
+    private List myPegRevisions;
+    private List myPegPathRevisions;
 
     public SVNCommandLine(String[] commandLine) throws SVNException {
         init(commandLine);
@@ -79,6 +82,16 @@ public class SVNCommandLine {
         return (String) myURLs.get(index);
     }
     
+    public SVNRevision getPegRevision(int index) {
+        String rev = (String) myPegRevisions.get(index);
+        return SVNRevision.parse(rev);
+    }
+
+    public SVNRevision getPathPegRevision(int index) {
+        String rev = (String) myPegPathRevisions.get(index);
+        return SVNRevision.parse(rev);
+    }
+    
     public void setURLAt(int index, String url) {
         if (index >= myURLs.size()) {
             myURLs.add(url);
@@ -109,6 +122,8 @@ public class SVNCommandLine {
         myPaths = new ArrayList();
         myURLs = new ArrayList();
         myPathURLs = new ArrayList();
+        myPegRevisions = new ArrayList();
+        myPegPathRevisions = new ArrayList();
 
         SVNArgument previousArgument = null;
         String previousArgumentName = null;
@@ -171,14 +186,18 @@ public class SVNCommandLine {
                 if (myCommandName == null) {
                     myCommandName = argument;
                 } else {
+                    String pegRevision = SVNRevision.UNDEFINED.toString();
                     if (argument.indexOf('@') > 0) {
-                        argument = argument.substring(0, argument.indexOf('@'));
+                        pegRevision = argument.substring(argument.lastIndexOf('@') + 1);
+                        argument = argument.substring(0, argument.lastIndexOf('@'));
                     }
                     myPathURLs.add(argument);
                     if (argument.indexOf("://") >= 0) {
                         myURLs.add(argument);
+                        myPegRevisions.add(pegRevision);
                     } else {
                         myPaths.add(argument);
+                        myPegPathRevisions.add(pegRevision);
                     }
                 }
             }
@@ -192,6 +211,10 @@ public class SVNCommandLine {
             myPaths.add(".");
             myPathURLs.add(".");
         }
+    }
+    
+    public boolean isURL(String url) {
+        return url != null && url.indexOf("://") >= 0;
     }
 
     public boolean isPathURLBefore(String pathURL1, String pathURL2) {

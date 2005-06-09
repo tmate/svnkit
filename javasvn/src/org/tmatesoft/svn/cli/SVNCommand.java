@@ -22,14 +22,18 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Locale;
 import java.util.Map;
+import java.util.StringTokenizer;
 
 import org.tmatesoft.svn.core.ISVNWorkspace;
 import org.tmatesoft.svn.core.SVNProperty;
 import org.tmatesoft.svn.core.SVNStatus;
+import org.tmatesoft.svn.core.io.ISVNCredentialsProvider;
 import org.tmatesoft.svn.core.io.SVNException;
 import org.tmatesoft.svn.core.io.SVNRepository;
 import org.tmatesoft.svn.core.io.SVNRepositoryFactory;
 import org.tmatesoft.svn.core.io.SVNRepositoryLocation;
+import org.tmatesoft.svn.core.wc.SVNOptions;
+import org.tmatesoft.svn.core.wc.SVNRevision;
 import org.tmatesoft.svn.util.DebugLog;
 import org.tmatesoft.svn.util.PathUtil;
 import org.tmatesoft.svn.util.SVNUtil;
@@ -62,6 +66,16 @@ public abstract class SVNCommand {
     protected ISVNWorkspace createWorkspace(String absolutePath) throws SVNException {
         return createWorkspace(absolutePath, true);
     }
+    
+    protected SVNOptions getOptions() {
+        String dir = (String) getCommandLine().getArgumentValue(SVNArgument.CONFIG_DIR);
+        if (dir == null) {
+            return new SVNOptions();
+        }
+        DebugLog.log("creating options for: " + new File(dir, "config"));
+        DebugLog.log("exists: " + new File(dir, "config").exists());
+        return new SVNOptions(new File(dir, "config"));
+    }
 
     protected ISVNWorkspace createWorkspace(String absolutePath, boolean root) throws SVNException {
         ISVNWorkspace ws = SVNUtil.createWorkspace(absolutePath, root);
@@ -75,6 +89,10 @@ public abstract class SVNCommand {
         repository.setCredentialsProvider(new SVNCommandLineCredentialsProvider(myUserName, myPassword, myIsStoreCreds));
         //repository.setCredentialsProvider(new SVNSimpleCredentialsProvider(myUserName, myPassword));
         return repository;
+    }
+    
+    protected ISVNCredentialsProvider getCredentialsProvider() {
+        return new SVNCommandLineCredentialsProvider(myUserName, myPassword, myIsStoreCreds);
     }
 
     public static SVNCommand getCommand(String name) {
@@ -147,6 +165,15 @@ public abstract class SVNCommand {
         return -1;
     }
     
+    protected final static SVNRevision parseRevision(SVNCommandLine commandLine) throws SVNException {
+        if (commandLine.hasArgument(SVNArgument.REVISION)) {
+            final String revStr = (String) commandLine.getArgumentValue(SVNArgument.REVISION);
+            DebugLog.log("parsing revision: " + revStr);
+            return SVNRevision.parse(revStr);
+        }
+        return SVNRevision.UNDEFINED;        
+    }
+    
     protected final static long getRevisionNumber(String rev, String path, ISVNWorkspace ws, SVNRepository repository) throws SVNException {
         if (rev == null) {
             return -2;
@@ -196,12 +223,12 @@ public abstract class SVNCommand {
         
     }
 
-    protected final static void println(PrintStream out, String line) {
+    public final static void println(PrintStream out, String line) {
         out.println(line);
         DebugLog.log(line);
     }
 
-    protected final static void println(PrintStream out) {
+    public final static void println(PrintStream out) {
         out.println();
         DebugLog.log("");
     }
@@ -212,6 +239,45 @@ public abstract class SVNCommand {
             return true;
         }
         return false;
+    }
+
+    public static String getPath(File file) {
+        String path = "";
+        String rootPath = "";
+        path = file.getAbsolutePath();
+        rootPath = new File("").getAbsolutePath();
+        path = path.replace(File.separatorChar, '/');
+        rootPath = rootPath.replace(File.separatorChar, '/');
+        if (path.startsWith(rootPath)) {
+            path = path.substring(rootPath.length());
+        }
+        // remove all "./"
+        path = condensePath(path);
+        path = PathUtil.removeLeadingSlash(path);
+        path = PathUtil.removeTrailingSlash(path);
+        path = path.replace('/', File.separatorChar);
+        if (path.trim().length() == 0) {
+        	path = ".";
+        }
+        return path;
+    }
+
+    private static String condensePath(String path) {
+        StringBuffer result = new StringBuffer();
+        for(StringTokenizer tokens = new StringTokenizer(path, "/", true); tokens.hasMoreTokens();) {
+            String token = tokens.nextToken();
+            if (".".equals(token)) {
+                if (tokens.hasMoreTokens()) {
+                    String nextToken = tokens.nextToken();
+                    if (!nextToken.equals("/")) {
+                        result.append(nextToken);
+                    }
+                }
+                continue;
+            }
+            result.append(token);
+        }
+        return result.toString();
     }
 
     static {
@@ -240,6 +306,9 @@ public abstract class SVNCommand {
         ourCommands.put(new String[] { "log" }, "org.tmatesoft.svn.cli.command.LogCommand");
         ourCommands.put(new String[] { "switch", "sw" }, "org.tmatesoft.svn.cli.command.SwitchCommand");
         ourCommands.put(new String[] { "diff", "di" }, "org.tmatesoft.svn.cli.command.DiffCommand");
+        ourCommands.put(new String[] { "merge" }, "org.tmatesoft.svn.cli.command.MergeCommand");
+        ourCommands.put(new String[] { "export" }, "org.tmatesoft.svn.cli.command.ExportCommand");
+        ourCommands.put(new String[] { "cleanup" }, "org.tmatesoft.svn.cli.command.CleanupCommand");
 
         ourCommands.put(new String[] { "lock" }, "org.tmatesoft.svn.cli.command.LockCommand");
         ourCommands.put(new String[] { "unlock" }, "org.tmatesoft.svn.cli.command.UnlockCommand");

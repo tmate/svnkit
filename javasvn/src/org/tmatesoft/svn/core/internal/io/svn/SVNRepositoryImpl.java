@@ -398,14 +398,19 @@ public class SVNRepositoryImpl extends SVNRepository implements ISVNReporter {
         }
     }
 
-    public void diff(String url, long revision, String target, boolean ignoreAncestry, boolean recursive, ISVNReporterBaton reporter, ISVNEditor editor)
+    public void diff(String url, long revision, String target, boolean ignoreAncestry, boolean recursive, ISVNReporterBaton reporter, ISVNEditor editor) throws SVNException {
+        diff(url, revision, revision, target, ignoreAncestry, recursive, reporter, editor);
+    }
+    
+
+    public void diff(String url, long tRevision, long revision, String target, boolean ignoreAncestry, boolean recursive, ISVNReporterBaton reporter, ISVNEditor editor)
             throws SVNException {
         target = target == null ? "" : target;
         url = getCanonicalURL(url);
         if (url == null) {
             throw new SVNException(url + ": not valid URL");
         }
-        Object[] buffer = new Object[] { "diff", getRevisionObject(revision), target, Boolean.valueOf(ignoreAncestry), Boolean.valueOf(recursive), url };
+        Object[] buffer = new Object[] { "diff", getRevisionObject(tRevision), target, Boolean.valueOf(recursive), Boolean.valueOf(ignoreAncestry), url };
         try {
             openConnection();
             write("(w((n)swws))", buffer);
