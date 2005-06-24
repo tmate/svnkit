@@ -17,6 +17,8 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.tmatesoft.svn.core.SVNProperty;
 import org.tmatesoft.svn.core.internal.io.dav.handlers.DAVDateRevisionHandler;
@@ -545,6 +547,21 @@ class DAVRepository extends SVNRepository {
         } finally {
             closeConnection();
         }
+    }
+
+    public SVNLock[] setLocks(String[] paths, String comment, boolean force, long[] revisions) throws SVNException {
+        List locks = new ArrayList(paths.length);
+        for (int i = 0; i < paths.length; i++) {
+            SVNLock lock = null;
+            try {
+                lock = setLock(paths[i], comment, force, revisions[i]);
+            } catch (SVNException e) {
+                //
+            }
+            locks.set(i, lock);
+
+        }
+        return (SVNLock[]) locks.toArray(new SVNLock[locks.size()]);
     }
 
     public void removeLock(String path, String id, boolean force) throws SVNException {

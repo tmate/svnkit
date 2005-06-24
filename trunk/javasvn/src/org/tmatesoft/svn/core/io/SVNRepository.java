@@ -1146,7 +1146,9 @@ public abstract class SVNRepository {
      * @since 						SVN 1.2
      */
     public abstract SVNLock setLock(String path, String comment, boolean force, long revision) throws SVNException;
-    
+
+    public abstract SVNLock[] setLocks(String[] paths, String comment, boolean force, long[] revisions) throws SVNException;
+
     /**
 	 * Removes the repository lock for the file located at the <code>path</code>.
 	 * The lock is identified by its token.
