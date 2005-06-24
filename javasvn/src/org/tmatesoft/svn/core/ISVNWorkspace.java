@@ -165,6 +165,8 @@ public interface ISVNWorkspace {
     
     public SVNLock lock(String path, String comment, boolean force) throws SVNException;
 
+    public SVNLock[] lock(String[] paths, String comment, boolean force) throws SVNException;
+
     public void unlock(String path, boolean force) throws SVNException;
     
     public void relocate(SVNRepositoryLocation oldLocation, SVNRepositoryLocation newLocation, String path, boolean recursive) throws SVNException;

@@ -18,6 +18,8 @@ import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.tmatesoft.svn.core.SVNProperty;
 import org.tmatesoft.svn.core.diff.SVNDiffWindow;
@@ -510,6 +512,30 @@ public class SVNRepositoryImpl extends SVNRepository implements ISVNReporter {
         } finally {
             closeConnection();
         }
+    }
+
+    public SVNLock[] setLocks(String[] paths, String comment, boolean force, long[] revisions) throws SVNException {
+        List createdLocks = new ArrayList(paths.length);
+        try {
+            openConnection();
+
+            Object[] request = new Object[] { "lock", null, comment, Boolean.valueOf(force), null};
+            Object[] result = new Object[1];
+            for (int i = 0; i < paths.length; i++) {
+                String path = paths[i];
+                path = getRepositoryPath(path);
+                request[1] = path;
+                request[4] = getRevisionObject(revisions[i]);
+                write("(w(s(s)w(n)))", request);
+                authenticate();
+                result[0] = null;
+                result = read("[(L)]", result);
+                createdLocks.set(i, result[0]);
+            }
+        } finally {
+            closeConnection();
+        }
+        return (SVNLock[]) createdLocks.toArray(new SVNLock[createdLocks.size()]);
     }
 
     public void removeLock(String path, String id, boolean force) throws SVNException {
