@@ -62,6 +62,10 @@ public class FSDirEntry extends FSEntry implements ISVNDirectoryEntry {
         }
     }
     
+    public File getIOFile() {
+        return getRootEntry().getWorkingCopyFile(this);
+    }
+    
     public ISVNEntry getChild(String name) throws SVNException {
         loadEntries();
         return (ISVNEntry) myChildren.get(name);
@@ -129,8 +133,6 @@ public class FSDirEntry extends FSEntry implements ISVNDirectoryEntry {
     }
 
     public boolean isScheduledForAddition() throws SVNException {
-        File file = getRootEntry().getWorkingCopyFile(this);
-        boolean missing = !FSUtil.isFileOrSymlinkExists(file);
         if (!isMissing() || getRootEntry() == this) {
             return super.isScheduledForAddition();
         }

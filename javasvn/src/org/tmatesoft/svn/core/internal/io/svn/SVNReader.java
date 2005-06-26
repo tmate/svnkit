@@ -187,6 +187,7 @@ class SVNReader {
         StringBuffer template = normalizeTemplate(templateStr);
         SVNEditModeReader editorBaton = null;
         int targetIndex = 0;
+        boolean unconditionalThrow = false;
         for(int i = 0; i < template.length(); i++) {
             char ch = template.charAt(i);
             boolean optional = ch == '?' || ch == '*';
@@ -279,9 +280,13 @@ class SVNReader {
                                 readChar(is2, ')');
                                 readChar(is2, ')');
                             } catch (IOException e1) {
-                            } catch (SVNException e2) {}
+                                //
+                            } catch (SVNException e2) {
+                                //
+                            }
                         }
-                        throw new SVNException("svnserve reported an error", (SVNError[]) errors.toArray(new SVNError[errors.size()]));
+                        String message = errors.isEmpty() ? "svnserver reported an error" : "svn: " + ((SVNError) errors.get(0)).getMessage();
+                        throw new SVNException(message);
                     } else if (!"success".equals(word)) {
                         throw new SVNException("network data doesn't match template, 'success' or 'failure' expected, '" + word + "' read");
                     }
@@ -306,6 +311,7 @@ class SVNReader {
                     try {
                         hasMore = editorBaton.processCommand(commandName, is);
                     } catch (Throwable th) {
+                    	unconditionalThrow = true;
                         DebugLog.error(th);
                         if (th instanceof SVNException) {
                             throw ((SVNException) th);
@@ -335,9 +341,13 @@ class SVNReader {
                     targetIndex++;
                 }
             } catch(SVNException e) {
+            	if (unconditionalThrow) {
+            		throw e;
+            	}
                 try {
                     is.reset();
                 } catch (IOException e1) {
+                    //
                 }
                 if (optional) {
                     if (doRead) {
@@ -398,10 +408,12 @@ class SVNReader {
 	            }
 	            out.flush();
             } catch (IOException e) {
+                //
             } finally {
                 try {
                     while(in.read() >= 0) {}
                 } catch (IOException e1) {
+                    //
                 }
             }
         }

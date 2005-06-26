@@ -12,16 +12,19 @@
 
 package org.tmatesoft.svn.core.internal.io.svn;
 
-import java.io.BufferedInputStream;
-import java.io.IOException;
-import java.util.List;
-
 import org.tmatesoft.svn.core.io.ISVNCredentials;
-import org.tmatesoft.svn.core.io.SVNAuthenticationException;
 import org.tmatesoft.svn.core.io.SVNException;
+import org.tmatesoft.svn.core.io.SVNRepositoryLocation;
+import org.tmatesoft.svn.core.io.SVNCancelException;
+import org.tmatesoft.svn.core.wc.ISVNAuthenticationManager;
+import org.tmatesoft.svn.core.wc.SVNAuthentication;
 import org.tmatesoft.svn.util.DebugLog;
 import org.tmatesoft.svn.util.LoggingInputStream;
 import org.tmatesoft.svn.util.LoggingOutputStream;
+
+import java.io.BufferedInputStream;
+import java.io.IOException;
+import java.util.List;
 
 /**
  * @author Alexander Kitaev
@@ -29,6 +32,10 @@ import org.tmatesoft.svn.util.LoggingOutputStream;
 class SVNConnection {
 
     private final ISVNConnector myConnector;
+    private ISVNAuthenticationManager myAuthManager;
+    private SVNRepositoryLocation myLocation;
+    private String myRealm;
+    private String myRoot;
 
     private LoggingOutputStream myOutputStream;
     private LoggingInputStream myInputStream;
@@ -38,14 +45,20 @@ class SVNConnection {
     private static final String STEP = "step";
     private static final String EDIT_PIPELINE = "edit-pipeline";
 
-    public SVNConnection(ISVNConnector connector) {
+    public SVNConnection(ISVNConnector connector, SVNRepositoryLocation location, ISVNAuthenticationManager manager) {
         myConnector = connector;
+        myAuthManager = manager;
+        myLocation = location;
     }
 
     public void open(SVNRepositoryImpl repository) throws SVNException {
         myIsCredentialsReceived = false;
         myConnector.open(repository);
         handshake(repository);
+    }
+
+    public String getRealm() {
+        return myRealm;
     }
 
     protected void handshake(SVNRepositoryImpl repository) throws SVNException {
@@ -59,62 +72,84 @@ class SVNConnection {
     private boolean myIsCredentialsReceived = false;
 
     public void authenticate(SVNRepositoryImpl repository, ISVNCredentials credentials) throws SVNException {
+        // use provider to get creds.
         String failureReason = null;
         Object[] items = read("[((*W)?S)]", null);
         List mechs = SVNReader.getList(items, 0);
+        myRealm = SVNReader.getString(items, 1);
         if (mechs == null || mechs.size() == 0) {
             return;
         }
+        SVNAuthentication auth = null;
         for (int i = 0; i < mechs.size(); i++) {
             String mech = (String) mechs.get(i);
             if ("EXTERNAL".equals(mech)) {
-                write("(w(s))", new Object[] { mech, credentials.getName()});
+                write("(w(s))", new Object[] { mech, repository.getExternalUserName()});
                 failureReason = readAuthResponse(repository);
                 if (failureReason == null) {
                     return;
                 }
-            } else if ("ANONYMOUS".equals(mech)) { 
+            } else if ("ANONYMOUS".equals(mech)) {
                 write("(w())", new Object[] { mech });
                 failureReason = readAuthResponse(repository);
                 if (failureReason == null) {
                     return;
                 }
             } else if ("CRAM-MD5".equals(mech)) {
-                CramMD5 authenticator = new CramMD5();
-                if (credentials == null) {
-                    throw new SVNAuthenticationException("authentication failed, no credentials");
-                }
-                write("(w())", new Object[] { mech });
-                while (true) {
-                    authenticator.setUserCredentials(credentials);
-                    items = read("(W(?B))", null);
-                    if (SUCCESS.equals(items[0])) {
-                        // should it be here?
-                        if (!myIsCredentialsReceived) {
-                            Object[] creds = read("[(S?S)]", null);
-                            if (creds != null && creds.length == 2 && creds[0] != null && creds[1] != null) {
-                                repository.updateCredentials((String) creds[0], (String) creds[1]);
+                while(true) {
+                    CramMD5 authenticator = new CramMD5();
+                    String realm = getRealm();
+                    if (myLocation != null) {
+                        realm = "<" + myLocation.getProtocol() + "://" + myLocation.getHost() + ":" + myLocation.getPort() + "> " + realm;
+                    }
+                    if (auth == null && myAuthManager != null) {
+                        auth = myAuthManager.getFirstAuthentication(ISVNAuthenticationManager.PASSWORD, realm);
+                    } else if (myAuthManager != null) {
+                        auth = myAuthManager.getNextAuthentication(ISVNAuthenticationManager.PASSWORD, realm);
+                    }
+                    if (auth == null || auth.getUserName() == null || auth.getPassword() == null) {
+                        failureReason = "no credentials for '" + mech + "'";
+                        break;
+                    }
+                    write("(w())", new Object[] { mech });
+                    while (true) {
+                        authenticator.setUserCredentials(auth);
+                        items = read("(W(?B))", null);
+                        if (SUCCESS.equals(items[0])) {
+                            // should it be here?
+                            if (!myIsCredentialsReceived) {
+                                Object[] creds = read("[(S?S)]", null);
+                                if (creds != null && creds.length == 2 && creds[0] != null && creds[1] != null) {
+                                    repository.updateCredentials((String) creds[0], (String) creds[1]);
+                                    if (myRealm == null) {
+                                        myRealm = (String) creds[0];
+                                    }
+                                }
+                                myIsCredentialsReceived = true;
                             }
-                            myIsCredentialsReceived = true;
-                        }
-                        return;
-                    } else if (FAILURE.equals(items[0])) {
-                        failureReason = new String((byte[]) items[1]);
-                        throw new SVNAuthenticationException("authentication failed: " + failureReason);
-                    } else if (STEP.equals(items[0])) {
-                        byte[] response = authenticator.buildChallengeReponse((byte[]) items[1]);
-                        try {
-                            getOutputStream().write(response);
-                        } catch (IOException e) {
-                            throw new SVNException(e);
-                        } finally {
-		                        getOutputStream().log();
+                            myAuthManager.addAuthentication(realm, auth, myAuthManager.isAuthStorageEnabled());
+                            return;
+                        } else if (FAILURE.equals(items[0])) {
+                            failureReason = new String((byte[]) items[1]);
+                            break;
+                        } else if (STEP.equals(items[0])) {
+                            byte[] response = authenticator.buildChallengeReponse((byte[]) items[1]);
+                            try {
+                                getOutputStream().write(response);
+                            } catch (IOException e) {
+                                throw new SVNException(e);
+                            } finally {
+                                getOutputStream().log();
+                            }
                         }
                     }
                 }
             } else {
                 failureReason = mech + " authorization requested, but not supported";
             }
+        }
+        if (auth == null) {
+            throw new SVNCancelException();
         }
         throw new SVNException(failureReason);
     }
@@ -126,6 +161,12 @@ class SVNConnection {
                 Object[] creds = read("[(?S?S)]", null);
                 if (repository != null && repository.getRepositoryRoot() == null) {
                     repository.updateCredentials((String) creds[0], (String) creds[1]);
+                }
+                if (myRealm == null) {
+                    myRealm = (String) creds[0];
+                }
+                if (myRoot == null) {
+                    myRoot = (String) creds[1];
                 }
                 myIsCredentialsReceived = true;
             }
@@ -155,8 +196,10 @@ class SVNConnection {
 		    try {
 				getOutputStream().flush();
 			} catch (IOException e) {
-			} catch (SVNException e) {
-			}
+                //
+            } catch (SVNException e) {
+                //
+            }
 		    getOutputStream().log();
         }
     }

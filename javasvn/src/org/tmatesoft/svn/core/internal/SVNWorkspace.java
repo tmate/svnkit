@@ -52,6 +52,7 @@ import org.tmatesoft.svn.core.io.ISVNCredentialsProvider;
 import org.tmatesoft.svn.core.io.ISVNEditor;
 import org.tmatesoft.svn.core.io.ISVNLogEntryHandler;
 import org.tmatesoft.svn.core.io.ISVNReporterBaton;
+import org.tmatesoft.svn.core.io.ISVNWorkspaceMediator;
 import org.tmatesoft.svn.core.io.SVNCommitInfo;
 import org.tmatesoft.svn.core.io.SVNError;
 import org.tmatesoft.svn.core.io.SVNException;
@@ -718,7 +719,43 @@ public class SVNWorkspace implements ISVNWorkspace {
         repository.setCredentialsProvider(getCredentialsProvider());
         DebugLog.log("IMPORT: REPOSITORY CREATED FOR: "
                 + destination.toString());
-        ISVNEditor editor = repository.getCommitEditor(message, getRoot());
+        ISVNEditor editor = repository.getCommitEditor(message, new ISVNWorkspaceMediator() {
+            private Map myTmpFiles = new HashMap(); 
+            public String getWorkspaceProperty(String path, String name) throws SVNException {
+                return null;
+            }
+            public void setWorkspaceProperty(String path, String name, String value) throws SVNException {
+            }
+
+            public OutputStream createTemporaryLocation(String path, Object id) throws IOException {
+                File tmpFile = File.createTempFile("javasvn.", ".tmp");
+                myTmpFiles.put(id, tmpFile);
+                tmpFile.deleteOnExit();                
+                return new FileOutputStream(tmpFile);
+            }
+            public InputStream getTemporaryLocation(Object id) throws IOException {
+                File file = (File) myTmpFiles.get(id);
+                if (file != null) {
+                    return new FileInputStream(file);
+                }
+                return null;
+            }
+            public long getLength(Object id) throws IOException {
+                File file = (File) myTmpFiles.get(id);
+                if (file != null) {
+                    return file.length();
+                }
+                return 0;
+            }
+            public void deleteTemporaryLocation(Object id) {
+                File file = (File) myTmpFiles.remove(id);
+                if (file != null) {
+                    file.delete();
+                }
+            }
+            public void deleteAdminFiles(String path) {
+            }
+        });
         SVNCommitInfo info = null;
         try {
             String dir = "";
@@ -959,6 +996,11 @@ public class SVNWorkspace implements ISVNWorkspace {
 
     public long commitPaths(List paths, String message, boolean keepLocks,
             ISVNProgressViewer progressViewer) throws SVNException {
+        return commitPaths(paths, message, keepLocks, true, progressViewer);
+    }
+
+    public long commitPaths(List paths, String message, boolean keepLocks, boolean recursive,
+            ISVNProgressViewer progressViewer) throws SVNException {
         long start = System.currentTimeMillis();
         try {
             final Set modified = new HashSet();
@@ -1095,7 +1137,7 @@ public class SVNWorkspace implements ISVNWorkspace {
                     && !entry.isMissing() && entry.isDirectory()) {
                 ISVNEntry child = entry.asDirectory().scheduleForAddition(name,
                         mkdir, recurse);
-                doApplyAutoProperties(child, recurse);
+                doApplyAutoProperties(child.getPath(), child, recurse);
                 fireEntryModified(child, SVNStatus.ADDED, true);
                 entry.save();
                 entry.dispose();
@@ -1109,15 +1151,15 @@ public class SVNWorkspace implements ISVNWorkspace {
         }
     }
 
-    private void doApplyAutoProperties(ISVNEntry addedEntry, boolean recurse)
+    private void doApplyAutoProperties(String commitPath, ISVNEntry addedEntry, boolean recurse)
             throws SVNException {
-        applyAutoProperties(addedEntry, null);
+        applyAutoProperties(commitPath, addedEntry, null);
         if (recurse && addedEntry.isDirectory()) {
             for (Iterator children = addedEntry.asDirectory().childEntries(); children
                     .hasNext();) {
                 ISVNEntry childEntry = (ISVNEntry) children.next();
                 if (childEntry.isScheduledForAddition()) {
-                    doApplyAutoProperties(childEntry, recurse);
+                    doApplyAutoProperties(PathUtil.append(commitPath, childEntry.getName()), childEntry, recurse);
                 }
             }
         }
@@ -1419,7 +1461,6 @@ public class SVNWorkspace implements ISVNWorkspace {
             repository = SVNRepositoryFactory.create(SVNRepositoryLocation
                     .parseURL(url));
             repository.setCredentialsProvider(myCredentialsProvider);
-
             myIsCopyCommit = true;
             SVNStatus[] committablePaths = getCommittables(
                     new String[] { src }, true, false);
@@ -1645,68 +1686,6 @@ public class SVNWorkspace implements ISVNWorkspace {
         return lock;
     }
 
-    public SVNLock[] lock(String[] paths, String comment, boolean force) throws SVNException {
-        try {
-            Map urls = new HashMap();
-            long[] revisions = new long[] {paths.length};
-            for (int i = 0; i < paths.length; i++) {
-                String path = paths[i];
-                ISVNEntry entry = locateEntry(path);
-                if (entry == null) {
-                    throw new SVNException("no versioned entry at '" + path + "'");
-                }
-                if (entry.isScheduledForAddition() || entry.getPropertyValue(SVNProperty.URL) == null) {
-                    throw new SVNException("'" + path
-                            + "' is not added to repository yet");
-                }
-                if (entry.isDirectory()) {
-                    throw new SVNException("'" + path + "' " + "is a directory and can't be locked");
-                }
-                urls.put(entry.getPropertyValue(SVNProperty.URL), entry);
-                revisions[i] = Long.parseLong(entry.getPropertyValue(SVNProperty.REVISION));
-            }
-            if (urls.isEmpty()) {
-                return new SVNLock[0];
-            }
-            // compute root url and lock
-            String[] allURLs = (String[]) urls.keySet().toArray(new String[urls.values().size()]);
-            String baseURL = PathUtil.getCommonRoot(allURLs);
-            // trunkate common ro
-            if (baseURL == null || "".equals(baseURL)) {
-                throw new SVNException("items to be locked belongs to the different repositories");
-            }
-            for (int i = 0; i < allURLs.length; i++) {
-                allURLs[i] = allURLs[i].substring(baseURL.length());
-                PathUtil.removeLeadingSlash(allURLs[i]);
-                PathUtil.removeTrailingSlash(allURLs[i]);
-            }
-            SVNRepository repos = SVNRepositoryFactory.create(SVNRepositoryLocation.parseURL(baseURL));
-            repos.setCredentialsProvider(getCredentialsProvider());
-            SVNLock[] locks = repos.setLocks(allURLs, comment, force, revisions);
-            for (int i = 0; i < locks.length; i++) {
-                SVNLock lock = locks[i];
-                if (lock == null) {
-                    continue;
-                }
-                String url = PathUtil.append(baseURL, lock.getPath());
-                ISVNEntry entry = (ISVNEntry) urls.get(url);
-                entry.setPropertyValue(SVNProperty.LOCK_TOKEN, lock.getID());
-                entry.setPropertyValue(SVNProperty.LOCK_COMMENT, comment);
-                entry.setPropertyValue(SVNProperty.LOCK_CREATION_DATE, TimeUtil
-                        .formatDate(lock.getCreationDate()));
-                entry.setPropertyValue(SVNProperty.LOCK_OWNER, lock.getOwner());
-                entry.save(false);
-                if (!entry.isDirectory()) {
-                    locateParentEntry(entry.getPath()).save(false);
-                }
-            }
-            return locks;
-        } finally {
-            getRoot().dispose();
-        }
-
-    }
-
     public ISVNEntryContent getContent(String path) throws SVNException {
         ISVNEntry entry = locateEntry(path, true);
         if (entry == null) {
@@ -1844,7 +1823,7 @@ public class SVNWorkspace implements ISVNWorkspace {
         if (entry.isDirectory()) {
             DebugLog.log("IMPORT: ADDING DIR: " + rootPath + entry.getPath());
             editor.addDir(rootPath + entry.getPath(), null, -1);
-            applyAutoProperties(entry, editor);
+            applyAutoProperties(null, entry, editor);
             for (Iterator children = entry.asDirectory().unmanagedChildEntries(
                     false); children.hasNext();) {
                 ISVNEntry child = (ISVNEntry) children.next();
@@ -1854,16 +1833,16 @@ public class SVNWorkspace implements ISVNWorkspace {
         } else {
             DebugLog.log("IMPORT: ADDING FILE: " + rootPath + entry.getPath());
             editor.addFile(rootPath + entry.getPath(), null, -1);
-            applyAutoProperties(entry, editor);
+            applyAutoProperties(rootPath + entry.getPath(), entry, editor);
             entry.setPropertyValue(SVNProperty.SCHEDULE,
                     SVNProperty.SCHEDULE_ADD);
-            entry.asFile().generateDelta(editor);
-            editor.closeFile(null);
+            String digest = entry.asFile().generateDelta(rootPath + entry.getPath(), editor);
+            editor.closeFile(rootPath + entry.getPath(), digest);
         }
         fireEntryCommitted(entry, SVNStatus.ADDED);
     }
 
-    private void applyAutoProperties(ISVNEntry entry, ISVNEditor editor)
+    private void applyAutoProperties(String commitPath, ISVNEntry entry, ISVNEditor editor)
             throws SVNException {
         if (myCompiledAutoProperties == null) {
             myCompiledAutoProperties = compileAutoProperties(myAutoProperties);
@@ -1885,7 +1864,7 @@ public class SVNWorkspace implements ISVNWorkspace {
                     if (entry.isDirectory()) {
                         editor.changeDirProperty(name, value);
                     } else {
-                        editor.changeFileProperty(name, value);
+                        editor.changeFileProperty(commitPath, name, value);
                     }
                 }
             }

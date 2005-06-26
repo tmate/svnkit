@@ -1,21 +1,20 @@
 package org.tmatesoft.svn.core.internal.io.svn;
 
+import com.jcraft.jsch.ChannelExec;
+import com.jcraft.jsch.JSchException;
+import com.jcraft.jsch.Session;
+import org.tmatesoft.svn.core.io.SVNAuthenticationException;
+import org.tmatesoft.svn.core.io.SVNException;
+import org.tmatesoft.svn.core.io.SVNCancelException;
+import org.tmatesoft.svn.core.wc.ISVNAuthenticationManager;
+import org.tmatesoft.svn.core.wc.SVNAuthentication;
+import org.tmatesoft.svn.util.DebugLog;
+
 import java.io.FilterInputStream;
 import java.io.FilterOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-
-import org.tmatesoft.svn.core.io.ISVNCredentials;
-import org.tmatesoft.svn.core.io.ISVNCredentialsProvider;
-import org.tmatesoft.svn.core.io.SVNAuthenticationException;
-import org.tmatesoft.svn.core.io.SVNException;
-import org.tmatesoft.svn.util.DebugLog;
-import org.tmatesoft.svn.util.SVNUtil;
-
-import com.jcraft.jsch.ChannelExec;
-import com.jcraft.jsch.JSchException;
-import com.jcraft.jsch.Session;
 
 /**
  * @author Marc Strapetz
@@ -31,34 +30,42 @@ public class SVNJSchConnector implements ISVNConnector {
     private OutputStream myOutputStream;
 
     public void open(SVNRepositoryImpl repository) throws SVNException {
-        ISVNCredentialsProvider provider = repository.getCredentialsProvider();
-        if (provider == null) {
-            throw new SVNException("Credentials provider is required for SSH connection");
-        }
-        provider.reset();
+        ISVNAuthenticationManager authManager = repository.getAuthenticationManager();
 
-        ISVNCredentials credentials = SVNUtil.nextCredentials(provider, repository.getLocation(), null);
+        String realm = repository.getLocation().getProtocol() + "://" + repository.getLocation().getHost() + ":" + repository.getLocation().getPort();
+        SVNAuthentication authentication = authManager.getFirstAuthentication(ISVNAuthenticationManager.SSH, realm);
+        if (authentication == null) {
+            throw new SVNCancelException();
+        }
         SVNAuthenticationException lastException = null;
         Session session = null;
         
-        while (credentials != null) {
+        while (authentication != null) {
             try {
-            	session = SVNJSchSession.getSession(repository.getLocation(), credentials);
+            	session = SVNJSchSession.getSession(repository.getLocation(), authentication);
             	if (session != null && !session.isConnected()) {
             		session = null;
             		continue;
             	}
-                provider.accepted(credentials);
                 lastException = null;
+                authManager.addAuthentication(realm, authentication, authManager.isAuthStorageEnabled());
+                repository.setExternalUserName(authentication.getUserName());
                 break;
             } catch (SVNAuthenticationException e) {
-            	if (session != null && session.isConnected()) {
+                if (session != null && session.isConnected()) {
             		DebugLog.log("DISCONNECTING: " + session);
             		session.disconnect();
             		session = null;
             	}
                 lastException = e;
-                credentials = SVNUtil.nextCredentials(provider, repository.getLocation(), e.getMessage());
+                if (e.getMessage() != null && e.getMessage().toLowerCase().indexOf("Auth") >= 0) {
+                    authentication = authManager.getNextAuthentication(ISVNAuthenticationManager.SSH, realm);
+                    if (authentication == null) {
+                        throw new SVNCancelException();
+                    }
+                } else {
+                    throw e;
+                }
             }
         }
         if (lastException != null || session == null) {
@@ -67,7 +74,6 @@ public class SVNJSchConnector implements ISVNConnector {
             }
             throw new SVNAuthenticationException("Can't establish SSH connection without credentials");
         }
-        repository.setCredentials(credentials);
         try {
             int retry = 1;
             while(true) {
@@ -98,16 +104,16 @@ public class SVNJSchConnector implements ISVNConnector {
         	if (session.isConnected()) {
         		session.disconnect();
         	}
-            throw new SVNException(e);
+            throw new SVNException("Failed to open SSH session: " + e.getMessage());
         }
         
 		myInputStream = new FilterInputStream(myInputStream) {
-			public void close() throws IOException {
-			}
+			public void close() {
+            }
 		};
 		myOutputStream = new FilterOutputStream(myOutputStream) {
-			public void close() throws IOException {
-			}
+			public void close() {
+            }
 		};
     }
 
