@@ -1648,7 +1648,7 @@ public class SVNWorkspace implements ISVNWorkspace {
     public SVNLock[] lock(String[] paths, String comment, boolean force) throws SVNException {
         try {
             Map urls = new HashMap();
-            long[] revisions = new long[] {paths.length};
+            long[] revisions = new long[paths.length];
             for (int i = 0; i < paths.length; i++) {
                 String path = paths[i];
                 ISVNEntry entry = locateEntry(path);
