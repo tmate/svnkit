@@ -530,7 +530,7 @@ public class SVNRepositoryImpl extends SVNRepository implements ISVNReporter {
                 authenticate();
                 result[0] = null;
                 result = read("[(L)]", result);
-                createdLocks.set(i, result[0]);
+                createdLocks.add(result[0]);
             }
         } finally {
             closeConnection();
