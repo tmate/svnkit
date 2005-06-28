@@ -577,6 +577,22 @@ class DAVRepository extends SVNRepository {
         }
     }
 
+    public void removeLocks(String[] paths, String[] ids, boolean force) throws SVNException {
+        try {
+            openConnection();
+            for (int i = 0; i < paths.length; i++) {
+                String path = paths[i];
+                path = getFullPath(path);
+                path = PathUtil.encode(path);
+                String url = getLocation().getProtocol() + "://" + getLocation().getHost() + ":" + getLocation().getPort();
+                url += path;
+                myConnection.doUnlock(url, path, ids[i], force);
+            }
+        } finally {
+            closeConnection();
+        }
+    }
+
     public SVNDirEntry info(String path, long revision) throws SVNException {
         final SVNDirEntry[] result = new SVNDirEntry[1];
         try {

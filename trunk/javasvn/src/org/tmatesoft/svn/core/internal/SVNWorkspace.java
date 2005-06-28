@@ -1606,6 +1606,59 @@ public class SVNWorkspace implements ISVNWorkspace {
 
     }
 
+    public void unlock(String[] paths, boolean force) throws SVNException {
+        try {
+            Map urls = new HashMap();
+            String[] ids = new String[paths.length];
+            for (int i = 0; i < paths.length; i++) {
+                String path = paths[i];
+                ISVNEntry entry = locateEntry(path);
+                if (entry == null) {
+                    throw new SVNException("no versioned entry at '" + path + "'");
+                }
+                String token = entry.getPropertyValue(SVNProperty.LOCK_TOKEN);
+                if (token == null && !force) {
+                    throw new SVNException("'" + path
+                            + "' is not locked in this working copy");
+                }
+                urls.put(entry.getPropertyValue(SVNProperty.URL), entry);
+                ids[i] = entry.getPropertyValue(SVNProperty.LOCK_TOKEN);
+            }
+            String[] allURLs = (String[]) urls.keySet().toArray(new String[urls.values().size()]);
+            String baseURL = PathUtil.getCommonRoot(allURLs);
+
+            if (baseURL == null || "".equals(baseURL)) {
+                throw new SVNException("items to be locked belongs to the different repositories");
+            }
+            for (int i = 0; i < allURLs.length; i++) {
+                allURLs[i] = allURLs[i].substring(baseURL.length());
+                allURLs[i] = PathUtil.removeLeadingSlash(allURLs[i]);
+                allURLs[i] = PathUtil.removeTrailingSlash(allURLs[i]);
+            }
+            SVNRepository repos = SVNRepositoryFactory.create(SVNRepositoryLocation.parseURL(baseURL));
+            repos.removeLocks(allURLs, ids, force);
+
+            for (int i = 0; i < allURLs.length; i++) {
+                String allURL = allURLs[i];
+
+                ISVNEntry entry = (ISVNEntry) urls.get(allURL);
+                entry.setPropertyValue(SVNProperty.LOCK_TOKEN, null);
+                entry.setPropertyValue(SVNProperty.LOCK_COMMENT, null);
+                entry.setPropertyValue(SVNProperty.LOCK_CREATION_DATE, null);
+                entry.setPropertyValue(SVNProperty.LOCK_OWNER, null);
+                entry.save();
+
+                ISVNEntry parent= locateParentEntry(entry.getPath());
+                if (!entry.isDirectory()) {
+                    parent.save(false);
+                }
+            }
+        } finally {
+            getRoot().dispose();
+        }
+
+    }
+
     public SVNLock lock(String path, String comment, boolean force)
             throws SVNException {
         SVNLock lock = null;
@@ -1668,10 +1721,15 @@ public class SVNWorkspace implements ISVNWorkspace {
             if (urls.isEmpty()) {
                 return new SVNLock[0];
             }
-            // compute root url and lock
+
             String[] allURLs = (String[]) urls.keySet().toArray(new String[urls.values().size()]);
+            ISVNEntry[] entriesArray = new ISVNEntry[allURLs.length];
+            for (int i = 0; i < allURLs.length; i++) {
+                String url = allURLs[i];
+                entriesArray[i] = (ISVNEntry) urls.get(url);
+            }
             String baseURL = PathUtil.getCommonRoot(allURLs);
-            // trunkate common ro
+
             if (baseURL == null || "".equals(baseURL)) {
                 throw new SVNException("items to be locked belongs to the different repositories");
             }
@@ -1683,13 +1741,13 @@ public class SVNWorkspace implements ISVNWorkspace {
             SVNRepository repos = SVNRepositoryFactory.create(SVNRepositoryLocation.parseURL(baseURL));
             repos.setCredentialsProvider(getCredentialsProvider());
             SVNLock[] locks = repos.setLocks(allURLs, comment, force, revisions);
+
             for (int i = 0; i < locks.length; i++) {
                 SVNLock lock = locks[i];
                 if (lock == null) {
                     continue;
                 }
-                String url = PathUtil.append(baseURL, lock.getPath());
-                ISVNEntry entry = (ISVNEntry) urls.get(url);
+                ISVNEntry entry = entriesArray[i];
                 entry.setPropertyValue(SVNProperty.LOCK_TOKEN, lock.getID());
                 entry.setPropertyValue(SVNProperty.LOCK_COMMENT, comment);
                 entry.setPropertyValue(SVNProperty.LOCK_CREATION_DATE, TimeUtil
