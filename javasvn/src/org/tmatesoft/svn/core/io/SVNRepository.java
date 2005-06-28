@@ -1183,7 +1183,9 @@ public abstract class SVNRepository {
      * @since				SVN 1.2
      */
     public abstract void removeLock(String path, String id, boolean force) throws SVNException;
-    
+
+    public abstract void removeLocks(String[] paths, String[] ids, boolean force) throws SVNException;
+
     /**
      * Locks the current session <code>SVNRepository</code> object. It prevents
      * from using non-reenterable methods of this object (for example, while having

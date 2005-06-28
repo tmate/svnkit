@@ -452,6 +452,22 @@ public class SVNAuthRepository extends SVNRepository {
         }
     }
 
+    public void removeLocks(String[] paths, String[] ids, boolean force) throws SVNException {
+        ISVNCredentials credentials = null;
+        ISVNCredentialsProvider provider = initProvider();
+        while(true) {
+            try {
+                myDelegate.setCredentials(credentials);
+                myDelegate.removeLocks(paths, ids, force);
+                accept(provider, credentials);
+                return;
+            } catch (SVNAuthenticationException e) {
+                notAccept(provider, credentials, e.getMessage());
+                credentials = nextCredentials(provider, e.getMessage());
+            }
+        }
+    }
+
     public SVNDirEntry info(String path, long revision) throws SVNException {
         ISVNCredentials credentials = null;
         ISVNCredentialsProvider provider = initProvider();

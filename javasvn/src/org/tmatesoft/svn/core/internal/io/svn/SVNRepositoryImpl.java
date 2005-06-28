@@ -515,7 +515,7 @@ public class SVNRepositoryImpl extends SVNRepository implements ISVNReporter {
     }
 
     public SVNLock[] setLocks(String[] paths, String comment, boolean force, long[] revisions) throws SVNException {
-        List createdLocks = new ArrayList(paths.length);
+        SVNLock[] createdLocks = new SVNLock[paths.length];
         try {
             openConnection();
 
@@ -530,12 +530,41 @@ public class SVNRepositoryImpl extends SVNRepository implements ISVNReporter {
                 authenticate();
                 result[0] = null;
                 result = read("[(L)]", result);
-                createdLocks.add(result[0]);
+                createdLocks[i] = (SVNLock) result[0];
             }
         } finally {
             closeConnection();
         }
-        return (SVNLock[]) createdLocks.toArray(new SVNLock[createdLocks.size()]);
+        return createdLocks;
+    }
+
+    public void removeLocks(String[] paths, String[] ids, boolean force) throws SVNException {
+        try {
+            openConnection();
+            for (int i = 0; i < paths.length; i++) {
+                String path = paths[i];
+                path = getRepositoryPath(path);
+                if (ids[i] == null) {
+                    Object[] buffer = new Object[] { "get-lock", path};
+                    write("(w(s))", buffer);
+                    authenticate();
+                    read("[((?L))]", buffer);
+                    if (buffer[0] == null) {
+                        // no lock there
+                        if (!force) {
+                            throw new SVNException("'" + path + "' is not locked in repository");
+                        }
+                        continue;
+                    }
+                }
+                Object[] buffer = new Object[] {"unlock", path, ids[i], Boolean.valueOf(force)};
+                write("(w(s(s)w))", buffer);
+                authenticate();
+                read("[()]", buffer);
+            }
+        } finally {
+            closeConnection();
+        }
     }
 
     public void removeLock(String path, String id, boolean force) throws SVNException {
