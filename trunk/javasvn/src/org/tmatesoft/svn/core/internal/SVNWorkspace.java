@@ -1636,6 +1636,7 @@ public class SVNWorkspace implements ISVNWorkspace {
                 allURLs[i] = PathUtil.removeTrailingSlash(allURLs[i]);
             }
             SVNRepository repos = SVNRepositoryFactory.create(SVNRepositoryLocation.parseURL(baseURL));
+            repos.setCredentialsProvider(getCredentialsProvider());
             repos.removeLocks(allURLs, ids, force);
 
             for (int i = 0; i < allURLs.length; i++) {
