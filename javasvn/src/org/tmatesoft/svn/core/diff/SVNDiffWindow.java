@@ -15,7 +15,7 @@ package org.tmatesoft.svn.core.diff;
 import java.io.IOException;
 import java.io.InputStream;
 
-import org.tmatesoft.svn.core.io.SVNException;
+import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.util.DebugLog;
 
 

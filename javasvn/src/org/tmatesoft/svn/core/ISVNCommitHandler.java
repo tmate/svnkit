@@ -16,6 +16,7 @@ package org.tmatesoft.svn.core;
 
 /**
  * @author TMate Software Ltd.
+ * @deprecated
  */
 public interface ISVNCommitHandler {
     

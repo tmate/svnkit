@@ -30,11 +30,11 @@ import org.tmatesoft.svn.core.ISVNDirectoryEntry;
 import org.tmatesoft.svn.core.ISVNEntry;
 import org.tmatesoft.svn.core.ISVNEntryContent;
 import org.tmatesoft.svn.core.ISVNFileEntry;
+import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNProperty;
+import org.tmatesoft.svn.core.SVNRepositoryLocation;
 import org.tmatesoft.svn.core.diff.SVNDiffWindow;
 import org.tmatesoft.svn.core.diff.SVNDiffWindowBuilder;
-import org.tmatesoft.svn.core.io.SVNException;
-import org.tmatesoft.svn.core.io.SVNRepositoryLocation;
 import org.tmatesoft.svn.util.DebugLog;
 import org.tmatesoft.svn.util.FileTypeUtil;
 import org.tmatesoft.svn.util.PathUtil;
@@ -60,6 +60,10 @@ public class FSDirEntry extends FSEntry implements ISVNDirectoryEntry {
                     }
                 }
         }
+    }
+    
+    public File getIOFile() {
+        return getRootEntry().getWorkingCopyFile(this);
     }
     
     public ISVNEntry getChild(String name) throws SVNException {
@@ -129,8 +133,6 @@ public class FSDirEntry extends FSEntry implements ISVNDirectoryEntry {
     }
 
     public boolean isScheduledForAddition() throws SVNException {
-        File file = getRootEntry().getWorkingCopyFile(this);
-        boolean missing = !FSUtil.isFileOrSymlinkExists(file);
         if (!isMissing() || getRootEntry() == this) {
             return super.isScheduledForAddition();
         }

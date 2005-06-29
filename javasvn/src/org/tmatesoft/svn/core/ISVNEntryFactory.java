@@ -12,10 +12,10 @@
 
 package org.tmatesoft.svn.core;
 
-import org.tmatesoft.svn.core.io.SVNException;
 
 /**
  * @author TMate Software Ltd.
+ * @deprecated
  */
 public interface ISVNEntryFactory {
     

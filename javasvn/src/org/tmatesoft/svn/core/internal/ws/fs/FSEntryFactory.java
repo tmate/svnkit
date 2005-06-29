@@ -17,8 +17,8 @@ import java.io.IOException;
 
 import org.tmatesoft.svn.core.ISVNEntryFactory;
 import org.tmatesoft.svn.core.ISVNRootEntry;
+import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNWorkspaceManager;
-import org.tmatesoft.svn.core.io.SVNException;
 
 /**
  * @author TMate Software Ltd.

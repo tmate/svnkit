@@ -1,9 +1,9 @@
 package org.tmatesoft.svn.core;
 
-import org.tmatesoft.svn.core.io.SVNException;
 
 /**
  * @author Marc Strapetz
+ * @deprecated
  */
 public interface ISVNEntryContent {
 	public String getPath();

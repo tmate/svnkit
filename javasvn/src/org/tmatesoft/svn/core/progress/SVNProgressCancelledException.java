@@ -1,5 +1,6 @@
 package org.tmatesoft.svn.core.progress;
 
+import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.io.*;
 
 /**

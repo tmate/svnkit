@@ -19,9 +19,9 @@ import java.util.Collection;
 import java.util.HashSet;
 
 import org.tmatesoft.svn.core.ISVNDirectoryEntry;
+import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNProperty;
-import org.tmatesoft.svn.core.io.SVNException;
-import org.tmatesoft.svn.core.io.SVNRepositoryLocation;
+import org.tmatesoft.svn.core.SVNRepositoryLocation;
 import org.tmatesoft.svn.util.PathUtil;
 
 /**

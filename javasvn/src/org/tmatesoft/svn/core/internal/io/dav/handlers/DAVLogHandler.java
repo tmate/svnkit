@@ -16,9 +16,9 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.tmatesoft.svn.core.ISVNLogEntryHandler;
 import org.tmatesoft.svn.core.internal.io.dav.DAVElement;
 import org.tmatesoft.svn.core.internal.io.dav.DAVUtil;
-import org.tmatesoft.svn.core.io.ISVNLogEntryHandler;
 import org.tmatesoft.svn.core.io.SVNLogEntry;
 import org.tmatesoft.svn.core.io.SVNLogEntryPath;
 import org.tmatesoft.svn.util.TimeUtil;
@@ -30,7 +30,7 @@ import org.xml.sax.Attributes;
 public class DAVLogHandler extends BasicDAVHandler {
 	
 	public static StringBuffer generateLogRequest(StringBuffer buffer, long startRevision, long endRevision,
-			boolean includeChangedPaths, boolean strictNodes, String[] paths) {
+			boolean includeChangedPaths, boolean strictNodes, long limit, String[] paths) {
 		buffer = buffer == null ? new StringBuffer() : buffer;
         buffer.append("<?xml version=\"1.0\" encoding=\"utf-8\"?>");
         buffer.append("<S:log-report xmlns:S=\"svn:\">");
@@ -39,6 +39,9 @@ public class DAVLogHandler extends BasicDAVHandler {
         } 
         if (endRevision >= 0) {
         	buffer.append("<S:end-revision>"  + endRevision + "</S:end-revision>");
+        }
+        if (limit > 0) {
+            buffer.append("<S:limit>" + limit + "</S:limit>");
         }
         if (includeChangedPaths) {
             buffer.append("<S:discover-changed-paths />");

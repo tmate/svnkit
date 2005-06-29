@@ -17,14 +17,11 @@ import java.util.List;
 import java.util.Map;
 
 import org.tmatesoft.svn.core.io.ISVNCredentialsProvider;
-import org.tmatesoft.svn.core.io.ISVNLogEntryHandler;
-import org.tmatesoft.svn.core.io.SVNException;
-import org.tmatesoft.svn.core.io.SVNLock;
-import org.tmatesoft.svn.core.io.SVNRepositoryLocation;
 import org.tmatesoft.svn.core.progress.ISVNProgressViewer;
 
 /**
  * @author TMate Software Ltd.
+ * @deprecated
  */
 public interface ISVNWorkspace {
     
@@ -164,10 +161,6 @@ public interface ISVNWorkspace {
     public void revert(String srcPath, String dstPath, boolean recursive) throws SVNException;
     
     public SVNLock lock(String path, String comment, boolean force) throws SVNException;
-
-    public SVNLock[] lock(String[] paths, String comment, boolean force) throws SVNException;
-
-    public void unlock(String[] paths, boolean force) throws SVNException;
 
     public void unlock(String path, boolean force) throws SVNException;
     

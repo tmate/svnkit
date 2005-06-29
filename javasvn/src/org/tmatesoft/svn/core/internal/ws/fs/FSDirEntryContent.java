@@ -8,7 +8,7 @@ import java.util.List;
 import org.tmatesoft.svn.core.ISVNDirectoryContent;
 import org.tmatesoft.svn.core.ISVNEntry;
 import org.tmatesoft.svn.core.ISVNFileContent;
-import org.tmatesoft.svn.core.io.SVNException;
+import org.tmatesoft.svn.core.SVNException;
 
 /**
  * @author Marc Strapetz

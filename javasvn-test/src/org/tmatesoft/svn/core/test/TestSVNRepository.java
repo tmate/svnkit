@@ -28,24 +28,24 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
+import org.tmatesoft.svn.core.ISVNReporter;
+import org.tmatesoft.svn.core.ISVNReporterBaton;
+import org.tmatesoft.svn.core.SVNCommitInfo;
+import org.tmatesoft.svn.core.SVNDirEntry;
+import org.tmatesoft.svn.core.SVNException;
+import org.tmatesoft.svn.core.SVNLocationEntry;
+import org.tmatesoft.svn.core.SVNNodeKind;
+import org.tmatesoft.svn.core.SVNRepositoryLocation;
 import org.tmatesoft.svn.core.diff.SVNDiffWindow;
 import org.tmatesoft.svn.core.diff.SVNDiffWindowBuilder;
 import org.tmatesoft.svn.core.internal.ws.fs.SVNRAFileData;
 import org.tmatesoft.svn.core.io.ISVNEditor;
 import org.tmatesoft.svn.core.io.ISVNFileRevisionHandler;
-import org.tmatesoft.svn.core.io.ISVNReporter;
-import org.tmatesoft.svn.core.io.ISVNReporterBaton;
 import org.tmatesoft.svn.core.io.ISVNWorkspaceMediator;
-import org.tmatesoft.svn.core.io.SVNCommitInfo;
-import org.tmatesoft.svn.core.io.SVNDirEntry;
-import org.tmatesoft.svn.core.io.SVNException;
 import org.tmatesoft.svn.core.io.SVNFileRevision;
-import org.tmatesoft.svn.core.io.SVNLocationEntry;
 import org.tmatesoft.svn.core.io.SVNLogEntry;
 import org.tmatesoft.svn.core.io.SVNLogEntryPath;
-import org.tmatesoft.svn.core.io.SVNNodeKind;
 import org.tmatesoft.svn.core.io.SVNRepository;
-import org.tmatesoft.svn.core.io.SVNRepositoryLocation;
 import org.tmatesoft.svn.util.PathUtil;
 
 
@@ -339,13 +339,13 @@ public class TestSVNRepository extends AbstractRepositoryTest {
             editor.addDir("dir2", null, -1); // open
             editor.changeDirProperty("testDirProperty", "testDirValue");
             editor.addFile("dir2/test.txt", null, -1);
-            editor.applyTextDelta(null);
+            editor.applyTextDelta("dir2/test.txt", null);
             SVNDiffWindow window = SVNDiffWindowBuilder.createReplacementDiffWindow(4);
-            OutputStream os = editor.textDeltaChunk(window);
+            OutputStream os = editor.textDeltaChunk("dir2/test.txt", window);
             os.write("test".getBytes());
             os.close();
-            editor.textDeltaEnd();
-            editor.closeFile(null);            
+            editor.textDeltaEnd("dir2/test.txt");
+            editor.closeFile("dir2/test.txt", null);
             editor.closeDir(); // added dir2
             
             editor.closeDir(); // ROOT
@@ -362,13 +362,13 @@ public class TestSVNRepository extends AbstractRepositoryTest {
             
             editor.openDir("dir2", 2); //open
             editor.openFile("dir2/test.txt", 2);
-            editor.applyTextDelta(null);
+            editor.applyTextDelta("dir2/test.txt", null);
             window = SVNDiffWindowBuilder.createReplacementDiffWindow(8);
-            os = editor.textDeltaChunk(window);
+            os = editor.textDeltaChunk("dir2/test.txt", window);
             os.write("modified".getBytes());
             os.close();
-            editor.textDeltaEnd();
-            editor.closeFile(null);
+            editor.textDeltaEnd("dir2/test.txt");
+            editor.closeFile("dir2/test.txt", null);
             editor.closeDir(); // close
 
             // like here close dir is called for root?

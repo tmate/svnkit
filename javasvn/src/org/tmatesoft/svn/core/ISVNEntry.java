@@ -16,12 +16,12 @@ import java.util.Iterator;
 import java.util.Map;
 
 import org.tmatesoft.svn.core.io.ISVNEditor;
-import org.tmatesoft.svn.core.io.SVNException;
 
 
 /**
  * @author TMate Software Ltd.
- */
+ * @deprecated
+*/
 public interface ISVNEntry {
 
     public String getPath();
@@ -67,7 +67,7 @@ public interface ISVNEntry {
      * Sends modified properties (i.e. custom properties that were changed since the last merge)
      * to the editor
      */
-    public boolean sendChangedProperties(ISVNEditor editor) throws SVNException;
+    public boolean sendChangedProperties(String commitPath, ISVNEditor editor) throws SVNException;
 
     /**
      * Saves custom properties as base properties file to merge later

@@ -12,11 +12,10 @@
 
 package org.tmatesoft.svn.core;
 
-import org.tmatesoft.svn.core.io.SVNException;
-import org.tmatesoft.svn.core.io.SVNRepositoryLocation;
 
 /**
  * @author TMate Software Ltd.
+ * @deprecated
  */
 public interface ISVNExternalsHandler {
     

@@ -26,8 +26,8 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
+import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.io.ISVNWorkspaceMediator;
-import org.tmatesoft.svn.core.io.SVNException;
 import org.tmatesoft.svn.util.DebugLog;
 import org.tmatesoft.svn.util.PathUtil;
 
@@ -47,6 +47,7 @@ class DAVResource {
     private DAVConnection myConnection;
     private List myDeltaFiles;
     private Map myProperties;
+    private boolean myIsAdded;
 
     public DAVResource(ISVNWorkspaceMediator mediator, DAVConnection connection, String path, long revision) {
         this(mediator, connection, path, revision, false);
@@ -56,9 +57,20 @@ class DAVResource {
         myPath = path;
         myMediator = mediator;
         myURL = PathUtil.append(connection.getLocation().getPath(), path);
+        if (myURL.endsWith("/")) {
+            myURL = PathUtil.removeTrailingSlash(myURL);
+        }
         myRevision = revision;
         myConnection = connection;
         myIsCopy = isCopy;
+    }
+
+    public void setAdded(boolean added) {
+        myIsAdded = added;
+    }
+
+    public boolean isAdded() {
+        return myIsAdded;
     }
     
     public boolean isCopy() {
@@ -77,7 +89,7 @@ class DAVResource {
         // do fetch from server if empty...
         if (myVURL == null) {
             if (myMediator != null) {
-                myVURL = myMediator.getWorkspaceProperty(myPath, "svn:wc:ra_dav:version-url");
+                myVURL = myMediator.getWorkspaceProperty(PathUtil.decode(myPath), "svn:wc:ra_dav:version-url");
                 DebugLog.log("cached vURL for " + myPath + " : " + myVURL);
                 if (myVURL != null) {
                     return myVURL;
