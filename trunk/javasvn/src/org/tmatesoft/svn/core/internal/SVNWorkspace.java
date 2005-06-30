@@ -1608,8 +1608,9 @@ public class SVNWorkspace implements ISVNWorkspace {
 
     public void unlock(String[] paths, boolean force) throws SVNException {
         try {
-            Map urls = new HashMap();
             String[] ids = new String[paths.length];
+            ISVNEntry[] entries = new ISVNEntry[paths.length];
+            String[] urls = new String[paths.length];
             for (int i = 0; i < paths.length; i++) {
                 String path = paths[i];
                 ISVNEntry entry = locateEntry(path);
@@ -1621,28 +1622,32 @@ public class SVNWorkspace implements ISVNWorkspace {
                     throw new SVNException("'" + path
                             + "' is not locked in this working copy");
                 }
-                urls.put(entry.getPropertyValue(SVNProperty.URL), entry);
+                urls[i] = entry.getPropertyValue(SVNProperty.URL);
+                entries[i] = entry;
                 ids[i] = entry.getPropertyValue(SVNProperty.LOCK_TOKEN);
+                DebugLog.log("lock url: " + urls[i]);
+                DebugLog.log("lock token: " + ids[i]);
             }
-            String[] allURLs = (String[]) urls.keySet().toArray(new String[urls.values().size()]);
-            String baseURL = PathUtil.getCommonRoot(allURLs);
+
+            String baseURL = PathUtil.getCommonRoot(urls);
+            DebugLog.log("base URL: " + baseURL);
 
             if (baseURL == null || "".equals(baseURL)) {
                 throw new SVNException("items to be locked belongs to the different repositories");
             }
-            for (int i = 0; i < allURLs.length; i++) {
-                allURLs[i] = allURLs[i].substring(baseURL.length());
-                allURLs[i] = PathUtil.removeLeadingSlash(allURLs[i]);
-                allURLs[i] = PathUtil.removeTrailingSlash(allURLs[i]);
+            for (int i = 0; i < urls.length; i++) {
+                urls[i] = urls[i].substring(baseURL.length());
+                urls[i] = PathUtil.removeLeadingSlash(urls[i]);
+                urls[i] = PathUtil.removeTrailingSlash(urls[i]);
+                DebugLog.log("relative path in repository: " + urls[i]);
             }
             SVNRepository repos = SVNRepositoryFactory.create(SVNRepositoryLocation.parseURL(baseURL));
             repos.setCredentialsProvider(getCredentialsProvider());
-            repos.removeLocks(allURLs, ids, force);
+            repos.removeLocks(urls, ids, force);
 
-            for (int i = 0; i < allURLs.length; i++) {
-                String allURL = allURLs[i];
+            for (int i = 0; i < entries.length; i++) {
 
-                ISVNEntry entry = (ISVNEntry) urls.get(allURL);
+                ISVNEntry entry = entries[i];
                 entry.setPropertyValue(SVNProperty.LOCK_TOKEN, null);
                 entry.setPropertyValue(SVNProperty.LOCK_COMMENT, null);
                 entry.setPropertyValue(SVNProperty.LOCK_CREATION_DATE, null);
