@@ -556,6 +556,8 @@ public class SVNRepositoryImpl extends SVNRepository implements ISVNReporter {
                         }
                         continue;
                     }
+                    SVNLock lock = (SVNLock) buffer[0];
+                    ids[i] = lock.getID();
                 }
                 Object[] buffer = new Object[] {"unlock", path, ids[i], Boolean.valueOf(force)};
                 write("(w(s(s)w))", buffer);
