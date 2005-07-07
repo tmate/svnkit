@@ -1,0 +1,22 @@
+/*
+ * Created on 06.06.2005
+ */
+package org.tmatesoft.svn.core.wc;
+
+import java.io.File;
+
+import org.tmatesoft.svn.core.SVNException;
+
+public interface ISVNPropertyHandler {
+
+    public static ISVNPropertyHandler NULL = new ISVNPropertyHandler() {
+        public void handleProperty(File path, SVNPropertyData property) {
+        }
+        public void handleProperty(String url, SVNPropertyData property) {
+        }
+    };
+    
+    public void handleProperty(File path, SVNPropertyData property) throws SVNException;
+
+    public void handleProperty(String url, SVNPropertyData property) throws SVNException;
+}
