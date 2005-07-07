@@ -26,6 +26,7 @@ import java.util.StringTokenizer;
 import org.tmatesoft.svn.core.ISVNDirectoryEntry;
 import org.tmatesoft.svn.core.ISVNEntryContent;
 import org.tmatesoft.svn.core.ISVNFileEntry;
+import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNProperty;
 import org.tmatesoft.svn.core.SVNStatus;
 import org.tmatesoft.svn.core.diff.ISVNRAData;
@@ -34,7 +35,6 @@ import org.tmatesoft.svn.core.diff.delta.ISVNDeltaGenerator;
 import org.tmatesoft.svn.core.diff.delta.SVNAllDeltaGenerator;
 import org.tmatesoft.svn.core.diff.delta.SVNSequenceDeltaGenerator;
 import org.tmatesoft.svn.core.io.ISVNEditor;
-import org.tmatesoft.svn.core.io.SVNException;
 import org.tmatesoft.svn.util.DebugLog;
 import org.tmatesoft.svn.util.TimeUtil;
 
@@ -152,14 +152,14 @@ public class FSFileEntry extends FSEntry implements ISVNFileEntry {
         return SVNStatus.UPDATED;
     }
 
-    public String generateDelta(ISVNEditor target) throws SVNException {
+    public String generateDelta(String commitPath, ISVNEditor target) throws SVNException {
         if (!isContentsModified() && !isScheduledForAddition()) {
             return null;
         }
         String digest = null;
         File file = getRootEntry().getWorkingCopyFile(this);
         if (file.exists()) {
-            target.applyTextDelta(null);
+            target.applyTextDelta(commitPath, null);
             String eolType = getPropertyValue(SVNProperty.EOL_STYLE);
             boolean sendAsIs = isBinary();// || eolType == null;
             File tmpFile = null;
@@ -186,7 +186,7 @@ public class FSFileEntry extends FSEntry implements ISVNFileEntry {
             SVNRAFileData baseFile = generator instanceof SVNSequenceDeltaGenerator ? 
                     new SVNRAFileData(getAdminArea().getBaseFile(this), true) : null;
             try {
-                generator.generateDiffWindow(target, workFile, baseFile);
+                generator.generateDiffWindow(commitPath, target, workFile, baseFile);
             } finally {
                 try {
                     if (baseFile != null) {
@@ -210,7 +210,8 @@ public class FSFileEntry extends FSEntry implements ISVNFileEntry {
     }
     
     public boolean isContentsModified() throws SVNException {
-        if (isPropertyModified(SVNProperty.EOL_STYLE)) {
+        if (isPropertyModified(SVNProperty.EOL_STYLE) || isPropertyModified(SVNProperty.KEYWORDS)
+                || isPropertyModified(SVNProperty.SPECIAL)) {
             return true;
         }
         if (isMissing() || isScheduledForDeletion()) {

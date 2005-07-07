@@ -16,7 +16,6 @@ import java.io.InputStream;
 
 import org.tmatesoft.svn.core.diff.SVNDiffWindow;
 import org.tmatesoft.svn.core.io.ISVNEditor;
-import org.tmatesoft.svn.core.io.SVNException;
 
 /**
  * @author TMate Software Ltd.
@@ -45,7 +44,7 @@ public interface ISVNFileEntry extends ISVNEntry {
      * 
      * @param editor editor to send delta to 
      */
-    public String generateDelta(ISVNEditor editor) throws SVNException;
+    public String generateDelta(String commitPath, ISVNEditor editor) throws SVNException;
     
     public boolean isContentsModified() throws SVNException;
 

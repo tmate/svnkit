@@ -16,8 +16,6 @@ import java.io.InputStream;
 import java.util.Iterator;
 import java.util.Map;
 
-import org.tmatesoft.svn.core.io.SVNException;
-import org.tmatesoft.svn.core.io.SVNRepositoryLocation;
 
 /**
  * @author TMate Software Ltd.

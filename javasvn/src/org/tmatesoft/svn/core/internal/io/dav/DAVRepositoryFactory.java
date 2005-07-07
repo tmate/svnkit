@@ -12,9 +12,9 @@
 
 package org.tmatesoft.svn.core.internal.io.dav;
 
+import org.tmatesoft.svn.core.SVNRepositoryFactory;
+import org.tmatesoft.svn.core.SVNRepositoryLocation;
 import org.tmatesoft.svn.core.io.SVNRepository;
-import org.tmatesoft.svn.core.io.SVNRepositoryFactory;
-import org.tmatesoft.svn.core.io.SVNRepositoryLocation;
 
 /**
  * @author Alexander Kitaev
@@ -43,8 +43,10 @@ public class DAVRepositoryFactory extends SVNRepositoryFactory {
         if (ourProxyManager == null) {
             ourProxyManager = proxyManager == null ? IDAVProxyManager.DEFAULT : proxyManager;
         }
-        DAVRepositoryFactory factory = new DAVRepositoryFactory();
-        SVNRepositoryFactory.registerRepositoryFactory("^https?://.*$", factory);
+        if (!SVNRepositoryFactory.hasRepositoryFactory("^https?://.*$")) {
+            DAVRepositoryFactory factory = new DAVRepositoryFactory();
+            SVNRepositoryFactory.registerRepositoryFactory("^https?://.*$", factory);
+        }
     }
 
     public SVNRepository createRepositoryImpl(SVNRepositoryLocation location) {

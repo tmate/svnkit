@@ -2,14 +2,14 @@ package org.tmatesoft.svn.core.diff;
 
 import java.io.OutputStream;
 
-import org.tmatesoft.svn.core.io.SVNException;
+import org.tmatesoft.svn.core.SVNException;
 
 /**
  * @author Marc Strapetz
  */
 public interface ISVNDeltaConsumer {
 
-	public OutputStream textDeltaChunk(SVNDiffWindow diffWindow) throws SVNException;
+	public OutputStream textDeltaChunk(String path, SVNDiffWindow diffWindow) throws SVNException;
 
-	public void textDeltaEnd() throws SVNException;
+	public void textDeltaEnd(String path) throws SVNException;
 }

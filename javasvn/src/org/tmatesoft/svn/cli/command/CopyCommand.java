@@ -12,25 +12,16 @@
 
 package org.tmatesoft.svn.cli.command;
 
-import java.io.File;
-import java.io.IOException;
-import java.io.PrintStream;
-
 import org.tmatesoft.svn.cli.SVNArgument;
 import org.tmatesoft.svn.cli.SVNCommand;
-import org.tmatesoft.svn.core.ISVNWorkspace;
-import org.tmatesoft.svn.core.SVNProperty;
-import org.tmatesoft.svn.core.SVNStatus;
-import org.tmatesoft.svn.core.SVNWorkspaceAdapter;
-import org.tmatesoft.svn.core.io.ISVNEditor;
-import org.tmatesoft.svn.core.io.SVNCommitInfo;
-import org.tmatesoft.svn.core.io.SVNException;
-import org.tmatesoft.svn.core.io.SVNNodeKind;
-import org.tmatesoft.svn.core.io.SVNRepository;
-import org.tmatesoft.svn.core.io.SVNRepositoryLocation;
-import org.tmatesoft.svn.util.DebugLog;
+import org.tmatesoft.svn.core.SVNCommitInfo;
+import org.tmatesoft.svn.core.SVNException;
+import org.tmatesoft.svn.core.wc.SVNCopyClient;
+import org.tmatesoft.svn.core.wc.SVNRevision;
 import org.tmatesoft.svn.util.PathUtil;
-import org.tmatesoft.svn.util.SVNUtil;
+
+import java.io.File;
+import java.io.PrintStream;
 
 /**
  * @author TMate Software Ltd.
@@ -65,151 +56,51 @@ public class CopyCommand extends SVNCommand {
         if (matchTabsInPath(absoluteDstPath, err) || matchTabsInPath(absoluteSrcPath, err)) {
             return;
         }
-        final ISVNWorkspace workspace = createWorkspace(absoluteSrcPath);
-        final String srcPath = SVNUtil.getWorkspacePath(workspace, absoluteSrcPath);
-        SVNRepository repository = createRepository(workspace.getLocation(srcPath).toCanonicalForm());
-        long revNumber = getRevisionNumber((String) getCommandLine().getArgumentValue(SVNArgument.REVISION),
-                srcPath, workspace, repository);
-        if (revNumber >= 0 && revNumber != SVNProperty.longValue(workspace.getPropertyValue(srcPath, SVNProperty.REVISION))) {
-            getCommandLine().setPathAt(0, null);
-            getCommandLine().setURLAt(0, workspace.getLocation(srcPath).toCanonicalForm());
-            getCommandLine().setArgumentValue(SVNArgument.REVISION, Long.toString(revNumber));  
-            runRemoteToLocal(out, err);
-            return;
+
+        SVNRevision srcRevision = SVNRevision.WORKING;
+        if (getCommandLine().hasArgument(SVNArgument.REVISION)) {
+            srcRevision = SVNRevision.parse((String) getCommandLine().getArgumentValue(SVNArgument.REVISION));
         }
 
-        workspace.addWorkspaceListener(new SVNWorkspaceAdapter() {
-            public void modified(String path, int kind) {
-                try {
-                    path = convertPath(absoluteDstPath, workspace, path);
-                } catch (IOException e) {}
-
-                final String kindString = (kind == SVNStatus.ADDED ? "A" : "D");
-                println(out, kindString + "  " + path);
-            }
-        });
-        
-        final String dstTempPath = SVNUtil.getWorkspacePath(workspace, absoluteDstPath);
-        final SVNStatus status = workspace.status(dstTempPath, false);
-        DebugLog.log("COPY: dst status is: " + status);
-        if (status != null && status.getContentsStatus() == SVNStatus.DELETED) {
-            try {
-                err.print("Can't copy to '" + convertPath(absoluteDstPath, workspace, dstTempPath) + "' - path is scheduled for deletion");
-            } catch (IOException e) {
-            }
-            return;
-        }
-        final String dstPath = status != null && status.isDirectory() ? PathUtil.append(dstTempPath, PathUtil.tail(srcPath)) : dstTempPath;
-        workspace.copy(srcPath, dstPath, false);
+        SVNCopyClient updater = new SVNCopyClient(getOptions(), new SVNCommandEventProcessor(out, err, false));
+        boolean force = getCommandLine().hasArgument(SVNArgument.FORCE);
+        updater.doCopy(new File(absoluteSrcPath), null, srcRevision, new File(absoluteDstPath), null, SVNRevision.WORKING, force, false, null);
     }
 
     private void runRemote(PrintStream out, PrintStream err) throws SVNException {
         if (getCommandLine().getURLCount() != 2) {
             throw new SVNException("Please enter SRC and DST URL");
         }
-
         String srcURL = getCommandLine().getURL(0);
-        String destURL = getCommandLine().getURL(1);
-        if (matchTabsInPath(PathUtil.decode(srcURL), err) || matchTabsInPath(PathUtil.decode(destURL), err)) {
+        SVNRevision srcRevision = SVNRevision.parse((String) getCommandLine().getArgumentValue(SVNArgument.REVISION));
+        SVNRevision srcPegRevision = getCommandLine().getPegRevision(0);
+        String dstURL = getCommandLine().getURL(1);
+        SVNRevision dstPegRevision = getCommandLine().getPegRevision(1);
+
+        if (matchTabsInPath(srcURL, err) || matchTabsInPath(dstURL, err)) {
             return;
         }
-        String message = (String) getCommandLine().getArgumentValue(SVNArgument.MESSAGE);
 
-        SVNRepository repository = createRepository(destURL);
-        String root = destURL;
-        String newPath = PathUtil.tail(srcURL);
-        SVNNodeKind nodeKind = repository.checkPath("", -1);
-        if (nodeKind == SVNNodeKind.NONE) {
-            // dst doesn't exists.
-            root = PathUtil.removeTail(destURL);
-            repository = createRepository(root);
-            newPath = PathUtil.tail(destURL);
-        } 
-        newPath = PathUtil.removeLeadingSlash(newPath);
-        newPath = PathUtil.decode(newPath);
-
-        long revNumber = -1;
-        String revStr = (String) getCommandLine().getArgumentValue(SVNArgument.REVISION);
-        if (revStr != null) {
-            try {
-                revNumber = Long.parseLong(revStr);
-            } catch (NumberFormatException e) {
-                revNumber = -1;
-            }
-        }
-        if (revNumber < 0) {
-            revNumber = repository.getLatestRevision();
-        }
-        String newPathParent = null;
-        DebugLog.log("checking new path: " + newPath);
-        nodeKind = repository.checkPath(newPath, -1);
-        if (nodeKind != SVNNodeKind.NONE) {
-        	DebugLog.log("can't copy to '" + PathUtil.append(destURL, newPath) + "', location already exists");
-        	err.println("can't copy to '" + PathUtil.append(destURL, newPath) + "', location already exists");
-        	return;
-        } else if (repository.checkPath(PathUtil.removeTail(newPath), -1) == SVNNodeKind.NONE) {
-            err.println("svn: Path '" + newPath + "' not present");
-        }
-
-        SVNRepositoryLocation srcLocation = SVNRepositoryLocation.parseURL(srcURL);
-        srcURL = srcLocation.getPath();
-        srcURL = PathUtil.decode(srcURL);
-        if (repository.getRepositoryRoot() == null) {
-            repository.testConnection();
-        }
-        srcURL = srcURL.substring(repository.getRepositoryRoot().length());
-        if (!srcURL.startsWith("/")) {
-            srcURL += "/";
-        }
-
-        ISVNEditor editor = repository.getCommitEditor(message, null);
-        try {
-            editor.openRoot(-1);
-            if (newPathParent != null) {
-            	editor.openDir(newPathParent, -1);
-            }
-            editor.addDir(newPath, srcURL, revNumber);
-            editor.closeDir();
-            if (newPathParent != null) {
-            	editor.closeDir();
-            }
-            editor.closeDir();
-
-            SVNCommitInfo info = editor.closeEdit();
-
+        String commitMessage = (String) getCommandLine().getArgumentValue(SVNArgument.MESSAGE);
+        SVNCopyClient updater = new SVNCopyClient(getOptions(), new SVNCommandEventProcessor(out, err, false));
+        SVNCommitInfo result = updater.doCopy(srcURL, srcPegRevision, srcRevision, dstURL, dstPegRevision, false, commitMessage);
+        if (result != SVNCommitInfo.NULL) {
             out.println();
-            out.println("Committed revision " + info.getNewRevision() + ".");
-        } catch (SVNException e) {
-            if (editor != null) {
-                try {
-                    editor.abortEdit();
-                } catch (SVNException es) {}
-            }
-            throw e;
+            out.println("Committed revision " + result.getNewRevision() + ".");
         }
     }
 
     private void runRemoteToLocal(final PrintStream out, PrintStream err) throws SVNException {
         final String srcURL = getCommandLine().getURL(0);
-        String destPathParent = getCommandLine().getPathAt(0);
-        destPathParent = destPathParent.replace(File.separatorChar, '/');
-        if (matchTabsInPath(PathUtil.decode(srcURL), err) || matchTabsInPath(getCommandLine().getPathAt(0), err)) {
-            return;
+        String dstPath = getCommandLine().getPathAt(0);
+        SVNRevision revision = SVNRevision.parse((String) getCommandLine().getArgumentValue(SVNArgument.REVISION));
+        if (revision == null || !revision.isValid()) {
+            revision = SVNRevision.HEAD;
         }
-
-        long revision = -1;
-        if (getCommandLine().hasArgument(SVNArgument.REVISION)) {
-            String revStr = (String) getCommandLine().getArgumentValue(SVNArgument.REVISION);
-            revision = Long.parseLong(revStr);
-        }
-        DebugLog.log("workspace id is : " + destPathParent);
-        final ISVNWorkspace ws = createWorkspace(destPathParent);
-        DebugLog.log("workspace root is : " + ws.getID());
-        String wsPath = SVNUtil.getWorkspacePath(ws, destPathParent);
-        DebugLog.log("workspace path is : " + wsPath);
-        ws.copy(SVNRepositoryLocation.parseURL(srcURL), wsPath, revision);
+        SVNCopyClient updater = new SVNCopyClient(getOptions(), new SVNCommandEventProcessor(out, err, false));
+        updater.doCopy(srcURL, getCommandLine().getPegRevision(0), revision, new File(dstPath), null, SVNRevision.WORKING, false, null);
     }
-
+    
     private void runLocalToRemote(final PrintStream out, PrintStream err) throws SVNException {
         final String dstURL = getCommandLine().getURL(0);
         String srcPath = getCommandLine().getPathAt(0);
@@ -217,14 +108,15 @@ public class CopyCommand extends SVNCommand {
             return;
         }
         String message = (String) getCommandLine().getArgumentValue(SVNArgument.MESSAGE);
-        srcPath = srcPath.replace(File.separatorChar, '/');
-
-        final ISVNWorkspace ws = createWorkspace(srcPath);
-        String wsPath = SVNUtil.getWorkspacePath(ws, srcPath);
-        DebugLog.log("workspace path is : " + wsPath);
-        long revision = ws.copy(wsPath, SVNRepositoryLocation.parseURL(dstURL), message);
-
-        out.println();
-        out.println("Committed revision " + revision + ".");
+        SVNRevision revision = SVNRevision.parse((String) getCommandLine().getArgumentValue(SVNArgument.REVISION));
+        if (revision == null || !revision.isValid()) {
+            revision = SVNRevision.WORKING;
+        }
+        SVNCopyClient updater = new SVNCopyClient(getOptions(), new SVNCommandEventProcessor(out, err, false));
+        SVNCommitInfo info = updater.doCopy(new File(srcPath), getCommandLine().getPathPegRevision(0), revision, dstURL, getCommandLine().getPegRevision(0), false, message);
+        if (info != SVNCommitInfo.NULL) {
+            out.println();
+            out.println("Committed revision " + info.getNewRevision() + ".");
+        }
     }
 }

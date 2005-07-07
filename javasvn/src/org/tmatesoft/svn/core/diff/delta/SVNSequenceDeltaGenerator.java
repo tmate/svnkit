@@ -8,16 +8,19 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
+import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.diff.ISVNDeltaConsumer;
 import org.tmatesoft.svn.core.diff.ISVNRAData;
 import org.tmatesoft.svn.core.diff.SVNDiffInstruction;
 import org.tmatesoft.svn.core.diff.SVNDiffWindow;
-import org.tmatesoft.svn.core.io.SVNException;
 import org.tmatesoft.svn.util.FileTypeUtil;
 import org.tmatesoft.svn.util.SVNAssert;
 
 import de.regnis.q.sequence.QSequenceDifferenceBlock;
-import de.regnis.q.sequence.line.*;
+import de.regnis.q.sequence.core.QSequenceException;
+import de.regnis.q.sequence.line.QSequenceLineCache;
+import de.regnis.q.sequence.line.QSequenceLineMedia;
+import de.regnis.q.sequence.line.QSequenceLineResult;
 
 /**
  * @author Marc Strapetz
@@ -30,14 +33,14 @@ public class SVNSequenceDeltaGenerator implements ISVNDeltaGenerator {
 
     // Implemented ============================================================
 
-    public void generateDiffWindow(ISVNDeltaConsumer consumer, ISVNRAData workFile, ISVNRAData baseFile) throws SVNException {
+    public void generateDiffWindow(String commitPath, ISVNDeltaConsumer consumer, ISVNRAData workFile, ISVNRAData baseFile) throws SVNException {
         try {
             if (!canProcess(workFile, baseFile)) {
-                ALL_DELTA_GENERATOR.generateDiffWindow(consumer, workFile, baseFile);
+                ALL_DELTA_GENERATOR.generateDiffWindow(commitPath, consumer, workFile, baseFile);
                 return;
             }
 
-            doGenerateDiffWindow(workFile, baseFile, consumer);
+            doGenerateDiffWindow(commitPath, workFile, baseFile, consumer);
         } catch (IOException ex) {
             throw new SVNException(ex);
         }
@@ -45,22 +48,34 @@ public class SVNSequenceDeltaGenerator implements ISVNDeltaGenerator {
 
     // Utils ==================================================================
 
-    private static void doGenerateDiffWindow(ISVNRAData workFile, ISVNRAData baseFile, ISVNDeltaConsumer consumer) throws IOException, SVNException {
-        final QSequenceLine[] workLines = new QSequenceLineReader(null).read(workFile.read(0, workFile.length()));
-        final QSequenceLine[] baseLines = new QSequenceLineReader(null).read(baseFile.read(0, baseFile.length()));
+    private static void doGenerateDiffWindow(String commitPath, ISVNRAData workFile, ISVNRAData baseFile, ISVNDeltaConsumer consumer) throws IOException, SVNException {
+	    final QSequenceLineResult result;
+	    try {
+		    result = QSequenceLineMedia.createBlocks(new SVNSequenceLineRAData(baseFile), new SVNSequenceLineRAData(workFile), null);
+	    }
+	    catch (QSequenceException ex) {
+		    throw new SVNException(ex);
+	    }
 
-        final List instructions = new ArrayList();
-        final List newDatas = new ArrayList();
-        createInstructions(baseLines, workLines, instructions, newDatas);
+	    try {
+		    final List instructions = new ArrayList();
+		    final List newDatas = new ArrayList();
+		    createInstructions(result, instructions, newDatas);
 
-        final long sourceLength = baseLines.length > 0 ? baseLines[baseLines.length - 1].getTo() + 1 : 0;
-        final long targetLength = workLines.length > 0 ? workLines[workLines.length - 1].getTo() + 1 : 0;
-        final long newDataLength = determineNewDataLength(newDatas);
-        final SVNDiffInstruction[] instructionsArray = (SVNDiffInstruction[]) instructions.toArray(new SVNDiffInstruction[instructions.size()]);
-        final OutputStream stream = consumer.textDeltaChunk(new SVNDiffWindow(0, sourceLength, targetLength, instructionsArray, newDataLength));
-        sendData(newDatas, stream);
-        stream.close();
-        consumer.textDeltaEnd();
+		    final QSequenceLineCache baseLines = result.getLeftCache();
+		    final QSequenceLineCache workLines = result.getRightCache();
+		    final long sourceLength = baseLines.getLineCount() > 0 ? baseLines.getLine(baseLines.getLineCount() - 1).getTo() + 1 : 0;
+		    final long targetLength = workLines.getLineCount() > 0 ? workLines.getLine(workLines.getLineCount() - 1).getTo() + 1 : 0;
+		    final long newDataLength = determineNewDataLength(newDatas);
+		    final SVNDiffInstruction[] instructionsArray = (SVNDiffInstruction[]) instructions.toArray(new SVNDiffInstruction[instructions.size()]);
+		    final OutputStream stream = consumer.textDeltaChunk(commitPath, new SVNDiffWindow(0, sourceLength, targetLength, instructionsArray, newDataLength));
+		    sendData(newDatas, stream);
+		    stream.close();
+		    consumer.textDeltaEnd(commitPath);
+	    }
+	    finally {
+		    result.close();
+	    }
     }
 
     private static boolean canProcess(ISVNRAData workFile, ISVNRAData baseFile) throws IOException {
@@ -85,11 +100,14 @@ public class SVNSequenceDeltaGenerator implements ISVNDeltaGenerator {
         return true;
     }
 
-    private static void createInstructions(final QSequenceLine[] baseLines, final QSequenceLine[] workLines, final List instructions, final List bytesToSend) {
-        final List blocks = QSequenceMedia.createBlocks(baseLines, workLines);
-        int lastBase = 0;
+    private static void createInstructions(final QSequenceLineResult result, final List instructions, final List bytesToSend) throws IOException {
+	    final QSequenceLineCache baseLines = result.getLeftCache();
+	    final QSequenceLineCache workLines = result.getRightCache();
+	    final List blockList = result.getBlocks();
 
-        for (Iterator it = blocks.iterator(); it.hasNext();) {
+	    int lastBase = 0;
+
+        for (Iterator it = blockList.iterator(); it.hasNext();) {
             final QSequenceDifferenceBlock block = (QSequenceDifferenceBlock) it.next();
             final int baseFrom = block.getLeftFrom();
             final int baseTo = block.getLeftTo();
@@ -97,28 +115,28 @@ public class SVNSequenceDeltaGenerator implements ISVNDeltaGenerator {
             final int workTo = block.getRightTo();
 
             if (lastBase < baseFrom) {
-                final long charFrom = baseLines[lastBase].getFrom();
-                final long charTo = baseLines[(baseFrom - 1)].getTo();
+                final long charFrom = baseLines.getLine(lastBase).getFrom();
+                final long charTo = baseLines.getLine(baseFrom - 1).getTo();
                 SVNAssert.assertTrue(charFrom <= charTo);
                 instructions.add(new SVNDiffInstruction(SVNDiffInstruction.COPY_FROM_SOURCE, charTo - charFrom + 1, charFrom));
             }
 
             if (workTo >= workFrom) {
-                final long charFrom = workLines[workFrom].getFrom();
-                final long charTo = workLines[workTo].getTo();
+                final long charFrom = workLines.getLine(workFrom).getFrom();
+                final long charTo = workLines.getLine(workTo).getTo();
                 SVNAssert.assertTrue(charFrom <= charTo);
                 instructions.add(new SVNDiffInstruction(SVNDiffInstruction.COPY_FROM_NEW_DATA, charTo - charFrom + 1, 0));
                 for (int lineIndex = workFrom; lineIndex <= workTo; lineIndex++) {
-                    bytesToSend.add(workLines[lineIndex].getBytes());
+                    bytesToSend.add(workLines.getLine(lineIndex).getBytes());
                 }
             }
 
             lastBase = baseTo + 1;
         }
 
-        if (lastBase <= baseLines.length - 1) {
-            final long baseFrom = baseLines[lastBase].getFrom();
-            final long baseTo = baseLines[(baseLines.length - 1)].getTo();
+        if (lastBase <= baseLines.getLineCount() - 1) {
+            final long baseFrom = baseLines.getLine(lastBase).getFrom();
+            final long baseTo = baseLines.getLine((baseLines.getLineCount() - 1)).getTo();
             SVNAssert.assertTrue(baseFrom <= baseTo);
             instructions.add(new SVNDiffInstruction(SVNDiffInstruction.COPY_FROM_SOURCE, baseTo - baseFrom + 1, baseFrom));
         }

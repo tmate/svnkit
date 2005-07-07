@@ -15,10 +15,10 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.tmatesoft.svn.core.internal.SVNWorkspace;
-import org.tmatesoft.svn.core.io.SVNException;
 
 /**
  * @author TMate Software Ltd.
+ * @deprecated
  */
 public class SVNWorkspaceManager {
 

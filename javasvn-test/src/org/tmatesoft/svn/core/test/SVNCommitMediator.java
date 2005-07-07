@@ -26,9 +26,9 @@ import java.util.StringTokenizer;
 
 import org.tmatesoft.svn.core.ISVNDirectoryEntry;
 import org.tmatesoft.svn.core.ISVNEntry;
+import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.internal.ws.fs.FSRootEntry;
 import org.tmatesoft.svn.core.io.ISVNWorkspaceMediator;
-import org.tmatesoft.svn.core.io.SVNException;
 
 /**
  * @author TMate Software Ltd.

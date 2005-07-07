@@ -3,6 +3,7 @@ package org.tmatesoft.svn.core;
 
 /**
  * @author Marc Strapetz
+ * @deprecated
  */
 public class SVNCommitPacket {
 

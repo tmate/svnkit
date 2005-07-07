@@ -9,19 +9,31 @@
  * newer version instead, at your option.
  * ====================================================================
  */
-
 package org.tmatesoft.svn.core.io;
 
-import java.io.IOException;
+import org.tmatesoft.svn.core.ISVNAnnotateHandler;
+import org.tmatesoft.svn.core.ISVNAuthenticationManager;
+import org.tmatesoft.svn.core.ISVNDirEntryHandler;
+import org.tmatesoft.svn.core.ISVNLogEntryHandler;
+import org.tmatesoft.svn.core.ISVNReporter;
+import org.tmatesoft.svn.core.ISVNReporterBaton;
+import org.tmatesoft.svn.core.SVNDirEntry;
+import org.tmatesoft.svn.core.SVNException;
+import org.tmatesoft.svn.core.SVNLocationEntry;
+import org.tmatesoft.svn.core.SVNLock;
+import org.tmatesoft.svn.core.SVNNodeKind;
+import org.tmatesoft.svn.core.SVNRepositoryFactory;
+import org.tmatesoft.svn.core.SVNRepositoryLocation;
+import org.tmatesoft.svn.core.diff.SVNDiffWindow;
+import org.tmatesoft.svn.core.internal.SVNAnnotationGenerator;
+import org.tmatesoft.svn.util.DebugLog;
+
+import java.io.File;
 import java.io.OutputStream;
 import java.util.Collection;
 import java.util.Date;
 import java.util.LinkedList;
 import java.util.Map;
-
-import org.tmatesoft.svn.core.diff.SVNDiffWindow;
-import org.tmatesoft.svn.core.internal.io.SVNAnnotate;
-import org.tmatesoft.svn.util.DebugLog;
 
 /**
  * The abstract class <code>SVNRepository</code> declares all the basic
@@ -93,6 +105,7 @@ import org.tmatesoft.svn.util.DebugLog;
  * @author 		TMate Software Ltd.
  * @see 		SVNRepositoryLocation
  * @see			SVNRepositoryFactory
+ * @see 		org.tmatesoft.svn.core.internal.io.dav.DAVRepositoryFactory
  */
 
 public abstract class SVNRepository {
@@ -105,20 +118,22 @@ public abstract class SVNRepository {
     private int myLockCount;
     private Thread myLocker;
     private ISVNCredentialsProvider myUserCredentialsProvider;
-	
+    private String myRepositoryRootURL;
+    private ISVNAuthenticationManager myAuthManager;
+
     /**
-	 * Constructs an <code>SVNRepository</code> instance (representing a 
-	 * Repository Access Layer session to work with a repository)
-	 * given the Subversion repository location as an
-	 * <code>SVNRepositoryLocation</code> object.   
-	 * 
-	 * @param location 		an <code>SVNRepositoryLocation</code> object that 
-	 * 						incapsulates the repository location (that is 
-	 * 						a <code>URL</code> pointing to a repository
-	 * 						tree node - not necessarily the repository root
-	 * 						directory which it was installed to).
-	 * @see 				SVNRepositoryLocation
-	 */
+     * Constructs an <code>SVNRepository</code> instance (representing a
+     * Repository Access Layer session to work with a repository)
+     * given the Subversion repository location as an
+     * <code>SVNRepositoryLocation</code> object.
+     *
+     * @param location 		an <code>SVNRepositoryLocation</code> object that
+     * 						incapsulates the repository location (that is
+     * 						a <code>URL</code> pointing to a repository
+     * 						tree node - not necessarily the repository root
+     * 						directory which it was installed to).
+     * @see 				SVNRepositoryLocation
+     */
     protected SVNRepository(SVNRepositoryLocation location) {
         myLocation = location;
     }
@@ -184,7 +199,26 @@ public abstract class SVNRepository {
      * @return 	the repository root <code>URL</code>
      */
     public String getRepositoryRoot() {
+        try {
+            return getRepositoryRoot(false);
+        } catch (SVNException e) {
+            // will not be thrown.
+        }
+        return null;
+    }
+
+    public String getRepositoryRoot(boolean forceConnection) throws SVNException {
+        if (forceConnection && myRepositoryRoot == null) {
+            testConnection();
+        }
         return myRepositoryRoot;
+    }
+
+    public String getRepositoryRootURL(boolean forceConnection) throws SVNException {
+        if (forceConnection && myRepositoryRootURL == null) {
+            testConnection();
+        }
+        return myRepositoryRootURL;
     }
 
     /**
@@ -209,6 +243,10 @@ public abstract class SVNRepository {
     public void setCredentialsProvider(ISVNCredentialsProvider provider) {
         myUserCredentialsProvider = provider;
     }
+
+    public void setAuthenticationManager(ISVNAuthenticationManager authManager) {
+        myAuthManager = authManager;
+    }
     /**
      * Gets the set (if any) provider of client's credentials. The Client's 
      * cridentials that can be obtained from the provider are used then to
@@ -222,6 +260,9 @@ public abstract class SVNRepository {
      */
     public ISVNCredentialsProvider getCredentialsProvider() {
         return myUserCredentialsProvider;
+    }
+    public ISVNAuthenticationManager getAuthenticationManager() {
+        return myAuthManager;
     }
     
     /**
@@ -237,11 +278,12 @@ public abstract class SVNRepository {
      * @see 			#getRepositoryUUID()
      * @see				org.tmatesoft.svn.util.DebugLog
      */
-    protected void setRepositoryCredentials(String uuid, String root) {
+    protected void setRepositoryCredentials(String uuid, String root, String rootURL) {
         if (uuid != null && root != null) {
             myRepositoryUUID = uuid;
             myRepositoryRoot = root;
-            DebugLog.log("REPOSITORY: " + uuid + ":" + root);
+            myRepositoryRootURL = rootURL;
+            DebugLog.log("REPOSITORY: " + uuid + ":" + root + " <" + rootURL + ">");
         }
     }
     
@@ -301,7 +343,7 @@ public abstract class SVNRepository {
      * @param  properties 	a <code>Map</code> instance to receive the revision 
      * 						properties
      * @return 				a hash map containing unversioned revision properties
-     * @throws SVNException if the <code>revision</code> number is invalid (&lt;0) or
+     * @throws SVNException if the <code>revision</code> number is invalid (&lt0) or
      * 						if there's no such <code>revision</code> at all.
      * 						Also if a failure in connection occured or the user 
      * 						authentication failed (see 
@@ -325,7 +367,7 @@ public abstract class SVNRepository {
      * 							to modify revision properties (it's done by default
      * 							when a repository is created) or an appropriate 
      * 							provided hook program (if any) failed;
-     * 							if <code>revision</code> is invalid (&lt;0) or doesn't 
+     * 							if <code>revision</code> is invalid (&lt0) or doesn't 
      * 							exist at all; if a failure in connection occured or the
      * 							user's authentification failed
      * 							(see {@link SVNAuthenticationException}).
@@ -343,7 +385,7 @@ public abstract class SVNRepository {
      * @param 	propertyName 	a property name
      * @return 					a revision property value or <code>null</code> if 
      * 							there's no such value
-     * @throws 	SVNException	if the <code>revision</code> number is invalid (&lt;0) or
+     * @throws 	SVNException	if the <code>revision</code> number is invalid (&lt0) or
      * 							if there's no such <code>revision</code> at all.
      * 							Also if a failure in connection occured or the user's 
      * 							authentication failed (see 
@@ -362,10 +404,7 @@ public abstract class SVNRepository {
      * @param  revision			a revision number which the <code>path</code> is under
      * @return 					the node kind for the given <code>path</code> at the given 
      * 							<code>revision</code>
-     * @throws SVNException  	if the <code>revision</code> number is invalid (&lt;0) or
-     * 							if there's no such <code>revision</code> at all. If there's
-     * 							no such <code>path</code> in that <code>revision</code>.
-     * 							Also if a failure in connection occured or the user's 
+     * @throws SVNException  	if a failure in connection occured or the user's 
      * 							authentication failed (see 
      * 							{@link SVNAuthenticationException}).
      */
@@ -393,7 +432,7 @@ public abstract class SVNRepository {
      * @param properties 		a map collection to receive the file properties
      * @param contents 			<code>OutputStream</code> to write the file contents to
      * @return 					the size of the file in bytes
-     * @throws SVNException		if the <code>revision</code> number is invalid (&lt;0) or
+     * @throws SVNException		if the <code>revision</code> number is invalid (&lt0) or
      * 							if there's no such <code>revision</code> at all. If 
      * 							there's	no such <code>path</code> in that 
      * 							<code>revision</code>. Also if a failure in connection 
@@ -416,10 +455,8 @@ public abstract class SVNRepository {
      * 						values. <code>properties</code> can be <code>null</code> 
      * 						when not interested in directory properties.
      * @param  handler 		a handler to process a next found directory entry
-     * @return 				the number of directory enries
-     * @throws SVNException	if the <code>revision</code> number is invalid (&lt;0) or
-     * 						if there's no such <code>revision</code> at all. If there's
-     * 						no such <code>path</code> in that <code>revision</code>.
+     * @return 				the revision of the directory
+     * @throws SVNException	If there's no such <code>path</code> in that <code>revision</code>.
      * 						Also if a failure in connection occured or the user's 
      * 						authentication failed (see 
      * 						{@link SVNAuthenticationException}).
@@ -522,7 +559,11 @@ public abstract class SVNRepository {
      * @see 					ISVNLogEntryHandler
      * @see 					SVNLogEntry
      */
-    public abstract int log(String[] targetPaths, long startRevision, long endRevision, boolean changedPath, boolean strictNode,
+    public long log(String[] targetPaths, long startRevision, long endRevision, boolean changedPath, boolean strictNode,
+            ISVNLogEntryHandler handler) throws SVNException {
+        return log(targetPaths, startRevision, endRevision,changedPath,strictNode, 0, handler);
+    }
+    public abstract long log(String[] targetPaths, long startRevision, long endRevision, boolean changedPath, boolean strictNode, long limit,
             ISVNLogEntryHandler handler) throws SVNException;
     
     /**
@@ -574,9 +615,9 @@ public abstract class SVNRepository {
             }
             public OutputStream handleDiffWindow(String token, SVNDiffWindow delta) {
             	return new OutputStream() {
-                    public void write(byte[] b, int o, int l) throws IOException {
+                    public void write(byte[] b, int o, int l) {
                     }
-                    public void write(int r) throws IOException {
+                    public void write(int r) {
                     }
                 };
             }
@@ -588,8 +629,6 @@ public abstract class SVNRepository {
     }
     
     /**
-     * 
-     * revision and returns them as a <code>Collection</code> instance.
      * The same as {@link #getDir(String, long, Map, ISVNDirEntryHandler)} except for
      * it just collects all the directory entries found and returns them in a 
      * <code>Collection</code>.  
@@ -609,7 +648,7 @@ public abstract class SVNRepository {
      */
     public Collection getDir(String path, long revision, Map properties, Collection dirEntries) throws SVNException {
         final Collection result = dirEntries != null ? dirEntries : new LinkedList();
-        ISVNDirEntryHandler handler = null;        
+        ISVNDirEntryHandler handler;
         handler = new ISVNDirEntryHandler() {
             public void handleDirEntry(SVNDirEntry dirEntry) {
                 result.add(dirEntry);
@@ -706,14 +745,18 @@ public abstract class SVNRepository {
 			long lastRevision = getLatestRevision();
 			startRevision = startRevision < 0 ? lastRevision : startRevision;
 			endRevision = endRevision < 0 ? lastRevision : endRevision;
-		} 
-		SVNAnnotate annotate = new SVNAnnotate();
-		annotate.setAnnotateHandler(handler);
-		try {
-			getFileRevisions(path, startRevision, endRevision, annotate);
-		} finally {
-			annotate.dispose();
 		}
+
+        File tmpDir = new File(System.getProperty("user.home"), ".javasvn");
+        tmpDir.mkdirs();
+
+        SVNAnnotationGenerator generator = new SVNAnnotationGenerator(path, startRevision, tmpDir);
+        try {
+            getFileRevisions(path, startRevision, endRevision, generator);
+            generator.reportAnnotations(handler, System.getProperty("file.encoding"));
+        } finally {
+            generator.dispose();
+        }
 	}
     
     /* edit-mode methods */
@@ -793,6 +836,7 @@ public abstract class SVNRepository {
      * @see 					ISVNEditor
 	 */
     public abstract void diff(String url, long revision, String target, boolean ignoreAncestry, boolean recursive, ISVNReporterBaton reporter, ISVNEditor editor) throws SVNException;
+    public abstract void diff(String url, long targetRevision, long revision, String target, boolean ignoreAncestry, boolean recursive, ISVNReporterBaton reporter, ISVNEditor editor) throws SVNException;
     
     /**
      * Asks the Repository Access (RA) Layer to update a working copy.
@@ -1003,7 +1047,7 @@ public abstract class SVNRepository {
     /**
      * Ask the Repository Access Layer to inform about an entry located at a 
      * <code>path</code> under a specified <code>revision</code>. If the 
-     * <code>revision</code> is invalid (&lt;0) it is assigned to the HEAD-revision 
+     * <code>revision</code> is invalid (&lt0) it is assigned to the HEAD-revision 
      * (the latest revision of the repository).
      * 
      * @param  path			an entry path (relative to a repository location path)
@@ -1026,7 +1070,7 @@ public abstract class SVNRepository {
 	 * {@link ISVNEditor#openRoot(long) ISVNEditor.openRoot(revision)}.
 	 * 
 	 * <p>
-	 * <code>locks</code>, if non-<code>null</code>, is a <code>Map</code> which
+	 * <code>locks</code>, if non-<code>null</code>, is a <code>Map<code> which
  	 * keys are locked paths in a working copy and each value for a key is a lock 
  	 * token (its identifier, in other words).  The server checks that the
  	 * correct token is provided for each committed, locked path. <code>locks</code> 
@@ -1146,9 +1190,7 @@ public abstract class SVNRepository {
      * @since 						SVN 1.2
      */
     public abstract SVNLock setLock(String path, String comment, boolean force, long revision) throws SVNException;
-
-    public abstract SVNLock[] setLocks(String[] paths, String comment, boolean force, long[] revisions) throws SVNException;
-
+    
     /**
 	 * Removes the repository lock for the file located at the <code>path</code>.
 	 * The lock is identified by its token.
@@ -1183,9 +1225,7 @@ public abstract class SVNRepository {
      * @since				SVN 1.2
      */
     public abstract void removeLock(String path, String id, boolean force) throws SVNException;
-
-    public abstract void removeLocks(String[] paths, String[] ids, boolean force) throws SVNException;
-
+    
     /**
      * Locks the current session <code>SVNRepository</code> object. It prevents
      * from using non-reenterable methods of this object (for example, while having
@@ -1198,15 +1238,17 @@ public abstract class SVNRepository {
      * @see 	#unlock()
      */
     protected synchronized void lock() {
-    	try {
-    	    while ((myLockCount > 0) || (myLocker != null)) {
-	    		if (Thread.currentThread() == myLocker) {
-	    			throw new Error("SVNRerpository methods are not reenterable");
-	            }
-	    		wait();
-    	    }
-    	    myLocker = Thread.currentThread();
-            myLockCount = 1;
+        try {
+            synchronized(this) {
+                while ((myLockCount > 0) || (myLocker != null)) {
+                    if (Thread.currentThread() == myLocker) {
+                        throw new Error("SVNRerpository methods are not reenterable");
+                    }
+                    wait();
+                }
+                myLocker = Thread.currentThread();
+                myLockCount = 1;
+            }
     	} catch (InterruptedException e) {
     	    throw new Error("Interrupted attempt to aquire write lock");
     	}
@@ -1225,10 +1267,12 @@ public abstract class SVNRepository {
      * @see 	#lock()
      */
     protected synchronized void unlock() {
-        if (--myLockCount <= 0) {
-            myLockCount = 0;
-            myLocker = null;
-            notifyAll();
+        synchronized(this) {
+            if (--myLockCount <= 0) {
+                myLockCount = 0;
+                myLocker = null;
+                notifyAll();
+            }
         }
     }
     
@@ -1256,7 +1300,7 @@ public abstract class SVNRepository {
     }
     
     /**
-     * Checks if the <code>revision</code> number is invalid (that is &lt;0); 
+     * Checks if the <code>revision</code> number is invalid (that is &lt 0); 
      * 
      * @param revision 		the revision number to be checked for invalidity.
      * @return 				<code>true</code> if <code>revision</code> is invalid,
@@ -1267,7 +1311,7 @@ public abstract class SVNRepository {
     }    
     
     /**
-     * Says if the <code>revision</code> number is valid (i.e. &gt; or == 0); 
+     * Says if the <code>revision</code> number is valid (i.e. &gt or == 0); 
      * 
      * @param revision 	the revision number to be checked for validity
      * @return 			<code>true</code> if valid, <code>false</code> otherwise
@@ -1293,7 +1337,7 @@ public abstract class SVNRepository {
     
     /**
      * This assertion method checks if the revision number can be assumed as valid.
-     * Note that only numbers &gt; or = 0 can be applied for revisioning! 
+     * Note that only numbers &gt or = 0 can be applied for revisioning! 
      * 
      * @param  revision 		the revision number to be checked for validity.  
      * @throws SVNException		

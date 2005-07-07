@@ -22,17 +22,17 @@ import java.util.List;
 import org.tmatesoft.svn.core.ISVNDirectoryEntry;
 import org.tmatesoft.svn.core.ISVNEntry;
 import org.tmatesoft.svn.core.ISVNFileEntry;
+import org.tmatesoft.svn.core.ISVNReporter;
+import org.tmatesoft.svn.core.ISVNReporterBaton;
+import org.tmatesoft.svn.core.SVNCommitInfo;
+import org.tmatesoft.svn.core.SVNException;
+import org.tmatesoft.svn.core.SVNRepositoryLocation;
 import org.tmatesoft.svn.core.diff.SVNDiffWindow;
 import org.tmatesoft.svn.core.diff.SVNDiffWindowBuilder;
 import org.tmatesoft.svn.core.internal.ws.fs.FSEntryFactory;
 import org.tmatesoft.svn.core.io.ISVNEditor;
-import org.tmatesoft.svn.core.io.ISVNReporter;
-import org.tmatesoft.svn.core.io.ISVNReporterBaton;
 import org.tmatesoft.svn.core.io.ISVNWorkspaceMediator;
-import org.tmatesoft.svn.core.io.SVNCommitInfo;
-import org.tmatesoft.svn.core.io.SVNException;
 import org.tmatesoft.svn.core.io.SVNRepository;
-import org.tmatesoft.svn.core.io.SVNRepositoryLocation;
 import org.tmatesoft.svn.util.TimeUtil;
 
 /**
@@ -248,8 +248,8 @@ public class TestSVNFSEntries extends AbstractRepositoryTest {
             // update modified props.
             // drop "commited-rev" -> will be reset.
             ISVNFileEntry file = (ISVNFileEntry) root;
-            file.generateDelta(editor);
-            editor.closeFile(null);
+            file.generateDelta(root.getPath(), editor);
+            editor.closeFile(root.getPath(), null);
         }
     }
     
@@ -292,23 +292,23 @@ public class TestSVNFSEntries extends AbstractRepositoryTest {
         // add file            
         commit.addDir("newDirectory", null, -1);
         commit.addFile("newDirectory/newFile.txt", null, -1);
-        commit.applyTextDelta(null);
+        commit.applyTextDelta("newDirectory/newFile.txt", null);
         SVNDiffWindow window = SVNDiffWindowBuilder.createReplacementDiffWindow(4);
-        OutputStream os = commit.textDeltaChunk(window);
+        OutputStream os = commit.textDeltaChunk("newDirectory/newFile.txt", window);
         os.write("file".getBytes());
         os.close();
-        commit.textDeltaEnd();
-        commit.closeFile(null);
+        commit.textDeltaEnd("newDirectory/newFile.txt");
+        commit.closeFile("newDirectory/newFile.txt", null);
         commit.closeDir();
         // change file
         commit.openFile(fileName, 1);
-        commit.applyTextDelta(null);
+        commit.applyTextDelta(fileName, null);
         window = SVNDiffWindowBuilder.createReplacementDiffWindow(8);
-        os = commit.textDeltaChunk(window);
+        os = commit.textDeltaChunk(fileName, window);
         os.write("modified".getBytes());
         os.close();
-        commit.textDeltaEnd();
-        commit.closeFile(null);
+        commit.textDeltaEnd(fileName);
+        commit.closeFile(fileName, null);
         // delete only for root repository!
         if (delete) {
             commit.deleteEntry("directory", 1);
@@ -360,8 +360,8 @@ public class TestSVNFSEntries extends AbstractRepositoryTest {
             ISVNFileEntry file = (ISVNFileEntry) root;
             editor.addFile(root.getPath(), null, -1);
             file.setPropertyValue("svn:entry:schedule", "add");
-            file.generateDelta(editor);
-            editor.closeFile(null);
+            file.generateDelta(root.getPath(), editor);
+            editor.closeFile(root.getPath(), null);
                         
         }
     }
