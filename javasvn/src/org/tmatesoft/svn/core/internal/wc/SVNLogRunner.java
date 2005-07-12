@@ -1,5 +1,12 @@
 /*
- * Created on 18.05.2005
+ * ====================================================================
+ * Copyright (c) 2004 TMate Software Ltd. All rights reserved.
+ * 
+ * This software is licensed as described in the file COPYING, which you should
+ * have received as part of this distribution. The terms are also available at
+ * http://tmate.org/svn/license.html. If newer versions of this license are
+ * posted there, you may use a newer version instead, at your option.
+ * ====================================================================
  */
 package org.tmatesoft.svn.core.internal.wc;
 
@@ -11,20 +18,25 @@ import java.util.Date;
 import java.util.Iterator;
 import java.util.Map;
 
-import org.tmatesoft.svn.core.SVNException;
-import org.tmatesoft.svn.core.SVNNodeKind;
 import org.tmatesoft.svn.core.SVNProperty;
+import org.tmatesoft.svn.core.io.SVNException;
+import org.tmatesoft.svn.core.io.SVNNodeKind;
 import org.tmatesoft.svn.core.wc.SVNStatusType;
 import org.tmatesoft.svn.core.wc.SVNWCUtil;
 import org.tmatesoft.svn.util.DebugLog;
 import org.tmatesoft.svn.util.TimeUtil;
 import org.tmatesoft.svn.util.PathUtil;
 
+/**
+ * @version 1.0
+ * @author TMate Software Ltd.
+ */
 public class SVNLogRunner {
 
     private boolean myIsEntriesChanged;
 
-    public void runCommand(SVNDirectory dir, String name, Map attributes) throws SVNException {
+    public void runCommand(SVNDirectory dir, String name, Map attributes)
+            throws SVNException {
         String fileName = (String) attributes.remove(SVNLog.NAME_ATTR);
         DebugLog.log("running: " + name + ":" + fileName + " : " + attributes);
         if (SVNLog.DELETE_ENTRY.equals(name)) {
@@ -44,13 +56,16 @@ public class SVNLogRunner {
 
                 if (SVNLog.WC_TIMESTAMP.equals(value)) {
                     if (SVNProperty.PROP_TIME.equals(attName)) {
-                        String path = "".equals(fileName) ? ".svn/dir-props" : ".svn/props/" + fileName + ".svn-work";
+                        String path = "".equals(fileName) ? ".svn/dir-props"
+                                : ".svn/props/" + fileName + ".svn-work";
                         File file = new File(dir.getRoot(), path);
-                        value = TimeUtil.formatDate(new Date(file.lastModified()));
+                        value = TimeUtil.formatDate(new Date(file
+                                .lastModified()));
                     } else if (SVNProperty.TEXT_TIME.equals(attName)) {
                         String path = "".equals(fileName) ? "" : fileName;
                         File file = new File(dir.getRoot(), path);
-                        value = TimeUtil.formatDate(new Date(file.lastModified()));
+                        value = TimeUtil.formatDate(new Date(file
+                                .lastModified()));
                     }
                 }
 
@@ -60,8 +75,10 @@ public class SVNLogRunner {
             setEntriesChanged(modified);
         } else if (SVNLog.MODIFY_WC_PROPERTY.equals(name)) {
             SVNProperties props = dir.getWCProperties(fileName);
-            String propName = (String) attributes.get(SVNLog.PROPERTY_NAME_ATTR);
-            String propValue = (String) attributes.get(SVNLog.PROPERTY_VALUE_ATTR);
+            String propName = (String) attributes
+                    .get(SVNLog.PROPERTY_NAME_ATTR);
+            String propValue = (String) attributes
+                    .get(SVNLog.PROPERTY_VALUE_ATTR);
             props.setPropertyValue(propName, propValue);
         } else if (SVNLog.DELETE_LOCK.equals(name)) {
             SVNEntries entries = dir.getEntries();
@@ -78,28 +95,25 @@ public class SVNLogRunner {
             file.delete();
         } else if (SVNLog.READONLY.equals(name)) {
             File file = new File(dir.getRoot(), fileName);
-            try {
-                SVNFileUtil.setReadonly(file, true);
-            } catch (IOException e) {
-                SVNErrorManager.error(0, e);
-            }
+            SVNFileUtil.setReadonly(file, true);
         } else if (SVNLog.MOVE.equals(name)) {
             File src = new File(dir.getRoot(), fileName);
-            File dst = new File(dir.getRoot(), (String) attributes.get(SVNLog.DEST_ATTR));
-            try {
-                SVNFileUtil.rename(src, dst);
-            } catch (IOException e) {
-                SVNErrorManager.error(0, e);
+            File dst = new File(dir.getRoot(), (String) attributes
+                    .get(SVNLog.DEST_ATTR));
+            if (!src.exists() && dst.exists()) {
+                return;
             }
+            SVNFileUtil.rename(src, dst);
         } else if (SVNLog.APPEND.equals(name)) {
             File src = new File(dir.getRoot(), fileName);
-            File dst = new File(dir.getRoot(), (String) attributes.get(SVNLog.DEST_ATTR));
+            File dst = new File(dir.getRoot(), (String) attributes
+                    .get(SVNLog.DEST_ATTR));
             OutputStream os = null;
             InputStream is = null;
             try {
                 os = SVNFileUtil.openFileForWriting(dst, true);
                 is = SVNFileUtil.openFileForReading(src);
-                while(true) {
+                while (true) {
                     int r = is.read();
                     if (r < 0) {
                         break;
@@ -107,24 +121,22 @@ public class SVNLogRunner {
                     os.write(r);
                 }
             } catch (IOException e) {
-                SVNErrorManager.error(0, e);
+                SVNErrorManager.error("svn: Cannot append data to file '" + dst + "'");
             } finally {
                 SVNFileUtil.closeFile(os);
                 SVNFileUtil.closeFile(is);
             }
         } else if (SVNLog.SET_TIMESTAMP.equals(name)) {
             File file = new File(dir.getRoot(), fileName);
-            Date time = TimeUtil.parseDate((String) attributes.get(SVNLog.TIMESTAMP_ATTR));
+            Date time = TimeUtil.parseDate((String) attributes
+                    .get(SVNLog.TIMESTAMP_ATTR));
             file.setLastModified(time.getTime());
         } else if (SVNLog.MAYBE_READONLY.equals(name)) {
             SVNEntries entries = dir.getEntries();
-            if (entries.getEntry(fileName, true) != null &&
-                    entries.getEntry(fileName, true).getLockToken() == null) {
-                try {
-                    SVNFileUtil.setReadonly(new File(dir.getRoot(), fileName), true);
-                } catch (IOException e) {
-                    SVNErrorManager.error(0, e);
-                }
+            if (entries.getEntry(fileName, true) != null
+                    && entries.getEntry(fileName, true).getLockToken() == null) {
+                SVNFileUtil
+                        .setReadonly(new File(dir.getRoot(), fileName), true);
             }
         } else if (SVNLog.COPY_AND_TRANSLATE.equals(name)) {
             String dstName = (String) attributes.get(SVNLog.DEST_ATTR);
@@ -133,21 +145,20 @@ public class SVNLogRunner {
             SVNProperties props = dir.getProperties(dstName, false);
             boolean executable = props.getPropertyValue(SVNProperty.EXECUTABLE) != null;
 
-            SVNTranslator.translate(dir, dstName, fileName, dstName, true, true);
+            SVNTranslator
+                    .translate(dir, dstName, fileName, dstName, true, true);
             if (executable) {
                 SVNFileUtil.setExecutable(dst, true);
             }
             SVNEntry entry = dir.getEntries().getEntry(dstName, true);
-            if (entry.getLockToken() == null && props.getPropertyValue(SVNProperty.NEEDS_LOCK) != null) {
-                try {
-                    SVNFileUtil.setReadonly(dst, true);
-                } catch (IOException e) {
-                    SVNErrorManager.error(0, e);
-                }
+            if (entry.getLockToken() == null
+                    && props.getPropertyValue(SVNProperty.NEEDS_LOCK) != null) {
+                SVNFileUtil.setReadonly(dst, true);
             }
         } else if (SVNLog.COPY_AND_DETRANSLATE.equals(name)) {
             String dstName = (String) attributes.get(SVNLog.DEST_ATTR);
-            SVNTranslator.translate(dir, fileName, fileName, dstName, false, true);
+            SVNTranslator.translate(dir, fileName, fileName, dstName, false,
+                    true);
         } else if (SVNLog.MERGE.equals(name)) {
             File target = new File(dir.getRoot(), fileName);
             String leftPath = (String) attributes.get(SVNLog.ATTR1);
@@ -162,49 +173,56 @@ public class SVNLogRunner {
             SVNProperties props = dir.getProperties(fileName, false);
             SVNEntry entry = dir.getEntries().getEntry(fileName, true);
 
-            SVNStatusType mergeResult = dir.mergeText(fileName, leftPath, rightPath, targetLabel, leftLabel, rightLabel, false);
+            String leaveConglictsAttr = (String) attributes.get(SVNLog.ATTR6);
+            boolean leaveConflicts = Boolean.TRUE.toString().equals(leaveConglictsAttr);
+            SVNStatusType mergeResult = dir.mergeText(fileName, leftPath,
+                    rightPath, targetLabel, leftLabel, rightLabel, leaveConflicts, false);
 
             if (props.getPropertyValue(SVNProperty.EXECUTABLE) != null) {
                 SVNFileUtil.setExecutable(target, true);
             }
-            if (props.getPropertyValue(SVNProperty.NEEDS_LOCK) != null && entry.getLockToken() == null) {
-                try {
-                    SVNFileUtil.setReadonly(target, true);
-                } catch (IOException e) {
-                    SVNErrorManager.error(0, e);
-                }
+            if (props.getPropertyValue(SVNProperty.NEEDS_LOCK) != null
+                    && entry.getLockToken() == null) {
+                SVNFileUtil.setReadonly(target, true);
             }
-            setEntriesChanged(mergeResult == SVNStatusType.CONFLICTED);
+            setEntriesChanged(mergeResult == SVNStatusType.CONFLICTED || 
+                    mergeResult == SVNStatusType.CONFLICTED_UNRESOLVED);
         } else if (SVNLog.COMMIT.equals(name)) {
             if (attributes.get(SVNLog.REVISION_ATTR) == null) {
-                SVNErrorManager.error("svn: Missing revision attribute for '" + fileName + "'");
+                SVNErrorManager.error("svn: Missing revision attribute for '"
+                        + fileName + "'");
             }
             SVNEntry entry = dir.getEntries().getEntry(fileName, true);
-            if (entry == null || (!"".equals(fileName) && entry.getKind() != SVNNodeKind.FILE)) {
+            if (entry == null
+                    || (!"".equals(fileName) && entry.getKind() != SVNNodeKind.FILE)) {
                 DebugLog.log("entry: " + entry);
                 DebugLog.log("kind: " + entry.getKind());
                 DebugLog.log("name: " + fileName);
-                SVNErrorManager.error("svn: Log command for directory '" + dir.getRoot() + "' is mislocated");
+                SVNErrorManager.error("svn: Log command for directory '"
+                        + dir.getRoot() + "' is mislocated");
             }
             setEntriesChanged(true);
-            long revisionNumber = Long.parseLong((String) attributes.get(SVNLog.REVISION_ATTR));
+            long revisionNumber = Long.parseLong((String) attributes
+                    .get(SVNLog.REVISION_ATTR));
             if (entry.isScheduledForDeletion()) {
                 if ("".equals(fileName)) {
                     entry.setRevision(revisionNumber);
                     entry.setKind(SVNNodeKind.DIR);
-                    File killMe = dir.getFile(".svn/KILLME", false);
+                    File killMe = dir.getFile(".svn/KILLME");
                     if (killMe.getParentFile().isDirectory()) {
                         try {
                             killMe.createNewFile();
                         } catch (IOException e) {
-                            SVNErrorManager.error(0, e);
+                            SVNErrorManager.error("svn: Cannot create file '"
+                                    + killMe + "'");
                         }
                     }
                 } else {
                     dir.destroy(fileName, false);
                     SVNEntry parentEntry = dir.getEntries().getEntry("", true);
                     if (revisionNumber > parentEntry.getRevision()) {
-                        SVNEntry fileEntry = dir.getEntries().addEntry(fileName);
+                        SVNEntry fileEntry = dir.getEntries()
+                                .addEntry(fileName);
                         fileEntry.setKind(SVNNodeKind.FILE);
                         fileEntry.setDeleted(true);
                         fileEntry.setRevision(revisionNumber);
@@ -214,12 +232,14 @@ public class SVNLogRunner {
             }
 
             if (entry.isScheduledForReplacement() && "".equals(fileName)) {
-                for (Iterator ents = dir.getEntries().entries(true); ents.hasNext();) {
+                for (Iterator ents = dir.getEntries().entries(true); ents
+                        .hasNext();) {
                     SVNEntry currentEntry = (SVNEntry) ents.next();
                     if (!currentEntry.isScheduledForDeletion()) {
                         continue;
                     }
-                    if (currentEntry.getKind() == SVNNodeKind.FILE || currentEntry.getKind() == SVNNodeKind.DIR) {
+                    if (currentEntry.getKind() == SVNNodeKind.FILE
+                            || currentEntry.getKind() == SVNNodeKind.DIR) {
                         dir.destroy(currentEntry.getName(), false);
                     }
                 }
@@ -229,19 +249,23 @@ public class SVNLogRunner {
             if (!"".equals(fileName)) {
                 File tmpFile = dir.getBaseFile(fileName, true);
                 SVNFileType fileType = SVNFileType.getType(tmpFile);
-                if (fileType == SVNFileType.FILE || fileType == SVNFileType.SYMLINK) {
+                if (fileType == SVNFileType.FILE
+                        || fileType == SVNFileType.SYMLINK) {
                     // check if wc file is not modified
-                    File tmpFile2 = SVNFileUtil.createUniqueFile(tmpFile.getParentFile(), fileName, ".tmp");
+                    File tmpFile2 = SVNFileUtil.createUniqueFile(tmpFile
+                            .getParentFile(), fileName, ".tmp");
                     boolean equals = true;
                     try {
                         String tmpFile2Path = SVNFileUtil.getBasePath(tmpFile2);
-                        SVNTranslator.translate(dir, fileName, fileName, tmpFile2Path, false, false);
-                        equals = SVNFileUtil.compareFiles(tmpFile, tmpFile2, null);
+                        SVNTranslator.translate(dir, fileName, fileName,
+                                tmpFile2Path, false, false);
+                        equals = SVNFileUtil.compareFiles(tmpFile, tmpFile2,
+                                null);
                     } finally {
                         tmpFile2.delete();
                     }
                     if (equals) {
-                        textTime = dir.getFile(fileName, false).lastModified();
+                        textTime = dir.getFile(fileName).lastModified();
                     } else {
                         textTime = tmpFile.lastModified();
                     }
@@ -259,77 +283,75 @@ public class SVNLogRunner {
 
             SVNFileType tmpPropsType = SVNFileType.getType(tmpProps.getFile());
             if (tmpPropsType == SVNFileType.FILE) {
-                boolean equals = SVNFileUtil.compareFiles(wcProps.getFile(), tmpProps.getFile(), null);
-                propTime = equals ? wcProps.getFile().lastModified() : tmpProps.getFile().lastModified();
+                boolean equals = SVNFileUtil.compareFiles(wcProps.getFile(),
+                        tmpProps.getFile(), null);
+                propTime = equals ? wcProps.getFile().lastModified() : tmpProps
+                        .getFile().lastModified();
                 if (!"".equals(fileName)) {
                     Map propDiff = baseProps.compareTo(tmpProps);
-                    setReadWrite = propDiff != null && propDiff.containsKey(SVNProperty.NEEDS_LOCK) &&
-                            propDiff.get(SVNProperty.NEEDS_LOCK) == null;
-                    setNotExecutable = propDiff != null && propDiff.containsKey(SVNProperty.EXECUTABLE) &&
-                            propDiff.get(SVNProperty.EXECUTABLE) == null;
+                    setReadWrite = propDiff != null
+                            && propDiff.containsKey(SVNProperty.NEEDS_LOCK)
+                            && propDiff.get(SVNProperty.NEEDS_LOCK) == null;
+                    setNotExecutable = propDiff != null
+                            && propDiff.containsKey(SVNProperty.EXECUTABLE)
+                            && propDiff.get(SVNProperty.EXECUTABLE) == null;
                 }
                 try {
                     SVNFileUtil.rename(tmpProps.getFile(), baseProps.getFile());
                     SVNFileUtil.setReadonly(baseProps.getFile(), true);
-                } catch (IOException e) {
-                    SVNErrorManager.error(0, e);
                 } finally {
                     tmpProps.delete();
                 }
+            } else if (entry.getPropTime() == null && !wcProps.isEmpty()) {
+                propTime = wcProps.getFile().lastModified();
             }
-
+            
             if (!"".equals(fileName)) {
                 File tmpFile = dir.getBaseFile(fileName, true);
                 File baseFile = dir.getBaseFile(fileName, false);
-                File wcFile = dir.getFile(fileName, false);
-                File tmpFile2 = SVNFileUtil.createUniqueFile(tmpFile.getParentFile(), fileName, ".tmp");
+                File wcFile = dir.getFile(fileName);
+                File tmpFile2 = SVNFileUtil.createUniqueFile(tmpFile
+                        .getParentFile(), fileName, ".tmp");
                 try {
                     boolean overwritten = false;
                     SVNFileType fileType = SVNFileType.getType(tmpFile);
-                    boolean special = dir.getProperties(fileName, false).getPropertyValue(SVNProperty.SPECIAL) != null;
+                    boolean special = dir.getProperties(fileName, false)
+                            .getPropertyValue(SVNProperty.SPECIAL) != null;
                     if (SVNFileUtil.isWindows || !special) {
-                        if (fileType == SVNFileType.FILE ) {
-                            SVNTranslator.translate(dir, fileName, SVNFileUtil.getBasePath(tmpFile), SVNFileUtil.getBasePath(tmpFile2), true, false);
+                        if (fileType == SVNFileType.FILE) {
+                            SVNTranslator.translate(dir, fileName, SVNFileUtil
+                                    .getBasePath(tmpFile), SVNFileUtil
+                                    .getBasePath(tmpFile2), true, false);
                         } else {
-                            SVNTranslator.translate(dir, fileName, fileName, SVNFileUtil.getBasePath(tmpFile2), true, false);
+                            SVNTranslator.translate(dir, fileName, fileName,
+                                    SVNFileUtil.getBasePath(tmpFile2), true,
+                                    false);
                         }
                         if (!SVNFileUtil.compareFiles(tmpFile2, wcFile, null)) {
-                            try {
-                                SVNFileUtil.copy(tmpFile2, wcFile, true);
-                                overwritten = true;
-                            } catch (IOException e) {
-                                SVNErrorManager.error(0, e);
-                            }
+                            SVNFileUtil.copyFile(tmpFile2, wcFile, true);
+                            overwritten = true;
                         }
                     }
-                    boolean needsReadonly = dir.getProperties(fileName, false).getPropertyValue(SVNProperty.NEEDS_LOCK) != null && entry.getLockToken() == null;
-                    boolean needsExecutable = dir.getProperties(fileName, false).getPropertyValue(SVNProperty.EXECUTABLE) != null;
+                    boolean needsReadonly = dir.getProperties(fileName, false)
+                            .getPropertyValue(SVNProperty.NEEDS_LOCK) != null
+                            && entry.getLockToken() == null;
+                    boolean needsExecutable = dir
+                            .getProperties(fileName, false).getPropertyValue(
+                                    SVNProperty.EXECUTABLE) != null;
                     if (needsReadonly) {
-                        try {
-                            SVNFileUtil.setReadonly(wcFile, true);
-                            overwritten = true;
-                        } catch (IOException e) {
-                            SVNErrorManager.error(0, e);
-                        }
+                        SVNFileUtil.setReadonly(wcFile, true);
+                        overwritten = true;
                     }
                     if (needsExecutable) {
                         SVNFileUtil.setExecutable(wcFile, true);
                         overwritten = true;
                     }
                     if (fileType == SVNFileType.FILE) {
-                        try {
-                            SVNFileUtil.rename(tmpFile, baseFile);
-                        } catch (IOException e) {
-                            SVNErrorManager.error(0, e);
-                        }
+                        SVNFileUtil.rename(tmpFile, baseFile);
                     }
                     if (setReadWrite) {
-                        try {
-                            SVNFileUtil.setReadonly(wcFile, false);
-                            overwritten = true;
-                        } catch (IOException e) {
-                            SVNErrorManager.error(0, e);
-                        }
+                        SVNFileUtil.setReadonly(wcFile, false);
+                        overwritten = true;
                     }
                     if (setNotExecutable) {
                         SVNFileUtil.setExecutable(wcFile, false);
@@ -345,12 +367,15 @@ public class SVNLogRunner {
             }
             // update entry
             entry.setRevision(revisionNumber);
-            entry.setKind("".equals(fileName) ? SVNNodeKind.DIR : SVNNodeKind.FILE);
+            entry.setKind("".equals(fileName) ? SVNNodeKind.DIR
+                    : SVNNodeKind.FILE);
             entry.unschedule();
             entry.setCopied(false);
             entry.setDeleted(false);
-            entry.setTextTime(textTime == 0 ? null : TimeUtil.formatDate(new Date(textTime)));
-            entry.setPropTime(propTime == 0 ? null : TimeUtil.formatDate(new Date(propTime)));
+            entry.setTextTime(textTime == 0 ? null : TimeUtil
+                    .formatDate(new Date(textTime)));
+            entry.setPropTime(propTime == 0 ? null : TimeUtil
+                    .formatDate(new Date(propTime)));
             entry.setConflictNew(null);
             entry.setConflictOld(null);
             entry.setConflictWorking(null);
@@ -367,7 +392,8 @@ public class SVNLogRunner {
             if (SVNWCUtil.isWorkingCopyRoot(dirFile, true)) {
                 return;
             }
-            String parentPath = "".equals(dir.getPath()) ? null : PathUtil.removeTail(dir.getPath());
+            String parentPath = "".equals(dir.getPath()) ? null : PathUtil
+                    .removeTail(dir.getPath());
             if (PathUtil.isEmpty(parentPath)) {
                 parentPath = "";
             }
@@ -379,7 +405,8 @@ public class SVNLogRunner {
                 parentAccess.open(true, false);
             }
             String nameInParent = dirFile.getName();
-            SVNEntry entryInParent = parentDir.getEntries().getEntry(nameInParent, false);
+            SVNEntry entryInParent = parentDir.getEntries().getEntry(
+                    nameInParent, false);
             if (entryInParent != null) {
                 entryInParent.unschedule();
                 entryInParent.setCopied(false);
@@ -399,8 +426,9 @@ public class SVNLogRunner {
     }
 
     public void logCompleted(SVNDirectory dir) throws SVNException {
-        boolean killMe = dir.getFile(".svn/KILLME", false).isFile();
-        long dirRevision = killMe ? dir.getEntries().getEntry("", true).getRevision() : -1;
+        boolean killMe = dir.getFile(".svn/KILLME").isFile();
+        long dirRevision = killMe ? dir.getEntries().getEntry("", true)
+                .getRevision() : -1;
         if (myIsEntriesChanged) {
             dir.getEntries().save(false);
         } else {
@@ -414,7 +442,8 @@ public class SVNLogRunner {
             if (SVNWCUtil.isWorkingCopyRoot(dirFile, true)) {
                 return;
             }
-            String parentPath = "".equals(dir.getPath()) ? null : PathUtil.removeTail(dir.getPath());
+            String parentPath = "".equals(dir.getPath()) ? null : PathUtil
+                    .removeTail(dir.getPath());
             if (PathUtil.isEmpty(parentPath)) {
                 parentPath = "";
             }
@@ -430,7 +459,8 @@ public class SVNLogRunner {
             SVNEntry parentEntry = parentDir.getEntries().getEntry("", false);
             if (parentEntry != null && parentEntry.getRevision() <= dirRevision) {
                 // create 'deleted' entry
-                SVNEntry entryInParent = parentDir.getEntries().addEntry(nameInParent);
+                SVNEntry entryInParent = parentDir.getEntries().addEntry(
+                        nameInParent);
                 entryInParent.setDeleted(true);
                 entryInParent.setKind(SVNNodeKind.DIR);
                 entryInParent.setRevision(dirRevision);

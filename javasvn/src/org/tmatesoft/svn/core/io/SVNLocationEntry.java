@@ -10,10 +10,7 @@
  * ====================================================================
  */
 
-package org.tmatesoft.svn.core;
-
-import org.tmatesoft.svn.core.io.ISVNLocationEntryHandler;
-import org.tmatesoft.svn.core.io.SVNRepository;
+package org.tmatesoft.svn.core.io;
 
 /**
  * A location entry represents the combination of the two following related matters:

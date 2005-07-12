@@ -22,11 +22,11 @@ import java.util.TreeMap;
 import org.tmatesoft.svn.core.ISVNDirectoryEntry;
 import org.tmatesoft.svn.core.ISVNEntry;
 import org.tmatesoft.svn.core.ISVNStatusHandler;
-import org.tmatesoft.svn.core.SVNException;
-import org.tmatesoft.svn.core.SVNLock;
 import org.tmatesoft.svn.core.SVNProperty;
 import org.tmatesoft.svn.core.SVNStatus;
 import org.tmatesoft.svn.core.internal.ws.fs.FSDirEntry;
+import org.tmatesoft.svn.core.io.SVNException;
+import org.tmatesoft.svn.core.io.SVNLock;
 import org.tmatesoft.svn.core.progress.ISVNProgressViewer;
 import org.tmatesoft.svn.core.progress.SVNProgressDummyViewer;
 import org.tmatesoft.svn.core.progress.SVNProgressViewerIterator;
@@ -35,6 +35,7 @@ import org.tmatesoft.svn.util.TimeUtil;
 import org.tmatesoft.svn.util.DebugLog;
 
 /**
+ * @version 1.0
  * @author TMate Software Ltd.
  */
 class SVNStatusUtil {

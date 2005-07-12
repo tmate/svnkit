@@ -12,11 +12,11 @@
 
 package org.tmatesoft.svn.core.internal.io.dav.handlers;
 
-import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.diff.SVNDiffWindow;
 import org.tmatesoft.svn.core.internal.io.dav.DAVElement;
 import org.tmatesoft.svn.core.internal.io.dav.DAVUtil;
 import org.tmatesoft.svn.core.io.ISVNFileRevisionHandler;
+import org.tmatesoft.svn.core.io.SVNException;
 import org.tmatesoft.svn.core.io.SVNFileRevision;
 import org.tmatesoft.svn.util.Base64;
 import org.xml.sax.Attributes;
@@ -26,8 +26,10 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
+
 /**
- * @author TMate Software Ltd.
+ * @version 1.0
+ * @author  TMate Software Ltd.
  */
 public class DAVFileRevisionHandler extends BasicDAVDeltaHandler {
 	
@@ -92,7 +94,7 @@ public class DAVFileRevisionHandler extends BasicDAVDeltaHandler {
 		}
 	}
     
-	protected void endElement(DAVElement parent, DAVElement element, StringBuffer cdata) {
+	protected void endElement(DAVElement parent, DAVElement element, StringBuffer cdata) throws SVNException {
         if (element == FILE_REVISION) {
             myPath = null;
             myProperties = null;
@@ -101,8 +103,8 @@ public class DAVFileRevisionHandler extends BasicDAVDeltaHandler {
             myPropertyName = null;
         } else if (element == TX_DELTA) {
             setDeltaProcessing(false);
-			myCount++;
-		} else if (element == REVISION_PROPERTY) {
+            myCount++;
+        } else if (element == REVISION_PROPERTY) {
             if (myProperties == null) {
                 myProperties = new HashMap();
             }
@@ -134,7 +136,7 @@ public class DAVFileRevisionHandler extends BasicDAVDeltaHandler {
             myPropertyEncoding = null;
             myPropertyName = null;
         }
-	}
+    }
 
 	public int getEntriesCount() {
 		return myCount;

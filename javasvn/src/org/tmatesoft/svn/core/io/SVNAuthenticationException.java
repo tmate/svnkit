@@ -14,8 +14,6 @@ package org.tmatesoft.svn.core.io;
 
 import java.util.Collection;
 
-import org.tmatesoft.svn.core.SVNException;
-
 /**
  * An exception class that is used to signal about the fact that errors
  * occured exactly during an authentication try. Provides the same kind of information

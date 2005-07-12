@@ -14,23 +14,25 @@ package org.tmatesoft.svn.core.internal.io.dav.handlers;
 
 import java.io.OutputStream;
 
-import org.tmatesoft.svn.core.ISVNReporter;
-import org.tmatesoft.svn.core.ISVNReporterBaton;
-import org.tmatesoft.svn.core.SVNException;
-import org.tmatesoft.svn.core.SVNRepositoryLocation;
 import org.tmatesoft.svn.core.diff.SVNDiffWindow;
 import org.tmatesoft.svn.core.internal.io.dav.DAVBaselineInfo;
 import org.tmatesoft.svn.core.internal.io.dav.DAVConnection;
 import org.tmatesoft.svn.core.internal.io.dav.DAVElement;
 import org.tmatesoft.svn.core.internal.io.dav.DAVUtil;
 import org.tmatesoft.svn.core.io.ISVNEditor;
+import org.tmatesoft.svn.core.io.ISVNReporter;
+import org.tmatesoft.svn.core.io.ISVNReporterBaton;
+import org.tmatesoft.svn.core.io.SVNException;
+import org.tmatesoft.svn.core.io.SVNRepositoryLocation;
 import org.tmatesoft.svn.util.Base64;
 import org.tmatesoft.svn.util.DebugLog;
 import org.tmatesoft.svn.util.PathUtil;
 import org.xml.sax.Attributes;
 
+
 /**
- * @author TMate Software Ltd.
+ * @version 1.0
+ * @author  TMate Software Ltd.
  */
 	
 public class DAVEditorHandler extends BasicDAVDeltaHandler {
@@ -38,7 +40,7 @@ public class DAVEditorHandler extends BasicDAVDeltaHandler {
     public static StringBuffer generateEditorRequest(final DAVConnection connection, StringBuffer buffer, final String url, 
             long targetRevision, String target, String dstPath, boolean recurse,
             boolean ignoreAncestry, boolean resourceWalk, 
-            boolean fetchContents, ISVNReporterBaton reporterBaton) {
+            boolean fetchContents, ISVNReporterBaton reporterBaton) throws SVNException {
 		buffer = buffer == null ? new StringBuffer() : buffer;
         buffer.append("<?xml version=\"1.0\" encoding=\"utf-8\"?>\n");
         buffer.append("<S:update-report send-all=\"true\" xmlns:S=\"svn:\">\n");
@@ -73,69 +75,65 @@ public class DAVEditorHandler extends BasicDAVDeltaHandler {
             buffer.append("<S:text-deltas>no</S:text-deltas>\n");
         }
         final StringBuffer report = buffer;
-        try {
-            reporterBaton.report(new ISVNReporter() {
-                public void setPath(String path, String locktoken, long revision, boolean startEmpty) {
-                    path = DAVUtil.xmlEncode(path);
-                    report.append("<S:entry rev=\"");
-                    report.append(revision);
+        reporterBaton.report(new ISVNReporter() {
+            public void setPath(String path, String locktoken, long revision, boolean startEmpty) {
+                path = DAVUtil.xmlEncode(path);
+                report.append("<S:entry rev=\"");
+                report.append(revision);
+                report.append("\" ");
+                if (locktoken != null) {
+                    report.append("lock-token=\"");
+                    report.append(DAVUtil.xmlEncode(locktoken));
                     report.append("\" ");
-                    if (locktoken != null) {
-                        report.append("lock-token=\"");
-                        report.append(DAVUtil.xmlEncode(locktoken));
-                        report.append("\" ");
-                    }
-                    if (startEmpty) {
-                        report.append("start-empty=\"true\" ");                        
-                    }
-                    report.append(">");
-                    report.append(path);
-                    report.append("</S:entry>\n");
                 }
-                
-                public void deletePath(String path) {
-                    path = DAVUtil.xmlEncode(path);
-                    report.append("<S:missing>");
-                    report.append(path);
-                    report.append("</S:missing>\n");
+                if (startEmpty) {
+                    report.append("start-empty=\"true\" ");
                 }
+                report.append(">");
+                report.append(path);
+                report.append("</S:entry>\n");
+            }
 
-                public void linkPath(SVNRepositoryLocation repository, String path, String locktoken, long revision, boolean startEmpty) throws SVNException {
-                    path = DAVUtil.xmlEncode(path);
-                    report.append("<S:entry rev=\"");
-                    report.append(revision);
-                    report.append("\" ");
-                    if (locktoken != null) {
-                        report.append("lock-token=\"");
-                        report.append(DAVUtil.xmlEncode(locktoken));
-                        report.append("\" ");
-                    }
-                    if (startEmpty) {
-                        report.append("start-empty=\"true\" ");                        
-                    }
-                    String linkedPath = repository.getPath();
-                    DAVBaselineInfo info = DAVUtil.getBaselineInfo(connection, linkedPath, revision, false, false, null);
+            public void deletePath(String path) {
+                path = DAVUtil.xmlEncode(path);
+                report.append("<S:missing>");
+                report.append(path);
+                report.append("</S:missing>\n");
+            }
 
-                    String switchUrl = PathUtil.decode(info.baselinePath);
-                    DebugLog.log("REPORTING LINKED PATH: " + switchUrl);
-                    report.append("linkpath=\"");
-                    // switched path relative to connection root.
-                    report.append(DAVUtil.xmlEncode(switchUrl));
+            public void linkPath(SVNRepositoryLocation repository, String path, String locktoken, long revision, boolean startEmpty) throws SVNException {
+                path = DAVUtil.xmlEncode(path);
+                report.append("<S:entry rev=\"");
+                report.append(revision);
+                report.append("\" ");
+                if (locktoken != null) {
+                    report.append("lock-token=\"");
+                    report.append(DAVUtil.xmlEncode(locktoken));
                     report.append("\" ");
-                    report.append(">");
-                    report.append(path);
-                    report.append("</S:entry>\n");
                 }
-                
-                public void finishReport() {
+                if (startEmpty) {
+                    report.append("start-empty=\"true\" ");
                 }
-                public void abortReport() throws SVNException {
-                    throw new SVNException();
-                }
-            });
-        } catch (SVNException e) {
-            return null;
-        }
+                String linkedPath = repository.getPath();
+                DAVBaselineInfo info = DAVUtil.getBaselineInfo(connection, linkedPath, revision, false, false, null);
+
+                String switchUrl = PathUtil.decode(info.baselinePath);
+                DebugLog.log("REPORTING LINKED PATH: " + switchUrl);
+                report.append("linkpath=\"");
+                // switched path relative to connection root.
+                report.append(DAVUtil.xmlEncode(switchUrl));
+                report.append("\" ");
+                report.append(">");
+                report.append(path);
+                report.append("</S:entry>\n");
+            }
+
+            public void finishReport() {
+            }
+            public void abortReport() throws SVNException {
+                throw new SVNException();
+            }
+        });
         buffer.append("</S:update-report>");
         return buffer;
 	}

@@ -1,5 +1,13 @@
 /*
- * Created on 25.04.2005
+ * ====================================================================
+ * Copyright (c) 2004 TMate Software Ltd.  All rights reserved.
+ *
+ * This software is licensed as described in the file COPYING, which
+ * you should have received as part of this distribution.  The terms
+ * are also available at http://tmate.org/svn/license.html.
+ * If newer versions of this license are posted there, you may use a
+ * newer version instead, at your option.
+ * ====================================================================
  */
 package org.tmatesoft.svn.core.internal.io.dav.handlers;
 
@@ -7,14 +15,18 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Date;
 
-import org.tmatesoft.svn.core.SVNException;
-import org.tmatesoft.svn.core.SVNLock;
 import org.tmatesoft.svn.core.internal.io.dav.DAVElement;
 import org.tmatesoft.svn.core.internal.io.dav.DAVUtil;
+import org.tmatesoft.svn.core.io.SVNException;
+import org.tmatesoft.svn.core.io.SVNLock;
 import org.tmatesoft.svn.util.Base64;
 import org.tmatesoft.svn.util.TimeUtil;
 import org.xml.sax.Attributes;
 
+/**
+ * @version 1.0
+ * @author  TMate Software Ltd.
+ */
 public class DAVGetLocksHandler extends BasicDAVHandler {
     
     public static StringBuffer generateGetLocksRequest(StringBuffer body) {

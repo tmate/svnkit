@@ -14,13 +14,12 @@ package org.tmatesoft.svn.examples.repository;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.Set;
-
-import org.tmatesoft.svn.core.SVNException;
-import org.tmatesoft.svn.core.SVNRepositoryFactory;
-import org.tmatesoft.svn.core.SVNRepositoryLocation;
 import org.tmatesoft.svn.core.internal.io.dav.DAVRepositoryFactory;
 import org.tmatesoft.svn.core.internal.io.svn.SVNRepositoryFactoryImpl;
+import org.tmatesoft.svn.core.io.SVNException;
 import org.tmatesoft.svn.core.io.SVNRepository;
+import org.tmatesoft.svn.core.io.SVNRepositoryFactory;
+import org.tmatesoft.svn.core.io.SVNRepositoryLocation;
 import org.tmatesoft.svn.core.io.SVNLogEntry;
 import org.tmatesoft.svn.core.io.SVNLogEntryPath;
 import org.tmatesoft.svn.core.wc.ISVNOptions;

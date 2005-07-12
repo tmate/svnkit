@@ -21,21 +21,23 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.tmatesoft.svn.core.SVNException;
-import org.tmatesoft.svn.core.SVNLock;
-import org.tmatesoft.svn.core.SVNRepositoryLocation;
 import org.tmatesoft.svn.core.internal.io.dav.handlers.DAVGetLockHandler;
 import org.tmatesoft.svn.core.internal.io.dav.handlers.DAVGetLocksHandler;
 import org.tmatesoft.svn.core.internal.io.dav.handlers.DAVMergeHandler;
 import org.tmatesoft.svn.core.internal.io.dav.handlers.DAVOptionsHandler;
 import org.tmatesoft.svn.core.internal.io.dav.handlers.DAVPropertiesHandler;
+import org.tmatesoft.svn.core.io.SVNException;
+import org.tmatesoft.svn.core.io.SVNLock;
+import org.tmatesoft.svn.core.io.SVNRepositoryLocation;
 import org.tmatesoft.svn.util.DebugLog;
 import org.tmatesoft.svn.util.PathUtil;
 import org.tmatesoft.svn.util.TimeUtil;
 import org.xml.sax.helpers.DefaultHandler;
 
+
 /**
- * @author Alexander Kitaev
+ * @version 1.0
+ * @author  TMate Software Ltd.
  */
 public class DAVConnection {
     
@@ -56,7 +58,7 @@ public class DAVConnection {
     
     public void open(DAVRepository repository) throws SVNException {
         if (myHttpConnection == null) {
-            myHttpConnection = new HttpConnection(myLocation, repository);
+        	myHttpConnection = new HttpConnection(myLocation, repository);
             if (repository.getRepositoryUUID() == null) {
                 String path = myLocation.getPath();
                 final DAVResponse[] result = new DAVResponse[1];
@@ -92,7 +94,7 @@ public class DAVConnection {
                         root = root.substring(0, root.length() - relativePath.length() - 1);                        
                     }
                 } else {
-                    root = path;
+                	root = path;
                 }
                 // TODO get rootURL
                 String url = myLocation.getProtocol() + "://" + myLocation.getHost() + ":" + myLocation.getPort() + root;
@@ -102,7 +104,7 @@ public class DAVConnection {
     }    
 
     public void doPropfind(String path, int depth, String label, DAVElement[] properties, IDAVResponseHandler handler) throws SVNException {
-        doPropfind(path, depth, label, properties, handler, new int[] {200, 207});
+    	doPropfind(path, depth, label, properties, handler, new int[] {200, 207});
     }
 
     public void doPropfind(String path, int depth, String label, DAVElement[] properties, IDAVResponseHandler handler, int[] okCodes) throws SVNException {
@@ -183,13 +185,13 @@ public class DAVConnection {
         myHttpConnection.request("UNLOCK", url, header, (StringBuffer) null, null, new int[] {204});
     }
 
-    public void doGet(String path, OutputStream os) throws SVNException {
-        myHttpConnection.request("GET", path, 0, null, new StringBuffer(), os, null);
+	public void doGet(String path, OutputStream os) throws SVNException {
+		myHttpConnection.request("GET", path, 0, null, new StringBuffer(), os, null);
     }
-    
-    public void doReport(String path, StringBuffer requestBody, DefaultHandler handler) throws SVNException {
-        myHttpConnection.request("REPORT", path, 0, null, requestBody, handler, new int[] {200, 207});
-    }
+	
+	public void doReport(String path, StringBuffer requestBody, DefaultHandler handler) throws SVNException {
+		myHttpConnection.request("REPORT", path, 0, null, requestBody, handler, new int[] {200, 207});
+	}
 
     public void doProppatch(String url, String path, StringBuffer requestBody, DefaultHandler handler) throws SVNException {
         Map header = null;

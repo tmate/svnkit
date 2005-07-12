@@ -5,9 +5,9 @@ package org.tigris.subversion.javahl;
 
 import java.io.File;
 
-import org.tmatesoft.svn.core.ISVNAuthenticationManager;
-import org.tmatesoft.svn.core.SVNAuthentication;
+import org.tmatesoft.svn.core.wc.ISVNAuthenticationManager;
 import org.tmatesoft.svn.core.wc.ISVNAuthenticationProvider;
+import org.tmatesoft.svn.core.wc.SVNAuthentication;
 
 public class PromptAuthenticationProvider implements ISVNAuthenticationProvider {
     

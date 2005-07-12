@@ -11,21 +11,9 @@
  */
 package org.tmatesoft.svn.core.io;
 
-import org.tmatesoft.svn.core.ISVNAnnotateHandler;
-import org.tmatesoft.svn.core.ISVNAuthenticationManager;
-import org.tmatesoft.svn.core.ISVNDirEntryHandler;
-import org.tmatesoft.svn.core.ISVNLogEntryHandler;
-import org.tmatesoft.svn.core.ISVNReporter;
-import org.tmatesoft.svn.core.ISVNReporterBaton;
-import org.tmatesoft.svn.core.SVNDirEntry;
-import org.tmatesoft.svn.core.SVNException;
-import org.tmatesoft.svn.core.SVNLocationEntry;
-import org.tmatesoft.svn.core.SVNLock;
-import org.tmatesoft.svn.core.SVNNodeKind;
-import org.tmatesoft.svn.core.SVNRepositoryFactory;
-import org.tmatesoft.svn.core.SVNRepositoryLocation;
 import org.tmatesoft.svn.core.diff.SVNDiffWindow;
 import org.tmatesoft.svn.core.internal.SVNAnnotationGenerator;
+import org.tmatesoft.svn.core.wc.ISVNAuthenticationManager;
 import org.tmatesoft.svn.util.DebugLog;
 
 import java.io.File;
@@ -107,7 +95,6 @@ import java.util.Map;
  * @see			SVNRepositoryFactory
  * @see 		org.tmatesoft.svn.core.internal.io.dav.DAVRepositoryFactory
  */
-
 public abstract class SVNRepository {
         
     private OutputStream myLoggingOutput;

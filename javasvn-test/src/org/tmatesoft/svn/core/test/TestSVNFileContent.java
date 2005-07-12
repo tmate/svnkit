@@ -24,8 +24,8 @@ import org.tmatesoft.svn.core.ISVNDirectoryContent;
 import org.tmatesoft.svn.core.ISVNEntryContent;
 import org.tmatesoft.svn.core.ISVNFileContent;
 import org.tmatesoft.svn.core.ISVNWorkspace;
-import org.tmatesoft.svn.core.SVNException;
-import org.tmatesoft.svn.core.SVNRepositoryLocation;
+import org.tmatesoft.svn.core.io.SVNException;
+import org.tmatesoft.svn.core.io.SVNRepositoryLocation;
 
 /**
  * @author TMate Software Ltd.

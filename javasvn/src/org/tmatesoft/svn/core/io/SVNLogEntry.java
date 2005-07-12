@@ -15,8 +15,6 @@ package org.tmatesoft.svn.core.io;
 import java.util.Date;
 import java.util.Map;
 
-import org.tmatesoft.svn.core.ISVNLogEntryHandler;
-
 /**
  * The class <code>SVNLogEntry</code> incapsulates log information provided for every
  * commit operation. This information includes:

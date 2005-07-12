@@ -10,12 +10,11 @@
  * ====================================================================
  */
 
-package org.tmatesoft.svn.core;
+package org.tmatesoft.svn.core.io;
 
 import java.net.MalformedURLException;
 import java.net.URL;
 
-import org.tmatesoft.svn.core.io.SVNRepository;
 import org.tmatesoft.svn.util.PathUtil;
 
 /**

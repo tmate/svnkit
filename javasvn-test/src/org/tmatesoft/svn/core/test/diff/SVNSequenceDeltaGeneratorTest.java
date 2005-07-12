@@ -3,8 +3,6 @@ package org.tmatesoft.svn.core.test.diff;
 import java.io.*;
 import java.util.*;
 import junit.framework.*;
-
-import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.diff.*;
 import org.tmatesoft.svn.core.diff.delta.*;
 import org.tmatesoft.svn.core.io.*;

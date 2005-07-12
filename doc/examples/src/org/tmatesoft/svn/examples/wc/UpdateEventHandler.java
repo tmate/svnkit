@@ -11,7 +11,7 @@
  */
 package org.tmatesoft.svn.examples.wc;
 
-import org.tmatesoft.svn.core.SVNCancelException;
+import org.tmatesoft.svn.core.io.SVNCancelException;
 import org.tmatesoft.svn.core.wc.ISVNEventHandler;
 import org.tmatesoft.svn.core.wc.SVNEvent;
 import org.tmatesoft.svn.core.wc.SVNStatusType;
@@ -27,7 +27,7 @@ import org.tmatesoft.svn.core.wc.SVNEventAction;
  * action it's running. Information on each action is incapsulated by SVNEvent and is
  * reported by ISVNEventHandler.svnEvent(SVNEvent event, double progress).    
  */
-public class UpdateEventListener implements ISVNEventHandler {
+public class UpdateEventHandler implements ISVNEventHandler {
     /*
      * progress - will be the current percentage stage of an operation (how many of
      * operation has passed) 

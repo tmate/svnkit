@@ -1,11 +1,22 @@
+/*
+ * ====================================================================
+ * Copyright (c) 2004 TMate Software Ltd.  All rights reserved.
+ *
+ * This software is licensed as described in the file COPYING, which
+ * you should have received as part of this distribution.  The terms
+ * are also available at http://tmate.org/svn/license.html.
+ * If newer versions of this license are posted there, you may use a
+ * newer version instead, at your option.
+ * ====================================================================
+ */
 package org.tmatesoft.svn.core.internal;
 
 import org.tmatesoft.svn.core.io.ISVNFileRevisionHandler;
 import org.tmatesoft.svn.core.io.SVNFileRevision;
+import org.tmatesoft.svn.core.io.SVNException;
+import org.tmatesoft.svn.core.io.ISVNAnnotateHandler;
 import org.tmatesoft.svn.core.diff.SVNDiffWindow;
 import org.tmatesoft.svn.core.diff.ISVNRAData;
-import org.tmatesoft.svn.core.ISVNAnnotateHandler;
-import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNProperty;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
@@ -33,12 +44,10 @@ import de.regnis.q.sequence.line.QSequenceLineMedia;
 import de.regnis.q.sequence.line.QSequenceLineRAFileData;
 import de.regnis.q.sequence.QSequenceDifferenceBlock;
 
+
 /**
- * Created by IntelliJ IDEA.
- * User: alex
- * Date: 20.06.2005
- * Time: 18:44:53
- * To change this template use File | Settings | File Templates.
+ * @version 1.0
+ * @author  TMate Software Ltd.
  */
 public class SVNAnnotationGenerator implements ISVNFileRevisionHandler {
 
@@ -95,11 +104,7 @@ public class SVNAnnotationGenerator implements ISVNFileRevisionHandler {
         if (myPreviousFile == null) {
             // create previous file.
             myPreviousFile = SVNFileUtil.createUniqueFile(myTmpDirectory, "annotate", ".tmp");
-            try {
-                myPreviousFile.createNewFile();
-            } catch (IOException e) {
-                SVNErrorManager.error(0, e);
-            }
+            SVNFileUtil.createEmptyFile(myPreviousFile);
             DebugLog.log("first base file created: " + myPreviousFile);
         }
     }
@@ -112,11 +117,7 @@ public class SVNAnnotationGenerator implements ISVNFileRevisionHandler {
         if (myCurrentFile == null) {
             // create file for current revision.
             myCurrentFile = SVNFileUtil.createUniqueFile(myTmpDirectory, "annotate", ".tmp");
-            try {
-                myCurrentFile.createNewFile();
-            } catch (IOException e) {
-                SVNErrorManager.error(0, e);
-            }
+            SVNFileUtil.createEmptyFile(myCurrentFile);
             DebugLog.log("tmp file for revision '" + myCurrentRevision + "' created: " + myCurrentFile);
         }
         File tmpFile = SVNFileUtil.createUniqueFile(myTmpDirectory, "annotate", ".tmp");
@@ -230,11 +231,7 @@ public class SVNAnnotationGenerator implements ISVNFileRevisionHandler {
 
         }
 
-        try {
-            SVNFileUtil.rename(myCurrentFile, myPreviousFile);
-        } catch (IOException e) {
-            SVNErrorManager.error(0, e);
-        }
+        SVNFileUtil.rename(myCurrentFile, myPreviousFile);
     }
 
     public void reportAnnotations(ISVNAnnotateHandler handler, String inputEncoding) {

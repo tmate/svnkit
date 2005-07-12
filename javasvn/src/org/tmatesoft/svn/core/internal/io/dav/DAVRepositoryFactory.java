@@ -12,12 +12,14 @@
 
 package org.tmatesoft.svn.core.internal.io.dav;
 
-import org.tmatesoft.svn.core.SVNRepositoryFactory;
-import org.tmatesoft.svn.core.SVNRepositoryLocation;
 import org.tmatesoft.svn.core.io.SVNRepository;
+import org.tmatesoft.svn.core.io.SVNRepositoryFactory;
+import org.tmatesoft.svn.core.io.SVNRepositoryLocation;
+
 
 /**
- * @author Alexander Kitaev
+ * @version 1.0
+ * @author  TMate Software Ltd.
  */
 public class DAVRepositoryFactory extends SVNRepositoryFactory {
     

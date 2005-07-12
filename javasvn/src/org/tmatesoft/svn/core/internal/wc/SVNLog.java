@@ -1,7 +1,18 @@
 /*
- * Created on 17.05.2005
+ * ====================================================================
+ * Copyright (c) 2004 TMate Software Ltd. All rights reserved.
+ *
+ * This software is licensed as described in the file COPYING, which you should
+ * have received as part of this distribution. The terms are also available at
+ * http://tmate.org/svn/license.html. If newer versions of this license are
+ * posted there, you may use a newer version instead, at your option.
+ * ====================================================================
  */
 package org.tmatesoft.svn.core.internal.wc;
+
+import org.tmatesoft.svn.core.SVNProperty;
+import org.tmatesoft.svn.core.io.SVNException;
+import org.tmatesoft.svn.core.wc.SVNStatusType;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -15,45 +26,67 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 
-import org.tmatesoft.svn.core.SVNException;
-import org.tmatesoft.svn.core.SVNProperty;
-import org.tmatesoft.svn.core.wc.SVNStatusType;
-import org.tmatesoft.svn.util.DebugLog;
-
+/**
+ * @version 1.0
+ * @author TMate Software Ltd.
+ */
 public class SVNLog {
 
     public static final String DELETE_ENTRY = "delete-entry";
+
     public static final String MODIFY_ENTRY = "modify-entry";
+
     public static final String MODIFY_WC_PROPERTY = "modify-wcprop";
+
     public static final String DELETE_LOCK = "delete-lock";
+
     public static final String MOVE = "mv";
+
     public static final String APPEND = "append";
+
     public static final String DELETE = "rm";
+
     public static final String READONLY = "readonly";
+
     public static final String COPY_AND_TRANSLATE = "cp-and-translate";
+
     public static final String COPY_AND_DETRANSLATE = "cp-and-detranslate";
+
     public static final String MERGE = "merge";
+
     public static final String MAYBE_READONLY = "maybe-readonly";
+
     public static final String SET_TIMESTAMP = "set-timestamp";
+
     public static final String COMMIT = "committed";
 
     public static final String NAME_ATTR = "name";
+
     public static final String PROPERTY_NAME_ATTR = "propname";
-    public static final String PROPERTY_VALUE_ATTR = "propvalue";
+
+    public static final String PROPERTY_VALUE_ATTR = "propval";
+
     public static final String DEST_ATTR = "dest";
+
     public static final String TIMESTAMP_ATTR = "timestamp";
+
     public static final String REVISION_ATTR = "revision";
-    public static final String ATTR1 = "attr1";
-    public static final String ATTR2 = "attr2";
-    public static final String ATTR3 = "attr3";
-    public static final String ATTR4 = "attr4";
-    public static final String ATTR5 = "attr5";
+
+    public static final String ATTR1 = "arg1";
+    public static final String ATTR2 = "arg2";
+    public static final String ATTR3 = "arg3";
+    public static final String ATTR4 = "arg4";
+    public static final String ATTR5 = "arg5";
+    public static final String ATTR6 = "arg6";
 
     public static final String WC_TIMESTAMP = "working";
 
     private File myFile;
+
     private File myTmpFile;
+
     private Collection myCache;
+
     private SVNDirectory myDirectory;
 
     public SVNLog(SVNDirectory directory, int id) {
@@ -63,7 +96,8 @@ public class SVNLog {
         myDirectory = directory;
     }
 
-    public void addCommand(String name, Map attributes, boolean save) throws SVNException {
+    public void addCommand(String name, Map attributes, boolean save)
+            throws SVNException {
         if (myCache == null) {
             myCache = new ArrayList();
         }
@@ -75,12 +109,14 @@ public class SVNLog {
         }
     }
 
-    public SVNStatusType logChangedEntryProperties(String name, Map modifiedEntryProps) throws SVNException {
+    public SVNStatusType logChangedEntryProperties(String name,
+            Map modifiedEntryProps) throws SVNException {
         SVNStatusType status = SVNStatusType.LOCK_UNCHANGED;
         if (modifiedEntryProps != null) {
             Map command = new HashMap();
             command.put(SVNLog.NAME_ATTR, name);
-            for (Iterator names = modifiedEntryProps.keySet().iterator(); names.hasNext();) {
+            for (Iterator names = modifiedEntryProps.keySet().iterator(); names
+                    .hasNext();) {
                 String propName = (String) names.next();
                 String propValue = (String) modifiedEntryProps.get(propName);
                 String longPropName = SVNProperty.SVN_ENTRY_PREFIX + propName;
@@ -97,11 +133,13 @@ public class SVNLog {
         return status;
     }
 
-    public void logChangedWCProperties(String name, Map modifiedWCProps) throws SVNException {
+    public void logChangedWCProperties(String name, Map modifiedWCProps)
+            throws SVNException {
         if (modifiedWCProps != null) {
             Map command = new HashMap();
             command.put(SVNLog.NAME_ATTR, name);
-            for (Iterator names = modifiedWCProps.keySet().iterator(); names.hasNext();) {
+            for (Iterator names = modifiedWCProps.keySet().iterator(); names
+                    .hasNext();) {
                 String propName = (String) names.next();
                 String propValue = (String) modifiedWCProps.get(propName);
                 command.put(SVNLog.PROPERTY_NAME_ATTR, propName);
@@ -119,13 +157,15 @@ public class SVNLog {
         Writer os = null;
 
         try {
-            os = new OutputStreamWriter(SVNFileUtil.openFileForWriting(myTmpFile), "UTF-8");
+            os = new OutputStreamWriter(SVNFileUtil
+                    .openFileForWriting(myTmpFile), "UTF-8");
             for (Iterator commands = myCache.iterator(); commands.hasNext();) {
                 Map command = (Map) commands.next();
                 String name = (String) command.remove("");
                 os.write("<");
                 os.write(name);
-                for (Iterator attrs = command.keySet().iterator(); attrs.hasNext();) {
+                for (Iterator attrs = command.keySet().iterator(); attrs
+                        .hasNext();) {
                     String attr = (String) attrs.next();
                     String value = (String) command.get(attr);
                     if (value == null) {
@@ -141,17 +181,13 @@ public class SVNLog {
                 os.write("/>\n");
             }
         } catch (IOException e) {
-            SVNErrorManager.error(0, e);
+            SVNErrorManager.error("svn: Cannot save log file '" + myFile + "'");
         } finally {
             SVNFileUtil.closeFile(os);
             myCache = null;
         }
-        try {
-            SVNFileUtil.rename(myTmpFile, myFile);
-            SVNFileUtil.setReadonly(myFile, true);
-        } catch (IOException e) {
-            SVNErrorManager.error(0, e);
-        }
+        SVNFileUtil.rename(myTmpFile, myFile);
+        SVNFileUtil.setReadonly(myFile, true);
     }
 
     public void run(SVNLogRunner runner) throws SVNException {
@@ -161,11 +197,12 @@ public class SVNLog {
         BufferedReader reader = null;
         Collection commands = new ArrayList();
         try {
-            reader = new BufferedReader(new InputStreamReader(SVNFileUtil.openFileForReading(myFile), "UTF-8"));
+            reader = new BufferedReader(new InputStreamReader(SVNFileUtil
+                    .openFileForReading(myFile), "UTF-8"));
             String line;
             Map attrs = new HashMap();
             String name = null;
-            while((line = reader.readLine()) != null) {
+            while ((line = reader.readLine()) != null) {
                 line = line.trim();
                 if (line.startsWith("<")) {
                     name = line.substring(1);
@@ -176,7 +213,8 @@ public class SVNLog {
                         String attrName = line.substring(0, index).trim();
                         String value = line.substring(index + 1).trim();
                         if (value.endsWith("/>")) {
-                            value = value.substring(0, value.length() - "/>".length());
+                            value = value.substring(0, value.length()
+                                    - "/>".length());
                         }
                         if (value.startsWith("\"")) {
                             value = value.substring(1);
@@ -197,41 +235,19 @@ public class SVNLog {
                 }
             }
         } catch (IOException e) {
-            SVNErrorManager.error(0, e);
+            SVNErrorManager.error("svn: Cannot read log file '" + myFile + "'");
         } finally {
-            if (reader != null) {
-                try {
-                    reader.close();
-                } catch (IOException e) {
-                }
+            SVNFileUtil.closeFile(reader);
+        }
+
+        for (Iterator cmds = commands.iterator(); cmds.hasNext();) {
+            Map command = (Map) cmds.next();
+            String name = (String) command.remove("");
+            if (runner != null) {
+                runner.runCommand(myDirectory, name, command);
             }
         }
-        SVNException error = null;
-        try {
-            for (Iterator cmds = commands.iterator(); error == null && cmds.hasNext();) {
-                Map command = (Map) cmds.next();
-                String name = (String) command.remove("");
-                if (runner != null) {
-                    try {
-                        runner.runCommand(myDirectory, name, command);
-                        cmds.remove();
-                    } catch (SVNException th) {
-                        DebugLog.error(th);
-                        command.put("", name);
-                        myCache = commands;
-                        save();
-                        error = th;
-                    }
-                }
-            }
-            if (error == null) {
-                delete();
-            }
-        } finally {
-            if (error != null) {
-                throw error;
-            }
-        }
+        delete();
     }
 
     public String toString() {

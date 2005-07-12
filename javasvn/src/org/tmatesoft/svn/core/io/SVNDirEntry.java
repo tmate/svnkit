@@ -10,10 +10,9 @@
  * ====================================================================
  */
 
-package org.tmatesoft.svn.core;
+package org.tmatesoft.svn.core.io;
 
 import java.util.Date;
-
 
 
 /**
@@ -190,6 +189,10 @@ public class SVNDirEntry implements Comparable {
     public int compareTo(Object o) {
         if (o == null || o.getClass() != SVNDirEntry.class) {
             return -1;
+        }
+        SVNNodeKind otherKind = ((SVNDirEntry) o).getKind();
+        if (otherKind != getKind()) {
+            return getKind().compareTo(otherKind);    
         }
         String otherName = ((SVNDirEntry) o).getName();
         if (myName == null || otherName == null) {

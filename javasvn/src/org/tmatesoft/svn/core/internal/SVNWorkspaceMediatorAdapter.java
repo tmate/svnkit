@@ -18,11 +18,14 @@ import java.io.OutputStream;
 import java.util.Map;
 
 import org.tmatesoft.svn.core.ISVNEntry;
-import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.io.ISVNWorkspaceMediator;
+import org.tmatesoft.svn.core.io.SVNException;
 import org.tmatesoft.svn.util.DebugLog;
 
-
+/**
+ * @version 1.0
+ * @author TMate Software Ltd.
+ */
 class SVNWorkspaceMediatorAdapter implements ISVNWorkspaceMediator {
     
     private ISVNWorkspaceMediator myMediator;

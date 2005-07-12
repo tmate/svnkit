@@ -10,10 +10,7 @@
  * ====================================================================
  */
 
-package org.tmatesoft.svn.core;
-
-import org.tmatesoft.svn.core.io.SVNLogEntry;
-import org.tmatesoft.svn.core.io.SVNRepository;
+package org.tmatesoft.svn.core.io;
 
 /**
  * 

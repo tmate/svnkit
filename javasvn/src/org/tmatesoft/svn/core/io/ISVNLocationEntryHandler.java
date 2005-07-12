@@ -12,8 +12,6 @@
 
 package org.tmatesoft.svn.core.io;
 
-import org.tmatesoft.svn.core.SVNLocationEntry;
-
 /**
  * This public interface should be implemented for using within 
  * {@link SVNRepository#getLocations(String, long, long[], ISVNLocationEntryHandler) 

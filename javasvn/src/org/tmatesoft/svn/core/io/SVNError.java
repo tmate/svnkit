@@ -12,8 +12,6 @@
 
 package org.tmatesoft.svn.core.io;
 
-import org.tmatesoft.svn.core.SVNException;
-
 /**
  * This class represents an error description that a custom Subversion repository server - 
  * <i>svnserve</i> - sends to a client if it can not perform the client's request.

@@ -10,9 +10,7 @@
  * ====================================================================
  */
 
-package org.tmatesoft.svn.core;
-
-import org.tmatesoft.svn.core.io.SVNRepository;
+package org.tmatesoft.svn.core.io;
 
 /**
  * This is a basic interface for implementors to describe a working copy state.
