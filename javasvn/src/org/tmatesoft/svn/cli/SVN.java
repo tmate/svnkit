@@ -60,8 +60,8 @@ public class SVN {
                 try {
                     command.run(System.out, System.err);
                 } catch (SVNException e) {
-                    System.err.println("error: " + e.getMessage());
-                    e.printStackTrace(System.err);
+                    System.err.println(e.getMessage());
+                    DebugLog.log("err: " + e.getMessage());
                     DebugLog.error(e);
                 }
             } else {

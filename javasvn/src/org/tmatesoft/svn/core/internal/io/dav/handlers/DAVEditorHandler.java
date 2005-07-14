@@ -14,7 +14,7 @@ package org.tmatesoft.svn.core.internal.io.dav.handlers;
 
 import java.io.OutputStream;
 
-import org.tmatesoft.svn.core.diff.SVNDiffWindow;
+import org.tmatesoft.svn.core.internal.diff.SVNDiffWindow;
 import org.tmatesoft.svn.core.internal.io.dav.DAVBaselineInfo;
 import org.tmatesoft.svn.core.internal.io.dav.DAVConnection;
 import org.tmatesoft.svn.core.internal.io.dav.DAVElement;
@@ -29,8 +29,10 @@ import org.tmatesoft.svn.util.DebugLog;
 import org.tmatesoft.svn.util.PathUtil;
 import org.xml.sax.Attributes;
 
+
 /**
- * @author TMate Software Ltd.
+ * @version 1.0
+ * @author  TMate Software Ltd.
  */
 	
 public class DAVEditorHandler extends BasicDAVDeltaHandler {
@@ -38,12 +40,12 @@ public class DAVEditorHandler extends BasicDAVDeltaHandler {
     public static StringBuffer generateEditorRequest(final DAVConnection connection, StringBuffer buffer, final String url, 
             long targetRevision, String target, String dstPath, boolean recurse,
             boolean ignoreAncestry, boolean resourceWalk, 
-            boolean fetchContents, ISVNReporterBaton reporterBaton) {
+            boolean fetchContents, ISVNReporterBaton reporterBaton) throws SVNException {
 		buffer = buffer == null ? new StringBuffer() : buffer;
         buffer.append("<?xml version=\"1.0\" encoding=\"utf-8\"?>\n");
         buffer.append("<S:update-report send-all=\"true\" xmlns:S=\"svn:\">\n");
         buffer.append("<S:src-path>");
-        buffer.append(url);
+        buffer.append(DAVUtil.xmlEncode(url));
         buffer.append("</S:src-path>\n");
         if (targetRevision >= 0) {
             buffer.append("<S:target-revision>");
@@ -52,12 +54,12 @@ public class DAVEditorHandler extends BasicDAVDeltaHandler {
         }
         if (target != null) {
             buffer.append("<S:update-target>");
-            buffer.append(target);
+            buffer.append(DAVUtil.xmlEncode(target));
             buffer.append("</S:update-target>\n");
         }
         if (dstPath != null) {
             buffer.append("<S:dst-path>");
-            buffer.append(dstPath);
+            buffer.append(DAVUtil.xmlEncode(dstPath));
             buffer.append("</S:dst-path>\n");
         }
         if (!recurse) {
@@ -73,69 +75,65 @@ public class DAVEditorHandler extends BasicDAVDeltaHandler {
             buffer.append("<S:text-deltas>no</S:text-deltas>\n");
         }
         final StringBuffer report = buffer;
-        try {
-            reporterBaton.report(new ISVNReporter() {
-                public void setPath(String path, String locktoken, long revision, boolean startEmpty) throws SVNException {
-                    path = DAVUtil.xmlEncode(path);
-                    report.append("<S:entry rev=\"");
-                    report.append(revision);
+        reporterBaton.report(new ISVNReporter() {
+            public void setPath(String path, String locktoken, long revision, boolean startEmpty) {
+                path = DAVUtil.xmlEncode(path);
+                report.append("<S:entry rev=\"");
+                report.append(revision);
+                report.append("\" ");
+                if (locktoken != null) {
+                    report.append("lock-token=\"");
+                    report.append(DAVUtil.xmlEncode(locktoken));
                     report.append("\" ");
-                    if (locktoken != null) {
-                        report.append("lock-token=\"");
-                        report.append(DAVUtil.xmlEncode(locktoken));
-                        report.append("\" ");
-                    }
-                    if (startEmpty) {
-                        report.append("start-empty=\"true\" ");                        
-                    }
-                    report.append(">");
-                    report.append(path);
-                    report.append("</S:entry>\n");
                 }
-                
-                public void deletePath(String path) throws SVNException {
-                    path = DAVUtil.xmlEncode(path);
-                    report.append("<S:missing>");
-                    report.append(path);
-                    report.append("</S:missing>\n");
+                if (startEmpty) {
+                    report.append("start-empty=\"true\" ");
                 }
+                report.append(">");
+                report.append(path);
+                report.append("</S:entry>\n");
+            }
 
-                public void linkPath(SVNRepositoryLocation repository, String path, String locktoken, long revision, boolean startEmpty) throws SVNException {
-                    path = DAVUtil.xmlEncode(path);
-                    report.append("<S:entry rev=\"");
-                    report.append(revision);
-                    report.append("\" ");
-                    if (locktoken != null) {
-                        report.append("lock-token=\"");
-                        report.append(DAVUtil.xmlEncode(locktoken));
-                        report.append("\" ");
-                    }
-                    if (startEmpty) {
-                        report.append("start-empty=\"true\" ");                        
-                    }
-                    String linkedPath = repository.getPath();
-                    DAVBaselineInfo info = DAVUtil.getBaselineInfo(connection, linkedPath, revision, false, false, null);
+            public void deletePath(String path) {
+                path = DAVUtil.xmlEncode(path);
+                report.append("<S:missing>");
+                report.append(path);
+                report.append("</S:missing>\n");
+            }
 
-                    String switchUrl = info.baselinePath;
-                    DebugLog.log("REPORTING LINKED PATH: " + switchUrl);
-                    report.append("linkpath=\"");
-                    // switched path relative to connection root.
-                    report.append(DAVUtil.xmlEncode(switchUrl));
+            public void linkPath(SVNRepositoryLocation repository, String path, String locktoken, long revision, boolean startEmpty) throws SVNException {
+                path = DAVUtil.xmlEncode(path);
+                report.append("<S:entry rev=\"");
+                report.append(revision);
+                report.append("\" ");
+                if (locktoken != null) {
+                    report.append("lock-token=\"");
+                    report.append(DAVUtil.xmlEncode(locktoken));
                     report.append("\" ");
-                    report.append(">");
-                    report.append(path);
-                    report.append("</S:entry>\n");
                 }
-                
-                public void finishReport() throws SVNException {
+                if (startEmpty) {
+                    report.append("start-empty=\"true\" ");
                 }
-                public void abortReport() throws SVNException {
-                    throw new SVNException();
-                }
-            });
-        } catch (SVNException e) {
-            return null;
-        }
+                String linkedPath = repository.getPath();
+                DAVBaselineInfo info = DAVUtil.getBaselineInfo(connection, linkedPath, revision, false, false, null);
+
+                String switchUrl = PathUtil.decode(info.baselinePath);
+                DebugLog.log("REPORTING LINKED PATH: " + switchUrl);
+                report.append("linkpath=\"");
+                // switched path relative to connection root.
+                report.append(DAVUtil.xmlEncode(switchUrl));
+                report.append("\" ");
+                report.append(">");
+                report.append(path);
+                report.append("</S:entry>\n");
+            }
+
+            public void finishReport() {
+            }
+            public void abortReport() throws SVNException {
+                throw new SVNException();
+            }
+        });
         buffer.append("</S:update-report>");
         return buffer;
 	}
@@ -234,7 +232,7 @@ public class DAVEditorHandler extends BasicDAVDeltaHandler {
             if (isDir(myPath)) {
                 myEditor.changeDirProperty(name, null);
             } else {
-                myEditor.changeFileProperty(name, null);
+                myEditor.changeFileProperty(myPath.toString(), name, null);
             }            
         } else if (element == RESOURCE || element == FETCH_FILE || element == FETCH_PROPS) {
             throw new SVNException(element + " element is not supported in update-report");
@@ -242,7 +240,7 @@ public class DAVEditorHandler extends BasicDAVDeltaHandler {
             if (myIsFetchContent) {
                 setDeltaProcessing(true);
             }
-            myEditor.applyTextDelta(myChecksum);
+            myEditor.applyTextDelta(myPath.toString(), myChecksum);
         }
 	}
     
@@ -255,7 +253,7 @@ public class DAVEditorHandler extends BasicDAVDeltaHandler {
                     myEditor.closeEdit();
                 }
             } else {
-                myEditor.closeFile(myChecksum);
+                myEditor.closeFile(myPath.toString(), myChecksum);
             }
             myChecksum = null;
             myPath = removeTail(myPath);
@@ -271,12 +269,12 @@ public class DAVEditorHandler extends BasicDAVDeltaHandler {
             }
             String value = cdata.toString();
             if ("base64".equals(myEncoding)) {
-                value = new String(Base64.base64ToByteArray(cdata, null));                
+                value = new String(Base64.base64ToByteArray(new StringBuffer(cdata.toString().trim()), null));                
             }
             if (isDir(myPath)) {
                 myEditor.changeDirProperty(myPropertyName, value);
             } else {
-                myEditor.changeFileProperty(myPropertyName, value);
+                myEditor.changeFileProperty(myPath.toString(), myPropertyName, value);
             }
             myPropertyName = null;
             myEncoding = null;
@@ -328,10 +326,10 @@ public class DAVEditorHandler extends BasicDAVDeltaHandler {
     }
 
     protected OutputStream handleDiffWindow(SVNDiffWindow window) throws SVNException {
-        return myEditor.textDeltaChunk(window);
+        return myEditor.textDeltaChunk(myPath.toString(), window);
     }
 
     protected void handleDiffWindowClosed() throws SVNException {
-        myEditor.textDeltaEnd();
+        myEditor.textDeltaEnd(myPath.toString());
     }
 }

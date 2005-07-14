@@ -64,6 +64,8 @@ import java.util.regex.Pattern;
  * @version 1.0
  * @author 	TMate Software Ltd.
  * @see		SVNRepository
+ * @see		org.tmatesoft.svn.core.internal.io.svn.SVNRepositoryFactoryImpl
+ * @see		org.tmatesoft.svn.core.internal.io.dav.DAVRepositoryFactory
  */
 public abstract class SVNRepositoryFactory {
     
@@ -85,6 +87,13 @@ public abstract class SVNRepositoryFactory {
                 myFactoriesMap.put(protocol, factory);
             }
         }
+    }
+    
+    protected static boolean hasRepositoryFactory(String protocol) {
+        if (protocol != null) {
+            return myFactoriesMap.get(protocol) != null;
+        }
+        return false;
     }
     
     /**
@@ -119,7 +128,7 @@ public abstract class SVNRepositoryFactory {
      * 
      * <p>
      * The protocol is a part of the <code>URL</code> (used to connect to the 
-     * repository) incapsulated in the <code>location</code> parameter.
+     * repository) incapsulated in the <code>location<code> parameter.
      * 
      * <p>
      * In fact, this method doesn't create an <code>SVNRepository</code> instance but
@@ -142,7 +151,7 @@ public abstract class SVNRepositoryFactory {
      */
     public static SVNRepository create(SVNRepositoryLocation location) throws SVNException {
         if (!canCreate(location)) {
-            throw new SVNException("no connection protocol implementation for " + location.toString());
+            throw new SVNException("svn: Unable to open an ra_local session to URL '" + location + "'\nsvn: No connection protocol implementation for " + location.toString());
         }
     	for(Iterator keys = myFactoriesMap.keySet().iterator(); keys.hasNext();) {
     		String key = (String) keys.next();

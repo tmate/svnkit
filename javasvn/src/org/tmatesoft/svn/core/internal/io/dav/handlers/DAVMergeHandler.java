@@ -17,6 +17,7 @@ import java.util.Iterator;
 import java.util.Map;
 
 import org.tmatesoft.svn.core.internal.io.dav.DAVElement;
+import org.tmatesoft.svn.core.internal.io.dav.DAVUtil;
 import org.tmatesoft.svn.core.io.ISVNWorkspaceMediator;
 import org.tmatesoft.svn.core.io.SVNCommitInfo;
 import org.tmatesoft.svn.core.io.SVNException;
@@ -25,8 +26,10 @@ import org.tmatesoft.svn.util.PathUtil;
 import org.tmatesoft.svn.util.TimeUtil;
 import org.xml.sax.Attributes;
 
+
 /**
- * @author TMate Software Ltd.
+ * @version 1.0
+ * @author  TMate Software Ltd.
  */
 public class DAVMergeHandler extends BasicDAVHandler {
     
@@ -61,7 +64,7 @@ public class DAVMergeHandler extends BasicDAVHandler {
                 lockPath = lockPath.substring(root.length());
                 lockPath = PathUtil.removeLeadingSlash(lockPath);
                 
-                target.append(lockPath);
+                target.append(DAVUtil.xmlEncode(PathUtil.decode(lockPath)));
                 target.append("</S:lock-path><S:lock-token>");
                 target.append(token);
                 target.append("</S:lock-token></S:lock>");
@@ -149,12 +152,15 @@ public class DAVMergeHandler extends BasicDAVHandler {
             if (myResourceType == DAVElement.BASELINE) {
                 myCommitInfo = new SVNCommitInfo(myRevision, myAuthor, myCommitDate);
             } else {
-            	DebugLog.log("COMMIT: saving new vurl for " + myRepositoryPath);
-                String path = (String) myPathsMap.get(myRepositoryPath);
-            	DebugLog.log("COMMIT: wc path " + path);
-            	DebugLog.log("COMMIT: existing wc paths " + myPathsMap);
+                String reposPath = PathUtil.encode(myRepositoryPath);
+                DebugLog.log("COMMIT: saving new vurl for " + reposPath);
+                String path = (String) myPathsMap.get(reposPath);
+                DebugLog.log("COMMIT: wc path " + path);
+                if (path == null) {
+                    DebugLog.log("COMMIT: existing wc paths " + myPathsMap);
+                }
                 if (path != null && myMediator != null) {
-                    myMediator.setWorkspaceProperty(path, "svn:wc:ra_dav:version-url", myVersionPath);
+                    myMediator.setWorkspaceProperty(PathUtil.decode(path), "svn:wc:ra_dav:version-url", myVersionPath);
                 } 
             }
         } else if (element == DAVElement.CREATION_DATE) {

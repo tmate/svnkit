@@ -316,10 +316,10 @@ public class SVNSimpleCredentialsProvider implements ISVNCredentialsProvider {
         /**
          * Returns a hash code for this object evaluated as:
          * <blockquote><pre>
-         * 17 + (userNameString!=null ? userNameString.hashCode()*31 : 0) + 
-         * (userPasswordString!=null ? userPasswordString.hashCode()*31 : 0) +
-         * (userPrivateKeyString!=null ? userPrivateKeyString.hashCode()*31 : 0) +
-         * (userPassphraseString!=null ? userPassphraseString.hashCode()*31 : 0)
+         * 		17 + (userNameString!=null ? userNameString.hashCode()*31 : 0) + 
+         * 		(userPasswordString!=null ? userPasswordString.hashCode()*31 : 0) +
+         * 		(userPrivateKeyString!=null ? userPrivateKeyString.hashCode()*31 : 0) +
+         * 		(userPassphraseString!=null ? userPassphraseString.hashCode()*31 : 0)
          * </pre></blockquote>
          * 
          * @return	 a hash code value for this object

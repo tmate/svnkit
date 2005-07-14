@@ -13,13 +13,16 @@
 package org.tmatesoft.svn.core.internal.io.dav.handlers;
 
 import org.tmatesoft.svn.core.internal.io.dav.DAVElement;
+import org.tmatesoft.svn.core.internal.io.dav.DAVUtil;
 import org.tmatesoft.svn.core.io.ISVNLocationEntryHandler;
 import org.tmatesoft.svn.core.io.SVNException;
 import org.tmatesoft.svn.core.io.SVNLocationEntry;
 import org.xml.sax.Attributes;
 
+
 /**
- * @author TMate Software Ltd.
+ * @version 1.0
+ * @author  TMate Software Ltd.
  */
 public class DAVLocationsHandler extends BasicDAVHandler {
 	
@@ -28,7 +31,7 @@ public class DAVLocationsHandler extends BasicDAVHandler {
         buffer.append("<?xml version=\"1.0\" encoding=\"utf-8\"?>");
         buffer.append("<S:get-locations xmlns:S=\"svn:\" xmlns:D=\"DAV:\" >");
         buffer.append("<S:path>");
-        buffer.append(path);
+        buffer.append(DAVUtil.xmlEncode(path));
         buffer.append("</S:path>");
         buffer.append("<S:peg-revision>");
         buffer.append(pegRevision);

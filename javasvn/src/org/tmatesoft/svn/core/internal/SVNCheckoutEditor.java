@@ -29,7 +29,7 @@ import org.tmatesoft.svn.core.ISVNFileEntry;
 import org.tmatesoft.svn.core.ISVNRootEntry;
 import org.tmatesoft.svn.core.SVNProperty;
 import org.tmatesoft.svn.core.SVNStatus;
-import org.tmatesoft.svn.core.diff.SVNDiffWindow;
+import org.tmatesoft.svn.core.internal.diff.SVNDiffWindow;
 import org.tmatesoft.svn.core.io.ISVNEditor;
 import org.tmatesoft.svn.core.io.ISVNWorkspaceMediator;
 import org.tmatesoft.svn.core.io.SVNCommitInfo;
@@ -37,8 +37,10 @@ import org.tmatesoft.svn.core.io.SVNException;
 import org.tmatesoft.svn.util.DebugLog;
 import org.tmatesoft.svn.util.PathUtil;
 
+
 /**
- * @author TMate Software Ltd.
+ * @version 1.0
+ * @author  TMate Software Ltd.
  */
 public class SVNCheckoutEditor implements ISVNEditor {
     
@@ -218,7 +220,7 @@ public class SVNCheckoutEditor implements ISVNEditor {
         myIsTimestampsChanged = !myIsExport;
     }
     
-    public void closeFile(String textChecksum) throws SVNException {
+    public void closeFile(String path, String textChecksum) throws SVNException {
         myObstructedCount--;
         if (myObstructedCount > 0) {
             return;
@@ -252,7 +254,7 @@ public class SVNCheckoutEditor implements ISVNEditor {
         myCurrentFile = null;
     }
     
-    public void applyTextDelta(String baseChecksum)  throws SVNException {
+    public void applyTextDelta(String path, String baseChecksum)  throws SVNException {
         if (myObstructedCount > 0) {
             return;
         }
@@ -265,7 +267,7 @@ public class SVNCheckoutEditor implements ISVNEditor {
         }
     }
     
-    public OutputStream textDeltaChunk(SVNDiffWindow diffWindow) throws SVNException {
+    public OutputStream textDeltaChunk(String path, SVNDiffWindow diffWindow) throws SVNException {
         if (myObstructedCount > 0) {
             DebugLog.log("UPDATED: TEXTDELTACHUNK: skipping obstructed file or file within obstructed dir");
             return null;
@@ -289,7 +291,7 @@ public class SVNCheckoutEditor implements ISVNEditor {
         }
     }    
     
-    public void textDeltaEnd() throws SVNException {
+    public void textDeltaEnd(String path) throws SVNException {
         if (myObstructedCount > 0) {
             return;
         }
@@ -342,7 +344,7 @@ public class SVNCheckoutEditor implements ISVNEditor {
         DebugLog.log("UPDATED: DELTA APPLIED: " + myCurrentFile.getPath());
     }
     
-    public void changeFileProperty(String name, String value) throws SVNException {
+    public void changeFileProperty(String path, String name, String value) throws SVNException {
         if (myObstructedCount > 0) {
             return;
         }

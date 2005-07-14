@@ -8,7 +8,7 @@ if (file_exists($cacheFile)) {
     return;
 } 
                                      
-$repository = "http://72.9.228.230/svn/jsvn/tags/";
+$repository = "http://72.9.228.230:8080/svn/jsvn/tags/";
 $contents = read_contents($repository);
 $handle = fopen($cacheFile, "w+");
 if (!$contents) {
@@ -105,7 +105,7 @@ return $items;
 }
 
 function read_contents($url) {
-	$fp = fsockopen("72.9.228.230", 80, $errno, $errstr, 1);	
+	$fp = fsockopen("72.9.228.230", 8080, $errno, $errstr, 1);	
         if (!$fp) {
         	return false; 
         }

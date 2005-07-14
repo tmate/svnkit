@@ -16,8 +16,10 @@ import org.tmatesoft.svn.core.io.SVNRepository;
 import org.tmatesoft.svn.core.io.SVNRepositoryFactory;
 import org.tmatesoft.svn.core.io.SVNRepositoryLocation;
 
+
 /**
- * @author Alexander Kitaev
+ * @version 1.0
+ * @author  TMate Software Ltd.
  */
 public class DAVRepositoryFactory extends SVNRepositoryFactory {
     
@@ -43,8 +45,10 @@ public class DAVRepositoryFactory extends SVNRepositoryFactory {
         if (ourProxyManager == null) {
             ourProxyManager = proxyManager == null ? IDAVProxyManager.DEFAULT : proxyManager;
         }
-        DAVRepositoryFactory factory = new DAVRepositoryFactory();
-        SVNRepositoryFactory.registerRepositoryFactory("^https?://.*$", factory);
+        if (!SVNRepositoryFactory.hasRepositoryFactory("^https?://.*$")) {
+            DAVRepositoryFactory factory = new DAVRepositoryFactory();
+            SVNRepositoryFactory.registerRepositoryFactory("^https?://.*$", factory);
+        }
     }
 
     public SVNRepository createRepositoryImpl(SVNRepositoryLocation location) {

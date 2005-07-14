@@ -18,7 +18,7 @@ package org.tmatesoft.svn.core.io;
  * <ul>
  * <li>a directory - the node is a directory
  * <li>a file      - the node is a file
- * <li>none        - the versioned node is absent (does not exist)
+ * <li>none        - the node is absent (does not exist)
  * <li>unknown     - the node kind can not be recognized
  * </ul>
  * <code>SVNNodeKind</code> items are used to describe directory
@@ -28,27 +28,29 @@ package org.tmatesoft.svn.core.io;
  * @author 	TMate Software Ltd.
  * @see 	SVNDirEntry
  */
-public final class SVNNodeKind {
+public final class SVNNodeKind implements Comparable {
     /**
      * Defines the none node kind 
      */
-    public static final SVNNodeKind NONE = new SVNNodeKind();
+    public static final SVNNodeKind NONE = new SVNNodeKind(2);
     /**
      * Defines the file node kind
      */
-    public static final SVNNodeKind FILE = new SVNNodeKind();
+    public static final SVNNodeKind FILE = new SVNNodeKind(1);
     /**
      * Defines the directory node kind
      */
-    public static final SVNNodeKind DIR = new SVNNodeKind();
+    public static final SVNNodeKind DIR = new SVNNodeKind(0);
     /**
      * Defines the unknown node kind
      */
-    public static final SVNNodeKind UNKNOWN = new SVNNodeKind();
-    /**
-     * Default constructor.
-     */
-    private SVNNodeKind() {}
+    public static final SVNNodeKind UNKNOWN = new SVNNodeKind(3);
+
+    private int myID;
+
+    private SVNNodeKind(int id) {
+        myID = id;
+    }
     
     /**
      * Parses the passed string and finds out the node kind. For instance,
@@ -72,16 +74,24 @@ public final class SVNNodeKind {
     /**
      * Represents the current <code>SVNNodeKind</code> object as a string.
      * 
-     * @return string representation of the node kind.
+     * @return string representation of this object.
      */
     public String toString() {
         if (this == NONE) {
-            return "<none>";
+            return "none";
         } else if (this == FILE) {
-            return "<file>";
+            return "file";
         } else if (this == DIR) {
-            return "<dir>";
+            return "dir";
         }
-        return "<unknown>";
+        return "unknown";
+    }
+
+    public int compareTo(Object o) {
+        if (o == null || o.getClass() != SVNNodeKind.class) {
+            return -1;
+        }
+        int otherID = ((SVNNodeKind) o).myID;
+        return myID > otherID ? 1 : myID < otherID ? -1 : 0;
     }
 }

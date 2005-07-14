@@ -34,8 +34,10 @@ import org.tmatesoft.svn.util.PathUtil;
 import org.tmatesoft.svn.util.TimeUtil;
 import org.xml.sax.helpers.DefaultHandler;
 
+
 /**
- * @author Alexander Kitaev
+ * @version 1.0
+ * @author  TMate Software Ltd.
  */
 public class DAVConnection {
     
@@ -56,8 +58,8 @@ public class DAVConnection {
     
     public void open(DAVRepository repository) throws SVNException {
         if (myHttpConnection == null) {
-        	myHttpConnection = new HttpConnection(myLocation, repository.getCredentialsProvider());
-            if (repository != null && repository.getRepositoryUUID() == null) {
+        	myHttpConnection = new HttpConnection(myLocation, repository);
+            if (repository.getRepositoryUUID() == null) {
                 String path = myLocation.getPath();
                 final DAVResponse[] result = new DAVResponse[1];
                 StringBuffer body = DAVPropertiesHandler.generatePropertiesRequest(null, DAVElement.STARTING_PROPERTIES);
@@ -81,10 +83,12 @@ public class DAVConnection {
                 }
                 String uuid = (String) result[0].getPropertyValue(DAVElement.REPOSITORY_UUID);
                 String relativePath = (String) result[0].getPropertyValue(DAVElement.BASELINE_RELATIVE_PATH);
+
                 
                 String root = myLocation.getPath();
                 if (relativePath != null) {
                     relativePath = PathUtil.removeTrailingSlash(relativePath);
+                    relativePath = PathUtil.encode(relativePath);
                     root = PathUtil.removeTrailingSlash(root);
                     if (root.endsWith(relativePath)) {
                         root = root.substring(0, root.length() - relativePath.length() - 1);                        
@@ -92,7 +96,9 @@ public class DAVConnection {
                 } else {
                 	root = path;
                 }
-                repository.updateCredentials(uuid, root);
+                // TODO get rootURL
+                String url = myLocation.getProtocol() + "://" + myLocation.getHost() + ":" + myLocation.getPort() + root;
+                repository.updateCredentials(uuid, PathUtil.decode(root), url);
             }
         }
     }    
@@ -153,7 +159,7 @@ public class DAVConnection {
         DAVGetLockHandler handler = new DAVGetLockHandler();
         DAVStatus status = myHttpConnection.request("LOCK", path, header, body, handler, null);
         if (status != null) {
-            String userName = myHttpConnection.getLastCredentials() != null ? myHttpConnection.getLastCredentials().getName() : null; 
+            String userName = myHttpConnection.getLastValidCredentials() != null ? myHttpConnection.getLastValidCredentials().getUserName() : null; 
             String created = (String) status.getResponseHeader().get("X-SVN-Creation-Date");
             Date createdDate = created != null ? TimeUtil.parseDate(created) : null;            
             return new SVNLock(info.baselinePath, handler.getID(), userName, comment, createdDate, null);
@@ -259,6 +265,7 @@ public class DAVConnection {
                 try {
                     data.close();
                 } catch (IOException e) {
+                    //
                 }
             }
             data = new ByteArrayInputStream(bos.toByteArray());
@@ -301,7 +308,7 @@ public class DAVConnection {
             header = new HashMap();
             header.put("If", "(<" + myLocks.get(url) + ">)");
         }
-        DAVStatus status = myHttpConnection.request("CHECKOUT", path, header, request, (DefaultHandler) null, null);
+        DAVStatus status = myHttpConnection.request("CHECKOUT", path, header, request, null, null);
         // update location to be a path!
         if (status.getResponseHeader().containsKey("Location")) {
             String location = (String) status.getResponseHeader().get("Location");

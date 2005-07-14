@@ -23,8 +23,10 @@ import org.xml.sax.Attributes;
 import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;
 
+
 /**
- * @author Alexander Kitaev
+ * @version 1.0
+ * @author  TMate Software Ltd.
  */
 public abstract class BasicDAVHandler extends DefaultHandler {
 	
@@ -51,8 +53,7 @@ public abstract class BasicDAVHandler extends DefaultHandler {
             startElement(getParent(), element, attributes);
         } catch(SVNException e) {
             DebugLog.error(e.getMessage());
-            e.printStackTrace();
-            throw new SAXException(e); 
+            throw new SAXException(e);
         }
         myParent.push(element);
         myCDATA = new StringBuffer();
