@@ -1,5 +1,13 @@
-a { color: #000090; text-decoration: none; }
-a:hover, a:active, a:focus { color: highlighttext; background-color: highlight; text-decoration: none; }
+a { 
+color: #000090; 
+text-decoration: none; 
+}
+
+a:hover, a:active, a:focus { 
+color: #000090; 
+background-color: rgb(75%,75%,100%); 
+text-decoration: none; 
+}
 
 body { background: #FFFFFF; }
 body, table { font-family: Verdana, Arial, Helvetica, sans-serif; font-size: 10pt; }

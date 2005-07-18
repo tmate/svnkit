@@ -16,20 +16,18 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 
+import org.tmatesoft.svn.core.SVNCommitInfo;
+import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.internal.io.dav.DAVRepositoryFactory;
 import org.tmatesoft.svn.core.internal.io.svn.SVNRepositoryFactoryImpl;
-import org.tmatesoft.svn.core.internal.ws.fs.FSEntryFactory;
-import org.tmatesoft.svn.core.io.SVNCommitInfo;
-import org.tmatesoft.svn.core.io.SVNException;
 import org.tmatesoft.svn.core.wc.ISVNOptions;
-import org.tmatesoft.svn.core.wc.SVNCommitClient;
-import org.tmatesoft.svn.core.wc.SVNCopyClient;
+import org.tmatesoft.svn.core.wc.SVNClientManager;
 import org.tmatesoft.svn.core.wc.SVNRevision;
-import org.tmatesoft.svn.core.wc.SVNStatusClient;
 import org.tmatesoft.svn.core.wc.SVNUpdateClient;
-import org.tmatesoft.svn.core.wc.SVNWCClient;
 import org.tmatesoft.svn.core.wc.SVNWCUtil;
+import org.tmatesoft.svn.core.wc.ISVNEventHandler;
 import org.tmatesoft.svn.util.PathUtil;
+
 /*
  * This is a complex example program that demonstrates how you can manage local
  * working copies as well as URLs by means of the API provided in the 
@@ -288,11 +286,9 @@ import org.tmatesoft.svn.util.PathUtil;
  */
 public class WorkingCopy {
 
-    private static SVNCommitClient myCommitClient;
-    private static SVNCopyClient myCopyClient;
-    private static SVNWCClient myWCClient;
-    private static SVNStatusClient myStatusClient;
-    private static SVNUpdateClient myUpdateClient;
+    private static SVNClientManager ourClientManager;
+    private static ISVNEventHandler myCommitEventHandler;
+    private static ISVNEventHandler myUpdateEventHandler;
     
     public static void main(String[] args) {
         /*
@@ -354,7 +350,10 @@ public class WorkingCopy {
          * library itself)
          */
         setupLibrary();
-
+        
+        myCommitEventHandler = new CommitEventHandler();
+        myUpdateEventHandler = new UpdateEventHandler();
+        
         /*
          * Creates a usre's authentication manager.
          * User's authentication is generally required in
@@ -362,8 +361,12 @@ public class WorkingCopy {
          * readonly=true - not to save to a config file any configuration 
          * changes that can be done during the program run 
          */
-        ISVNOptions myOptions = SVNWCUtil.createDefaultOptions(true);
-        myOptions.setDefaultAuthentication(name, password);
+        ISVNOptions options = SVNWCUtil.createDefaultOptions(true);
+        ourClientManager = SVNClientManager.newInstance(options, name, password);
+        ourClientManager.getCommitClient().setEventHandler(myCommitEventHandler);
+        ourClientManager.getUpdateClient().setEventHandler(myUpdateEventHandler);
+        ourClientManager.getWCClient().setEventHandler(myUpdateEventHandler);
+        ourClientManager.getCopyClient().setEventHandler(myCommitEventHandler);
 
         /*
          * The following 'SVN*Client' objects come from org.tmatesoft.svn.core.io
@@ -371,33 +374,6 @@ public class WorkingCopy {
          * managing working copies.    
          */
         
-        /*
-         * passing options when creating an instance of
-         * SVNCommitClient
-         */
-        myCommitClient = new SVNCommitClient(myOptions, new CommitEventHandler());
-        /*
-         * passing options when creating an instance of
-         * SVNCopyClient
-         */
-        myCopyClient = new SVNCopyClient(myOptions, null);
-        /*
-         * not passing options when creating an instance of
-         * SVNWCClient - all the operations will be local 
-         */
-        myWCClient = new SVNWCClient();
-        /*
-         * not passing options when creating an instance of
-         * SVNStatusClient - all status commands will be invoked on localp 
-         * aths, there's no need in authentication
-         */
-        myStatusClient = new SVNStatusClient(new StatusHandler());
-        /*
-         * not passing options when creating an instance of
-         * SVNUpdateClient - assuming that the repository server is configured
-         * to allow reading operations for non-authenticated users
-         */
-        myUpdateClient = new SVNUpdateClient(new UpdateEventHandler());
 
         long committedRevision = -1;
         System.out.println("Making a new directory at '" + url + "'...");
@@ -527,7 +503,8 @@ public class WorkingCopy {
             error("error while recursively updating the working copy at '"
                     + wcDir.getAbsolutePath() + "'", svne);
         }
-        System.out.println("Updated to revision " + updatedRevision + ".");
+        System.out.println("Updated to revision " + updatedRevision + "." );
+        System.out.println();
 
         System.out.println("Committing changes for '" + wcDir.getAbsolutePath() + "'...");
         try {
@@ -684,10 +661,6 @@ public class WorkingCopy {
          * for SVN (over svn and svn+ssh)
          */
         SVNRepositoryFactoryImpl.setup();
-        /*
-         * Working copy storage (default is file system).
-         */
-        FSEntryFactory.setup();
     }
 
     /*
@@ -707,7 +680,7 @@ public class WorkingCopy {
          * Returns SVNCommitInfo containing information on the commit (revision number, 
          * etc.) 
          */
-        return myCommitClient.doMkDir(new String[]{url}, commitMessage);
+        return ourClientManager.getCommitClient().doMkDir(new String[]{url}, commitMessage);
     }
     
     /*
@@ -737,14 +710,14 @@ public class WorkingCopy {
          * Returns SVNCommitInfo containing information on the commit (revision number, 
          * etc.) 
          */
-        return myCommitClient.doImport(localPath, dstURL, commitMessage, isRecursive);
+        return ourClientManager.getCommitClient().doImport(localPath, dstURL, commitMessage, isRecursive);
         
     }
     /*
      * Committs changes in a working copy to the repository. Like 
      * 'svn commit PATH -m "some comment"' command. It's done by invoking 
      * SVNCommitClient.doCommit(File[] paths, boolean keepLocks, String commitMessage,
-     * boolean recursive) which takes the following parameters:
+     * boolean force, boolean recursive) which takes the following parameters:
      * 
      * paths - working copy paths which changes are to be committed;
      * 
@@ -752,6 +725,8 @@ public class WorkingCopy {
      * be unlocked after a successful commit; 
      * 
      * commitMessage - a commit log message;
+     * 
+     * force - if true then a non-recursive commit will be forced anyway;  
      * 
      * recursive - if true and a path corresponds to a directory then doCommit(..) recursively 
      * committs changes for the entire directory, otherwise - only for child entries of the 
@@ -764,7 +739,7 @@ public class WorkingCopy {
          * Returns SVNCommitInfo containing information on the commit (revision number, 
          * etc.) 
          */
-        return myCommitClient.doCommit(new File[] { wcPath }, keepLocks,
+        return ourClientManager.getCommitClient().doCommit(new File[] { wcPath }, keepLocks,
                 commitMessage, false, true);
     }
 
@@ -790,14 +765,16 @@ public class WorkingCopy {
     private static long checkout(String url,
             SVNRevision revision, File destPath, boolean isRecursive)
             throws SVNException {
+
+        SVNUpdateClient updateClient = ourClientManager.getUpdateClient();
         /*
          * sets externals not to be ignored during the checkout
          */
-        myUpdateClient.setIgnoreExternals(false);
+        updateClient.setIgnoreExternals(false);
         /*
          * returns the number of the revision at which the working copy is 
          */
-        return myUpdateClient.doCheckout(url, destPath, revision, revision,
+        return updateClient.doCheckout(url, destPath, revision, revision,
                 isRecursive);
     }
     
@@ -817,14 +794,16 @@ public class WorkingCopy {
     private static long update(File wcPath,
             SVNRevision updateToRevision, boolean isRecursive)
             throws SVNException {
+
+        SVNUpdateClient updateClient = ourClientManager.getUpdateClient();
         /*
          * sets externals not to be ignored during the update
          */
-        myUpdateClient.setIgnoreExternals(false);
+        updateClient.setIgnoreExternals(false);
         /*
          * returns the number of the revision wcPath was updated to
          */
-        return myUpdateClient.doUpdate(wcPath, updateToRevision, isRecursive);
+        return updateClient.doUpdate(wcPath, updateToRevision, isRecursive);
     }
     
     /*
@@ -844,14 +823,15 @@ public class WorkingCopy {
     private static long switchToURL(File wcPath,
             String url, SVNRevision updateToRevision, boolean isRecursive)
             throws SVNException {
+        SVNUpdateClient updateClient = ourClientManager.getUpdateClient();
         /*
          * sets externals not to be ignored during the switch
          */
-        myUpdateClient.setIgnoreExternals(false);
+        updateClient.setIgnoreExternals(false);
         /*
          * returns the number of the revision wcPath was updated to
          */
-        return myUpdateClient.doSwitch(wcPath, url, updateToRevision,
+        return updateClient.doSwitch(wcPath, url, updateToRevision,
                 isRecursive);
     }
 
@@ -890,7 +870,7 @@ public class WorkingCopy {
          * StatusHandler displays status information for each entry in the console (in the 
          * manner of the native Subversion command line client)
          */
-        myStatusClient.doStatus(wcPath, isRecursive, isRemote, isReportAll,
+        ourClientManager.getStatusClient().doStatus(wcPath, isRecursive, isRemote, isReportAll,
                 isIncludeIgnored, isCollectParentExternals, new StatusHandler());
     }
 
@@ -917,7 +897,7 @@ public class WorkingCopy {
          * InfoHandler displays information for each entry in the console (in the manner of
          * the native Subversion command line client)
          */
-        myWCClient.doInfo(wcPath, revision, isRecursive, new InfoHandler());
+        ourClientManager.getWCClient().doInfo(wcPath, revision, isRecursive, new InfoHandler());
     }
     
     /*
@@ -942,7 +922,7 @@ public class WorkingCopy {
      * schedules all its inner entries for addition as well. 
      */
     private static void addEntry(File wcPath) throws SVNException {
-        myWCClient.doAdd(wcPath, false, false, false, true);
+        ourClientManager.getWCClient().doAdd(wcPath, false, false, false, true);
     }
     
     /*
@@ -958,7 +938,7 @@ public class WorkingCopy {
      * lockMessage - an optional lock comment string.
      */
     private static void lock(File wcPath, boolean isStealLock, String lockComment) throws SVNException {
-        myWCClient.doLock(new File[] { wcPath }, isStealLock, lockComment);
+        ourClientManager.getWCClient().doLock(new File[] { wcPath }, isStealLock, lockComment);
     }
     
     /*
@@ -976,7 +956,7 @@ public class WorkingCopy {
      * if false - then it's a deletion itself.  
      */
     private static void delete(File wcPath, boolean force) throws SVNException {
-        myWCClient.doDelete(wcPath, force, false);
+        ourClientManager.getWCClient().doDelete(wcPath, force, false);
     }
     
     /*
@@ -1027,7 +1007,7 @@ public class WorkingCopy {
          * Returns SVNCommitInfo containing information on the commit (revision number, 
          * etc.) 
          */
-        return myCopyClient.doCopy(srcURL, srcPegRevision, SVNRevision.HEAD,
+        return ourClientManager.getCopyClient().doCopy(srcURL, srcPegRevision, SVNRevision.HEAD,
                 dstURL, null, isMove, commitMessage);
     }
     

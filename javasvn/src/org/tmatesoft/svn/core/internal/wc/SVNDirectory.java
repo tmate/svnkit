@@ -14,7 +14,6 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.io.RandomAccessFile;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.text.MessageFormat;
@@ -26,21 +25,19 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 
+import org.tmatesoft.svn.core.SVNCommitInfo;
+import org.tmatesoft.svn.core.SVNException;
+import org.tmatesoft.svn.core.SVNNodeKind;
 import org.tmatesoft.svn.core.SVNProperty;
-import org.tmatesoft.svn.core.internal.ws.fs.FSMergerBySequence;
-import org.tmatesoft.svn.core.io.SVNCommitInfo;
-import org.tmatesoft.svn.core.io.SVNException;
-import org.tmatesoft.svn.core.io.SVNNodeKind;
 import org.tmatesoft.svn.core.wc.ISVNEventHandler;
+import org.tmatesoft.svn.core.wc.ISVNMerger;
+import org.tmatesoft.svn.core.wc.ISVNMergerFactory;
 import org.tmatesoft.svn.core.wc.SVNEvent;
 import org.tmatesoft.svn.core.wc.SVNStatusType;
 import org.tmatesoft.svn.core.wc.SVNWCUtil;
 import org.tmatesoft.svn.util.DebugLog;
 import org.tmatesoft.svn.util.PathUtil;
 import org.tmatesoft.svn.util.TimeUtil;
-
-import de.regnis.q.sequence.line.QSequenceLineRAData;
-import de.regnis.q.sequence.line.QSequenceLineRAFileData;
 
 /**
  * @version 1.0
@@ -49,11 +46,8 @@ import de.regnis.q.sequence.line.QSequenceLineRAFileData;
 public class SVNDirectory {
 
     private File myDirectory;
-
     private SVNEntries myEntries;
-
     private SVNWCAccess myWCAccess;
-
     private String myPath;
 
     public SVNDirectory(SVNWCAccess wcAccess, String path, File dir) {
@@ -313,7 +307,7 @@ public class SVNDirectory {
         String mimeType = getProperties(localPath, false).getPropertyValue(
                 SVNProperty.MIME_TYPE);
         SVNEntry entry = getEntries().getEntry(localPath, true);
-        if (mimeType != null && !mimeType.startsWith("text/")) {
+        if (SVNProperty.isBinaryMimeType(mimeType)) {
             // binary
             if (!dryRun) {
                 File oldFile = SVNFileUtil.createUniqueFile(getRoot(),
@@ -336,9 +330,6 @@ public class SVNDirectory {
         SVNTranslator.translate(this, localPath, localPath, SVNFileUtil
                 .getBasePath(localTmpFile), false, false);
         // 2. run merge between all files we have :)
-        RandomAccessFile localIS = null;
-        RandomAccessFile latestIS = null;
-        RandomAccessFile baseIS = null;
         OutputStream result = null;
         File resultFile = dryRun ? null : SVNFileUtil.createUniqueFile(
                 getRoot(), localPath, ".result");
@@ -346,55 +337,15 @@ public class SVNDirectory {
         byte[] conflictStart = ("<<<<<<< " + localLabel).getBytes();
         byte[] conflictEnd = (">>>>>>> " + latestLabel).getBytes();
         byte[] separator = ("=======").getBytes();
-        FSMergerBySequence merger = new FSMergerBySequence(conflictStart,
-                separator, conflictEnd, null);
-        int mergeResult = 0;
+        ISVNMergerFactory factory = myWCAccess.getOptions().getMergerFactory();
+        ISVNMerger merger = factory.createMerger(conflictStart, separator, conflictEnd, null);
+        
+        result = resultFile == null ? SVNFileUtil.DUMMY_OUT : SVNFileUtil.openFileForWriting(resultFile);
+        SVNStatusType status = SVNStatusType.UNCHANGED;
         try {
-            localIS = new RandomAccessFile(localTmpFile, "r");
-            latestIS = new RandomAccessFile(getFile(latestPath), "r");
-            baseIS = new RandomAccessFile(getFile(basePath), "r");
-            OutputStream dummy = new OutputStream() {
-                public void write(int b) {
-                }
-            };
-            result = resultFile == null ? dummy : new FileOutputStream(
-                    resultFile);
-
-            QSequenceLineRAData baseData = new QSequenceLineRAFileData(baseIS);
-            QSequenceLineRAData localData = new QSequenceLineRAFileData(localIS);
-            QSequenceLineRAData latestData = new QSequenceLineRAFileData(latestIS);
-            mergeResult = merger.merge(baseData, localData, latestData, result);
-        } catch (IOException e) {
-            SVNErrorManager.error("svn: I/O error while merging file '" + localPath + "'");
+            status = merger.mergeText(getFile(basePath), localTmpFile, getFile(latestPath), result);
         } finally {
             SVNFileUtil.closeFile(result);
-            if (localIS != null) {
-                try {
-                    localIS.close();
-                } catch (IOException e) {
-                    //
-                }
-            }
-            if (baseIS != null) {
-                try {
-                    baseIS.close();
-                } catch (IOException e) {
-                    //
-                }
-            }
-            if (latestIS != null) {
-                try {
-                    latestIS.close();
-                } catch (IOException e) {
-                    //
-                }
-            }
-        }
-        SVNStatusType status = SVNStatusType.UNCHANGED;
-        if (mergeResult == 2) {
-            status = SVNStatusType.CONFLICTED;
-        } else if (mergeResult == 4) {
-            status = SVNStatusType.MERGED;
         }
         if (dryRun) {
             localTmpFile.delete();
@@ -408,24 +359,18 @@ public class SVNDirectory {
                     .getBasePath(resultFile), localPath, true, true);
         } else {
             // copy all to wc.
-            File mineFile = SVNFileUtil.createUniqueFile(getRoot(), localPath,
-                    localLabel);
+            File mineFile = SVNFileUtil.createUniqueFile(getRoot(), localPath, localLabel);
             String minePath = SVNFileUtil.getBasePath(mineFile);
             SVNFileUtil.copyFile(getFile(localPath), mineFile, false);
-            File oldFile = SVNFileUtil.createUniqueFile(getRoot(), localPath,
-                    baseLabel);
+            File oldFile = SVNFileUtil.createUniqueFile(getRoot(), localPath, baseLabel);
             String oldPath = SVNFileUtil.getBasePath(oldFile);
-            File newFile = SVNFileUtil.createUniqueFile(getRoot(), localPath,
-                    latestLabel);
+            File newFile = SVNFileUtil.createUniqueFile(getRoot(), localPath, latestLabel);
             String newPath = SVNFileUtil.getBasePath(newFile);
-            SVNTranslator.translate(this, localPath, basePath, oldPath, true,
-                    false);
-            SVNTranslator.translate(this, localPath, latestPath, newPath, true,
-                    false);
+            SVNTranslator.translate(this, localPath, basePath, oldPath, true, false);
+            SVNTranslator.translate(this, localPath, latestPath, newPath, true, false);
             // translate result to local
             if (!leaveConflict) {
-                SVNTranslator.translate(this, localPath, SVNFileUtil
-                        .getBasePath(resultFile), localPath, true, true);
+                SVNTranslator.translate(this, localPath, SVNFileUtil.getBasePath(resultFile), localPath, true, true);
             }
 
             entry.setConflictNew(newPath);
@@ -662,6 +607,7 @@ public class SVNDirectory {
             return true;
         }
         String realTimestamp = TimeUtil.formatDate(new Date(propFile.lastModified()));
+        String fullRealTimestamp = realTimestamp;
         realTimestamp = realTimestamp.substring(0, 23);
         String timeStamp = entry.getPropTime();
         if (timeStamp != null) {
@@ -674,7 +620,7 @@ public class SVNDirectory {
         Map m2 = getBaseProperties(name, false).asMap();
         if (m1.equals(m2)) {
             if (isLocked()) {
-                entry.setPropTime(realTimestamp);
+                entry.setPropTime(fullRealTimestamp);
                 getEntries().save(false);
             }
             return false;

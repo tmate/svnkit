@@ -16,7 +16,7 @@ import java.io.File;
 import java.io.PrintStream;
 
 import org.tmatesoft.svn.cli.SVNCommand;
-import org.tmatesoft.svn.core.io.SVNException;
+import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.wc.SVNWCClient;
 
 /**
@@ -26,7 +26,7 @@ public class CleanupCommand extends SVNCommand {
 
     public void run(final PrintStream out, final PrintStream err) throws SVNException {
         String path = getCommandLine().getPathAt(0);
-        SVNWCClient client = new SVNWCClient(getOptions(), null);
+        SVNWCClient client = getClientManager().getWCClient();
         client.doCleanup(new File(path).getAbsoluteFile());
     }
 }

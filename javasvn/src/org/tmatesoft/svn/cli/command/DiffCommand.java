@@ -19,7 +19,7 @@ import java.util.Map;
 
 import org.tmatesoft.svn.cli.SVNArgument;
 import org.tmatesoft.svn.cli.SVNCommand;
-import org.tmatesoft.svn.core.io.SVNException;
+import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.wc.DefaultSVNDiffGenerator;
 import org.tmatesoft.svn.core.wc.SVNDiffClient;
 import org.tmatesoft.svn.core.wc.SVNRevision;
@@ -34,7 +34,7 @@ public class DiffCommand extends SVNCommand {
 
     public void run(final PrintStream out, PrintStream err) throws SVNException {
         boolean error = false;
-        SVNDiffClient differ = new SVNDiffClient(getOptions(), null);
+        SVNDiffClient differ = getClientManager().getDiffClient();
         differ.setDiffGenerator(new DefaultSVNDiffGenerator() {
             public String getDisplayPath(File file) {
                 return SVNUtil.getPath(file).replace(File.separatorChar, '/');

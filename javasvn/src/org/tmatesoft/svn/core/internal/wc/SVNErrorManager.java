@@ -10,7 +10,7 @@
  */
 package org.tmatesoft.svn.core.internal.wc;
 
-import org.tmatesoft.svn.core.io.SVNException;
+import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.util.DebugLog;
 
 /**
@@ -25,7 +25,7 @@ public class SVNErrorManager {
         } else if (!message.startsWith("svn: ")) {
             message = "svn: " + message;
         }
-        DebugLog.error(message);
+        DebugLog.log(message);
         throw new SVNException(message);
     }
 }

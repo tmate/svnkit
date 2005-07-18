@@ -10,7 +10,7 @@ import java.util.Collection;
 
 import org.tmatesoft.svn.cli.SVNArgument;
 import org.tmatesoft.svn.cli.SVNCommand;
-import org.tmatesoft.svn.core.io.SVNException;
+import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.wc.SVNWCClient;
 
 public class UnlockCommand extends SVNCommand {
@@ -23,8 +23,9 @@ public class UnlockCommand extends SVNCommand {
             files.add(new File(getCommandLine().getPathAt(i)));
         }
         File[] filesArray = (File[]) files.toArray(new File[files.size()]);
+        getClientManager().setEventHandler(new SVNCommandEventProcessor(out, err, false));
+        SVNWCClient wcClient = getClientManager().getWCClient();
         if (filesArray.length > 0) {
-            SVNWCClient wcClient = new SVNWCClient(getOptions(), new SVNCommandEventProcessor(out, err, false));
             wcClient.doUnlock(filesArray, force);
         }
         files.clear();
@@ -34,7 +35,6 @@ public class UnlockCommand extends SVNCommand {
         }
         String[] urls = (String[]) files.toArray(new String[files.size()]);
         if (urls.length > 0) {
-            SVNWCClient wcClient = new SVNWCClient(getOptions(), new SVNCommandEventProcessor(out, err, false));
             wcClient.doUnlock(urls, force);
         }
     }

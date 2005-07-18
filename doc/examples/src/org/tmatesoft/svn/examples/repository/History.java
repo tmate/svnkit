@@ -14,15 +14,16 @@ package org.tmatesoft.svn.examples.repository;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.Set;
+
+import org.tmatesoft.svn.core.SVNException;
+import org.tmatesoft.svn.core.SVNLogEntry;
+import org.tmatesoft.svn.core.SVNLogEntryPath;
+import org.tmatesoft.svn.core.auth.ISVNAuthenticationManager;
 import org.tmatesoft.svn.core.internal.io.dav.DAVRepositoryFactory;
 import org.tmatesoft.svn.core.internal.io.svn.SVNRepositoryFactoryImpl;
-import org.tmatesoft.svn.core.io.SVNException;
 import org.tmatesoft.svn.core.io.SVNRepository;
 import org.tmatesoft.svn.core.io.SVNRepositoryFactory;
 import org.tmatesoft.svn.core.io.SVNRepositoryLocation;
-import org.tmatesoft.svn.core.io.SVNLogEntry;
-import org.tmatesoft.svn.core.io.SVNLogEntryPath;
-import org.tmatesoft.svn.core.wc.ISVNOptions;
 import org.tmatesoft.svn.core.wc.SVNWCUtil;
 
 /*
@@ -105,6 +106,7 @@ public class History {
 
         SVNRepositoryLocation location;
         SVNRepository repository = null;
+        
         try {
             /*
              * Parses the URL string and creates an SVNRepositoryLocation which
@@ -134,15 +136,24 @@ public class History {
          * SVNRepository since this low-level class is not intended to work
          * with working copy config files 
          */
-        ISVNOptions myOptions = SVNWCUtil.createDefaultOptions(true);
-        myOptions.setDefaultAuthentication(name, password);
+        ISVNAuthenticationManager authManager = SVNWCUtil.createDefaultAuthenticationManager(name, password);
 
         /*
          * Sets the manager of the user's authentication information that will 
          * be used to authenticate the user to the server (if needed) during 
          * operations handled by the SVNRepository.
          */
-        repository.setAuthenticationManager(myOptions);
+        repository.setAuthenticationManager(authManager);
+        /*
+         * Gets the latest revision number of the repository
+         */
+        try {
+            endRevision = repository.getLatestRevision();
+        } catch (SVNException svne) {
+            System.err.println("error while fetching the latest repository revision: " + svne.getMessage());
+            System.exit(1);
+        }
+
         Collection logEntries = null;
         try {
             /*
@@ -160,8 +171,8 @@ public class History {
              * way to reach the scope.
              * 
              * startRevision, endRevision - to define a range of revisions you are
-             * interested in; by default in this program - startRevision=0, endRevision=-1
-             * meaning the latest (HEAD) revision of the repository.
+             * interested in; by default in this program - startRevision=0, endRevision=
+             * the latest (HEAD) revision of the repository.
              * 
              * the 5th parameter - a boolean flag changedPath - if true then for
              * each revision a corresponding SVNLogEntry will contain a map of
@@ -179,6 +190,7 @@ public class History {
              */
             logEntries = repository.log(new String[] {""}, null,
                     startRevision, endRevision, true, true);
+
         } catch (SVNException svne) {
             System.out.println("error while collecting log information for '"
                     + url + "': " + svne.getMessage());

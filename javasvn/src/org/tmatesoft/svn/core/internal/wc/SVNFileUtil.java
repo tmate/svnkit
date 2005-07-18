@@ -10,7 +10,7 @@
  */
 package org.tmatesoft.svn.core.internal.wc;
 
-import org.tmatesoft.svn.core.io.SVNException;
+import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.util.DebugLog;
 import org.tmatesoft.svn.util.PathUtil;
 
@@ -39,13 +39,17 @@ import java.util.StringTokenizer;
  */
 public class SVNFileUtil {
 
-    private static final String BINARY_MIME_TYPE = "application/octet-stream";
 
     public final static boolean isWindows;
+    public final static OutputStream DUMMY_OUT = new OutputStream() {
+        public void write(int b) throws IOException {
+        }
+    };
+    
 
     private static String ourGroupID;
-
     private static String ourUserID;
+    private static final String BINARY_MIME_TYPE = "application/octet-stream";
 
     static {
         String osName = System.getProperty("os.name");
@@ -76,7 +80,7 @@ public class SVNFileUtil {
     }
     
     public static boolean createEmptyFile(File file) throws SVNException {
-        boolean created = false;
+        boolean created;
         try {
             created = file.createNewFile();
         } catch (IOException e) {
@@ -175,6 +179,13 @@ public class SVNFileUtil {
         }
     }
 
+    public static void copy(InputStream is, OutputStream os) throws IOException {
+        int r;
+        while((r = is.read()) >= 0) {
+            os.write(r);
+        }        
+    }
+
     public static void copyFile(File src, File dst, boolean safe)
             throws SVNException {
         if (src == null || dst == null) {
@@ -228,6 +239,7 @@ public class SVNFileUtil {
         if (safe && tmpDst != dst) {
             rename(tmpDst, dst);
         }
+        dst.setLastModified(src.lastModified());
     }
 
     public static boolean createSymlink(File link, File linkName)
@@ -477,24 +489,11 @@ public class SVNFileUtil {
             //
         }
     }
-
-    public static String detectMimeType(File file) {
-        if (file == null || !file.exists()) {
-            return null;
-        }
+    
+    public static String detectMimeType(InputStream is) throws IOException {
         byte[] buffer = new byte[1024];
-        InputStream is = null;
         int read = 0;
-        try {
-            is = openFileForReading(file);
-            read = is.read(buffer);
-        } catch (IOException e) {
-            return null;
-        } catch (SVNException e) {
-            return null;
-        } finally {
-            closeFile(is);
-        }
+        read = is.read(buffer);
         int binaryCount = 0;
         for (int i = 0; i < read; i++) {
             byte b = buffer[i];
@@ -509,6 +508,23 @@ public class SVNFileUtil {
             return BINARY_MIME_TYPE;
         }
         return null;
+    }
+
+    public static String detectMimeType(File file) {
+        if (file == null || !file.exists()) {
+            return null;
+        }
+        InputStream is = null;
+        try {
+            is = openFileForReading(file);
+            return detectMimeType(is);
+        } catch (IOException e) {
+            return null;
+        } catch (SVNException e) {
+            return null;
+        } finally {
+            closeFile(is);
+        }
     }
 
     public static boolean isExecutable(File file) {
@@ -558,6 +574,7 @@ public class SVNFileUtil {
             boolean copyAdminDir) throws SVNException {
         if (!dstDir.exists()) {
             dstDir.mkdirs();
+            dstDir.setLastModified(srcDir.lastModified());
         }
         File[] files = srcDir.listFiles();
         for (int i = 0; files != null && i < files.length; i++) {

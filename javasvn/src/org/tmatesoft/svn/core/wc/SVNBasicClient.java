@@ -10,29 +10,29 @@
  */
 package org.tmatesoft.svn.core.wc;
 
-import org.tmatesoft.svn.core.SVNProperty;
-import org.tmatesoft.svn.core.internal.wc.SVNDirectory;
-import org.tmatesoft.svn.core.internal.wc.SVNEntries;
-import org.tmatesoft.svn.core.internal.wc.SVNEntry;
-import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
-import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
-import org.tmatesoft.svn.core.internal.wc.SVNOptions;
-import org.tmatesoft.svn.core.internal.wc.SVNWCAccess;
-import org.tmatesoft.svn.core.io.SVNCancelException;
-import org.tmatesoft.svn.core.io.SVNException;
-import org.tmatesoft.svn.core.io.SVNLocationEntry;
-import org.tmatesoft.svn.core.io.SVNNodeKind;
-import org.tmatesoft.svn.core.io.SVNRepository;
-import org.tmatesoft.svn.core.io.SVNRepositoryFactory;
-import org.tmatesoft.svn.core.io.SVNRepositoryLocation;
-import org.tmatesoft.svn.util.DebugLog;
-import org.tmatesoft.svn.util.PathUtil;
-
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+
+import org.tmatesoft.svn.core.SVNCancelException;
+import org.tmatesoft.svn.core.SVNException;
+import org.tmatesoft.svn.core.SVNNodeKind;
+import org.tmatesoft.svn.core.SVNProperty;
+import org.tmatesoft.svn.core.auth.ISVNAuthenticationManager;
+import org.tmatesoft.svn.core.internal.wc.SVNDirectory;
+import org.tmatesoft.svn.core.internal.wc.SVNEntries;
+import org.tmatesoft.svn.core.internal.wc.SVNEntry;
+import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
+import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
+import org.tmatesoft.svn.core.internal.wc.SVNWCAccess;
+import org.tmatesoft.svn.core.io.SVNLocationEntry;
+import org.tmatesoft.svn.core.io.SVNRepository;
+import org.tmatesoft.svn.core.io.SVNRepositoryFactory;
+import org.tmatesoft.svn.core.io.SVNRepositoryLocation;
+import org.tmatesoft.svn.util.DebugLog;
+import org.tmatesoft.svn.util.PathUtil;
 
 /**
  * @version 1.0
@@ -41,56 +41,33 @@ import java.util.List;
 public class SVNBasicClient implements ISVNEventHandler {
 
     private ISVNRepositoryFactory myRepositoryFactory;
-
     private ISVNOptions myOptions;
-
     private ISVNEventHandler myEventDispatcher;
-
     private List myPathPrefixesStack;
-
     private boolean myIsIgnoreExternals;
-
     private boolean myIsDoNotSleepForTimeStamp;
-
     private boolean myIsCommandRunning;
-
     private boolean myIsLeaveConflictsUnresolved;
 
-    protected SVNBasicClient() {
-        this(new SVNOptions(), null);
+    protected SVNBasicClient(final ISVNAuthenticationManager authManager, ISVNOptions options) {
+        this(new ISVNRepositoryFactory() {
+
+            public SVNRepository createRepository(String url) throws SVNException {
+                SVNRepositoryLocation location = SVNRepositoryLocation.parseURL(url);
+                SVNRepository repository = SVNRepositoryFactory.create(location);
+                repository.setAuthenticationManager(authManager);
+                return repository;
+            }
+            
+        }, options);
     }
 
-    protected SVNBasicClient(ISVNEventHandler eventDispatcher) {
-        this(new SVNOptions(), eventDispatcher);
-    }
-
-    protected SVNBasicClient(final ISVNOptions options,
-            ISVNEventHandler eventDispatcher) {
-        this(null, options, eventDispatcher);
-    }
-
-    protected SVNBasicClient(ISVNRepositoryFactory repositoryFactory,
-            ISVNOptions options, ISVNEventHandler eventDispatcher) {
+    protected SVNBasicClient(ISVNRepositoryFactory repositoryFactory, ISVNOptions options) {
         myRepositoryFactory = repositoryFactory;
         myOptions = options;
         if (myOptions == null) {
-            myOptions = new SVNOptions();
+            myOptions = SVNWCUtil.createDefaultOptions(true);
         }
-        if (myRepositoryFactory == null) {
-            myRepositoryFactory = new ISVNRepositoryFactory() {
-                public SVNRepository createRepository(String url)
-                        throws SVNException {
-                    SVNRepository repos = SVNRepositoryFactory
-                            .create(SVNRepositoryLocation.parseURL(url));
-                    if (repos != null) {
-                        repos.setAuthenticationManager(myOptions);
-                    }
-                    return repos;
-                }
-            };
-        }
-
-        myEventDispatcher = eventDispatcher;
         myPathPrefixesStack = new LinkedList();
     }
 
@@ -146,6 +123,10 @@ public class SVNBasicClient implements ISVNEventHandler {
                     .parseURL(PathUtil.decode(url)));
         }
         return myRepositoryFactory.createRepository(PathUtil.decode(url));
+    }
+    
+    protected ISVNRepositoryFactory getRepositoryFactory() {
+        return myRepositoryFactory;
     }
 
     protected void dispatchEvent(SVNEvent event) {
@@ -284,17 +265,18 @@ public class SVNBasicClient implements ISVNEventHandler {
         try {
             locations = (List) repos.getLocations("", locations, pegRevNumber,
                     new long[] { revNumber });
-            if (locations == null || locations.size() != 1) {
-                SVNErrorManager
-                        .error("svn: Unable to find repository location for '"
-                                + url + "' in revision " + revNumber);
-                return null;
-            }
         } catch (SVNException e) {
             DebugLog.error(e);
             SVNErrorManager
                     .error("svn: Unable to find repository location for '"
                             + url + "' in revision " + revNumber);
+            return null;
+        }
+        if (locations == null || locations.size() != 1) {
+            SVNErrorManager
+                    .error("svn: Unable to find repository location for '"
+                            + url + "' in revision " + revNumber);
+            return null;
         }
         SVNLocationEntry location = (SVNLocationEntry) locations.get(0);
         String path = PathUtil.encode(location.getPath());
@@ -344,17 +326,9 @@ public class SVNBasicClient implements ISVNEventHandler {
         entry.setKind(SVNNodeKind.DIR);
         entry.setRevision(revNumber);
         entry.setIncomplete(true);
-        ;
+
         entries.save(true);
         return dir;
-    }
-
-    protected SVNRepository createRepository(File path,
-            SVNRevision pegRevision, SVNRevision revision, long[] actualRevision)
-            throws SVNException {
-        // get entry URL from path
-
-        return null;
     }
 
     protected SVNRepository createRepository(File path, String url,
@@ -459,8 +433,7 @@ public class SVNBasicClient implements ISVNEventHandler {
                     + " or refers to an unrelated object");
             return null;
         }
-        String host = url
-                .substring(0, url.indexOf('/', url.indexOf("://") + 3));
+        String host = url.substring(0, url.indexOf('/', url.indexOf("://") + 3));
         String startPath = host
                 + PathUtil.encode(PathUtil.append(rootPath, startLocation
                         .getPath()));

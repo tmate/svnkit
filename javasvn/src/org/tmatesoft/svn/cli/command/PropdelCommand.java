@@ -17,7 +17,7 @@ import java.io.PrintStream;
 
 import org.tmatesoft.svn.cli.SVNArgument;
 import org.tmatesoft.svn.cli.SVNCommand;
-import org.tmatesoft.svn.core.io.SVNException;
+import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.wc.ISVNPropertyHandler;
 import org.tmatesoft.svn.core.wc.SVNPropertyData;
 import org.tmatesoft.svn.core.wc.SVNRevision;
@@ -36,7 +36,7 @@ public class PropdelCommand extends SVNCommand {
         boolean force = getCommandLine().hasArgument(SVNArgument.FORCE);
         int pathIndex = 1;
 
-        SVNWCClient wcClient = new SVNWCClient(getOptions(), null);
+        SVNWCClient wcClient = getClientManager().getWCClient();
         if (revProp) {
             SVNRevision revision = SVNRevision.UNDEFINED;
             if (getCommandLine().hasArgument(SVNArgument.REVISION)) {

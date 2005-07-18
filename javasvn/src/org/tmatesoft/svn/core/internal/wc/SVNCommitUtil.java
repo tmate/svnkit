@@ -10,10 +10,10 @@
  */
 package org.tmatesoft.svn.core.internal.wc;
 
+import org.tmatesoft.svn.core.SVNException;
+import org.tmatesoft.svn.core.SVNNodeKind;
 import org.tmatesoft.svn.core.SVNProperty;
 import org.tmatesoft.svn.core.io.ISVNEditor;
-import org.tmatesoft.svn.core.io.SVNException;
-import org.tmatesoft.svn.core.io.SVNNodeKind;
 import org.tmatesoft.svn.core.wc.SVNCommitItem;
 import org.tmatesoft.svn.core.wc.SVNRevision;
 import org.tmatesoft.svn.core.wc.SVNStatus;
@@ -118,7 +118,8 @@ public class SVNCommitUtil {
     }
 
     public static SVNWCAccess createCommitWCAccess(File[] paths,
-            boolean recursive, boolean force, Collection relativePaths)
+            boolean recursive, boolean force, Collection relativePaths,
+            SVNStatusClient statusClient)
             throws SVNException {
         File wcRoot = null;
         for (int i = 0; i < paths.length; i++) {
@@ -186,8 +187,10 @@ public class SVNCommitUtil {
                     }
                 }
                 // now lock all dirs from anchor to base dir (non-recursive).
+                targetFile = targetFile.getParentFile();
+                targetPath = PathUtil.removeTail(targetPath);
                 while (targetFile != null && !baseDir.equals(targetFile)
-                        && !PathUtil.isEmpty(targetPath)) {
+                        && !PathUtil.isEmpty(targetPath) && !dirsToLock.contains(targetPath)) {
                     dirsToLock.add(targetPath);
                     targetFile = targetFile.getParentFile();
                     targetPath = PathUtil.removeTail(targetPath);
@@ -197,7 +200,6 @@ public class SVNCommitUtil {
         SVNDirectory anchor = new SVNDirectory(null, "", baseDir);
         SVNWCAccess baseAccess = new SVNWCAccess(anchor, anchor, "");
         if (!recursive && !force) {
-            SVNStatusClient statusClient = new SVNStatusClient();
             for (Iterator targets = relativePaths.iterator(); targets.hasNext();) {
                 String targetPath = (String) targets.next();
                 File targetFile = new File(baseDir, targetPath);
@@ -262,8 +264,7 @@ public class SVNCommitUtil {
                     targetName, false);
             String url = null;
             if (entry == null) {
-                SVNErrorManager.error("svn: '" + targetFile
-                        + "' is not under version control");
+                SVNErrorManager.error("svn: '" + targetFile + "' is not under version control");
             } else if (entry.getURL() == null) {
                 SVNErrorManager.error("svn: '" + targetFile + "' has no URL");
             } else {
@@ -665,17 +666,17 @@ public class SVNCommitUtil {
         if (relativePaths.contains("")) {
             String targetName = getTargetName(rootFile);
             if (!"".equals(targetName) && rootFile.getParentFile() != null) {
+                // there is a versioned parent.
                 rootFile = rootFile.getParentFile();
+                Collection result = new TreeSet();
+                for (Iterator paths = relativePaths.iterator(); paths.hasNext();) {
+                    String path = (String) paths.next();
+                    path = "".equals(path) ? targetName : PathUtil.append(targetName, path);
+                    result.add(path);
+                }
+                relativePaths.clear();
+                relativePaths.addAll(result);
             }
-            Collection result = new TreeSet();
-            for (Iterator paths = relativePaths.iterator(); paths.hasNext();) {
-                String path = (String) paths.next();
-                path = "".equals(path) ? targetName : PathUtil.append(
-                        targetName, path);
-                result.add(path);
-            }
-            relativePaths.clear();
-            relativePaths.addAll(result);
         }
         return rootFile;
     }

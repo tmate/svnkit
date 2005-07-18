@@ -14,8 +14,8 @@ package org.tmatesoft.svn.cli.command;
 
 import org.tmatesoft.svn.cli.SVNArgument;
 import org.tmatesoft.svn.cli.SVNCommand;
-import org.tmatesoft.svn.core.io.SVNException;
-import org.tmatesoft.svn.core.io.SVNCommitInfo;
+import org.tmatesoft.svn.core.SVNCommitInfo;
+import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.wc.SVNCopyClient;
 import org.tmatesoft.svn.core.wc.SVNRevision;
 
@@ -54,7 +54,8 @@ public class MoveCommand extends SVNCommand {
         }
 
         String commitMessage = (String) getCommandLine().getArgumentValue(SVNArgument.MESSAGE);
-        SVNCopyClient updater = new SVNCopyClient(getOptions(), new SVNCommandEventProcessor(out, err, false));
+        getClientManager().setEventHandler(new SVNCommandEventProcessor(out, err, false));
+        SVNCopyClient updater = getClientManager().getCopyClient();
         SVNCommitInfo result = updater.doCopy(srcURL, srcPegRevision, srcRevision, dstURL, dstPegRevision, true, commitMessage);
         if (result != SVNCommitInfo.NULL) {
             out.println();
@@ -72,7 +73,8 @@ public class MoveCommand extends SVNCommand {
         if (matchTabsInPath(absoluteDstPath, err) || matchTabsInPath(absoluteSrcPath, err)) {
             return;
         }
-        SVNCopyClient updater = new SVNCopyClient(getOptions(), new SVNCommandEventProcessor(out, err, false));
+        getClientManager().setEventHandler(new SVNCommandEventProcessor(out, err, false));
+        SVNCopyClient updater = getClientManager().getCopyClient();
         boolean force = getCommandLine().hasArgument(SVNArgument.FORCE);
         updater.doCopy(new File(absoluteSrcPath), null, SVNRevision.WORKING, new File(absoluteDstPath), null, SVNRevision.WORKING, force, true, null);
 	}

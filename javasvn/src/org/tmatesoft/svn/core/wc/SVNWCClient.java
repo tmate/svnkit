@@ -10,7 +10,13 @@
  */
 package org.tmatesoft.svn.core.wc;
 
+import org.tmatesoft.svn.core.SVNDirEntry;
+import org.tmatesoft.svn.core.SVNException;
+import org.tmatesoft.svn.core.SVNLock;
+import org.tmatesoft.svn.core.SVNNodeKind;
 import org.tmatesoft.svn.core.SVNProperty;
+import org.tmatesoft.svn.core.SVNRevisionProperty;
+import org.tmatesoft.svn.core.auth.ISVNAuthenticationManager;
 import org.tmatesoft.svn.core.internal.wc.SVNDirectory;
 import org.tmatesoft.svn.core.internal.wc.SVNEntries;
 import org.tmatesoft.svn.core.internal.wc.SVNEntry;
@@ -22,10 +28,6 @@ import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNProperties;
 import org.tmatesoft.svn.core.internal.wc.SVNTranslator;
 import org.tmatesoft.svn.core.internal.wc.SVNWCAccess;
-import org.tmatesoft.svn.core.io.SVNDirEntry;
-import org.tmatesoft.svn.core.io.SVNException;
-import org.tmatesoft.svn.core.io.SVNLock;
-import org.tmatesoft.svn.core.io.SVNNodeKind;
 import org.tmatesoft.svn.core.io.SVNRepository;
 import org.tmatesoft.svn.core.io.SVNRepositoryLocation;
 import org.tmatesoft.svn.util.DebugLog;
@@ -45,25 +47,18 @@ import java.util.Iterator;
 import java.util.Map;
 
 /**
+ * 
  * @version 1.0
  * @author TMate Software Ltd.
  */
 public class SVNWCClient extends SVNBasicClient {
 
-    public SVNWCClient() {
+    public SVNWCClient(ISVNAuthenticationManager authManager, ISVNOptions options) {
+        super(authManager, options);
     }
 
-    public SVNWCClient(ISVNEventHandler eventDispatcher) {
-        super(eventDispatcher);
-    }
-
-    public SVNWCClient(ISVNOptions options, ISVNEventHandler eventDispatcher) {
-        super(options, eventDispatcher);
-    }
-
-    public SVNWCClient(ISVNRepositoryFactory repositoryFactory,
-            ISVNOptions options, ISVNEventHandler eventDispatcher) {
-        super(repositoryFactory, options, eventDispatcher);
+    protected SVNWCClient(ISVNRepositoryFactory repositoryFactory, ISVNOptions options) {
+        super(repositoryFactory, options);
     }
 
     public void doGetFileContents(File path, SVNRevision pegRevision,
@@ -328,7 +323,7 @@ public class SVNWCClient extends SVNBasicClient {
             SVNRevision revision, String propName, String propValue,
             boolean force, ISVNPropertyHandler handler) throws SVNException {
         propName = validatePropertyName(propName);
-        if (!force && "svn:author".equals(propName) && propValue != null
+        if (!force && SVNRevisionProperty.AUTHOR.equals(propName) && propValue != null
                 && propValue.indexOf('\n') >= 0) {
             SVNErrorManager.error("svn: Value will not be set unless forced");
         }
@@ -835,9 +830,9 @@ public class SVNWCClient extends SVNBasicClient {
             try {
                 wcAccess.open(true, false);
                 SVNEntry entry = wcAccess.getAnchor().getEntries().getEntry(
-                        wcAccess.getTargetName(), true);
-                if (entry == null || entry.isHidden()) {
-                    SVNErrorManager.error("svn: '" + entry.getName()
+                        wcAccess.getTargetName(), false);
+                if (entry == null) {
+                    SVNErrorManager.error("svn: '" + paths[i]
                             + "' is not under version control");
                 }
                 if (entry.getURL() == null) {
@@ -1377,7 +1372,7 @@ public class SVNWCClient extends SVNBasicClient {
                 }
                 if (!force && SVNProperty.EOL_STYLE.equals(propName)
                         && propValue != null) {
-                    if (SVNWCUtil.isBinaryMimetype(props
+                    if (SVNProperty.isBinaryMimeType(props
                             .getPropertyValue(SVNProperty.MIME_TYPE))) {
                         if (!recursive) {
                             SVNErrorManager.error("svn: File '" + wcFile
@@ -1506,11 +1501,11 @@ public class SVNWCClient extends SVNBasicClient {
 
     private static final Collection REVISION_PROPS = new HashSet();
     static {
-        REVISION_PROPS.add("svn:author");
-        REVISION_PROPS.add("svn:log");
-        REVISION_PROPS.add("svn:date");
-        REVISION_PROPS.add("svn:autoversioned");
-        REVISION_PROPS.add("svn:original-date");
+        REVISION_PROPS.add(SVNRevisionProperty.AUTHOR);
+        REVISION_PROPS.add(SVNRevisionProperty.LOG);
+        REVISION_PROPS.add(SVNRevisionProperty.DATE);
+        REVISION_PROPS.add(SVNRevisionProperty.ORIGINAL_DATE);
+        REVISION_PROPS.add(SVNRevisionProperty.AUTOVERSIONED);
     }
 
     private static class LockInfo {

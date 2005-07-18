@@ -17,7 +17,7 @@ import java.io.PrintStream;
 
 import org.tmatesoft.svn.cli.SVNArgument;
 import org.tmatesoft.svn.cli.SVNCommand;
-import org.tmatesoft.svn.core.io.SVNException;
+import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.wc.ISVNPropertyHandler;
 import org.tmatesoft.svn.core.wc.SVNPropertyData;
 import org.tmatesoft.svn.core.wc.SVNRevision;
@@ -44,7 +44,7 @@ public class PropgetCommand extends SVNCommand implements ISVNPropertyHandler {
         if (getCommandLine().hasArgument(SVNArgument.REVISION)) {
             revision = SVNRevision.parse((String) getCommandLine().getArgumentValue(SVNArgument.REVISION));
         }
-        SVNWCClient wcClient = new SVNWCClient(getOptions(), null);
+        SVNWCClient wcClient = getClientManager().getWCClient();
         if (getCommandLine().hasURLs()) {
             String url = getCommandLine().getURL(0);
             if (revProp) {

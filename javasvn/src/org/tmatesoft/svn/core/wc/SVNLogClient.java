@@ -15,17 +15,17 @@ import java.util.Collection;
 import java.util.Iterator;
 import java.util.TreeSet;
 
-import org.tmatesoft.svn.core.internal.SVNAnnotationGenerator;
+import org.tmatesoft.svn.core.ISVNDirEntryHandler;
+import org.tmatesoft.svn.core.ISVNLogEntryHandler;
+import org.tmatesoft.svn.core.SVNDirEntry;
+import org.tmatesoft.svn.core.SVNException;
+import org.tmatesoft.svn.core.SVNNodeKind;
+import org.tmatesoft.svn.core.auth.ISVNAuthenticationManager;
+import org.tmatesoft.svn.core.internal.wc.SVNAnnotationGenerator;
 import org.tmatesoft.svn.core.internal.wc.SVNEntry;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNPathUtil;
-import org.tmatesoft.svn.core.io.ISVNAnnotateHandler;
-import org.tmatesoft.svn.core.io.ISVNDirEntryHandler;
-import org.tmatesoft.svn.core.io.ISVNLogEntryHandler;
-import org.tmatesoft.svn.core.io.SVNDirEntry;
-import org.tmatesoft.svn.core.io.SVNException;
-import org.tmatesoft.svn.core.io.SVNNodeKind;
 import org.tmatesoft.svn.core.io.SVNRepository;
 import org.tmatesoft.svn.util.DebugLog;
 import org.tmatesoft.svn.util.PathUtil;
@@ -36,20 +36,12 @@ import org.tmatesoft.svn.util.PathUtil;
  */
 public class SVNLogClient extends SVNBasicClient {
 
-    public SVNLogClient() {
+    public SVNLogClient(ISVNAuthenticationManager authManager, ISVNOptions options) {
+        super(authManager, options);
     }
 
-    public SVNLogClient(ISVNEventHandler eventDispatcher) {
-        super(eventDispatcher);
-    }
-
-    public SVNLogClient(ISVNOptions options, ISVNEventHandler eventDispatcher) {
-        super(options, eventDispatcher);
-    }
-
-    public SVNLogClient(ISVNRepositoryFactory repositoryFactory,
-            ISVNOptions options, ISVNEventHandler eventDispatcher) {
-        super(repositoryFactory, options, eventDispatcher);
+    protected SVNLogClient(ISVNRepositoryFactory repositoryFactory, ISVNOptions options) {
+        super(repositoryFactory, options);
     }
 
     public void doAnnotate(File path, SVNRevision pegRevision,
@@ -131,8 +123,7 @@ public class SVNLogClient extends SVNBasicClient {
             File path = paths[i];
             SVNEntry entry = getEntry(path);
             if (entry == null) {
-                SVNErrorManager.error("svn: '" + path
-                        + "' is not under version control");
+                SVNErrorManager.error("svn: '" + path + "' is not under version control");
                 return;
             }
             if (entry.getURL() == null) {
@@ -146,19 +137,17 @@ public class SVNLogClient extends SVNBasicClient {
         Collection targets = new TreeSet();
         String baseURL = SVNPathUtil.condenceURLs(urls, targets, true);
         if (baseURL == null || "".equals(baseURL)) {
-            SVNErrorManager
-                    .error("svn: Entries belongs to different repositories");
+            SVNErrorManager.error("svn: Entries belongs to different repositories");
         }
         if (targets.isEmpty()) {
             targets.add("");
         }
         SVNRepository repos = createRepository(baseURL);
-        String[] targetPaths = (String[]) targets.toArray(new String[targets
-                .size()]);
+        String[] targetPaths = (String[]) targets.toArray(new String[targets.size()]);
         DebugLog.log("base URL is: " + baseURL);
         for (int i = 0; i < targetPaths.length; i++) {
-            String targetPath = targetPaths[i];
-            DebugLog.log("target path: " + targetPath);
+            targetPaths[i] = PathUtil.decode(targetPaths[i]);
+            DebugLog.log("target path: " + targetPaths[i]);
         }
         if (startRevision.isLocal() || endRevision.isLocal()) {
             for (int i = 0; i < paths.length; i++) {
@@ -197,8 +186,7 @@ public class SVNLogClient extends SVNBasicClient {
         SVNRepository repos = createRepository(url);
         long startRev = getRevisionNumber(null, url, repos, startRevision);
         long endRev = getRevisionNumber(null, url, repos, endRevision);
-        repos.log(paths, startRev, endRev, reportPaths, stopOnCopy, limit,
-                handler);
+        repos.log(paths, startRev, endRev, reportPaths, stopOnCopy, limit, handler);
     }
 
     public void doList(File path, SVNRevision pegRevision,

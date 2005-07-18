@@ -10,14 +10,14 @@
  */
 package org.tmatesoft.svn.core.internal.wc;
 
+import org.tmatesoft.svn.core.SVNCommitInfo;
+import org.tmatesoft.svn.core.SVNException;
+import org.tmatesoft.svn.core.SVNNodeKind;
 import org.tmatesoft.svn.core.SVNProperty;
-import org.tmatesoft.svn.core.diff.ISVNRAData;
-import org.tmatesoft.svn.core.diff.SVNDiffWindow;
-import org.tmatesoft.svn.core.internal.ws.fs.SVNRAFileData;
 import org.tmatesoft.svn.core.io.ISVNEditor;
-import org.tmatesoft.svn.core.io.SVNCommitInfo;
-import org.tmatesoft.svn.core.io.SVNException;
-import org.tmatesoft.svn.core.io.SVNNodeKind;
+import org.tmatesoft.svn.core.io.diff.ISVNRAData;
+import org.tmatesoft.svn.core.io.diff.SVNDiffWindow;
+import org.tmatesoft.svn.core.io.diff.SVNRAFileData;
 import org.tmatesoft.svn.core.wc.SVNEventAction;
 import org.tmatesoft.svn.core.wc.SVNStatusType;
 import org.tmatesoft.svn.util.DebugLog;
@@ -90,7 +90,7 @@ public class SVNUpdateEditor implements ISVNEditor {
             entry.setURL(myCurrentDirectory.URL);
             entry.setIncomplete(true);
             if (mySwitchURL != null) {
-                clearWCProperty();
+                clearWCProperty(myCurrentDirectory.getDirectory());
             }
             entries.save(true);
         }
@@ -191,15 +191,14 @@ public class SVNUpdateEditor implements ISVNEditor {
         path = PathUtil.removeLeadingSlash(path);
         path = PathUtil.removeTrailingSlash(path);
 
-        myCurrentDirectory = createDirectoryInfo(myCurrentDirectory, path,
-                false);
+        myCurrentDirectory = createDirectoryInfo(myCurrentDirectory, path, false);
         SVNEntries entries = myCurrentDirectory.getDirectory().getEntries();
         SVNEntry entry = entries.getEntry("", true);
         entry.setRevision(myTargetRevision);
         entry.setURL(myCurrentDirectory.URL);
         entry.setIncomplete(true);
         if (mySwitchURL != null) {
-            clearWCProperty();
+            clearWCProperty(myCurrentDirectory.getDirectory());
         }
         entries.save(true);
     }
@@ -244,18 +243,18 @@ public class SVNUpdateEditor implements ISVNEditor {
         myCurrentDirectory.propertyChanged(name, value);
     }
 
-    private void clearWCProperty() throws SVNException {
-        if (myCurrentDirectory == null
-                || myCurrentDirectory.getDirectory() == null) {
+    private void clearWCProperty(SVNDirectory dir) throws SVNException {
+        if (dir == null) {
             return;
         }
-        SVNDirectory dir = myCurrentDirectory.getDirectory();
         SVNEntries entires = dir.getEntries();
-        for (Iterator ents = entires.entries(true); ents.hasNext();) {
+        for (Iterator ents = entires.entries(false); ents.hasNext();) {
             SVNEntry entry = (SVNEntry) ents.next();
             if (entry.isFile() || "".equals(entry.getName())) {
                 SVNProperties props = dir.getWCProperties(entry.getName());
                 props.setPropertyValue(SVNProperty.WC_URL, null);
+            } else {
+                clearWCProperty(dir.getChildDirectory(entry.getName()));
             }
         }
     }

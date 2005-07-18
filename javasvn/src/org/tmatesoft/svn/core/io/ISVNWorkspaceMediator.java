@@ -16,6 +16,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 
+import org.tmatesoft.svn.core.SVNException;
+
 /**
  * <code>ISVNWorkspaceMediator</code> is a custom interface for managing a workspace.
  * A workspace is a notion that represents a user's disk area where his working copies
@@ -91,13 +93,4 @@ public interface ISVNWorkspaceMediator {
      * @param id	the id of a temporary file
      */
     public void deleteTemporaryLocation(Object id);
-    
-    /**
-     * Removes an administrative directory (<i>.svn</i> folder) and 
-     * all its contents.
-     * 
-     * @param path	a path to a directory which contains an <i>.svn</i> folder
-     * 				to be entirely removed
-     */
-    public void deleteAdminFiles(String path);
 }

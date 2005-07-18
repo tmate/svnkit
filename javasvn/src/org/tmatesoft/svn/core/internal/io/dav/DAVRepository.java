@@ -18,6 +18,13 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 
+import org.tmatesoft.svn.core.ISVNDirEntryHandler;
+import org.tmatesoft.svn.core.ISVNLogEntryHandler;
+import org.tmatesoft.svn.core.SVNAuthenticationException;
+import org.tmatesoft.svn.core.SVNDirEntry;
+import org.tmatesoft.svn.core.SVNException;
+import org.tmatesoft.svn.core.SVNLock;
+import org.tmatesoft.svn.core.SVNNodeKind;
 import org.tmatesoft.svn.core.SVNProperty;
 import org.tmatesoft.svn.core.internal.io.dav.handlers.DAVDateRevisionHandler;
 import org.tmatesoft.svn.core.internal.io.dav.handlers.DAVEditorHandler;
@@ -25,18 +32,11 @@ import org.tmatesoft.svn.core.internal.io.dav.handlers.DAVFileRevisionHandler;
 import org.tmatesoft.svn.core.internal.io.dav.handlers.DAVLocationsHandler;
 import org.tmatesoft.svn.core.internal.io.dav.handlers.DAVLogHandler;
 import org.tmatesoft.svn.core.internal.io.dav.handlers.DAVProppatchHandler;
-import org.tmatesoft.svn.core.io.ISVNDirEntryHandler;
 import org.tmatesoft.svn.core.io.ISVNEditor;
 import org.tmatesoft.svn.core.io.ISVNFileRevisionHandler;
 import org.tmatesoft.svn.core.io.ISVNLocationEntryHandler;
-import org.tmatesoft.svn.core.io.ISVNLogEntryHandler;
 import org.tmatesoft.svn.core.io.ISVNReporterBaton;
 import org.tmatesoft.svn.core.io.ISVNWorkspaceMediator;
-import org.tmatesoft.svn.core.io.SVNAuthenticationException;
-import org.tmatesoft.svn.core.io.SVNDirEntry;
-import org.tmatesoft.svn.core.io.SVNException;
-import org.tmatesoft.svn.core.io.SVNLock;
-import org.tmatesoft.svn.core.io.SVNNodeKind;
 import org.tmatesoft.svn.core.io.SVNRepository;
 import org.tmatesoft.svn.core.io.SVNRepositoryLocation;
 import org.tmatesoft.svn.util.DebugLog;
@@ -271,7 +271,7 @@ class DAVRepository extends SVNRepository {
 			for (int i = 0; i < targetPaths.length; i++) {
 				fullPaths[i] = getFullPath(targetPaths[i]);
 				DebugLog.log("LOG: full path: " + fullPaths[i]);
-			}
+            }
 			// now find common root, this will be request path.
 			String path = fullPaths.length > 1 ? PathUtil.getCommonRoot(fullPaths) : fullPaths[0];
 			if (!path.startsWith("/")) {
@@ -282,13 +282,14 @@ class DAVRepository extends SVNRepository {
 			for (int i = 0; i < targetPaths.length; i++) {
 				fullPaths[i] = fullPaths[i].substring(path.length());
 				fullPaths[i] = PathUtil.removeLeadingSlash(fullPaths[i]);
-				DebugLog.log("LOG: log path: " + fullPaths[i]);
+                DebugLog.log("LOG: log path: " + fullPaths[i]);
 			}
 	        StringBuffer request = DAVLogHandler.generateLogRequest(null, startRevision, endRevision,
 	        		changedPath, strictNode, limit, fullPaths);
 	        
             davHandler = new DAVLogHandler(handler); 
-			long revision = Math.max(startRevision, endRevision);;
+			long revision = Math.max(startRevision, endRevision);
+            path = PathUtil.encode(path);
             DAVBaselineInfo info = DAVUtil.getBaselineInfo(myConnection, path, revision, false, false, null);
             path = PathUtil.append(info.baselineBase, info.baselinePath);
             myConnection.doReport(path, request, davHandler);

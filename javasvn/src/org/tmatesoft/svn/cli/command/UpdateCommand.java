@@ -17,8 +17,8 @@ import java.io.PrintStream;
 
 import org.tmatesoft.svn.cli.SVNArgument;
 import org.tmatesoft.svn.cli.SVNCommand;
+import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.internal.wc.SVNWCAccess;
-import org.tmatesoft.svn.core.io.SVNException;
 import org.tmatesoft.svn.core.wc.SVNRevision;
 import org.tmatesoft.svn.core.wc.SVNUpdateClient;
 import org.tmatesoft.svn.util.DebugLog;
@@ -40,9 +40,9 @@ public class UpdateCommand extends SVNCommand {
             if (!revision.isValid()) {
                 revision = SVNRevision.HEAD;
             }
-            SVNUpdateClient updater = new SVNUpdateClient(getOptions(),
-                    new SVNCommandEventProcessor(out, err, false));
-
+            getClientManager().setEventHandler(new SVNCommandEventProcessor(out, err, false));
+            SVNUpdateClient updater = getClientManager().getUpdateClient();
+            
             File file = new File(path).getAbsoluteFile();
             if (!file.exists()) {
                 File parent = file.getParentFile();

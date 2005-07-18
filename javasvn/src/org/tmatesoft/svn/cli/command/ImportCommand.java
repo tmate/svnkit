@@ -14,8 +14,8 @@ package org.tmatesoft.svn.cli.command;
 
 import org.tmatesoft.svn.cli.SVNArgument;
 import org.tmatesoft.svn.cli.SVNCommand;
-import org.tmatesoft.svn.core.io.SVNCommitInfo;
-import org.tmatesoft.svn.core.io.SVNException;
+import org.tmatesoft.svn.core.SVNCommitInfo;
+import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.wc.SVNCommitClient;
 
 import java.io.File;
@@ -37,7 +37,8 @@ public class ImportCommand extends SVNCommand {
         boolean enableAutoProps = getCommandLine().hasArgument(SVNArgument.AUTO_PROPS);
         String message = (String) getCommandLine().getArgumentValue(SVNArgument.MESSAGE);
 
-        SVNCommitClient commitClient = new SVNCommitClient(getOptions(), new SVNCommandEventProcessor(out, err, false));
+        getClientManager().setEventHandler(new SVNCommandEventProcessor(out, err, false));
+        SVNCommitClient commitClient = getClientManager().getCommitClient();
 
         if (disableAutoProps) {
             commitClient.getOptions().setUseAutoProperties(false);

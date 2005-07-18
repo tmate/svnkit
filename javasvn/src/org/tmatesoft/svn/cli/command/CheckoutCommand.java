@@ -14,7 +14,7 @@ package org.tmatesoft.svn.cli.command;
 
 import org.tmatesoft.svn.cli.SVNArgument;
 import org.tmatesoft.svn.cli.SVNCommand;
-import org.tmatesoft.svn.core.io.SVNException;
+import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.wc.SVNRevision;
 import org.tmatesoft.svn.core.wc.SVNUpdateClient;
 import org.tmatesoft.svn.util.PathUtil;
@@ -41,8 +41,8 @@ public class CheckoutCommand extends SVNCommand {
         if (!revision.isValid()) {
             revision = SVNRevision.HEAD;
         }
-        SVNUpdateClient updater = new SVNUpdateClient(getOptions(),
-                new SVNCommandEventProcessor(out, err, true));
+        getClientManager().setEventHandler(new SVNCommandEventProcessor(out, err, true));
+        SVNUpdateClient updater = getClientManager().getUpdateClient();
         if (getCommandLine().getURLCount() == 1) {
             updater.doCheckout(url, new File(path), SVNRevision.UNDEFINED, revision, !getCommandLine().hasArgument(SVNArgument.NON_RECURSIVE));
         } else {

@@ -11,19 +11,18 @@
 
 package org.tmatesoft.svn.core.internal.io.svn;
 
-import org.tmatesoft.svn.core.io.ISVNCredentials;
-import org.tmatesoft.svn.core.io.SVNException;
-import org.tmatesoft.svn.core.io.SVNRepositoryLocation;
-import org.tmatesoft.svn.core.io.SVNCancelException;
-import org.tmatesoft.svn.core.wc.ISVNAuthenticationManager;
-import org.tmatesoft.svn.core.wc.SVNAuthentication;
-import org.tmatesoft.svn.util.DebugLog;
-import org.tmatesoft.svn.util.LoggingInputStream;
-import org.tmatesoft.svn.util.LoggingOutputStream;
-
 import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.util.List;
+
+import org.tmatesoft.svn.core.SVNAuthenticationException;
+import org.tmatesoft.svn.core.SVNException;
+import org.tmatesoft.svn.core.auth.ISVNAuthenticationManager;
+import org.tmatesoft.svn.core.auth.SVNPasswordAuthentication;
+import org.tmatesoft.svn.core.io.SVNRepositoryLocation;
+import org.tmatesoft.svn.util.DebugLog;
+import org.tmatesoft.svn.util.LoggingInputStream;
+import org.tmatesoft.svn.util.LoggingOutputStream;
 
 /**
  * @version 1.0
@@ -32,25 +31,16 @@ import java.util.List;
 class SVNConnection {
 
     private final ISVNConnector myConnector;
-
     private ISVNAuthenticationManager myAuthManager;
-
     private SVNRepositoryLocation myLocation;
-
     private String myRealm;
-
     private String myRoot;
-
     private LoggingOutputStream myOutputStream;
-
     private LoggingInputStream myInputStream;
 
     private static final String SUCCESS = "success";
-
     private static final String FAILURE = "failure";
-
     private static final String STEP = "step";
-
     private static final String EDIT_PIPELINE = "edit-pipeline";
 
     public SVNConnection(ISVNConnector connector,
@@ -82,8 +72,7 @@ class SVNConnection {
 
     private boolean myIsCredentialsReceived = false;
 
-    public void authenticate(SVNRepositoryImpl repository,
-            ISVNCredentials credentials) throws SVNException {
+    public void authenticate(SVNRepositoryImpl repository) throws SVNException {
         // use provider to get creds.
         String failureReason = null;
         Object[] items = read("[((*W)?S)]", null);
@@ -92,7 +81,7 @@ class SVNConnection {
         if (mechs == null || mechs.size() == 0) {
             return;
         }
-        SVNAuthentication auth = null;
+        SVNPasswordAuthentication auth = null;
         for (int i = 0; i < mechs.size(); i++) {
             String mech = (String) mechs.get(i);
             if ("EXTERNAL".equals(mech)) {
@@ -118,14 +107,12 @@ class SVNConnection {
                                 + myLocation.getPort() + "> " + realm;
                     }
                     if (auth == null && myAuthManager != null) {
-                        auth = myAuthManager.getFirstAuthentication(
-                                ISVNAuthenticationManager.PASSWORD, realm);
+                        auth = (SVNPasswordAuthentication) myAuthManager.getFirstAuthentication(ISVNAuthenticationManager.PASSWORD, realm);
                     } else if (myAuthManager != null) {
-                        auth = myAuthManager.getNextAuthentication(
-                                ISVNAuthenticationManager.PASSWORD, realm);
+                        myAuthManager.acknowledgeAuthentication(false, ISVNAuthenticationManager.PASSWORD, realm, failureReason, auth);
+                        auth = (SVNPasswordAuthentication) myAuthManager.getNextAuthentication(ISVNAuthenticationManager.PASSWORD, realm);
                     }
-                    if (auth == null || auth.getUserName() == null
-                            || auth.getPassword() == null) {
+                    if (auth == null || auth.getUserName() == null || auth.getPassword() == null) {
                         failureReason = "no credentials for '" + mech + "'";
                         break;
                     }
@@ -148,8 +135,7 @@ class SVNConnection {
                                 }
                                 myIsCredentialsReceived = true;
                             }
-                            myAuthManager.addAuthentication(realm, auth,
-                                    myAuthManager.isAuthStorageEnabled());
+                            myAuthManager.acknowledgeAuthentication(true, ISVNAuthenticationManager.PASSWORD, realm, null, auth);
                             return;
                         } else if (FAILURE.equals(items[0])) {
                             failureReason = new String((byte[]) items[1]);
@@ -172,10 +158,7 @@ class SVNConnection {
                         + " authorization requested, but not supported";
             }
         }
-        if (auth == null) {
-            throw new SVNCancelException();
-        }
-        throw new SVNException(failureReason);
+        throw new SVNAuthenticationException(failureReason);
     }
 
     private String readAuthResponse(SVNRepositoryImpl repository)

@@ -19,10 +19,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.tmatesoft.svn.core.io.SVNException;
+import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.wc.SVNRevision;
 import org.tmatesoft.svn.util.DebugLog;
-import org.tmatesoft.svn.util.SVNAssert;
 
 /**
  * @author TMate Software Ltd.
@@ -224,9 +223,6 @@ public class SVNCommandLine {
         final int index1 = myPathURLs.indexOf(pathURL1);
         final int index2 = myPathURLs.indexOf(pathURL2);
 
-        SVNAssert.assertTrue(index1 >= 0, pathURL1);
-        SVNAssert.assertTrue(index2 >= 0, pathURL2);
-        SVNAssert.assertTrue(index1 != index2, pathURL2);
         return index1 < index2;
     }
 }

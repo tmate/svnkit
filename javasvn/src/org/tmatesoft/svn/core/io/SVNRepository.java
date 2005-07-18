@@ -11,17 +11,24 @@
  */
 package org.tmatesoft.svn.core.io;
 
-import org.tmatesoft.svn.core.diff.SVNDiffWindow;
-import org.tmatesoft.svn.core.internal.SVNAnnotationGenerator;
-import org.tmatesoft.svn.core.wc.ISVNAuthenticationManager;
-import org.tmatesoft.svn.util.DebugLog;
-
-import java.io.File;
 import java.io.OutputStream;
 import java.util.Collection;
 import java.util.Date;
 import java.util.LinkedList;
 import java.util.Map;
+
+import org.tmatesoft.svn.core.ISVNDirEntryHandler;
+import org.tmatesoft.svn.core.ISVNLogEntryHandler;
+import org.tmatesoft.svn.core.SVNAuthenticationException;
+import org.tmatesoft.svn.core.SVNDirEntry;
+import org.tmatesoft.svn.core.SVNException;
+import org.tmatesoft.svn.core.SVNLock;
+import org.tmatesoft.svn.core.SVNLogEntry;
+import org.tmatesoft.svn.core.SVNNodeKind;
+import org.tmatesoft.svn.core.SVNRevisionProperty;
+import org.tmatesoft.svn.core.auth.ISVNAuthenticationManager;
+import org.tmatesoft.svn.core.io.diff.SVNDiffWindow;
+import org.tmatesoft.svn.util.DebugLog;
 
 /**
  * The abstract class <code>SVNRepository</code> declares all the basic
@@ -104,7 +111,6 @@ public abstract class SVNRepository {
     private SVNRepositoryLocation myLocation;
     private int myLockCount;
     private Thread myLocker;
-    private ISVNCredentialsProvider myUserCredentialsProvider;
     private String myRepositoryRootURL;
     private ISVNAuthenticationManager myAuthManager;
 
@@ -208,46 +214,10 @@ public abstract class SVNRepository {
         return myRepositoryRootURL;
     }
 
-    /**
-	 * Sets a provider that will contain user credentials for accessing a repository.
-	 * 
-	 * <p>
-	 * If a Subversion repository server is configured to let only registered
-	 * clients work with a repository it asks the Repository Access Layer for
-	 * the user's cridentials to authenticate him. If those are reliable the user
-	 * is permitted to access the repository.
-	 * 
-	 * <p>
-	 * Cridentials are provided via the interface {@link ISVNCredentialsProvider}
-	 * which implimentation is stored by <code>SVNRepository</code> by calling this
-	 * method.
-	 * 
-     * @param provider	a cridentials provider implementation to authenticate a 
-     * 					client
-     * @see 			#getCredentialsProvider()	
-     */
-    
-    public void setCredentialsProvider(ISVNCredentialsProvider provider) {
-        myUserCredentialsProvider = provider;
-    }
-
     public void setAuthenticationManager(ISVNAuthenticationManager authManager) {
         myAuthManager = authManager;
     }
-    /**
-     * Gets the set (if any) provider of client's credentials. The Client's 
-     * cridentials that can be obtained from the provider are used then to
-     * authenticate the client.
-     *   
-     * @return	the proveder of client's credentials
-     * @see		#setCredentialsProvider(ISVNCredentialsProvider)
-     * @see 	ISVNCredentialsProvider
-     * @see 	ISVNCredentials
-     * @see 	SVNSimpleCredentialsProvider
-     */
-    public ISVNCredentialsProvider getCredentialsProvider() {
-        return myUserCredentialsProvider;
-    }
+
     public ISVNAuthenticationManager getAuthenticationManager() {
         return myAuthManager;
     }
@@ -702,50 +672,6 @@ public abstract class SVNRepository {
         return result;        
     }
 	
-    /**
-	 * Gets the contetnts of the specified (by the <code>path</code>
-	 * parameter) file  with revision and author information in-line for all its
-	 * appearances in revisions from <code>startRevision</code> and up to 
-	 * <code>endRevision</code>. 
-	 * 
-	 * <p>
-	 * The method starts with the <code>startRevision</code>. For each revision it 
-	 * gets a delta for the file which in the first case  is the whole file contents.
-	 * And for each of the delta lines the method invokes a <code>handler</code>. Then
-	 * the process passes on to the next revision and gets a new delta but yet 
-	 * against the previous revision file contents. And so on - up to 
-	 * <code>endRevision</code> when all the output lines will be provided author and
-	 * revision labels as a result of the file evolution in those revisions. 
-	 * 
-	 * @param  path					a file path (relative to a repository location path)
-	 * @param  startRevision		a file revision to start from
-	 * @param  endRevision			a file revision to stop at
-	 * @param  handler				will be invoked for each file contetnts delta 
-	 * 								line 
-	 * @throws SVNException
-	 */
-	public void annotate(String path, long startRevision, long endRevision, ISVNAnnotateHandler handler) throws SVNException {
-		if (handler == null) {
-			return;
-		}
-		if (endRevision < 0 || endRevision < 0) {
-			long lastRevision = getLatestRevision();
-			startRevision = startRevision < 0 ? lastRevision : startRevision;
-			endRevision = endRevision < 0 ? lastRevision : endRevision;
-		}
-
-        File tmpDir = new File(System.getProperty("user.home"), ".javasvn");
-        tmpDir.mkdirs();
-
-        SVNAnnotationGenerator generator = new SVNAnnotationGenerator(path, startRevision, tmpDir);
-        try {
-            getFileRevisions(path, startRevision, endRevision, generator);
-            generator.reportAnnotations(handler, System.getProperty("file.encoding"));
-        } finally {
-            generator.dispose();
-        }
-	}
-    
     /* edit-mode methods */
 	/**
 	 * Asks the Repository Access (RA) Layer to 'diff' a working copy against

@@ -24,10 +24,10 @@ import java.util.TreeMap;
 
 import org.tmatesoft.svn.cli.SVNArgument;
 import org.tmatesoft.svn.cli.SVNCommand;
-import org.tmatesoft.svn.core.io.ISVNLogEntryHandler;
-import org.tmatesoft.svn.core.io.SVNException;
-import org.tmatesoft.svn.core.io.SVNLogEntry;
-import org.tmatesoft.svn.core.io.SVNLogEntryPath;
+import org.tmatesoft.svn.core.ISVNLogEntryHandler;
+import org.tmatesoft.svn.core.SVNException;
+import org.tmatesoft.svn.core.SVNLogEntry;
+import org.tmatesoft.svn.core.SVNLogEntryPath;
 import org.tmatesoft.svn.core.wc.SVNLogClient;
 import org.tmatesoft.svn.core.wc.SVNRevision;
 import org.tmatesoft.svn.util.DebugLog;
@@ -79,7 +79,7 @@ public class LogCommand extends SVNCommand implements ISVNLogEntryHandler {
                 buffer.append(s);
             }
         };
-        SVNLogClient logClient = new SVNLogClient(getOptions(), null);
+        SVNLogClient logClient = getClientManager().getLogClient();
         if (getCommandLine().hasURLs()) {
             String url = getCommandLine().getURL(0);
             Collection targets = new ArrayList();

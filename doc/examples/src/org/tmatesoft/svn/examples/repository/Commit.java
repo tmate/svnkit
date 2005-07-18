@@ -11,21 +11,6 @@
  */
 package org.tmatesoft.svn.examples.repository;
 
-import org.tmatesoft.svn.core.diff.SVNDiffWindow;
-import org.tmatesoft.svn.core.diff.SVNDiffWindowBuilder;
-import org.tmatesoft.svn.core.internal.io.dav.DAVRepositoryFactory;
-import org.tmatesoft.svn.core.internal.io.svn.SVNRepositoryFactoryImpl;
-import org.tmatesoft.svn.core.io.ISVNEditor;
-import org.tmatesoft.svn.core.io.ISVNWorkspaceMediator;
-import org.tmatesoft.svn.core.io.SVNCommitInfo;
-import org.tmatesoft.svn.core.io.SVNException;
-import org.tmatesoft.svn.core.io.SVNNodeKind;
-import org.tmatesoft.svn.core.io.SVNRepository;
-import org.tmatesoft.svn.core.io.SVNRepositoryFactory;
-import org.tmatesoft.svn.core.io.SVNRepositoryLocation;
-import org.tmatesoft.svn.core.wc.SVNWCUtil;
-import org.tmatesoft.svn.core.wc.ISVNOptions;
-
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -33,6 +18,22 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.HashMap;
 import java.util.Map;
+
+import org.tmatesoft.svn.core.SVNCommitInfo;
+import org.tmatesoft.svn.core.SVNException;
+import org.tmatesoft.svn.core.SVNNodeKind;
+import org.tmatesoft.svn.core.auth.ISVNAuthenticationManager;
+import org.tmatesoft.svn.core.internal.io.dav.DAVRepositoryFactory;
+import org.tmatesoft.svn.core.internal.io.svn.SVNRepositoryFactoryImpl;
+import org.tmatesoft.svn.core.io.ISVNEditor;
+import org.tmatesoft.svn.core.io.ISVNWorkspaceMediator;
+import org.tmatesoft.svn.core.io.SVNRepository;
+import org.tmatesoft.svn.core.io.SVNRepositoryFactory;
+import org.tmatesoft.svn.core.io.SVNRepositoryLocation;
+import org.tmatesoft.svn.core.io.diff.SVNDiffWindow;
+import org.tmatesoft.svn.core.io.diff.SVNDiffWindowBuilder;
+import org.tmatesoft.svn.core.wc.SVNWCUtil;
+
 /*
  * This is an example of how to commit several types of changes to a repository:
  * a new directory with a file, modification to a file, copying a directory into
@@ -212,15 +213,14 @@ public class Commit {
          * SVNRepository since this low-level class is not intended to work
          * with working copy config files 
          */
-        ISVNOptions myOptions = SVNWCUtil.createDefaultOptions(true);
-        myOptions.setDefaultAuthentication(name, password);
+        ISVNAuthenticationManager authManager = SVNWCUtil.createDefaultAuthenticationManager(name, password);
 
         /*
          * Sets the manager of the user's authentication information that will 
          * be used to authenticate the user to the server (if needed) during 
          * operations handled by the SVNRepository.
          */
-        repository.setAuthenticationManager(myOptions);
+        repository.setAuthenticationManager(authManager);
 
         SVNNodeKind nodeKind = null;
         try {
@@ -804,9 +804,6 @@ public class Commit {
          */
         public void deleteTemporaryLocation(Object id) {
             myTmpFiles.remove(id);
-        }
-
-        public void deleteAdminFiles(String path) {
         }
     }
 }

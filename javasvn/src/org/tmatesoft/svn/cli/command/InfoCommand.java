@@ -20,9 +20,9 @@ import java.util.Date;
 
 import org.tmatesoft.svn.cli.SVNArgument;
 import org.tmatesoft.svn.cli.SVNCommand;
-import org.tmatesoft.svn.core.io.SVNException;
-import org.tmatesoft.svn.core.io.SVNLock;
-import org.tmatesoft.svn.core.io.SVNNodeKind;
+import org.tmatesoft.svn.core.SVNException;
+import org.tmatesoft.svn.core.SVNLock;
+import org.tmatesoft.svn.core.SVNNodeKind;
 import org.tmatesoft.svn.core.wc.ISVNInfoHandler;
 import org.tmatesoft.svn.core.wc.SVNInfo;
 import org.tmatesoft.svn.core.wc.SVNRevision;
@@ -48,7 +48,7 @@ public class InfoCommand extends SVNCommand implements ISVNInfoHandler {
         if (getCommandLine().hasArgument(SVNArgument.RECURSIVE)) {
             revision = SVNRevision.parse((String) getCommandLine().getArgumentValue(SVNArgument.REVISION));
         }
-        SVNWCClient wcClient = new SVNWCClient(getOptions(), null);
+        SVNWCClient wcClient = getClientManager().getWCClient();
         myOut = out;
 
         for (int i = 0; i < getCommandLine().getPathCount(); i++) {

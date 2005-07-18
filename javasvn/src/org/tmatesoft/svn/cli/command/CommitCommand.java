@@ -14,8 +14,8 @@ package org.tmatesoft.svn.cli.command;
 
 import org.tmatesoft.svn.cli.SVNArgument;
 import org.tmatesoft.svn.cli.SVNCommand;
-import org.tmatesoft.svn.core.io.SVNException;
-import org.tmatesoft.svn.core.io.SVNCommitInfo;
+import org.tmatesoft.svn.core.SVNCommitInfo;
+import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.wc.SVNCommitClient;
 
 import java.io.ByteArrayOutputStream;
@@ -40,7 +40,8 @@ public class CommitCommand extends SVNCommand {
             matchTabsInPath(getCommandLine().getPathAt(i), err);
             localPaths[i] = new File(getCommandLine().getPathAt(i));
         }
-        SVNCommitClient client = new SVNCommitClient(getOptions(), new SVNCommandEventProcessor(out, err, false));
+        getClientManager().setEventHandler(new SVNCommandEventProcessor(out, err, false));
+        SVNCommitClient client = getClientManager().getCommitClient();
         SVNCommitInfo result = client.doCommit(localPaths, keepLocks, message, false, recursive);
         if (result != SVNCommitInfo.NULL) {
             out.println();

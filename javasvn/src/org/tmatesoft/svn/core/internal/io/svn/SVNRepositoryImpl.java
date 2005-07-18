@@ -18,28 +18,27 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.tmatesoft.svn.core.ISVNDirEntryHandler;
+import org.tmatesoft.svn.core.ISVNLogEntryHandler;
+import org.tmatesoft.svn.core.SVNDirEntry;
+import org.tmatesoft.svn.core.SVNException;
+import org.tmatesoft.svn.core.SVNLock;
+import org.tmatesoft.svn.core.SVNLogEntry;
+import org.tmatesoft.svn.core.SVNLogEntryPath;
+import org.tmatesoft.svn.core.SVNNodeKind;
 import org.tmatesoft.svn.core.SVNProperty;
-import org.tmatesoft.svn.core.diff.SVNDiffWindow;
-import org.tmatesoft.svn.core.diff.SVNDiffWindowBuilder;
-import org.tmatesoft.svn.core.io.ISVNCredentials;
-import org.tmatesoft.svn.core.io.ISVNDirEntryHandler;
 import org.tmatesoft.svn.core.io.ISVNEditor;
 import org.tmatesoft.svn.core.io.ISVNFileRevisionHandler;
 import org.tmatesoft.svn.core.io.ISVNLocationEntryHandler;
-import org.tmatesoft.svn.core.io.ISVNLogEntryHandler;
 import org.tmatesoft.svn.core.io.ISVNReporter;
 import org.tmatesoft.svn.core.io.ISVNReporterBaton;
 import org.tmatesoft.svn.core.io.ISVNWorkspaceMediator;
-import org.tmatesoft.svn.core.io.SVNDirEntry;
-import org.tmatesoft.svn.core.io.SVNException;
 import org.tmatesoft.svn.core.io.SVNFileRevision;
 import org.tmatesoft.svn.core.io.SVNLocationEntry;
-import org.tmatesoft.svn.core.io.SVNLock;
-import org.tmatesoft.svn.core.io.SVNLogEntry;
-import org.tmatesoft.svn.core.io.SVNLogEntryPath;
-import org.tmatesoft.svn.core.io.SVNNodeKind;
 import org.tmatesoft.svn.core.io.SVNRepository;
 import org.tmatesoft.svn.core.io.SVNRepositoryLocation;
+import org.tmatesoft.svn.core.io.diff.SVNDiffWindow;
+import org.tmatesoft.svn.core.io.diff.SVNDiffWindowBuilder;
 import org.tmatesoft.svn.util.DebugLog;
 import org.tmatesoft.svn.util.PathUtil;
 
@@ -50,13 +49,8 @@ import org.tmatesoft.svn.util.PathUtil;
 public class SVNRepositoryImpl extends SVNRepository implements ISVNReporter {
 
     private SVNConnection myConnection;
-
-    private ISVNCredentials myCredentials;
-
     private String myFullRoot;
-
     private String myRealm;
-
     private String myExternalUserName;
 
     protected SVNRepositoryImpl(SVNRepositoryLocation location) {
@@ -671,7 +665,7 @@ public class SVNRepositoryImpl extends SVNRepository implements ISVNReporter {
 
     void authenticate() throws SVNException {
         if (myConnection != null) {
-            myConnection.authenticate(this, myCredentials);
+            myConnection.authenticate(this);
         }
     }
 
@@ -773,14 +767,6 @@ public class SVNRepositoryImpl extends SVNRepository implements ISVNReporter {
         }
         return PathUtil.removeTrailingSlash(PathUtil.isEmpty(fullPath) ? "/"
                 : fullPath);
-    }
-
-    public void setCredentials(ISVNCredentials credentials) {
-        myCredentials = credentials;
-    }
-
-    public ISVNCredentials getCredentials() {
-        return myCredentials;
     }
 
     public String getFullRoot() {

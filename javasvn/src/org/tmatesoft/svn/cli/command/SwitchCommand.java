@@ -17,7 +17,7 @@ import java.io.PrintStream;
 
 import org.tmatesoft.svn.cli.SVNArgument;
 import org.tmatesoft.svn.cli.SVNCommand;
-import org.tmatesoft.svn.core.io.SVNException;
+import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.wc.SVNRevision;
 import org.tmatesoft.svn.core.wc.SVNUpdateClient;
 import org.tmatesoft.svn.util.DebugLog;
@@ -35,7 +35,8 @@ public class SwitchCommand extends SVNCommand {
         if (!revision.isValid()) {
             revision = SVNRevision.HEAD;
         }
-        SVNUpdateClient updater = new SVNUpdateClient(getOptions(), new SVNCommandEventProcessor(out, err, false, false));
+        getClientManager().setEventHandler(new SVNCommandEventProcessor(out, err, false, false));
+        SVNUpdateClient updater = getClientManager().getUpdateClient();
         try {
             if (getCommandLine().hasArgument(SVNArgument.RELOCATE)) {
                 updater.doRelocate(new File(absolutePath).getAbsoluteFile(), url, getCommandLine().getURL(1), !getCommandLine().hasArgument(SVNArgument.NON_RECURSIVE));

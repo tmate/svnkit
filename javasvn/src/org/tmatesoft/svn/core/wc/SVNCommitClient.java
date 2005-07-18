@@ -10,8 +10,11 @@
  */
 package org.tmatesoft.svn.core.wc;
 
+import org.tmatesoft.svn.core.SVNCommitInfo;
+import org.tmatesoft.svn.core.SVNException;
+import org.tmatesoft.svn.core.SVNNodeKind;
 import org.tmatesoft.svn.core.SVNProperty;
-import org.tmatesoft.svn.core.diff.SVNDiffWindowBuilder;
+import org.tmatesoft.svn.core.auth.ISVNAuthenticationManager;
 import org.tmatesoft.svn.core.internal.wc.ISVNCommitPathHandler;
 import org.tmatesoft.svn.core.internal.wc.SVNCommitMediator;
 import org.tmatesoft.svn.core.internal.wc.SVNCommitUtil;
@@ -27,10 +30,8 @@ import org.tmatesoft.svn.core.internal.wc.SVNPathUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNTranslator;
 import org.tmatesoft.svn.core.internal.wc.SVNWCAccess;
 import org.tmatesoft.svn.core.io.ISVNEditor;
-import org.tmatesoft.svn.core.io.SVNCommitInfo;
-import org.tmatesoft.svn.core.io.SVNException;
-import org.tmatesoft.svn.core.io.SVNNodeKind;
 import org.tmatesoft.svn.core.io.SVNRepository;
+import org.tmatesoft.svn.core.io.diff.SVNDiffWindowBuilder;
 import org.tmatesoft.svn.util.DebugLog;
 import org.tmatesoft.svn.util.PathUtil;
 
@@ -50,40 +51,100 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 
 /**
+ * This class provides methods to perform operations that relate to commiting changes
+ * to an <span class="style2">SVN</span> repository. These operations are similar to 
+ * respective commands of the native <span class="style2">SVN</span> command line client 
+ * and include ones which operate on working copy items as well as ones
+ * that operate only on a repository.
+ * 
+ * <p>
+ * Here's a list of the <span class="style0">SVNCommitClient</span>'s commit-related methods 
+ * matched against corresponing commands of the <span class="style2">SVN</span> command line 
+ * client:
+ * 
+ * <ul>
+ * <li><span class="style3">doCommit(..)</span> -> 'svn commit'
+ * <li><span class="style3">doImport(..)</span> -> 'svn import'
+ * <li><span class="style3">doCommit(..)</span> -> 'svn delete URL'
+ * <li><span class="style3">doMkDir(..)&nbsp;</span> -> 'svn mkdir URL'
+ * </ul>
+ *   
  * @version 1.0
- * @author TMate Software Ltd.
+ * @author  TMate Software Ltd.
+ * 
  */
 public class SVNCommitClient extends SVNBasicClient {
 
     private ISVNCommitHandler myCommitHandler;
-
-    public SVNCommitClient() {
+    
+    public SVNCommitClient(ISVNAuthenticationManager authManager, ISVNOptions options) {
+        super(authManager, options);
     }
 
-    public SVNCommitClient(ISVNEventHandler eventDispatcher) {
-        super(eventDispatcher);
+    /**
+     * Constructs an <span class="style0">SVNCommitClient</span> provided an 
+     * event handler, initial options and a repository factory. What options, event handler and
+     * repository factory are for, please, see {@link SVNCommitClient#SVNCommitClient()} 
+     * and {@link #SVNCommitClient(ISVNEventHandler)}.  
+     * 
+     * @param repositoryFactory	
+     * @param options
+     */
+    protected SVNCommitClient(ISVNRepositoryFactory repositoryFactory, ISVNOptions options) {
+        super(repositoryFactory, options);
     }
-
-    public SVNCommitClient(ISVNOptions options, ISVNEventHandler eventDispatcher) {
-        super(options, eventDispatcher);
-    }
-
-    public SVNCommitClient(ISVNRepositoryFactory repositoryFactory,
-            ISVNOptions options, ISVNEventHandler eventDispatcher) {
-        super(repositoryFactory, options, eventDispatcher);
-    }
-
+    
+    /**
+     * Sets an implementation of <span class="style0">ISVNCommitHandler</span> to 
+     * the commit handler that will be used during commit operations to handle 
+     * commit log messages. The handler will receive a clien's log message and items 
+     * (represented as <span class="style0">SVNCommitItem</span> objects) that will be 
+     * committed. Depending on implementor's aims the initial log message can
+     * be modified (or something else) and returned back. 
+     * 
+     * <p>
+     * If using <span class="style0">SVNCommitClient</span> without specifying any
+     * commit handler then a default one will be used - {@link DefaultSVNCommitHandler}.
+     * 
+     * @param handler				an implementor's handler that will be used to handle 
+     * 								commit log messages
+     * @see	  #getCommitHandler()
+     * @see	  ISVNCommitHandler
+     */
     public void setCommitHander(ISVNCommitHandler handler) {
         myCommitHandler = handler;
     }
-
+    
+    /**
+     * Returns the specified commit handler being in use or a default one 
+     * (<span class="style0">DefaultSVNCommitHandler</span>) if no special 
+     * implementations of <span class="style0">ISVNCommitHandler</span> were 
+     * previousely provided.
+     *   
+     * @return	the commit handler being in use or a default one
+     * @see	    #setCommitHander(ISVNCommitHandler)
+     * @see		ISVNCommitHabdler
+     * @see		DefaultSVNCommitHandler 
+     */
     public ISVNCommitHandler getCommitHandler() {
         if (myCommitHandler == null) {
             myCommitHandler = new DefaultSVNCommitHandler();
         }
         return myCommitHandler;
     }
-
+    
+    /**
+     * Committs removing specified URL-paths from the repository. This
+     * operation immediately results upon the repository therefore a 
+     * commit log message is required.
+     *   
+     * @param  urls				an array containing URL-strings that represent
+     * 							repository locations to be removed
+     * @param  commitMessage	a string to be a commit log message
+     * @return					information on a new revision as the result
+     * 							of the commit
+     * @throws SVNException
+     */
     public SVNCommitInfo doDelete(String[] urls, String commitMessage)
             throws SVNException {
         if (urls == null || urls.length == 0) {
@@ -155,7 +216,19 @@ public class SVNCommitClient extends SVNBasicClient {
         }
         return info != null ? info : SVNCommitInfo.NULL;
     }
-
+    
+    /**
+     * Committs a creation of a new directory/directories in the repository.
+     * This operation immediately results upon the repository therefore a 
+     * commit log message is required.
+     * 
+     * @param  urls				an array containing URL-strings that represent
+     * 							new repository locations to be created
+     * @param  commitMessage	a string to be a commit log message
+     * @return					information on a new revision as the result
+     * 							of the commit
+     * @throws SVNException
+     */
     public SVNCommitInfo doMkDir(String[] urls, String commitMessage)
             throws SVNException {
         if (urls == null || urls.length == 0) {
@@ -231,7 +304,27 @@ public class SVNCommitClient extends SVNBasicClient {
         }
         return info != null ? info : SVNCommitInfo.NULL;
     }
-
+    
+    /**
+     * Committs an addition of a local unversioned file or directory into 
+     * the repository. If the destination URL (<code>dstURL</code>) contains any
+     * non-existent parent directories they will be automatically created by the
+     * server. Importing immediately results upon the repository therefore a commit
+     * log message is required.
+     * 
+     * @param  path				a local unversioned file or directory to be imported
+     * 							into the repository
+     * @param  dstURL			a URL-string that represents a repository location
+     * 							where the <code>path</code> will be imported 			
+     * @param  commitMessage	a string to be a commit log message
+     * @param  recursive		this flag is relevant only when the <code>path</code> is 
+     * 							a directory: if <code>true</code> then the entire directory
+     * 							tree will be imported including all child directories, otherwise 
+     * 							only items located in the directory itself
+     * @return					information on a new revision as the result
+     * 							of the commit
+     * @throws SVNException
+     */
     public SVNCommitInfo doImport(File path, String dstURL,
             String commitMessage, boolean recursive) throws SVNException {
         dstURL = validateURL(dstURL);
@@ -323,7 +416,29 @@ public class SVNCommitClient extends SVNBasicClient {
         }
         return info != null ? info : SVNCommitInfo.NULL;
     }
-
+    
+    /**
+     * Committs local changes made to the Working Copy items (provided as an array of
+     * <code>File</code>s) to the repository. Requires a commit log message. 
+     * 
+     * @param  paths			an array of local items which should be traversed
+     * 							to commit changes they have to the repository  
+     * @param  keepLocks		if <code>true</code> and there are local items that 
+     * 							were locked then the commit will left them locked,
+     * 							otherwise the items will be unlocked after the commit
+     * 							succeeds  
+     * @param  commitMessage	a string to be a commit log message
+     * @param  force			<code>true</code> to force a non-recursive commit; if
+     * 							<code>recursive</code> is set to <code>true</code> the <code>force</code>
+     * 							flag is ignored
+     * @param  recursive		relevant only for directory items: if <code>true</code> then 
+     * 							the entire directory tree will be committed including all child directories, 
+     * 							otherwise only items located in the directory itself
+     * @return					information on a new revision as the result
+     * 							of the commit
+     * @throws SVNException
+     * @see	   #doCommit(SVNCommitPacket, boolean, String) 
+     */
     public SVNCommitInfo doCommit(File[] paths, boolean keepLocks,
             String commitMessage, boolean force, boolean recursive)
             throws SVNException {
@@ -338,7 +453,33 @@ public class SVNCommitClient extends SVNBasicClient {
             }
         }
     }
-
+    
+    /**
+     * Committs local changes made to the Working Copy items (provided as a single 
+     * <code>commitPacket</code>) to the repository. 
+     * 
+     * <p>
+     * The <code>commitPacket</code> contains commit items (<span class="style0">SVNCommitItem</span>) 
+     * which represent local Working Copy items that were changed and are to be committed. 
+     * Commit items are packed in a single <span class="style0">SVNCommitPacket</span>
+     * by invoking {@link #doCollectCommitItems(File[], boolean, boolean, boolean) 
+     * doCollectCommitItems(..)}. 
+     * 
+     * <p>
+     * Committing requires a commit log message. 
+     *
+     * @param  commitPacket		a single object that contains items to be committed
+     * @param  keepLocks		if <code>true</code> and there are local items that 
+     * 							were locked then the commit will left them locked,
+     * 							otherwise the items will be unlocked after the commit
+     * 							succeeds
+     * @param  commitMessage	a string to be a commit log message
+     * @return					information on a new revision as the result
+     * 							of the commit
+     * @throws SVNException
+     * @see	   SVNCommitItem
+     * 
+     */
     public SVNCommitInfo doCommit(SVNCommitPacket commitPacket,
             boolean keepLocks, String commitMessage) throws SVNException {
         if (commitPacket == null || commitPacket == SVNCommitPacket.EMPTY) {
@@ -460,7 +601,34 @@ public class SVNCommitClient extends SVNBasicClient {
         }
         return info != null ? info : SVNCommitInfo.NULL;
     }
-
+    
+    /**
+     * Collects commit items (containing detailed information on each Working Copy item
+     * that was changed and need to be committed to the repository) into a single 
+     * <span class="style0">SVNCommitPacket</span> which further can be passed to
+     * {@link #doCommit(SVNCommitPacket, boolean, String) doCommit(..)}.
+     * 
+     * @param  paths			an array of local items which should be traversed
+     * 							to collect information on every changed item (one 
+     * 							<span class="style0">SVNCommitItem</span> per each
+     * 							modified local item)
+     * @param  keepLocks		if <code>true</code> and there are local items that 
+     * 							were locked then these items will be left locked after
+     * 							traversing all of them, otherwise the items will be unlocked
+     * @param  force			relevant only if <code>recursive</code> is <code>false</code> - 
+     * 							forces collecting commit items for a non-recursive commit  
+     * @param  recursive		relevant only for directory items: if <code>true</code> then 
+     * 							the entire directory tree will be traversed including all child 
+     * 							directories, otherwise only items located in the directory itself
+     * 							will be processed
+     * @return					an <span class="style0">SVNCommitPacket</span> containing
+     * 							all Working Copy items having local modifications and represented as 
+     * 							<span class="style0">SVNCommitItem</span> objects; if no modified
+     * 							items were found then 
+     * 							<span class="style0">SVNCommitPacket</span>.<span class="style0"><i>EMPTY</i></span> is returned
+     * @throws SVNException
+     * @see	   SVNCommitItem
+     */
     public SVNCommitPacket doCollectCommitItems(File[] paths,
             boolean keepLocks, boolean force, boolean recursive)
             throws SVNException {
@@ -468,8 +636,9 @@ public class SVNCommitClient extends SVNBasicClient {
             return SVNCommitPacket.EMPTY;
         }
         Set targets = new TreeSet();
+        SVNStatusClient statusClient = new SVNStatusClient(getRepositoryFactory(), getOptions());
         SVNWCAccess wcAccess = SVNCommitUtil.createCommitWCAccess(paths,
-                recursive, force, targets);
+                recursive, force, targets, statusClient);
         try {
             Map lockTokens = new HashMap();
             SVNCommitItem[] commitItems = SVNCommitUtil
@@ -493,11 +662,7 @@ public class SVNCommitClient extends SVNBasicClient {
             return new SVNCommitPacket(wcAccess, commitItems, lockTokens);
         } catch (SVNException e) {
             wcAccess.close(true);
-            if (e.getMessage() != null && e.getMessage().startsWith("svn:")) {
-                e.setMessage("svn: Commit failed (details follow):\n"
-                        + e.getMessage());
-            }
-            throw e;
+            throw new SVNException("svn: Commit failed (details follow):", e);
         }
     }
 

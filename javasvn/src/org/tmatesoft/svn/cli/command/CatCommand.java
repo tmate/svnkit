@@ -14,7 +14,7 @@ package org.tmatesoft.svn.cli.command;
 
 import org.tmatesoft.svn.cli.SVNArgument;
 import org.tmatesoft.svn.cli.SVNCommand;
-import org.tmatesoft.svn.core.io.SVNException;
+import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.wc.SVNRevision;
 import org.tmatesoft.svn.core.wc.SVNWCClient;
 
@@ -27,7 +27,7 @@ import java.io.PrintStream;
 public class CatCommand extends SVNCommand {
 
     public void run(PrintStream out, PrintStream err) throws SVNException {
-        SVNWCClient wcClient = new SVNWCClient(getOptions(), null);
+        SVNWCClient wcClient = getClientManager().getWCClient();
         SVNRevision revision = SVNRevision.BASE;
 
         if (getCommandLine().hasArgument(SVNArgument.REVISION)) {
