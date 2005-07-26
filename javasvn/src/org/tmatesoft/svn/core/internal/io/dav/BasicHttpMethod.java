@@ -38,6 +38,12 @@ public class BasicHttpMethod extends HttpMethodBase{
         }
     }
     
+    public BasicHttpMethod(String name, String uri, byte[] body){
+        super(uri);
+        myName = name;
+        myRequestBodyArray = body;
+    }
+    
     public String getName() {
         return myName;
     }
