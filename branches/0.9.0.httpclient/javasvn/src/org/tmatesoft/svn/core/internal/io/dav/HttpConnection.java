@@ -13,6 +13,7 @@
 package org.tmatesoft.svn.core.internal.io.dav;
 
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -180,11 +181,9 @@ class HttpConnection {
             DAVStatus status;
             try {
                 connect();
-                try{
-                    myHttpMethod = new BasicHttpMethod(method, path, requestBody);
-                }catch(Throwable th){
-                    th.printStackTrace();
-                }
+                byte[] body = readBody(requestBody);
+                myHttpMethod = new BasicHttpMethod(method, path, body);
+                myHttpMethod.addRequestHeader("Content-Length", ""+body.length);
                 for (Iterator iter = header.keySet().iterator(); iter.hasNext();) {
                     String name = (String) iter.next();
                     String value = (String)header.get(name);
@@ -288,6 +287,23 @@ class HttpConnection {
             }
         }
     }
+    
+    private static byte[] readBody(InputStream body) throws SVNException{
+        ByteArrayOutputStream os = new ByteArrayOutputStream();
+        byte[] buffer = new byte[1024];
+        try{
+        while (true) {
+            int count = body.read(buffer);
+            if (count <= 0) {
+                break;
+            }
+            os.write(buffer, 0, count);
+        }
+        return os.toByteArray();
+        }catch(IOException e){
+            throw new SVNException(e);
+        }
+    }
 
     private void readError(String url, DAVStatus status) {
         close();
@@ -305,7 +321,8 @@ class HttpConnection {
     private void readResponse(OutputStream result, Map responseHeader) throws SVNException {
         LoggingInputStream stream = null;
         try {
-            stream = createInputStream(responseHeader, getInputStream());
+            stream = createInputStream(getResponseBodyAsStream(), getResponseBodyLength());
+            //stream = createInputStream(responseHeader, getInputStream());
             byte[] buffer = new byte[1024];
             while (true) {
                 int count = stream.read(buffer);
@@ -330,11 +347,20 @@ class HttpConnection {
         }
         return myHttpMethod.getResponseBodyAsStream();
     }
+    
+    private InputStream getResponseBodyAsStream() throws IOException{
+        return new ByteArrayInputStream( myHttpMethod.getResponseBodyAsString().getBytes());
+    }
+
+    private int getResponseBodyLength() throws IOException{
+        return myHttpMethod.getResponseBodyAsString().length();
+    }
 
     private void readResponse(DefaultHandler handler, Map responseHeader) throws SVNException {
         LoggingInputStream is = null;
         try {
-            is = createInputStream(responseHeader, myHttpMethod.getResponseBodyAsStream());
+            is = createInputStream(getResponseBodyAsStream(), getResponseBodyLength());
+            //is = createInputStream(responseHeader, getInputStream());
             XMLInputStream xmlIs = new XMLInputStream(is);
 
             if (handler == null) {
@@ -382,6 +408,11 @@ class HttpConnection {
             DebugLog.log("using GZIP to decode server responce");
             is = new GZIPInputStream(is);
         }
+        return DebugLog.getLoggingInputStream("http", is);
+    }
+
+    private static LoggingInputStream createInputStream(InputStream is, int size) {
+        is = new FixedSizeInputStream(is, size);
         return DebugLog.getLoggingInputStream("http", is);
     }
 
