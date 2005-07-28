@@ -12,18 +12,14 @@
 
 package org.tmatesoft.svn.cli.command;
 
-import java.io.IOException;
-import java.io.PrintStream;
-
 import org.tmatesoft.svn.cli.SVNArgument;
 import org.tmatesoft.svn.cli.SVNCommand;
-import org.tmatesoft.svn.core.ISVNWorkspace;
-import org.tmatesoft.svn.core.SVNWorkspaceAdapter;
-import org.tmatesoft.svn.core.io.SVNException;
-import org.tmatesoft.svn.core.io.SVNRepositoryLocation;
-import org.tmatesoft.svn.util.DebugLog;
-import org.tmatesoft.svn.util.PathUtil;
-import org.tmatesoft.svn.util.SVNUtil;
+import org.tmatesoft.svn.core.SVNCommitInfo;
+import org.tmatesoft.svn.core.SVNException;
+import org.tmatesoft.svn.core.wc.SVNCommitClient;
+
+import java.io.File;
+import java.io.PrintStream;
 
 /**
  * @author TMate Software Ltd.
@@ -31,37 +27,31 @@ import org.tmatesoft.svn.util.SVNUtil;
 public class ImportCommand extends SVNCommand {
 
     public void run(final PrintStream out, PrintStream err) throws SVNException {
-        final String path = getCommandLine().getPathAt(0);
+        String path = ".";
+        if (getCommandLine().getPathCount() >= 1) {
+            path = getCommandLine().getPathAt(0);
+        }
         String url = getCommandLine().getURL(0);
-
-        DebugLog.log("import url: " + url);
-        DebugLog.log("import path: " + path);
-
-        final ISVNWorkspace workspace = createWorkspace(path, false);
-        final String homePath = path;
-        DebugLog.log("import root: " + workspace.getID());
-        String wsPath = SVNUtil.getWorkspacePath(workspace, path);
-        if (wsPath.trim().length() == 0) {
-            wsPath = null;
-        } else {
-            url = PathUtil.removeTail(url);
-        }
-        workspace.addWorkspaceListener(new SVNWorkspaceAdapter() {
-            public void committed(String committedPath, int kind) {
-                try {
-                    committedPath = convertPath(homePath, workspace, committedPath);
-                } catch (IOException e) {}
-                println(out, "Adding " + committedPath);
-            }
-        });
-        SVNRepositoryLocation location = SVNRepositoryLocation.parseURL(url);
+        boolean recursive = !getCommandLine().hasArgument(SVNArgument.NON_RECURSIVE);
+        boolean disableAutoProps = getCommandLine().hasArgument(SVNArgument.NO_AUTO_PROPS);
+        boolean enableAutoProps = getCommandLine().hasArgument(SVNArgument.AUTO_PROPS);
         String message = (String) getCommandLine().getArgumentValue(SVNArgument.MESSAGE);
-        if (message == null) {
-            DebugLog.log("NO MESSAGE!");
-            message = "";
+
+        getClientManager().setEventHandler(new SVNCommandEventProcessor(out, err, false));
+        SVNCommitClient commitClient = getClientManager().getCommitClient();
+
+        if (disableAutoProps) {
+            commitClient.getOptions().setUseAutoProperties(false);
         }
-        long revision = workspace.commit(location, wsPath, message);
-        out.println("Imported revision " + revision + ".");
+        if (enableAutoProps) {
+            commitClient.getOptions().setUseAutoProperties(true);
+        }
+
+        SVNCommitInfo info = commitClient.doImport(new File(path), url, message, recursive);
+        if (info != SVNCommitInfo.NULL) {
+            out.println();
+            out.println("Imported revision " + info.getNewRevision() + ".");
+        }
     }
 
 }

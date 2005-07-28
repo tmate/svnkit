@@ -12,11 +12,16 @@
 
 package org.tmatesoft.svn.cli.command;
 
-import java.io.*;
-import org.tmatesoft.svn.cli.*;
-import org.tmatesoft.svn.core.*;
-import org.tmatesoft.svn.core.io.*;
-import org.tmatesoft.svn.util.*;
+import org.tmatesoft.svn.cli.SVNArgument;
+import org.tmatesoft.svn.cli.SVNCommand;
+import org.tmatesoft.svn.core.SVNException;
+import org.tmatesoft.svn.core.internal.util.SVNEncodingUtil;
+import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
+import org.tmatesoft.svn.core.wc.SVNRevision;
+import org.tmatesoft.svn.core.wc.SVNUpdateClient;
+
+import java.io.File;
+import java.io.PrintStream;
 
 /**
  * @author TMate Software Ltd.
@@ -25,47 +30,28 @@ public class CheckoutCommand extends SVNCommand {
 
 	public void run(final PrintStream out, final PrintStream err) throws SVNException {
 		final String url = getCommandLine().getURL(0);
-		final SVNRepositoryLocation location = SVNRepositoryLocation.parseURL(url);
 
-		final String path;
-		if (getCommandLine().getPathCount() == 1) {
-			path = getCommandLine().getPathAt(0);
-		}
-		else {
-			final SVNRepository repository = createRepository(url);
-			repository.testConnection();
-			final String root = repository.getRepositoryRoot();
-			final String locationPath = location.getPath();
-			SVNAssert.assertTrue(locationPath.startsWith(root));
-			path = locationPath.substring(root.length());
-		}
+		String path;
+        if (getCommandLine().getPathCount() > 0) {
+            path = getCommandLine().getPathAt(0);
+        } else {
+            path = new File(".", SVNEncodingUtil.uriDecode(SVNPathUtil.tail(url))).getAbsolutePath();
+        }
 
-		DebugLog.log("checkout url: " + url);
-		DebugLog.log("checkout path: " + path);
-
-		final ISVNWorkspace workspace = createWorkspace(path, false);
-
-		long revision = parseRevision(getCommandLine(), null, null);
-		if (SVNRepositoryLocation.equals(workspace.getLocation(), location)) {
-			workspace.update(revision);
-			return;
-		}
-
-		final String homePath = path;
-		workspace.addWorkspaceListener(new SVNWorkspaceAdapter() {
-			public void updated(String updatedPath, int contentsStatus, int propertiesStatus, long rev) {
-				//if ("".equals(updatedPath)) {
-				//	return;
-				//}
-				try {
-					updatedPath = convertPath(homePath, workspace, updatedPath);
-				}
-				catch (IOException e) {
-				}
-				println(out, "A   " + updatedPath);
-			}
-		});
-		revision = workspace.checkout(location, revision, false, !getCommandLine().hasArgument(SVNArgument.NON_RECURSIVE));
-		println(out, "Checked out revision " + revision + ".");
+        SVNRevision revision = parseRevision(getCommandLine());
+        if (!revision.isValid()) {
+            revision = SVNRevision.HEAD;
+        }
+        getClientManager().setEventHandler(new SVNCommandEventProcessor(out, err, true));
+        SVNUpdateClient updater = getClientManager().getUpdateClient();
+        if (getCommandLine().getURLCount() == 1) {
+            updater.doCheckout(url, new File(path), SVNRevision.UNDEFINED, revision, !getCommandLine().hasArgument(SVNArgument.NON_RECURSIVE));
+        } else {
+            for(int i = 0; i < getCommandLine().getURLCount(); i++) {
+                String curl = getCommandLine().getURL(i);
+                File dstPath = new File(path, SVNEncodingUtil.uriDecode(SVNPathUtil.tail(curl)));
+                updater.doCheckout(url, dstPath, SVNRevision.UNDEFINED, revision, !getCommandLine().hasArgument(SVNArgument.NON_RECURSIVE));
+            }
+        }
 	}
 }

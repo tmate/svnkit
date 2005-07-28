@@ -12,25 +12,27 @@
 
 package org.tmatesoft.svn.core.internal.io.dav.handlers;
 
-import java.io.OutputStream;
+import java.io.UnsupportedEncodingException;
 
-import org.tmatesoft.svn.core.diff.SVNDiffWindow;
+import org.tmatesoft.svn.core.SVNException;
+import org.tmatesoft.svn.core.SVNProperty;
+import org.tmatesoft.svn.core.SVNURL;
 import org.tmatesoft.svn.core.internal.io.dav.DAVBaselineInfo;
 import org.tmatesoft.svn.core.internal.io.dav.DAVConnection;
 import org.tmatesoft.svn.core.internal.io.dav.DAVElement;
 import org.tmatesoft.svn.core.internal.io.dav.DAVUtil;
+import org.tmatesoft.svn.core.internal.util.SVNBase64;
+import org.tmatesoft.svn.core.internal.util.SVNEncodingUtil;
+import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
 import org.tmatesoft.svn.core.io.ISVNEditor;
 import org.tmatesoft.svn.core.io.ISVNReporter;
 import org.tmatesoft.svn.core.io.ISVNReporterBaton;
-import org.tmatesoft.svn.core.io.SVNException;
-import org.tmatesoft.svn.core.io.SVNRepositoryLocation;
-import org.tmatesoft.svn.util.Base64;
-import org.tmatesoft.svn.util.DebugLog;
-import org.tmatesoft.svn.util.PathUtil;
 import org.xml.sax.Attributes;
 
+
 /**
- * @author TMate Software Ltd.
+ * @version 1.0
+ * @author  TMate Software Ltd.
  */
 	
 public class DAVEditorHandler extends BasicDAVDeltaHandler {
@@ -38,12 +40,12 @@ public class DAVEditorHandler extends BasicDAVDeltaHandler {
     public static StringBuffer generateEditorRequest(final DAVConnection connection, StringBuffer buffer, final String url, 
             long targetRevision, String target, String dstPath, boolean recurse,
             boolean ignoreAncestry, boolean resourceWalk, 
-            boolean fetchContents, ISVNReporterBaton reporterBaton) {
+            boolean fetchContents, ISVNReporterBaton reporterBaton) throws SVNException {
 		buffer = buffer == null ? new StringBuffer() : buffer;
         buffer.append("<?xml version=\"1.0\" encoding=\"utf-8\"?>\n");
         buffer.append("<S:update-report send-all=\"true\" xmlns:S=\"svn:\">\n");
         buffer.append("<S:src-path>");
-        buffer.append(url);
+        buffer.append(SVNEncodingUtil.xmlEncodeCDATA(url));
         buffer.append("</S:src-path>\n");
         if (targetRevision >= 0) {
             buffer.append("<S:target-revision>");
@@ -52,12 +54,12 @@ public class DAVEditorHandler extends BasicDAVDeltaHandler {
         }
         if (target != null) {
             buffer.append("<S:update-target>");
-            buffer.append(target);
+            buffer.append(SVNEncodingUtil.xmlEncodeCDATA(target));
             buffer.append("</S:update-target>\n");
         }
         if (dstPath != null) {
             buffer.append("<S:dst-path>");
-            buffer.append(dstPath);
+            buffer.append(SVNEncodingUtil.xmlEncodeCDATA(dstPath));
             buffer.append("</S:dst-path>\n");
         }
         if (!recurse) {
@@ -73,69 +75,61 @@ public class DAVEditorHandler extends BasicDAVDeltaHandler {
             buffer.append("<S:text-deltas>no</S:text-deltas>\n");
         }
         final StringBuffer report = buffer;
-        try {
-            reporterBaton.report(new ISVNReporter() {
-                public void setPath(String path, String locktoken, long revision, boolean startEmpty) throws SVNException {
-                    path = DAVUtil.xmlEncode(path);
-                    report.append("<S:entry rev=\"");
-                    report.append(revision);
+        reporterBaton.report(new ISVNReporter() {
+            public void setPath(String path, String locktoken, long revision, boolean startEmpty) {
+                report.append("<S:entry rev=\"");
+                report.append(revision);
+                report.append("\" ");
+                if (locktoken != null) {
+                    report.append("lock-token=\"");
+                    report.append(locktoken);
                     report.append("\" ");
-                    if (locktoken != null) {
-                        report.append("lock-token=\"");
-                        report.append(DAVUtil.xmlEncode(locktoken));
-                        report.append("\" ");
-                    }
-                    if (startEmpty) {
-                        report.append("start-empty=\"true\" ");                        
-                    }
-                    report.append(">");
-                    report.append(path);
-                    report.append("</S:entry>\n");
                 }
-                
-                public void deletePath(String path) throws SVNException {
-                    path = DAVUtil.xmlEncode(path);
-                    report.append("<S:missing>");
-                    report.append(path);
-                    report.append("</S:missing>\n");
+                if (startEmpty) {
+                    report.append("start-empty=\"true\" ");
                 }
+                report.append(">");
+                report.append(SVNEncodingUtil.xmlEncodeCDATA(path));
+                report.append("</S:entry>\n");
+            }
 
-                public void linkPath(SVNRepositoryLocation repository, String path, String locktoken, long revision, boolean startEmpty) throws SVNException {
-                    path = DAVUtil.xmlEncode(path);
-                    report.append("<S:entry rev=\"");
-                    report.append(revision);
-                    report.append("\" ");
-                    if (locktoken != null) {
-                        report.append("lock-token=\"");
-                        report.append(DAVUtil.xmlEncode(locktoken));
-                        report.append("\" ");
-                    }
-                    if (startEmpty) {
-                        report.append("start-empty=\"true\" ");                        
-                    }
-                    String linkedPath = repository.getPath();
-                    DAVBaselineInfo info = DAVUtil.getBaselineInfo(connection, linkedPath, revision, false, false, null);
+            public void deletePath(String path) {
+                report.append("<S:missing>");
+                report.append(SVNEncodingUtil.xmlEncodeCDATA(path));
+                report.append("</S:missing>\n");
+            }
 
-                    String switchUrl = info.baselinePath;
-                    DebugLog.log("REPORTING LINKED PATH: " + switchUrl);
-                    report.append("linkpath=\"");
-                    // switched path relative to connection root.
-                    report.append(DAVUtil.xmlEncode(switchUrl));
+            public void linkPath(SVNURL url, String path, String locktoken, long revision, boolean startEmpty) throws SVNException {
+                report.append("<S:entry rev=\"");
+                report.append(revision);
+                report.append("\" ");
+                if (locktoken != null) {
+                    report.append("lock-token=\"");
+                    report.append(locktoken);
                     report.append("\" ");
-                    report.append(">");
-                    report.append(path);
-                    report.append("</S:entry>\n");
                 }
-                
-                public void finishReport() throws SVNException {
+                if (startEmpty) {
+                    report.append("start-empty=\"true\" ");
                 }
-                public void abortReport() throws SVNException {
-                    throw new SVNException();
-                }
-            });
-        } catch (SVNException e) {
-            return null;
-        }
+                String linkedPath = url.getURIEncodedPath();
+                DAVBaselineInfo info = DAVUtil.getBaselineInfo(connection, linkedPath, revision, false, false, null);
+
+                String switchUrl = SVNEncodingUtil.uriDecode(info.baselinePath);
+                report.append("linkpath=\"");
+                // switched path relative to connection root.
+                report.append(SVNEncodingUtil.xmlEncodeAttr(switchUrl));
+                report.append("\" ");
+                report.append(">");
+                report.append(SVNEncodingUtil.xmlEncodeCDATA(path));
+                report.append("</S:entry>\n");
+            }
+
+            public void finishReport() {
+            }
+            public void abortReport() throws SVNException {
+                throw new SVNException();
+            }
+        });
         buffer.append("</S:update-report>");
         return buffer;
 	}
@@ -163,11 +157,12 @@ public class DAVEditorHandler extends BasicDAVDeltaHandler {
     private static final String SEND_ALL_ATTR = "send-all";
 
     private ISVNEditor myEditor;
-    private StringBuffer myPath;
+    private String myPath;
     private String myPropertyName;
     private String myChecksum;
     private String myEncoding;
     private boolean myIsFetchContent;
+    private boolean myIsDirectory;
 
     public DAVEditorHandler(ISVNEditor editor, boolean fetchContent) {
         myIsFetchContent = fetchContent; 
@@ -186,55 +181,59 @@ public class DAVEditorHandler extends BasicDAVDeltaHandler {
             myEditor.targetRevision(revision);
         } else if (element == ABSENT_DIRECTORY) {
             String name = attrs.getValue(NAME_ATTR);
-            myEditor.absentDir(append(myPath, name, true).toString());
+            myEditor.absentDir(SVNPathUtil.append(myPath, name));
         } else if (element == ABSENT_FILE) {
             String name = attrs.getValue(NAME_ATTR);
-            myEditor.absentFile(append(myPath, name, false).toString());
+            myEditor.absentFile(SVNPathUtil.append(myPath, name));
         } else if (element == OPEN_DIRECTORY) {            
             long revision = Long.parseLong(attrs.getValue(REVISION_ATTR));
+            myIsDirectory = true;
             if (myPath == null) {
-                myPath = new StringBuffer("");
+                myPath = "";
                 myEditor.openRoot(revision);
             } else {
                 String name = attrs.getValue(NAME_ATTR);
-                myPath = append(myPath, name, true);
-                myEditor.openDir(myPath.toString(), revision);
+                myPath = SVNPathUtil.append(myPath, name);
+                myEditor.openDir(myPath, revision);
             }
         } else if (element == ADD_DIRECTORY) {
+            myIsDirectory = true;
             String name = attrs.getValue(NAME_ATTR);
             String copyFromPath = attrs.getValue(COPYFROM_PATH_ATTR);
             long copyFromRev = -1;
             if (copyFromPath != null) {
                 copyFromRev = Long.parseLong(attrs.getValue(COPYFROM_REV_ATTR));
             }
-            myPath = append(myPath, name, true);
-            myEditor.addDir(myPath.toString(), copyFromPath, copyFromRev);
+            myPath = SVNPathUtil.append(myPath, name);
+            myEditor.addDir(myPath, copyFromPath, copyFromRev);
         } else if (element == OPEN_FILE) {
+            myIsDirectory = false;
             long revision = Long.parseLong(attrs.getValue(REVISION_ATTR));
             String name = attrs.getValue(NAME_ATTR);
-            myPath = append(myPath, name, false);
-            myEditor.openFile(myPath.toString(), revision);
+            myPath = SVNPathUtil.append(myPath, name);
+            myEditor.openFile(myPath, revision);
         } else if (element == ADD_FILE) {
+            myIsDirectory = false;
             String name = attrs.getValue(NAME_ATTR);
-            myPath = append(myPath, name, false);
+            myPath = SVNPathUtil.append(myPath, name);
             String copyFromPath = attrs.getValue(COPYFROM_PATH_ATTR);
             long copyFromRev = -1;
             if (copyFromPath != null) {
                 copyFromRev = Long.parseLong(attrs.getValue(COPYFROM_REV_ATTR));
             }
-            myEditor.addFile(myPath.toString(), copyFromPath, copyFromRev);
+            myEditor.addFile(myPath, copyFromPath, copyFromRev);
         } else if (element == DELETE_ENTRY) {
             String name = attrs.getValue(NAME_ATTR);
-            myEditor.deleteEntry(PathUtil.append(myPath.toString(), name), -1);
+            myEditor.deleteEntry(SVNPathUtil.append(myPath, name), -1);
         } else if (element == SET_PROP) {
             myPropertyName = attrs.getValue(NAME_ATTR);
             myEncoding = attrs.getValue(ENCODING_ATTR);
         } else if (element == REMOVE_PROP) { 
             String name = attrs.getValue(NAME_ATTR);
-            if (isDir(myPath)) {
+            if (myIsDirectory) {
                 myEditor.changeDirProperty(name, null);
             } else {
-                myEditor.changeFileProperty(name, null);
+                myEditor.changeFileProperty(myPath, name, null);
             }            
         } else if (element == RESOURCE || element == FETCH_FILE || element == FETCH_PROPS) {
             throw new SVNException(element + " element is not supported in update-report");
@@ -242,24 +241,24 @@ public class DAVEditorHandler extends BasicDAVDeltaHandler {
             if (myIsFetchContent) {
                 setDeltaProcessing(true);
             }
-            myEditor.applyTextDelta(myChecksum);
+            myEditor.applyTextDelta(myPath, myChecksum);
         }
 	}
     
 	
 	protected void endElement(DAVElement parent, DAVElement element, StringBuffer cdata) throws SVNException {
-        if (element == OPEN_DIRECTORY || element == OPEN_FILE || element == ADD_DIRECTORY || element == ADD_FILE) {
-            if (isDir(myPath)) {
-                myEditor.closeDir();
-                if ("".equals(myPath.toString()) || "/".equals(myPath.toString())) {
-                    myEditor.closeEdit();
-                }
-            } else {
-                myEditor.closeFile(myChecksum);
+        if (element == OPEN_DIRECTORY || element == ADD_DIRECTORY) {
+            myEditor.closeDir();
+            if ("".equals(myPath)) {
+                myEditor.closeEdit();
             }
             myChecksum = null;
-            myPath = removeTail(myPath);
-        } else if (element == DAVElement.MD5_CHECKSUM) {
+            myPath = SVNPathUtil.removeTail(myPath);
+        } else if (element == OPEN_FILE || element == ADD_FILE) {
+            myEditor.closeFile(myPath, myChecksum);
+            myChecksum = null;
+            myPath = SVNPathUtil.removeTail(myPath);
+        } else if (element == DAVElement.MD5_CHECKSUM) {        
             myChecksum = cdata.toString();
         } else if (element == DAVElement.CREATOR_DISPLAY_NAME || 
                 element == DAVElement.VERSION_NAME || 
@@ -271,12 +270,16 @@ public class DAVEditorHandler extends BasicDAVDeltaHandler {
             }
             String value = cdata.toString();
             if ("base64".equals(myEncoding)) {
-                value = new String(Base64.base64ToByteArray(cdata, null));                
+                try {
+                    value = new String(SVNBase64.base64ToByteArray(new StringBuffer(cdata.toString().trim()), null), "UTF-8");
+                } catch (UnsupportedEncodingException e) {
+                    value = new String(SVNBase64.base64ToByteArray(new StringBuffer(cdata.toString().trim()), null));
+                }                
             }
-            if (isDir(myPath)) {
+            if (myIsDirectory) {
                 myEditor.changeDirProperty(myPropertyName, value);
             } else {
-                myEditor.changeFileProperty(myPropertyName, value);
+                myEditor.changeFileProperty(myPath, myPropertyName, value);
             }
             myPropertyName = null;
             myEncoding = null;
@@ -284,54 +287,19 @@ public class DAVEditorHandler extends BasicDAVDeltaHandler {
             setDeltaProcessing(false);
         }
 	}
+
+    protected String getCurrentPath() {
+        return myPath;
+    }
+    
+    protected ISVNEditor getEditor() {
+        return myEditor;
+    }
     
     private static String computeWCPropertyName(DAVElement element) {
         if (element == DAVElement.HREF) {
-            return "svn:wc:ra_dav:version-url";
+            return SVNProperty.WC_URL;
         }
-        return "svn:entry:" + element.getName();
-    }
-    
-    private static boolean isDir(StringBuffer path) {
-        if (path.length() == 0) {
-            return true;
-        }
-        return path.length() >= 1 && path.charAt(path.length() - 1) == '/';
-    }
-    
-    private static StringBuffer append(StringBuffer buffer, String segment, boolean dir) {
-        if (buffer.length() > 0 && buffer.charAt(buffer.length() - 1) != '/') {
-            buffer = buffer.append('/');
-        } 
-        if (segment.charAt(0) == '/') {
-            buffer = buffer.append(segment.substring(1));
-        } else {
-            buffer = buffer.append(segment);
-        }
-        if (dir && !isDir(buffer)) {
-            buffer = buffer.append('/');
-        }
-        return buffer;
-    }
-    
-    private static StringBuffer removeTail(StringBuffer buffer) {
-        if (buffer.length() > 0 && buffer.charAt(buffer.length() - 1) == '/') {
-            buffer = buffer.delete(buffer.length() - 1, buffer.length());
-        }
-        int i = buffer.length() - 1;
-        for(; i >= 0; i--) {
-            if (buffer.charAt(i) == '/') {
-                break;
-            }
-        }
-        return buffer.delete(i + 1, buffer.length());
-    }
-
-    protected OutputStream handleDiffWindow(SVNDiffWindow window) throws SVNException {
-        return myEditor.textDeltaChunk(window);
-    }
-
-    protected void handleDiffWindowClosed() throws SVNException {
-        myEditor.textDeltaEnd();
+        return SVNProperty.SVN_ENTRY_PREFIX + element.getName();
     }
 }

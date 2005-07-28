@@ -12,17 +12,17 @@
 
 package org.tmatesoft.svn.cli.command;
 
-import java.io.IOException;
+import java.io.File;
 import java.io.PrintStream;
 
 import org.tmatesoft.svn.cli.SVNArgument;
 import org.tmatesoft.svn.cli.SVNCommand;
-import org.tmatesoft.svn.core.ISVNWorkspace;
-import org.tmatesoft.svn.core.SVNStatus;
-import org.tmatesoft.svn.core.SVNWorkspaceAdapter;
-import org.tmatesoft.svn.core.io.SVNException;
-import org.tmatesoft.svn.util.DebugLog;
-import org.tmatesoft.svn.util.SVNUtil;
+import org.tmatesoft.svn.core.SVNException;
+import org.tmatesoft.svn.core.internal.util.SVNFormatUtil;
+import org.tmatesoft.svn.core.internal.wc.SVNWCAccess;
+import org.tmatesoft.svn.core.wc.SVNRevision;
+import org.tmatesoft.svn.core.wc.SVNUpdateClient;
+import org.tmatesoft.svn.util.SVNDebugLog;
 
 /**
  * @author TMate Software Ltd.
@@ -30,92 +30,39 @@ import org.tmatesoft.svn.util.SVNUtil;
 public class UpdateCommand extends SVNCommand {
 
     public void run(final PrintStream out, final PrintStream err) throws SVNException {
+        boolean error = false;
         for (int i = 0; i < getCommandLine().getPathCount(); i++) {
-            final String absolutPath = getCommandLine().getPathAt(i);
-            final ISVNWorkspace workspace = createWorkspace(absolutPath, true);
-            final String homePath = absolutPath;
-            final boolean[] changesReceived = new boolean[] { false };
-            workspace.addWorkspaceListener(new SVNWorkspaceAdapter() {
-                public void updated(String updatedPath, int contentsStatus, int propertiesStatus, long rev) {
-                    DebugLog.log("updated path: " + updatedPath);
-                    try {
-                        updatedPath = convertPath(homePath, workspace, updatedPath);
-                    } catch (IOException e) {
-                        DebugLog.error(e);
-                    }
-                    if (contentsStatus == SVNStatus.OBSTRUCTED) {
-                        println(err, "Failed to add directory '" + updatedPath + "', object of the same name already exists");
-                        return;
-                    }
-                    char contents = 'U';
-                    char properties = ' ';
-                    if (propertiesStatus == SVNStatus.UPDATED) {
-                        properties = 'U';
-                    } else if (propertiesStatus == SVNStatus.CONFLICTED) {
-                        properties = 'C';
-                    }
+            final String path;
+            path = getCommandLine().getPathAt(i);
 
-                    if (contentsStatus == SVNStatus.ADDED) {
-                        contents = 'A';
-                        properties = ' ';
-                    } else if (contentsStatus == SVNStatus.DELETED) {
-                        contents = 'D';
-                        properties = ' ';
-                    } else if (contentsStatus == SVNStatus.MERGED) {
-                        contents = 'G';
-                    } else if (contentsStatus == SVNStatus.CONFLICTED) {
-                        contents = 'C';
-                    } else if (contentsStatus == SVNStatus.NOT_MODIFIED) {
-                        contents = ' ';
-                    } else if (contentsStatus == SVNStatus.CORRUPTED) {
-                        contents = 'U';
+            SVNRevision revision = parseRevision(getCommandLine());
+            if (!revision.isValid()) {
+                revision = SVNRevision.HEAD;
+            }
+            getClientManager().setEventHandler(new SVNCommandEventProcessor(out, err, false));
+            SVNUpdateClient updater = getClientManager().getUpdateClient();
+            
+            File file = new File(path).getAbsoluteFile();
+            if (!file.exists()) {
+                File parent = file.getParentFile();
+                if (!parent.exists() || !SVNWCAccess.isVersionedDirectory(parent)) {
+                    if (!getCommandLine().hasArgument(SVNArgument.QUIET)) {
+                        println(out, "Skipped '" +  SVNFormatUtil.formatPath(file).replace('/', File.separatorChar) + "'");
                     }
-                    if (contents == ' ' && properties == ' ') {
-                        return;
-                    }
-                    changesReceived[0] = true;
-                    DebugLog.log(contents + "" + properties + "  " + updatedPath);
-                    if (contents == 'A' || contents == 'D') {
-                        out.println(contents + "    " + updatedPath);
-                    } else {
-                        out.println(contents + "" + properties + "  " + updatedPath);
-                    }
-                    if (contentsStatus == SVNStatus.CORRUPTED) {
-                        err.println("svn: Checksum error: base version of file '" + updatedPath + "' is corrupted and was not updated.");
-                        DebugLog.log("svn: Checksum error: base version of file '" + updatedPath + "' is corrupted and was not updated.");
-                    }
+                    return;
                 }
-
-                public void modified(String path, int kind) {
-                    try {
-                        path = convertPath(homePath, workspace, path);
-                    } catch (IOException e) {
-                    }
-                    DebugLog.log("Restored '" + path + "'");
-                    out.println("Restored '" + path + "'");
-                }
-                
-            });
-
-	        final String path = SVNUtil.getWorkspacePath(workspace, absolutPath);
-	        long revision = parseRevision(getCommandLine(), workspace, path);
+            }
             try {
-                revision = workspace.update(path, revision, !getCommandLine().hasArgument(SVNArgument.NON_RECURSIVE));
-            } catch (SVNException e) {
-                if (getCommandLine().hasArgument(SVNArgument.QUIET)) {
-                   return;
-                }
-                try {
-                   String fullPath = convertPath(homePath, workspace, path);
-                   out.println("Skipped '" +fullPath + "'");
-                } catch (IOException ioException) {}
-                return;
+                updater.doUpdate(file.getAbsoluteFile(), revision, !getCommandLine().hasArgument(SVNArgument.NON_RECURSIVE));
+            } catch (Throwable th) {
+                SVNDebugLog.log(th);
+                println(err, th.getMessage());
+                println(err);
+                error = true;
             }
-            if (!changesReceived[0]) {
-                println(out, "At revision " + revision + ".");
-            } else {
-                println(out, "Updated to revision " + revision + ".");
-            }
+        }
+        if (error) {
+            System.exit(1);
         }
     }
 }

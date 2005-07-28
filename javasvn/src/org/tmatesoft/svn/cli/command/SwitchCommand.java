@@ -12,18 +12,15 @@
 
 package org.tmatesoft.svn.cli.command;
 
-import java.io.IOException;
+import java.io.File;
 import java.io.PrintStream;
 
 import org.tmatesoft.svn.cli.SVNArgument;
 import org.tmatesoft.svn.cli.SVNCommand;
-import org.tmatesoft.svn.core.ISVNWorkspace;
-import org.tmatesoft.svn.core.SVNStatus;
-import org.tmatesoft.svn.core.SVNWorkspaceAdapter;
-import org.tmatesoft.svn.core.io.SVNException;
-import org.tmatesoft.svn.core.io.SVNRepositoryLocation;
-import org.tmatesoft.svn.util.DebugLog;
-import org.tmatesoft.svn.util.SVNUtil;
+import org.tmatesoft.svn.core.SVNException;
+import org.tmatesoft.svn.core.wc.SVNRevision;
+import org.tmatesoft.svn.core.wc.SVNUpdateClient;
+import org.tmatesoft.svn.util.SVNDebugLog;
 
 /**
  * @author TMate Software Ltd.
@@ -34,71 +31,23 @@ public class SwitchCommand extends SVNCommand {
         String url = getCommandLine().getURL(0);
         String absolutePath = getCommandLine().getPathAt(0);
 
-        final ISVNWorkspace workspace = createWorkspace(absolutePath, true);
-        final String homePath = absolutePath;
-        final String path = SVNUtil.getWorkspacePath(workspace, absolutePath);
-        final boolean[] changesReceived = new boolean[] { false };
-        if (getCommandLine().hasArgument(SVNArgument.RELOCATE)) {
-            String newURL = getCommandLine().getURL(1);
-            workspace.relocate(SVNRepositoryLocation.parseURL(url), SVNRepositoryLocation.parseURL(newURL), 
-                    path, !getCommandLine().hasArgument(SVNArgument.NON_RECURSIVE));
-            return;
+        SVNRevision revision = parseRevision(getCommandLine());
+        if (!revision.isValid()) {
+            revision = SVNRevision.HEAD;
         }
-        
-        String revStr = (String) getCommandLine().getArgumentValue(SVNArgument.REVISION);
-        long revision = -1;
-        if (revStr != null) {
-            try {
-                revision = Long.parseLong(revStr);
-            } catch (NumberFormatException nfe) {}
-        }
-        workspace.addWorkspaceListener(new SVNWorkspaceAdapter() {
-            public void updated(String updatedPath, int contentsStatus, int propertiesStatus, long rev) {
-                try {
-                    updatedPath = convertPath(homePath, workspace, updatedPath);
-                } catch (IOException e) {
-                    DebugLog.error(e);
-
-                }
-                char contents = 'U';
-                char properties = ' ';
-                if (contentsStatus == SVNStatus.ADDED) {
-                    contents = 'A';
-                } else if (contentsStatus == SVNStatus.DELETED) {
-                    contents = 'D';
-                } else if (contentsStatus == SVNStatus.MERGED) {
-                    contents = 'G';
-                } else if (contentsStatus == SVNStatus.CONFLICTED) {
-                    contents = 'C';
-                } else if (contentsStatus == SVNStatus.NOT_MODIFIED) {
-                    contents = ' ';
-                } else if (contentsStatus == SVNStatus.CORRUPTED) {
-                    contents = 'U';
-                }
-
-                if (propertiesStatus == SVNStatus.UPDATED) {
-                    properties = 'U';
-                } else if (propertiesStatus == SVNStatus.CONFLICTED) {
-                    properties = 'C';
-                }
-                DebugLog.log(contents + "" + properties + ' ' + updatedPath);
-                if (contents == ' ' && properties == ' ') {
-                    return;
-                }
-                changesReceived[0] = true;
-                out.println(contents + "" + properties + "  " + updatedPath);
-                if (contentsStatus == SVNStatus.CORRUPTED) {
-                    err.println("svn: Checksum error: base version of file '" + updatedPath + "' is corrupted and was not updated.");
-                    DebugLog.log("svn: Checksum error: base version of file '" + updatedPath + "' is corrupted and was not updated.");
-                }
+        getClientManager().setEventHandler(new SVNCommandEventProcessor(out, err, false, false));
+        SVNUpdateClient updater = getClientManager().getUpdateClient();
+        try {
+            if (getCommandLine().hasArgument(SVNArgument.RELOCATE)) {
+                updater.doRelocate(new File(absolutePath).getAbsoluteFile(), url, getCommandLine().getURL(1), !getCommandLine().hasArgument(SVNArgument.NON_RECURSIVE));
+            } else {
+                updater.doSwitch(new File(absolutePath).getAbsoluteFile(), url, revision, !getCommandLine().hasArgument(SVNArgument.NON_RECURSIVE));
             }
-        });
-
-        workspace.update(SVNRepositoryLocation.parseURL(url), path, revision, !getCommandLine().hasArgument(SVNArgument.NON_RECURSIVE));
-        if (!changesReceived[0]) {
-            println(out, "At revision " + revision + ".");
-        } else {
-            println(out, "Updated to revision " + revision + ".");
+        } catch (Throwable th) {
+            SVNDebugLog.log(th);
+            println(err, th.getMessage());
+            println(err);
+            System.exit(1);
         }
     }
 }
