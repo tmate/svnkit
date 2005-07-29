@@ -13,7 +13,6 @@
 package org.tmatesoft.svn.core.internal.io.dav;
 
 import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -23,7 +22,6 @@ import java.net.HttpURLConnection;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
-import java.util.zip.GZIPInputStream;
 
 import javax.xml.parsers.FactoryConfigurationError;
 import javax.xml.parsers.ParserConfigurationException;
@@ -106,7 +104,11 @@ class HttpConnection {
     public void close() {
         if(myHttpMethod != null){
             myHttpMethod.releaseConnection();
-            myLastStatusText = myHttpMethod.getStatusText();
+            if(myHttpMethod.getStatusLine() != null){
+                myLastStatusText = myHttpMethod.getStatusText();
+            }else{
+                myLastStatusText = null;
+            }
             myHttpMethod = null;
         }
     }
@@ -181,9 +183,14 @@ class HttpConnection {
             DAVStatus status;
             try {
                 connect();
-                byte[] body = readBody(requestBody);
-                myHttpMethod = new BasicHttpMethod(method, path, body);
-                myHttpMethod.addRequestHeader("Content-Length", ""+body.length);
+                int bodyLength = -1;
+                if (requestBody instanceof ByteArrayInputStream) {
+                    bodyLength = ((ByteArrayInputStream)requestBody).available();
+                }//XXX: else if(requestBody instanceof IMeasurable)
+                myHttpMethod = new BasicHttpMethod(method, path, requestBody);
+                if(bodyLength > -1){
+                    myHttpMethod.addRequestHeader("Content-Length", ""+bodyLength);
+                }
                 for (Iterator iter = header.keySet().iterator(); iter.hasNext();) {
                     String name = (String) iter.next();
                     String value = (String)header.get(name);
@@ -288,23 +295,6 @@ class HttpConnection {
         }
     }
     
-    private static byte[] readBody(InputStream body) throws SVNException{
-        ByteArrayOutputStream os = new ByteArrayOutputStream();
-        byte[] buffer = new byte[1024];
-        try{
-        while (true) {
-            int count = body.read(buffer);
-            if (count <= 0) {
-                break;
-            }
-            os.write(buffer, 0, count);
-        }
-        return os.toByteArray();
-        }catch(IOException e){
-            throw new SVNException(e);
-        }
-    }
-
     private void readError(String url, DAVStatus status) {
         close();
         if (status.getResponseCode() == 404) {
@@ -322,7 +312,6 @@ class HttpConnection {
         LoggingInputStream stream = null;
         try {
             stream = createInputStream(getResponseBodyAsStream(), getResponseBodyLength());
-            //stream = createInputStream(responseHeader, getInputStream());
             byte[] buffer = new byte[1024];
             while (true) {
                 int count = stream.read(buffer);
@@ -341,18 +330,11 @@ class HttpConnection {
         }
     }
     
-    private InputStream getInputStream() throws IOException{
-        if(myHttpMethod == null){
-            return null;
-        }
-        return myHttpMethod.getResponseBodyAsStream();
-    }
-    
     private InputStream getResponseBodyAsStream() throws IOException{
-        return new ByteArrayInputStream( myHttpMethod.getResponseBodyAsString().getBytes());
+        return new ByteArrayInputStream(myHttpMethod.getResponseBody());
     }
 
-    private int getResponseBodyLength() throws IOException{
+    private long getResponseBodyLength() throws IOException {
         return myHttpMethod.getResponseBodyAsString().length();
     }
 
@@ -360,7 +342,6 @@ class HttpConnection {
         LoggingInputStream is = null;
         try {
             is = createInputStream(getResponseBodyAsStream(), getResponseBodyLength());
-            //is = createInputStream(responseHeader, getInputStream());
             XMLInputStream xmlIs = new XMLInputStream(is);
 
             if (handler == null) {
@@ -398,21 +379,13 @@ class HttpConnection {
         }
     }
 
-    private static LoggingInputStream createInputStream(Map readHeader, InputStream is) throws IOException {
-        if (readHeader.get("Content-Length") != null) {
-            is = new FixedSizeInputStream(is, Long.parseLong(readHeader.get("Content-Length").toString()));
-        } else if ("chunked".equals(readHeader.get("Transfer-Encoding"))) {
-            is = new ChunkedInputStream(is);
-        }
+    private static LoggingInputStream createInputStream(InputStream is, long size) {
+        is = new FixedSizeInputStream(is, size);
+        /* XXX: does HttpClient decode this?
         if ("gzip".equals(readHeader.get("Content-Encoding"))) {
             DebugLog.log("using GZIP to decode server responce");
             is = new GZIPInputStream(is);
-        }
-        return DebugLog.getLoggingInputStream("http", is);
-    }
-
-    private static LoggingInputStream createInputStream(InputStream is, int size) {
-        is = new FixedSizeInputStream(is, size);
+        }*/
         return DebugLog.getLoggingInputStream("http", is);
     }
 

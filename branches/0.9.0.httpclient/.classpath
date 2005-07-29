@@ -14,6 +14,5 @@
 	<classpathentry kind="lib" path="contrib/apache-commons/commons-codec-1.3.jar"/>
 	<classpathentry kind="lib" path="contrib/apache-commons/commons-httpclient-3.0-rc3.jar"/>
 	<classpathentry kind="lib" path="contrib/apache-commons/commons-logging.jar"/>
-	<classpathentry kind="lib" path="contrib/apache-commons/commons-logging-api.jar"/>
 	<classpathentry kind="output" path="javasvn/bin"/>
 </classpath>
