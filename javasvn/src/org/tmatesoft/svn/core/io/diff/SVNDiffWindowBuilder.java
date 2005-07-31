@@ -23,6 +23,7 @@ import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 import org.tmatesoft.svn.core.io.ISVNEditor;
+import org.tmatesoft.svn.util.SVNDebugLog;
 
 
 /**
@@ -143,7 +144,7 @@ public class SVNDiffWindowBuilder {
         return offset;
     }
 
-    public void accept(InputStream is, ISVNEditor consumer, String path) throws SVNException {       
+    public boolean accept(InputStream is, ISVNEditor consumer, String path) throws SVNException {       
         switch (myState) {
             case HEADER:
                 try {
@@ -175,7 +176,7 @@ public class SVNDiffWindowBuilder {
                         }
                         if (myOffsets[i] < 0) {
                             // can't read?
-                            return;
+                            return false;
                         }
                     }
                 }
@@ -196,8 +197,8 @@ public class SVNDiffWindowBuilder {
                     } catch (IOException e) {
                         SVNErrorManager.error(e.getMessage());
                     }
-                    if (length < 0) {
-                        return;
+                    if (length <= 0) {
+                        return false;
                     }
                     myOffsets[3] -= length;
                     if (myOffsets[3] == 0) {
@@ -228,7 +229,7 @@ public class SVNDiffWindowBuilder {
                     while(myFedDataCount < myDiffWindow.getNewDataLength()) {
                         int r = is.read();
                         if (r < 0) {
-                            return;
+                            return false;
                         }
                         myNewDataStream.write(r);
                         myFedDataCount++;
@@ -238,8 +239,12 @@ public class SVNDiffWindowBuilder {
                 }
                 SVNFileUtil.closeFile(myNewDataStream);
                 reset(1);
+                break;
+            default:
+                SVNDebugLog.log("invalid diff window builder state: " + myState);
+                return false;
         }
-        accept(is, consumer, path);
+        return true;
     }
     
     public static void save(SVNDiffWindow window, OutputStream os) throws IOException {
