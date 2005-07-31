@@ -69,7 +69,7 @@ public class SVNWCUtil {
     }
     
     public static ISVNAuthenticationManager createDefaultAuthenticationManager(File configDir, String userName, String password, boolean storeAuth) {
-        return new DefaultSVNAuthenticationManager(getDefaultConfigurationDirectory(), storeAuth, userName, password);
+        return new DefaultSVNAuthenticationManager(configDir, storeAuth, userName, password);
     }
 
     public static ISVNOptions createDefaultOptions(File dir, boolean readonly) {

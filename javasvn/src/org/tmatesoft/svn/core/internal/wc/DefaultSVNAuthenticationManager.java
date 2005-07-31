@@ -68,7 +68,7 @@ public class DefaultSVNAuthenticationManager implements ISVNAuthenticationManage
         ISVNAuthenticationProvider cacheProvider = new CacheAuthenticationProvider();
         myProviders[1] = cacheProvider;
         // disk storage providers
-        myProviders[2] = new PersistentAuthenticationProvider(new File(configDirectory, "auth"));
+        myProviders[2] = new PersistentAuthenticationProvider(new File(myConfigDirectory, "auth"));
     }
 
     public void setAuthenticationProvider(ISVNAuthenticationProvider provider) {
