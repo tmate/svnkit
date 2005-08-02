@@ -12,15 +12,13 @@
 
 package org.tmatesoft.svn.cli.command;
 
-import java.io.IOException;
+import java.io.File;
 import java.io.PrintStream;
 
 import org.tmatesoft.svn.cli.SVNArgument;
 import org.tmatesoft.svn.cli.SVNCommand;
-import org.tmatesoft.svn.core.ISVNWorkspace;
-import org.tmatesoft.svn.core.SVNWorkspaceAdapter;
-import org.tmatesoft.svn.core.io.SVNException;
-import org.tmatesoft.svn.util.SVNUtil;
+import org.tmatesoft.svn.core.SVNException;
+import org.tmatesoft.svn.core.wc.SVNWCClient;
 
 /**
  * @author TMate Software Ltd.
@@ -29,21 +27,20 @@ public class ResolvedCommand extends SVNCommand {
 
     public void run(final PrintStream out, PrintStream err) throws SVNException {
         final boolean recursive = getCommandLine().hasArgument(SVNArgument.RECURSIVE);
+        getClientManager().setEventHandler(new SVNCommandEventProcessor(out, err, false));
+        SVNWCClient wcClient  = getClientManager().getWCClient();
+        boolean error = false;
         for (int i = 0; i < getCommandLine().getPathCount(); i++) {
             final String absolutePath = getCommandLine().getPathAt(i);
-            final ISVNWorkspace workspace = createWorkspace(absolutePath);
-            workspace.addWorkspaceListener(new SVNWorkspaceAdapter() {
-                public void modified(String path, int kind) {
-                    try {
-                        path = convertPath(absolutePath, workspace, path);
-                    } catch (IOException e) {}
-
-                    println(out, "Resolved conflicted state of  '" + path + "'");
-                }
-            });
-
-            final String relativePath = SVNUtil.getWorkspacePath(workspace, absolutePath);
-            workspace.markResolved(relativePath, recursive);
+            try {
+                wcClient.doResolve(new File(absolutePath), recursive);
+            } catch (SVNException e) {
+                err.println(e.getMessage());
+                error = true;
+            }
+        }
+        if (error) {
+            System.exit(1);
         }
     }
 }

@@ -17,8 +17,10 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 
+
 /**
- * @author Alexander Kitaev
+ * @version 1.0
+ * @author  TMate Software Ltd.
  */
 public class DAVResponse {
     
@@ -54,6 +56,9 @@ public class DAVResponse {
         myStatus = status;
     }
     public void setHref(String href) {
+        if (href != null && href.length() > 0 && href.charAt(href.length() - 1) == '/') {
+            href = href.substring(0, href.length() - 1);
+        }
         myHref = href;
     }
 }

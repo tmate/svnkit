@@ -67,7 +67,7 @@ public class QSequenceDifferenceCoreTest extends TestCase {
 
 	// Accessing ==============================================================
 
-	public void test() throws QSequenceCancelledException {
+	public void test() throws QSequenceException {
 		test1("abcabba", "cbabac", "--c-bba", "cb-ba-");
 		test1("abcccd", "accccd", "a-cccd", "a-cccd");
 		test2("abbb", "abbbb", "abbb", "abbb-");
@@ -79,16 +79,20 @@ public class QSequenceDifferenceCoreTest extends TestCase {
 		test2("abccd", "", "-----", "");
 		test2("", "", "", "");
 		test2("Howdy", "Rucola", "-o---", "---o--");
+		test2("*bc", "bc", "-bc", "bc"); // Special case, which results immediately in D = 1
+		test2("b*c", "bc", "b-c", "bc"); // Special case, which results immediately in D = 1
+		test2("bc*", "bc", "bc-", "bc"); // Special case, which results immediately in D = 1
+		test2("abc*defgh*i*", "a+bc+defg+h+i++", "abc-defgh-i-", "a-bc-defg-h-i--");
 	}
 
 	// Utils ==================================================================
 
-	private void test2(String left, String right, String leftTest, String rightTest) throws QSequenceCancelledException {
+	private void test2(String left, String right, String leftTest, String rightTest) throws QSequenceException {
 		test1(left, right, leftTest, rightTest);
 		test1(right, left, rightTest, leftTest);
 	}
 
-	private void test1(String left, String right, String leftTest, String rightTest) throws QSequenceCancelledException {
+	private void test1(String left, String right, String leftTest, String rightTest) throws QSequenceException {
 		final QSequenceTestMedia media = QSequenceTestMedia.createCharacterMedia(left, right);
 		final QSequenceIntMedia cachingMedia = new QSequenceCachingMedia(media, new QSequenceDummyCanceller());
 		final QSequenceDiscardingMedia discardingMedia = new QSequenceDiscardingMedia(cachingMedia, new QSequenceDiscardingMediaNoConfusionDectector(false), new QSequenceDummyCanceller());

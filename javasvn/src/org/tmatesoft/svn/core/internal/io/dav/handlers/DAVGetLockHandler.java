@@ -1,15 +1,27 @@
 /*
- * Created on 22.04.2005
+ * ====================================================================
+ * Copyright (c) 2004 TMate Software Ltd.  All rights reserved.
+ *
+ * This software is licensed as described in the file COPYING, which
+ * you should have received as part of this distribution.  The terms
+ * are also available at http://tmate.org/svn/license.html.
+ * If newer versions of this license are posted there, you may use a
+ * newer version instead, at your option.
+ * ====================================================================
  */
 package org.tmatesoft.svn.core.internal.io.dav.handlers;
 
 import org.tmatesoft.svn.core.internal.io.dav.DAVElement;
 import org.tmatesoft.svn.core.internal.io.dav.DAVResponse;
-import org.tmatesoft.svn.core.internal.io.dav.DAVUtil;
 import org.tmatesoft.svn.core.internal.io.dav.IDAVResponseHandler;
+import org.tmatesoft.svn.core.internal.util.SVNEncodingUtil;
 import org.xml.sax.Attributes;
 
 
+/**
+ * @version 1.0
+ * @author  TMate Software Ltd.
+ */
 public class DAVGetLockHandler extends DAVPropertiesHandler {
 
     public static StringBuffer generateGetLockRequest(StringBuffer body) {
@@ -22,7 +34,7 @@ public class DAVGetLockHandler extends DAVPropertiesHandler {
         body.append("<lockinfo xmlns=\"DAV:\" >");
         body.append("<lockscope><exclusive/></lockscope>");
         body.append("<locktype><write/></locktype><owner>");
-        comment = comment == null ? "" : DAVUtil.xmlEncode(comment);
+        comment = comment == null ? "" : SVNEncodingUtil.xmlEncodeAttr(comment);
         body.append(comment);
         body.append("</owner></lockinfo>");
         return body;

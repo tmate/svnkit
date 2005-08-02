@@ -12,19 +12,18 @@
 
 package org.tmatesoft.svn.cli.command;
 
-import java.io.IOException;
-import java.io.PrintStream;
-
 import org.tmatesoft.svn.cli.SVNArgument;
 import org.tmatesoft.svn.cli.SVNCommand;
-import org.tmatesoft.svn.core.ISVNWorkspace;
-import org.tmatesoft.svn.core.SVNWorkspaceAdapter;
-import org.tmatesoft.svn.core.io.ISVNEditor;
-import org.tmatesoft.svn.core.io.SVNCommitInfo;
-import org.tmatesoft.svn.core.io.SVNException;
-import org.tmatesoft.svn.core.io.SVNRepository;
-import org.tmatesoft.svn.util.PathUtil;
-import org.tmatesoft.svn.util.SVNUtil;
+import org.tmatesoft.svn.core.SVNCommitInfo;
+import org.tmatesoft.svn.core.SVNException;
+import org.tmatesoft.svn.core.SVNURL;
+import org.tmatesoft.svn.core.wc.SVNCommitClient;
+import org.tmatesoft.svn.core.wc.SVNWCClient;
+
+import java.io.File;
+import java.io.PrintStream;
+import java.util.ArrayList;
+import java.util.Collection;
 
 /**
  * @author TMate Software Ltd.
@@ -35,49 +34,48 @@ public class DeleteCommand extends SVNCommand {
         if (getCommandLine().hasURLs()) {
             runRemote(out);
         } else {
-            runLocally(out);
+            runLocally(out, err);
         }
     }
 
     private void runRemote(PrintStream out) throws SVNException {
-        final String entryUrl = getCommandLine().getURL(0);
         final String commitMessage = (String) getCommandLine().getArgumentValue(SVNArgument.MESSAGE);
-        final String entry = PathUtil.tail(entryUrl);
-        final String url = entryUrl.substring(0, entryUrl.length() - entry.length());
-        final SVNRepository repository = createRepository(url);
-        ISVNEditor editor = repository.getCommitEditor(commitMessage != null ? commitMessage : "", null);
-        try {
-            editor.openRoot(-1);
-            editor.deleteEntry(entry, -1);
-            editor.closeDir();
-            SVNCommitInfo info = editor.closeEdit();
 
+        SVNCommitClient client = getClientManager().getCommitClient();
+        Collection urls  = new ArrayList(getCommandLine().getURLCount());
+        for(int i = 0; i < getCommandLine().getURLCount(); i++) {
+            urls.add(getCommandLine().getURL(i));
+        }
+        String[] urlsArray = (String[]) urls.toArray(new String[urls.size()]);
+        SVNURL[] svnUrls = new SVNURL[urlsArray.length];
+        for (int i = 0; i < svnUrls.length; i++) {
+            svnUrls[i] = SVNURL.parseURIEncoded(urlsArray[i]);
+        }
+        SVNCommitInfo info = client.doDelete(svnUrls, commitMessage);
+        if (info != SVNCommitInfo.NULL) {
             out.println();
             out.println("Committed revision " + info.getNewRevision() + ".");
-        } catch (SVNException ex) {
-            editor.abortEdit();
-            throw ex;
         }
     }
 
-    private void runLocally(final PrintStream out) throws SVNException {
+    private void runLocally(final PrintStream out, PrintStream err) {
+        boolean force = getCommandLine().hasArgument(SVNArgument.FORCE);
+
+        getClientManager().setEventHandler(new SVNCommandEventProcessor(out, err, false));
+
+        SVNWCClient client = getClientManager().getWCClient();
+        boolean error = false;
         for (int i = 0; i < getCommandLine().getPathCount(); i++) {
             final String absolutePath = getCommandLine().getPathAt(i);
-            final String workspacePath = absolutePath;
-            final ISVNWorkspace workspace = createWorkspace(absolutePath);
-            boolean force = getCommandLine().hasArgument(SVNArgument.FORCE);
-            workspace.addWorkspaceListener(new SVNWorkspaceAdapter() {
-                public void modified(String path, int kind) {
-                    try {
-                        path = convertPath(workspacePath, workspace, path);
-                    } catch (IOException e) {}
-
-                    println(out, "D  " + path);
-                }
-            });
-
-            final String relativePath = SVNUtil.getWorkspacePath(workspace, absolutePath);
-            workspace.delete(relativePath, force);
+            try {
+                client.doDelete(new File(absolutePath), force, false);
+            } catch (SVNException e) {
+                err.println(e.getMessage());
+                error = true;
+            }
+        }
+        if (error) {
+            System.exit(1);
         }
     }
 }

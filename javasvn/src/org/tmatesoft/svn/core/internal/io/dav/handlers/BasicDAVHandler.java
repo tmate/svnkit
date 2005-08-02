@@ -16,15 +16,17 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Stack;
 
+import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.internal.io.dav.DAVElement;
-import org.tmatesoft.svn.core.io.SVNException;
-import org.tmatesoft.svn.util.DebugLog;
+import org.tmatesoft.svn.util.SVNDebugLog;
 import org.xml.sax.Attributes;
 import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;
 
+
 /**
- * @author Alexander Kitaev
+ * @version 1.0
+ * @author  TMate Software Ltd.
  */
 public abstract class BasicDAVHandler extends DefaultHandler {
 	
@@ -50,9 +52,8 @@ public abstract class BasicDAVHandler extends DefaultHandler {
         try {
             startElement(getParent(), element, attributes);
         } catch(SVNException e) {
-            DebugLog.error(e.getMessage());
-            e.printStackTrace();
-            throw new SAXException(e); 
+            SVNDebugLog.logInfo(e);
+            throw new SAXException(e);
         }
         myParent.push(element);
         myCDATA = new StringBuffer();
@@ -64,7 +65,7 @@ public abstract class BasicDAVHandler extends DefaultHandler {
         try {
             endElement(getParent(), element, myCDATA);
         } catch(SVNException e) {            
-            DebugLog.error(e.getMessage());
+            SVNDebugLog.logInfo(e);
             throw new SAXException(e); 
         }
         myCDATA = null;

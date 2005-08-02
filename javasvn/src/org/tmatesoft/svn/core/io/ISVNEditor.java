@@ -12,7 +12,11 @@
 
 package org.tmatesoft.svn.core.io;
 
-import org.tmatesoft.svn.core.diff.ISVNDeltaConsumer;
+import java.io.OutputStream;
+
+import org.tmatesoft.svn.core.SVNCommitInfo;
+import org.tmatesoft.svn.core.SVNException;
+import org.tmatesoft.svn.core.io.diff.SVNDiffWindow;
 
 /**
  * The <code>ISVNEditor</code> interface provides methods that should be used
@@ -42,7 +46,7 @@ import org.tmatesoft.svn.core.diff.ISVNDeltaConsumer;
  * @author  TMate Software Ltd.
  * @see		SVNRepository
  */
-public interface ISVNEditor extends ISVNDeltaConsumer {
+public interface ISVNEditor {
     /**
      * Specifies the target revision number a working copy (WC) to be updated to
      * (or the revision number the WC would have if it is updated).
@@ -228,8 +232,12 @@ public interface ISVNEditor extends ISVNDeltaConsumer {
      * @param  baseChecksum		a server's checksum for the file to be modified
      * @throws SVNException		server's and client's checksums differ
      */
-    public void applyTextDelta(String baseChecksum) throws SVNException;
+    public void applyTextDelta(String path, String baseChecksum) throws SVNException;
     
+    public OutputStream textDeltaChunk(String path, SVNDiffWindow diffWindow) throws SVNException;
+
+    public void textDeltaEnd(String path) throws SVNException;
+
     /**
      * Changes the value of a property of the currently "opened" file.
      * 
@@ -237,7 +245,7 @@ public interface ISVNEditor extends ISVNDeltaConsumer {
      * @param  value			a new value for the property
      * @throws SVNException
      */
-    public void changeFileProperty(String name, String value) throws SVNException;
+    public void changeFileProperty(String path, String name, String value) throws SVNException;
     
     /**
      * "Closes" the currently opened file fixing all changes in its properties
@@ -249,9 +257,9 @@ public interface ISVNEditor extends ISVNDeltaConsumer {
      * corrupted, an exception is thrown.
      * 
      * @param  textChecksum		a server's checksum for the modified file 
-     * @throws SVNException		server's and client's checksums differ
+     * @throws SVNException		if server's and client's checksums differ
      */
-    public void closeFile(String textChecksum) throws SVNException;
+    public void closeFile(String path, String textChecksum) throws SVNException;
     
     /**
      * Closes this editor completing the whole operation the editor

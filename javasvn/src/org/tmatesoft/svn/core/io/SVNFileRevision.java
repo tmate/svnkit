@@ -14,6 +14,8 @@ package org.tmatesoft.svn.core.io;
 
 import java.util.Map;
 
+import org.tmatesoft.svn.core.SVNRevisionProperty;
+
 /**
  * This is a class that represents information on what path a file is located at a 
  * definite revision and what its revision properties and file properties delta
@@ -35,7 +37,7 @@ import java.util.Map;
  * @see		SVNRepository#getFileRevisions(String, Collection, long, long)
  * @see		SVNRevisionProperty
  */
-public class SVNFileRevision {
+public class SVNFileRevision implements Comparable {
     
     private String myPath;
     private long myRevision;
@@ -101,6 +103,17 @@ public class SVNFileRevision {
     public long getRevision() {
         return myRevision;
     }
+
+    public int compareTo(Object o) {
+        if (o == null || o.getClass() != SVNFileRevision.class) {
+            return 1;
+        }
+        SVNFileRevision rev = (SVNFileRevision) o;
+        long number = rev.getRevision();
+        return myRevision == number ? 0 : myRevision > number ? 1 : -1;
+    }
+
+
     private Map myProperties;
     private Map myPropertiesDelta;
 

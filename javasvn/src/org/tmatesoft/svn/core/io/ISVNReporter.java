@@ -12,6 +12,9 @@
 
 package org.tmatesoft.svn.core.io;
 
+import org.tmatesoft.svn.core.SVNException;
+import org.tmatesoft.svn.core.SVNURL;
+
 /**
  * This is a basic interface for implementors to describe a working copy state.
  * 
@@ -69,7 +72,7 @@ public interface ISVNReporter {
      * @param  startEmpty 		<code>true</code> and if the <code>path</code> is a 
      * 							directory - an implementer should assume that the 
      * 							directory has no entries or properties
-     * @throws SVNException		if the <code>revision</code> is invalid (&lt;0) or there's
+     * @throws SVNException		if the <code>revision</code> is invalid (<0) or there's
      * 							no such revision at all; also if a connection failure
      *  						occured
      * 
@@ -78,7 +81,7 @@ public interface ISVNReporter {
 
 	/**
      * 
-     * Describes a working copy <code>path</code> as missing (deleted from the WC).
+     * Describes a working copy <code>path</cdoe> as missing (deleted from the WC).
      * 
      * @param  path 			a path within the working copy
      * @throws SVNException		if a failure in connection occured.
@@ -105,12 +108,12 @@ public interface ISVNReporter {
      * @param  startEmtpy 	<code>true</code> and if the <code>path</code> is a 
      * 						directory - an implementer should assume that the 
      * 						directory has no entries or properties
-     * @throws SVNException if the <code>revision</code> is invalid (&lt;0) or there's
+     * @throws SVNException if the <code>revision</code> is invalid (<0) or there's
      * 						no such revision at all; also if a connection failure
      *  					occured
      */
 
-    public void linkPath(SVNRepositoryLocation repository, String path, String lockToken, long revison, boolean startEmtpy) throws SVNException;
+    public void linkPath(SVNURL url, String path, String lockToken, long revison, boolean startEmtpy) throws SVNException;
     
     /**
      * Finishes describing a working copy.

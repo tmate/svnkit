@@ -37,14 +37,8 @@ class QSequenceRestrictedMedia implements QSequenceMedia {
 	public void restrictTo(int leftMin, int leftMax, int rightMin, int rightMax) {
 		if (QSequenceAlgorithm.ASSERTIONS) {
 			QSequenceAssert.assertTrue(0 <= leftMin && leftMin <= leftMax + 1);
-		}
-		if (QSequenceAlgorithm.ASSERTIONS) {
 			QSequenceAssert.assertTrue(leftMax <= media.getLeftLength());
-		}
-		if (QSequenceAlgorithm.ASSERTIONS) {
 			QSequenceAssert.assertTrue(0 <= rightMin && rightMin <= rightMax + 1);
-		}
-		if (QSequenceAlgorithm.ASSERTIONS) {
 			QSequenceAssert.assertTrue(rightMax <= media.getRightLength());
 		}
 
@@ -64,7 +58,7 @@ class QSequenceRestrictedMedia implements QSequenceMedia {
 		return rightMax - rightMin + 1;
 	}
 
-	public boolean equals(int leftIndex, int rightIndex) throws QSequenceCancelledException {
+	public boolean equals(int leftIndex, int rightIndex) throws QSequenceException {
 		if (QSequenceAlgorithm.ASSERTIONS) {
 			QSequenceAssert.assertTrue(1 <= leftIndex && leftIndex <= leftMax - leftMin + 1);
 		}

@@ -1,5 +1,13 @@
 /*
- * Created on 04.05.2005
+ * ====================================================================
+ * Copyright (c) 2004 TMate Software Ltd.  All rights reserved.
+ *
+ * This software is licensed as described in the file COPYING, which
+ * you should have received as part of this distribution.  The terms
+ * are also available at http://tmate.org/svn/license.html.
+ * If newer versions of this license are posted there, you may use a
+ * newer version instead, at your option.
+ * ====================================================================
  */
 package org.tmatesoft.svn.core.internal.io.dav;
 
@@ -11,7 +19,7 @@ import java.security.KeyStore;
 import javax.net.ssl.KeyManager;
 import javax.net.ssl.KeyManagerFactory;
 
-import org.tmatesoft.svn.util.DebugLog;
+import org.tmatesoft.svn.util.SVNDebugLog;
 
 class DAVKeyManager {
     
@@ -30,7 +38,6 @@ class DAVKeyManager {
         if (certFileName == null) {
             return null;
         }
-        DebugLog.log("SSL: using client certificate file: " + certFileName);
         char[] passphrase = null;
         if (System.getProperty(CERTIFICATE_PASSPHRASE) != null) {
             passphrase = System.getProperty(CERTIFICATE_PASSPHRASE).toCharArray();
@@ -44,7 +51,7 @@ class DAVKeyManager {
                 keyStore.load(is, passphrase);                    
             }
         } catch (Throwable th) {
-            DebugLog.error(th);
+            SVNDebugLog.logInfo(th);
         } finally {
             if (is != null) {
                 try {
@@ -62,7 +69,7 @@ class DAVKeyManager {
                     ourKeyManagers = kmf.getKeyManagers();
                 }
             } catch (Throwable e) {
-                DebugLog.error(e);
+                SVNDebugLog.logInfo(e);
             } 
         }
         return ourKeyManagers; 
