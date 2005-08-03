@@ -32,6 +32,8 @@ import org.apache.commons.httpclient.Header;
 import org.apache.commons.httpclient.HttpClient;
 import org.apache.commons.httpclient.UsernamePasswordCredentials;
 import org.apache.commons.httpclient.auth.AuthScope;
+import org.apache.commons.httpclient.protocol.Protocol;
+import org.apache.commons.httpclient.protocol.ProtocolSocketFactory;
 import org.tmatesoft.svn.core.SVNAuthenticationException;
 import org.tmatesoft.svn.core.SVNCancelException;
 import org.tmatesoft.svn.core.SVNException;
@@ -83,7 +85,14 @@ class HttpConnection {
         int port = mySVNRepositoryLocation.getPort();
         myProxyAuth = myAuthManager != null ? myAuthManager.getProxyManager(mySVNRepositoryLocation.toCanonicalForm()) : null;
         myClient = new HttpClient();
-        myClient.getHostConfiguration().setHost(host, port);
+        
+        String protocol = mySVNRepositoryLocation.getProtocol();
+        if("https".equals(protocol)){
+            Protocol myProtocol = new Protocol(protocol, (ProtocolSocketFactory)new EasySSLProtocolSocketFactory(), 443);
+            myClient.getHostConfiguration().setHost(host, port, myProtocol);
+        }else{
+            myClient.getHostConfiguration().setHost(host, port);
+        }
         if (myProxyAuth != null && myProxyAuth.getProxyHost() != null) {
             if (isSecured()) {
                 if (myProxyAuth.getProxyUserName() != null && myProxyAuth.getProxyPassword() != null) {
