@@ -13,6 +13,9 @@
       </library>
       <library name="javasvnplugin.jar"/>
       <library name="jsch.jar"/>
+      <library name="commons-codec-1.3.jar" />
+      <library name="commons-httpclient-3.0-rc3.jar"/>
+      <library name="commons-logging.jar" />
    </runtime>
    <requires>
       <import plugin="org.eclipse.core.runtime"/>
