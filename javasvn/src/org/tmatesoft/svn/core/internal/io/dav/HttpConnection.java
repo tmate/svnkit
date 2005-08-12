@@ -193,9 +193,10 @@ class HttpConnection {
             try {
                 connect();
                 int bodyLength = -1;
-                if (requestBody instanceof ByteArrayInputStream) {
-                    bodyLength = ((ByteArrayInputStream)requestBody).available();
-                }//XXX: else if(requestBody instanceof IMeasurable)
+                if(requestBody != null){
+                    bodyLength = requestBody.available();
+                }
+                //XXX: else if(requestBody instanceof IMeasurable)
                 myHttpMethod = new BasicHttpMethod(method, path, requestBody);
                 if(bodyLength > -1){
                     myHttpMethod.addRequestHeader("Content-Length", ""+bodyLength);
@@ -304,17 +305,37 @@ class HttpConnection {
         }
     }
     
-    private void readError(String url, DAVStatus status) {
-        close();
+    private void readError(String url, DAVStatus status) throws SVNException {
+        // XXX: We can buffer response body of error responses as they hardly are large. (?)
+        // This method is only called if there's error present.
         if (status.getResponseCode() == 404) {
             status.setErrorText("svn: '" + url + "' path not found");
         } else {
             if(myHttpMethod != null){
-                status.setErrorText(myHttpMethod.getStatusText());
+                String errorMessage;
+                try {
+                    errorMessage = myHttpMethod.getResponseBodyAsString();
+                } catch (IOException e) {
+                    throw new SVNException(e);
+                }
+                if (errorMessage.indexOf("<m:human-readable") >= 0) {
+                    errorMessage = errorMessage.substring(errorMessage.indexOf("<m:human-readable") + "<m:human-readable".length());
+                    if (errorMessage.indexOf('>') >= 0) {
+                        errorMessage = errorMessage.substring(errorMessage.indexOf('>') + 1);
+                    }
+                    if (errorMessage.indexOf("</m:human-readable>") >= 0) {
+                        errorMessage = errorMessage.substring(0, errorMessage.indexOf("</m:human-readable>"));
+                        errorMessage = "svn: " + errorMessage.trim();
+                    }
+                    status.setErrorText(myHttpMethod.getStatusText() + " : " + errorMessage);
+                }else{
+                    status.setErrorText(myHttpMethod.getStatusText());
+                }
             }else{
                 status.setErrorText(myLastStatusText);
             }
         }
+        close();
     }
 
     private void readResponse(OutputStream result, Map responseHeader) throws SVNException {

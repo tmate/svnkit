@@ -3,7 +3,6 @@
  */
 package org.tmatesoft.svn.core.internal.io.dav;
 
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -22,6 +21,9 @@ public class BasicHttpMethod extends HttpMethodBase{
         super(uri);
         myName = name;
         myRequestBody = requestBody;
+        if(myRequestBody != null && myRequestBody.markSupported()){
+            myRequestBody.mark(0);
+        }
     }
     
     public String getName() {
@@ -33,7 +35,7 @@ public class BasicHttpMethod extends HttpMethodBase{
             return true;
         }
         OutputStream os = conn.getRequestOutputStream();
-        if (myRequestBody instanceof ByteArrayInputStream) {
+        if(myRequestBody.markSupported()){
             myRequestBody.reset();
         }
         byte[] buffer = new byte[1024];
