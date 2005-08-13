@@ -362,11 +362,22 @@ class HttpConnection {
     }
     
     private InputStream getResponseBodyAsStream() throws IOException{
-        return new ByteArrayInputStream(myHttpMethod.getResponseBody());
+        return myHttpMethod.getResponseBodyAsStream();
+        //return new ByteArrayInputStream(myHttpMethod.getResponseBody());
     }
 
-    private long getResponseBodyLength() throws IOException {
-        return myHttpMethod.getResponseBodyAsString().length();
+    private long getResponseBodyLength() {
+        if(myHttpMethod != null){
+            Header lenHeader = myHttpMethod.getResponseHeader("Content-Length");
+            if(lenHeader != null){
+                String slength = lenHeader.getValue();
+                if(slength != null){
+                    return Long.decode(slength).longValue();
+                }
+            }
+        }
+        return -1;
+        // we cannot use "getResponseBodyAsString as it caches data of unknown size"
     }
 
     private void readResponse(DefaultHandler handler, Map responseHeader) throws SVNException {
@@ -411,7 +422,9 @@ class HttpConnection {
     }
 
     private static LoggingInputStream createInputStream(InputStream is, long size) {
-        is = new FixedSizeInputStream(is, size);
+        if(size > -1){
+            is = new FixedSizeInputStream(is, size);
+        }
         /* XXX: does HttpClient decode this?
         if ("gzip".equals(readHeader.get("Content-Encoding"))) {
             DebugLog.log("using GZIP to decode server responce");
