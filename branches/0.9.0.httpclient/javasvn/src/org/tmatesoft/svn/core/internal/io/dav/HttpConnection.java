@@ -212,6 +212,7 @@ class HttpConnection {
                             AuthScope.ANY_REALM), new UsernamePasswordCredentials(
                                     passwordAuth.getUserName(), passwordAuth.getPassword()));
                     myHttpMethod.setDoAuthentication(true);
+                    myClient.getParams().setAuthenticationPreemptive(true);
                 }
                 myClient.executeMethod(myHttpMethod);
                 status = new DAVStatus(myHttpMethod.getStatusCode(), myHttpMethod.getStatusText(), myHttpMethod.getParams().getVersion().toString());
