@@ -79,7 +79,7 @@ class HttpConnection {
         myAuthManager = repos.getAuthenticationManager();
     }
 
-    public void connect() throws SVNException {
+    private void connect() throws SVNException {
         close();
         String host = mySVNRepositoryLocation.getHost();
         int port = mySVNRepositoryLocation.getPort();
@@ -196,7 +196,6 @@ class HttpConnection {
                 if(requestBody != null){
                     bodyLength = requestBody.available();
                 }
-                //XXX: else if(requestBody instanceof IMeasurable)
                 myHttpMethod = new BasicHttpMethod(method, path, requestBody);
                 if(bodyLength > -1){
                     myHttpMethod.addRequestHeader("Content-Length", ""+bodyLength);
@@ -363,7 +362,6 @@ class HttpConnection {
     
     private InputStream getResponseBodyAsStream() throws IOException{
         return myHttpMethod.getResponseBodyAsStream();
-        //return new ByteArrayInputStream(myHttpMethod.getResponseBody());
     }
 
     private long getResponseBodyLength() {
@@ -377,7 +375,6 @@ class HttpConnection {
             }
         }
         return -1;
-        // we cannot use "getResponseBodyAsString as it caches data of unknown size"
     }
 
     private void readResponse(DefaultHandler handler, Map responseHeader) throws SVNException {
