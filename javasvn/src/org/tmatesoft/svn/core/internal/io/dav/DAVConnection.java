@@ -42,7 +42,7 @@ import org.xml.sax.helpers.DefaultHandler;
 public class DAVConnection {
     
     private SVNRepositoryLocation myLocation;
-    private HttpConnection myHttpConnection;
+    private CommonsHttpConnection myHttpConnection;
     private String myActivityCollectionURL;
     private boolean myIsHTTP10Connection;
     private Map myLocks;
@@ -58,7 +58,7 @@ public class DAVConnection {
     
     public void open(DAVRepository repository) throws SVNException {
         if (myHttpConnection == null) {
-        	myHttpConnection = new HttpConnection(myLocation, repository);
+        	myHttpConnection = new CommonsHttpConnection(myLocation, repository);
             if (repository.getRepositoryUUID() == null) {
                 String path = myLocation.getPath();
                 final DAVResponse[] result = new DAVResponse[1];

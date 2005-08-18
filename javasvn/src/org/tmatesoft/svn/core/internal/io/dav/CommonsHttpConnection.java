@@ -58,7 +58,7 @@ import org.xml.sax.helpers.DefaultHandler;
  * @author TMate Software Ltd.
  *
  */
-class HttpConnection {
+class CommonsHttpConnection {
 
     private SVNRepositoryLocation mySVNRepositoryLocation;
     private SAXParser mySAXParser;
@@ -74,7 +74,7 @@ class HttpConnection {
     private BasicHttpMethod myHttpMethod;
     private String myLastStatusText;
 
-    public HttpConnection(SVNRepositoryLocation location, SVNRepository repos) {
+    public CommonsHttpConnection(SVNRepositoryLocation location, SVNRepository repos) {
         mySVNRepositoryLocation = location;
         myAuthManager = repos.getAuthenticationManager();
     }
