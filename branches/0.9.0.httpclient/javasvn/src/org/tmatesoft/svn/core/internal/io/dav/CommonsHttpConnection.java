@@ -88,14 +88,12 @@ class CommonsHttpConnection {
         
         String protocol = mySVNRepositoryLocation.getProtocol();
         if("https".equals(protocol)){
-            try {
-                ProtocolSocketFactory factory =
-                    new SSLProtocolSocketFactory(myAuthManager.getSSLManager(mySVNRepositoryLocation.toCanonicalForm()).getSSLContext());
-                Protocol myProtocol = new Protocol(protocol, factory, 443);
-                myClient.getHostConfiguration().setHost(host, port, myProtocol);
-            } catch (IOException e) {
-                throw new SVNException(e);
-            }
+            ProtocolSocketFactory factory =
+                new SSLProtocolSocketFactory();
+            //ProtocolSocketFactory factory =
+            //    new SSLProtocolSocketFactory(myAuthManager.getSSLManager(mySVNRepositoryLocation.toCanonicalForm()).getSSLContext());
+            Protocol myProtocol = new Protocol(protocol, factory, 443);
+            myClient.getHostConfiguration().setHost(host, port, myProtocol);
         }else{
             myClient.getHostConfiguration().setHost(host, port);
         }
