@@ -89,7 +89,7 @@ class CommonsHttpConnection {
         String protocol = mySVNRepositoryLocation.getProtocol();
         if("https".equals(protocol)){
             ProtocolSocketFactory factory =
-                new SSLProtocolSocketFactory();
+                new EasySunSSLProtocolSocketFactory();
             //ProtocolSocketFactory factory =
             //    new SSLProtocolSocketFactory(myAuthManager.getSSLManager(mySVNRepositoryLocation.toCanonicalForm()).getSSLContext());
             Protocol myProtocol = new Protocol(protocol, factory, 443);
