@@ -5,27 +5,45 @@ import java.net.InetAddress;
 import java.net.Socket;
 import java.net.UnknownHostException;
 
-import javax.net.ssl.SSLContext;
-
 import org.apache.commons.httpclient.ConnectTimeoutException;
+import org.apache.commons.httpclient.HttpClientError;
 import org.apache.commons.httpclient.params.HttpConnectionParams;
 import org.apache.commons.httpclient.protocol.ControllerThreadSocketFactory;
 import org.apache.commons.httpclient.protocol.SecureProtocolSocketFactory;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 
-public class SSLProtocolSocketFactory implements SecureProtocolSocketFactory {
+import com.sun.net.ssl.SSLContext;
+import com.sun.net.ssl.TrustManager;
 
+public class EasySunSSLProtocolSocketFactory implements SecureProtocolSocketFactory {
+
+    private static final Log LOG = LogFactory.getLog(EasySunSSLProtocolSocketFactory.class);
+    
     private SSLContext sslcontext = null;
 
-    public SSLProtocolSocketFactory() {
+    public EasySunSSLProtocolSocketFactory() {
         super();
     }
 
-    public SSLProtocolSocketFactory(SSLContext context) {
-        super();
-        sslcontext = context;
+    private static SSLContext createEasySSLContext() {
+        try {
+            SSLContext context = SSLContext.getInstance("SSL");
+            context.init(
+              null, 
+              new TrustManager[] {new EasySunX509TrustManager(null)}, 
+              null);
+            return context;
+        } catch (Exception e) {
+            LOG.error(e.getMessage(), e);
+            throw new HttpClientError(e.toString());
+        }
     }
-    
+
     private SSLContext getSSLContext() {
+        if (this.sslcontext == null) {
+            this.sslcontext = createEasySSLContext();
+        }
         return this.sslcontext;
     }
 
@@ -95,11 +113,11 @@ public class SSLProtocolSocketFactory implements SecureProtocolSocketFactory {
     }
 
     public boolean equals(Object obj) {
-        return ((obj != null) && obj.getClass().equals(SSLProtocolSocketFactory.class));
+        return ((obj != null) && obj.getClass().equals(EasySunSSLProtocolSocketFactory.class));
     }
 
     public int hashCode() {
-        return SSLProtocolSocketFactory.class.hashCode();
+        return EasySunSSLProtocolSocketFactory.class.hashCode();
     }
 
 }
