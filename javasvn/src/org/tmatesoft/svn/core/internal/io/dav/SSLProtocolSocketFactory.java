@@ -6,14 +6,20 @@ import java.net.Socket;
 import java.net.UnknownHostException;
 
 import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManager;
 
 import org.apache.commons.httpclient.ConnectTimeoutException;
+import org.apache.commons.httpclient.HttpClientError;
 import org.apache.commons.httpclient.params.HttpConnectionParams;
 import org.apache.commons.httpclient.protocol.ControllerThreadSocketFactory;
 import org.apache.commons.httpclient.protocol.SecureProtocolSocketFactory;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 
 public class SSLProtocolSocketFactory implements SecureProtocolSocketFactory {
 
+    private static final Log LOG = LogFactory.getLog(SSLProtocolSocketFactory.class);
+    
     private SSLContext sslcontext = null;
 
     public SSLProtocolSocketFactory() {
@@ -24,8 +30,25 @@ public class SSLProtocolSocketFactory implements SecureProtocolSocketFactory {
         super();
         sslcontext = context;
     }
+    
+    private static SSLContext createEasySSLContext() {
+        try {
+            SSLContext context = SSLContext.getInstance("SSL");
+            context.init(
+              null, 
+              new TrustManager[] {new EasyX509TrustManager(null)}, 
+              null);
+            return context;
+        } catch (Exception e) {
+            LOG.error(e.getMessage(), e);
+            throw new HttpClientError(e.toString());
+        }
+    }
 
     private SSLContext getSSLContext() {
+        if (this.sslcontext == null) {
+            this.sslcontext = createEasySSLContext();
+        }
         return this.sslcontext;
     }
 
