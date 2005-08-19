@@ -31,11 +31,10 @@ import java.security.NoSuchAlgorithmException;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 
-import javax.net.ssl.TrustManager;
-import javax.net.ssl.TrustManagerFactory;
-import javax.net.ssl.X509TrustManager;
-
-import org.apache.commons.logging.Log;
+import com.sun.net.ssl.TrustManagerFactory;
+import com.sun.net.ssl.TrustManager;
+import com.sun.net.ssl.X509TrustManager;
+import org.apache.commons.logging.Log; 
 import org.apache.commons.logging.LogFactory;
 
 /**
@@ -58,6 +57,7 @@ import org.apache.commons.logging.LogFactory;
  * The component is provided as a reference material, which may be inappropriate
  * for use without additional customization.
  * </p>
+ * XXX: fix
  */
 
 public class EasyX509TrustManager implements X509TrustManager
@@ -81,15 +81,17 @@ public class EasyX509TrustManager implements X509TrustManager
         this.standardTrustManager = (X509TrustManager)trustmanagers[0];
     }
 
-    public void checkClientTrusted(X509Certificate[] certificates, String authType) throws CertificateException {
-        this.standardTrustManager.checkClientTrusted(certificates, authType);
+    /**
+     * @see com.sun.net.ssl.X509TrustManager#isClientTrusted(X509Certificate[])
+     */
+    public boolean isClientTrusted(X509Certificate[] certificates) {
+        return this.standardTrustManager.isClientTrusted(certificates);
     }
 
     /**
-     * @throws CertificateException 
      * @see com.sun.net.ssl.X509TrustManager#isServerTrusted(X509Certificate[])
      */
-    public void checkServerTrusted(X509Certificate[] certificates, String authType) throws CertificateException {
+    public boolean isServerTrusted(X509Certificate[] certificates) {
         if ((certificates != null) && LOG.isDebugEnabled()) {
             LOG.debug("Server certificate chain:");
             for (int i = 0; i < certificates.length; i++) {
@@ -103,11 +105,11 @@ public class EasyX509TrustManager implements X509TrustManager
             }
             catch (CertificateException e) {
                 LOG.error(e.toString());
-                throw e;
+                return false;
             }
-            return;
+            return true;
         }
-        this.standardTrustManager.checkServerTrusted(certificates, authType);
+        return this.standardTrustManager.isServerTrusted(certificates);
     }
 
     /**
