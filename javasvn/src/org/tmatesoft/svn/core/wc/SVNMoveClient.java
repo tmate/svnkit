@@ -15,8 +15,6 @@ import java.io.File;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNNodeKind;
 import org.tmatesoft.svn.core.auth.ISVNAuthenticationManager;
-import org.tmatesoft.svn.core.internal.util.SVNEncodingUtil;
-import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNDirectory;
 import org.tmatesoft.svn.core.internal.wc.SVNEntry;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
@@ -24,6 +22,7 @@ import org.tmatesoft.svn.core.internal.wc.SVNFileType;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNProperties;
 import org.tmatesoft.svn.core.internal.wc.SVNWCAccess;
+import org.tmatesoft.svn.util.PathUtil;
 
 /**
  * @version 1.0
@@ -168,8 +167,8 @@ public class SVNMoveClient extends SVNBasicClient {
                 long srcRevision = srcEntry.getRevision();
                 long srcCFRevision = srcEntry.getCopyFromRevision();
 
-                dstURL = SVNPathUtil
-                        .append(dstURL, SVNEncodingUtil.uriEncode(dst.getName()));
+                dstURL = PathUtil
+                        .append(dstURL, PathUtil.encode(dst.getName()));
                 if (srcEntry.isScheduledForAddition() && srcEntry.isCopied()) {
                     srcProps.copyTo(dstProps);
                     dstEntry.scheduleForAddition();
@@ -222,7 +221,7 @@ public class SVNMoveClient extends SVNBasicClient {
                     dstAccess.getAnchor().getEntries().deleteEntry(
                             dst.getName());
                     dstAccess.getAnchor().getEntries().save(true);
-                    SVNFileUtil.deleteAll(dst, this);
+                    SVNFileUtil.deleteAll(dst);
                     SVNFileUtil.copy(src, dst, false, false);
                     myWCClient.doAdd(dst, false, false, false, true);
                 }
@@ -279,7 +278,8 @@ public class SVNMoveClient extends SVNBasicClient {
             SVNWCAccess dstAccess = SVNWCAccess.create(dst);
             SVNEntry srcEntry = srcAccess.getTargetEntry();
             SVNEntry dstEntry = dstAccess.getTargetEntry();
-            SVNEntry dstParentEntry = dstAccess.getAnchor().getEntries().getEntry("", false);
+            SVNEntry dstParentEntry = dstAccess.getAnchor().getEntries()
+                    .getEntry("", false);
 
             if (dstEntry != null && dstEntry.isScheduledForDeletion()) {
                 // clear undo.
@@ -356,8 +356,8 @@ public class SVNMoveClient extends SVNBasicClient {
                 long srcRevision = srcEntry.getRevision();
                 long srcCFRevision = srcEntry.getCopyFromRevision();
 
-                dstURL = SVNPathUtil
-                        .append(dstURL, SVNEncodingUtil.uriEncode(dst.getName()));
+                dstURL = PathUtil
+                        .append(dstURL, PathUtil.encode(dst.getName()));
                 if (srcEntry.isScheduledForAddition() && srcEntry.isCopied()) {
                     dstEntry.scheduleForAddition();
                     dstEntry.setCopyFromRevision(srcCFRevision);
@@ -407,7 +407,7 @@ public class SVNMoveClient extends SVNBasicClient {
                     dstAccess.getAnchor().getEntries().deleteEntry(
                             dst.getName());
                     dstAccess.getAnchor().getEntries().save(true);
-                    SVNFileUtil.deleteAll(dst, this);
+                    SVNFileUtil.deleteAll(dst);
                     SVNFileUtil.copy(src, dst, false, false);
                     myWCClient.doAdd(dst, false, false, false, true);
                 }
@@ -448,25 +448,19 @@ public class SVNMoveClient extends SVNBasicClient {
         boolean added = false;
         long cfRevision = -1;
         try {
-            srcAccess.open(false, false);
+            srcAccess.open(true, false);
             SVNEntry srcEntry = srcAccess.getTargetEntry();
             if (srcEntry == null) {
                 SVNErrorManager.error("svn: '" + src + "' is not under version control");
             }
             if (srcEntry.isCopied() && !srcEntry.isScheduledForAddition()) {
-                cfURL = getCopyFromURL(src.getParentFile(), SVNEncodingUtil.uriEncode(src.getName()));
-                cfRevision = getCopyFromRevision(src.getParentFile());
-                if (cfURL == null || cfRevision < 0) {
-                    SVNErrorManager.error("svn: Cannot locate copied directory root for '" + src + "'");
-                }
-                added = false;
-            } else {
-                cfURL = srcEntry.isCopied() ? srcEntry.getCopyFromURL() : srcEntry.getURL();
-                cfRevision = srcEntry.isCopied() ? srcEntry.getCopyFromRevision() : srcEntry.getRevision();
-                added = srcEntry.isScheduledForAddition() && !srcEntry.isCopied();
+                SVNErrorManager.error("svn: '" + src + "' is part of the copied tree");
             }
+            cfURL = srcEntry.isCopied() ? srcEntry.getCopyFromURL() : srcEntry.getURL();
+            cfRevision = srcEntry.isCopied() ? srcEntry.getCopyFromRevision() : srcEntry.getRevision();
+            added = srcEntry.isScheduledForAddition() && !srcEntry.isCopied();
         } finally {
-            srcAccess.close(false);
+            srcAccess.close(true);
         }
         if (!move) {
             myWCClient.doDelete(src, true, false);
@@ -509,52 +503,5 @@ public class SVNMoveClient extends SVNBasicClient {
         } catch (SVNException e) {
             return false;
         }
-    }
-    
-    private static String getCopyFromURL(File path, String urlTail) throws SVNException {
-        if (path == null) {
-            return null;
-        }
-        SVNWCAccess wcAccess = null;
-        try {
-            wcAccess = SVNWCAccess.create(path);
-        } catch (SVNException e) {
-            return null;
-        }
-        // urlTail is either name of an entry
-        SVNEntry entry = wcAccess.getTargetEntry();
-        if (entry == null) {
-            return null;
-        }
-        String cfURL = entry.getCopyFromURL();
-        if (cfURL != null) {
-            return SVNPathUtil.append(cfURL, urlTail);
-        }
-        urlTail = SVNPathUtil.append(SVNEncodingUtil.uriEncode(path.getName()), urlTail);
-        path = path.getParentFile();
-        return getCopyFromURL(path, urlTail);
-    }
-
-    private static long getCopyFromRevision(File path) throws SVNException {
-        if (path == null) {
-            return -1;
-        }
-        SVNWCAccess wcAccess = null;
-        try {
-            wcAccess = SVNWCAccess.create(path);
-        } catch (SVNException e) {
-            return -1;
-        }
-        // urlTail is either name of an entry
-        SVNEntry entry = wcAccess.getTargetEntry();
-        if (entry == null) {
-            return -1;
-        }
-        long rev = entry.getCopyFromRevision();
-        if (rev >= 0) {
-            return rev;
-        }
-        path = path.getParentFile();
-        return getCopyFromRevision(path);
-    }
+     }
 }

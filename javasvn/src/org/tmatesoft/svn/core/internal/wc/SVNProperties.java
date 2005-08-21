@@ -245,8 +245,9 @@ public class SVNProperties {
                 if (currentName.equals(name)) {
                     readProperty('V', is, os);
                     return os;
+                } else {
+                    readProperty('V', is, null);
                 }
-                readProperty('V', is, null);                
             }
         } catch (IOException e) {
             SVNErrorManager.error("svn: Cannot read properties file '" + myFile + "'");
@@ -329,14 +330,9 @@ public class SVNProperties {
     public void copyTo(SVNProperties destination) throws SVNException {
         if (!getFile().exists()) {
             // just create empty dst.
-            OutputStream os = null;
-            try {
-                os = SVNFileUtil.openFileForWriting(destination.getFile());
-                os.write("END\n".getBytes());
-            } catch (IOException e) {
-            } finally {
-                SVNFileUtil.closeFile(os);
-            }
+            destination.setPropertyValue("tmp", "empty");
+            destination.setPropertyValue("tmp", null);
+            // this will leave "end\n";
         } else {
             SVNFileUtil.copyFile(getFile(), destination.getFile(), true);
         }

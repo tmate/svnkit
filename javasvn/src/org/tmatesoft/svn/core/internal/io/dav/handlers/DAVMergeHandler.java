@@ -19,9 +19,11 @@ import java.util.Map;
 import org.tmatesoft.svn.core.SVNCommitInfo;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.internal.io.dav.DAVElement;
-import org.tmatesoft.svn.core.internal.util.SVNEncodingUtil;
-import org.tmatesoft.svn.core.internal.util.SVNTimeUtil;
+import org.tmatesoft.svn.core.internal.io.dav.DAVUtil;
 import org.tmatesoft.svn.core.io.ISVNWorkspaceMediator;
+import org.tmatesoft.svn.util.DebugLog;
+import org.tmatesoft.svn.util.PathUtil;
+import org.tmatesoft.svn.util.TimeUtil;
 import org.xml.sax.Attributes;
 
 
@@ -59,9 +61,10 @@ public class DAVMergeHandler extends BasicDAVHandler {
             if (path == null || isChildPath(path, lockPath)) {
                 String token = (String) locks.get(lockPath);
                 target.append("<S:lock><S:lock-path>");
-                lockPath = getRelativePath(lockPath, root);
+                lockPath = lockPath.substring(root.length());
+                lockPath = PathUtil.removeLeadingSlash(lockPath);
                 
-                target.append(SVNEncodingUtil.xmlEncodeCDATA(SVNEncodingUtil.uriDecode(lockPath)));
+                target.append(DAVUtil.xmlEncode(PathUtil.decode(lockPath)));
                 target.append("</S:lock-path><S:lock-token>");
                 target.append(token);
                 target.append("</S:lock-token></S:lock>");
@@ -71,17 +74,12 @@ public class DAVMergeHandler extends BasicDAVHandler {
         return target;
     }
     
-    // both paths shouldn't end with '/'
-    private static String getRelativePath(String path, String root) {
-        if (path.length() <= root.length()) {
-            return "";
-        }
-        return path.substring(root.length() + 1);
-    }
-    
     public static boolean hasChildPaths(String path, Map locks) {
         for (Iterator paths = locks.keySet().iterator(); paths.hasNext();) {
             String lockPath = (String) paths.next();
+            if (!lockPath.startsWith("/")) {
+                lockPath = "/" + lockPath;
+            }
             if (isChildPath(path, lockPath)) {
                 return true;
             }
@@ -93,7 +91,10 @@ public class DAVMergeHandler extends BasicDAVHandler {
         if (path.equals(childPath)) {
             return true;
         }
-        return childPath.startsWith(path + "/");
+        if (!path.endsWith("/")) {
+            path += "/";
+        }
+        return childPath.startsWith(path);
     }
     
     private ISVNWorkspaceMediator myMediator;
@@ -138,7 +139,7 @@ public class DAVMergeHandler extends BasicDAVHandler {
         if (element == DAVElement.HREF) {
             if (parent == RESPONSE) {
                 myRepositoryPath = cdata.toString();
-                myRepositoryPath = SVNEncodingUtil.uriDecode(myRepositoryPath);
+                myRepositoryPath = PathUtil.decode(myRepositoryPath);
             } else if (parent == DAVElement.CHECKED_IN) {
                 myVersionPath = cdata.toString();
             } 
@@ -151,14 +152,19 @@ public class DAVMergeHandler extends BasicDAVHandler {
             if (myResourceType == DAVElement.BASELINE) {
                 myCommitInfo = new SVNCommitInfo(myRevision, myAuthor, myCommitDate);
             } else {
-                String reposPath = SVNEncodingUtil.uriEncode(myRepositoryPath);
+                String reposPath = PathUtil.encode(myRepositoryPath);
+                DebugLog.log("COMMIT: saving new vurl for " + reposPath);
                 String path = (String) myPathsMap.get(reposPath);
+                DebugLog.log("COMMIT: wc path " + path);
+                if (path == null) {
+                    DebugLog.log("COMMIT: existing wc paths " + myPathsMap);
+                }
                 if (path != null && myMediator != null) {
-                    myMediator.setWorkspaceProperty(SVNEncodingUtil.uriDecode(path), "svn:wc:ra_dav:version-url", myVersionPath);
+                    myMediator.setWorkspaceProperty(PathUtil.decode(path), "svn:wc:ra_dav:version-url", myVersionPath);
                 } 
             }
         } else if (element == DAVElement.CREATION_DATE) {
-            myCommitDate = SVNTimeUtil.parseDate(cdata.toString());
+            myCommitDate = TimeUtil.parseDate(cdata.toString());
         } else if (element == DAVElement.CREATOR_DISPLAY_NAME) {
             myAuthor = cdata.toString();
         } else if (element == DAVElement.VERSION_NAME) {

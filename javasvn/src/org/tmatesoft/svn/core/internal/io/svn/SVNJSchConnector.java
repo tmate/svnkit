@@ -10,6 +10,8 @@
  */
 package org.tmatesoft.svn.core.internal.io.svn;
 
+import java.io.FilterInputStream;
+import java.io.FilterOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -18,8 +20,7 @@ import org.tmatesoft.svn.core.SVNAuthenticationException;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.auth.ISVNAuthenticationManager;
 import org.tmatesoft.svn.core.auth.SVNSSHAuthentication;
-import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
-import org.tmatesoft.svn.util.SVNDebugLog;
+import org.tmatesoft.svn.util.DebugLog;
 
 import com.jcraft.jsch.ChannelExec;
 import com.jcraft.jsch.Session;
@@ -31,10 +32,13 @@ import com.jcraft.jsch.Session;
 public class SVNJSchConnector implements ISVNConnector {
 
     private static final String CHANNEL_TYPE = "exec";
+
     private static final String SVNSERVE_COMMAND = "svnserve --tunnel";
 
     private ChannelExec myChannel;
+
     private InputStream myInputStream;
+
     private OutputStream myOutputStream;
 
     public void open(SVNRepositoryImpl repository) throws SVNException {
@@ -44,8 +48,7 @@ public class SVNJSchConnector implements ISVNConnector {
         String realm = repository.getLocation().getProtocol() + "://"
                 + repository.getLocation().getHost() + ":"
                 + repository.getLocation().getPort();
-        SVNSSHAuthentication authentication = 
-            (SVNSSHAuthentication) authManager.getFirstAuthentication(ISVNAuthenticationManager.SSH, realm, repository.getLocation());
+        SVNSSHAuthentication authentication = (SVNSSHAuthentication) authManager.getFirstAuthentication(ISVNAuthenticationManager.SSH, realm);
         SVNAuthenticationException lastException = null;
         Session session = null;
 
@@ -62,13 +65,14 @@ public class SVNJSchConnector implements ISVNConnector {
                 break;
             } catch (SVNAuthenticationException e) {
                 if (session != null && session.isConnected()) {
+                    DebugLog.log("DISCONNECTING: " + session);
                     session.disconnect();
                     session = null;
                 }
                 lastException = e;
                 if (e.getMessage() != null  && e.getMessage().toLowerCase().indexOf("auth") >= 0) {
                     authManager.acknowledgeAuthentication(false, ISVNAuthenticationManager.SSH, realm, e.getMessage(), authentication);
-                    authentication = (SVNSSHAuthentication) authManager.getNextAuthentication(ISVNAuthenticationManager.SSH, realm, repository.getLocation());
+                    authentication = (SVNSSHAuthentication) authManager.getNextAuthentication(ISVNAuthenticationManager.SSH, realm);
                 } else {
                     throw e;
                 }
@@ -91,10 +95,11 @@ public class SVNJSchConnector implements ISVNConnector {
                 myOutputStream = myChannel.getOutputStream();
                 myInputStream = myChannel.getInputStream();
 
+                DebugLog.log("JSCH command: " + command);
                 try {
                     myChannel.connect();
                 } catch (Throwable e) {
-                    SVNDebugLog.logInfo(e);
+                    DebugLog.error(e);
                     retry--;
                     if (retry < 0) {
                         throw new SVNException(e);
@@ -107,14 +112,14 @@ public class SVNJSchConnector implements ISVNConnector {
                 break;
             }
         } catch (Throwable e) {
-            SVNDebugLog.logInfo(e);
+            DebugLog.error(e);
             close();
             if (session.isConnected()) {
                 session.disconnect();
             }
             throw new SVNException("Failed to open SSH session: " + e.getMessage());
         }
-/*
+
         myInputStream = new FilterInputStream(myInputStream) {
             public void close() {
             }
@@ -123,12 +128,9 @@ public class SVNJSchConnector implements ISVNConnector {
             public void close() {
             }
         };
-        */
     }
 
     public void close() throws SVNException {
-        SVNFileUtil.closeFile(myOutputStream);
-        SVNFileUtil.closeFile(myInputStream);
         if (myChannel != null) {
             myChannel.disconnect();
         }

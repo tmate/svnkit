@@ -38,13 +38,6 @@ public class SVNFileType {
     }
 
     public String toString() {
-        switch(myType) {
-            case 0: return "unknown";
-            case 1: return "none";
-            case 2: return "file";
-            case 3: return "symlink";
-            case 4: return "directory";
-        }
         return Integer.toString(myType);
     }
 

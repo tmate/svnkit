@@ -16,7 +16,6 @@ import org.tmatesoft.svn.cli.SVNArgument;
 import org.tmatesoft.svn.cli.SVNCommand;
 import org.tmatesoft.svn.core.SVNCommitInfo;
 import org.tmatesoft.svn.core.SVNException;
-import org.tmatesoft.svn.core.SVNURL;
 import org.tmatesoft.svn.core.wc.SVNCommitClient;
 import org.tmatesoft.svn.core.wc.SVNWCClient;
 
@@ -66,7 +65,7 @@ public class MkDirCommand extends SVNCommand {
     private void createRemoteDirectories(final PrintStream out, PrintStream err) throws SVNException {
         final Collection urls = new ArrayList();
         for (int i = 0; i < getCommandLine().getURLCount(); i++) {
-            if (matchTabsInURL(getCommandLine().getURL(i), err)) {
+            if (matchTabsInPath(getCommandLine().getURL(i), err)) {
                 continue;
             }
             urls.add(getCommandLine().getURL(i));
@@ -78,11 +77,7 @@ public class MkDirCommand extends SVNCommand {
         getClientManager().setEventHandler(new SVNCommandEventProcessor(out, err, false));
         SVNCommitClient client = getClientManager().getCommitClient();
         String[] paths = (String[]) urls.toArray(new String[urls.size()]);
-        SVNURL[] svnURLs = new SVNURL[paths.length];
-        for (int i = 0; i < svnURLs.length; i++) {
-            svnURLs[i] = SVNURL.parseURIEncoded(paths[i]);
-        }
-        SVNCommitInfo info = client.doMkDir(svnURLs, message == null ? "" : message);
+        SVNCommitInfo info = client.doMkDir(paths, message == null ? "" : message);
         if (info != SVNCommitInfo.NULL) {
             out.println();
             out.println("Committed revision " + info.getNewRevision() + ".");

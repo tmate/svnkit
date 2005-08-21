@@ -1,7 +1,7 @@
 package de.regnis.q.sequence.line;
 
-import java.io.*;
 import java.util.*;
+import java.io.*;
 
 /**
  * @author Marc Strapetz
@@ -35,10 +35,6 @@ final class QSequenceLineMemoryCache implements QSequenceLineCache {
 
 	public int getLineCount() {
 		return lines.size();
-	}
-
-	public int getLineHash(int index) {
-		return 0;
 	}
 
 	public QSequenceLine getLine(int index) {

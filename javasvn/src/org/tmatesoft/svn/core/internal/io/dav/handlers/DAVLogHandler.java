@@ -20,7 +20,8 @@ import org.tmatesoft.svn.core.ISVNLogEntryHandler;
 import org.tmatesoft.svn.core.SVNLogEntry;
 import org.tmatesoft.svn.core.SVNLogEntryPath;
 import org.tmatesoft.svn.core.internal.io.dav.DAVElement;
-import org.tmatesoft.svn.core.internal.util.SVNTimeUtil;
+import org.tmatesoft.svn.core.internal.io.dav.DAVUtil;
+import org.tmatesoft.svn.util.TimeUtil;
 import org.xml.sax.Attributes;
 
 
@@ -73,13 +74,12 @@ public class DAVLogHandler extends BasicDAVHandler {
 	private SVNLogEntryPathEx myPath;
 
 	private int myCount;
-    private long myLimit;
 
-	public DAVLogHandler(ISVNLogEntryHandler handler, long limit) {
+
+	public DAVLogHandler(ISVNLogEntryHandler handler) {
 		myLogEntryHandler = handler;
 		myRevision = -1;
 		myCount = 0;
-        myLimit = limit;
 		init();
 	}
 	
@@ -111,15 +111,13 @@ public class DAVLogHandler extends BasicDAVHandler {
 	protected void endElement(DAVElement parent, DAVElement element, StringBuffer cdata) {
 		if (element == LOG_ITEM) {
 			myCount++;
-            if (myLimit <= 0 || myCount <= myLimit) {
-    			if (myLogEntryHandler != null) {
-    				if (myPaths == null) {
-    					myPaths = new HashMap();
-    				}
-    				SVNLogEntry logEntry = new SVNLogEntry(myPaths, myRevision, myAuthor, myDate, myComment);
-    				myLogEntryHandler.handleLogEntry(logEntry);
-    			}
-            }
+			if (myLogEntryHandler != null) {
+				if (myPaths == null) {
+					myPaths = new HashMap();
+				}
+				SVNLogEntry logEntry = new SVNLogEntry(myPaths, myRevision, myAuthor, myDate, myComment);
+				myLogEntryHandler.handleLogEntry(logEntry);
+			}
 			myPaths = null;
 			myRevision = -1;
 			myAuthor = null;
@@ -129,10 +127,12 @@ public class DAVLogHandler extends BasicDAVHandler {
 			myRevision = Long.parseLong(cdata.toString());
 		} else if (element == DAVElement.CREATOR_DISPLAY_NAME && cdata != null) {
 			myAuthor = cdata.toString();
+            myAuthor = DAVUtil.xmlDecode(myAuthor);
 		} else if (element == DAVElement.COMMENT && cdata != null) {
 			myComment = cdata.toString();
+            myComment = DAVUtil.xmlDecode(myComment);
 		} else if (element == DAVElement.DATE && cdata != null) {
-			myDate = SVNTimeUtil.parseDate(cdata.toString());
+			myDate = TimeUtil.parseDate(cdata.toString());
 		} else if (element == ADDED_PATH || element == MODIFIED_PATH || element == REPLACED_PATH ||
 				element == DELETED_PATH) {
 			if (myPath != null && cdata != null) {

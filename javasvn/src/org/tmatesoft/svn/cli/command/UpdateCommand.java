@@ -18,11 +18,11 @@ import java.io.PrintStream;
 import org.tmatesoft.svn.cli.SVNArgument;
 import org.tmatesoft.svn.cli.SVNCommand;
 import org.tmatesoft.svn.core.SVNException;
-import org.tmatesoft.svn.core.internal.util.SVNFormatUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNWCAccess;
 import org.tmatesoft.svn.core.wc.SVNRevision;
 import org.tmatesoft.svn.core.wc.SVNUpdateClient;
-import org.tmatesoft.svn.util.SVNDebugLog;
+import org.tmatesoft.svn.util.DebugLog;
+import org.tmatesoft.svn.util.SVNUtil;
 
 /**
  * @author TMate Software Ltd.
@@ -34,6 +34,7 @@ public class UpdateCommand extends SVNCommand {
         for (int i = 0; i < getCommandLine().getPathCount(); i++) {
             final String path;
             path = getCommandLine().getPathAt(i);
+            DebugLog.log("updating path: " + path);
 
             SVNRevision revision = parseRevision(getCommandLine());
             if (!revision.isValid()) {
@@ -47,7 +48,7 @@ public class UpdateCommand extends SVNCommand {
                 File parent = file.getParentFile();
                 if (!parent.exists() || !SVNWCAccess.isVersionedDirectory(parent)) {
                     if (!getCommandLine().hasArgument(SVNArgument.QUIET)) {
-                        println(out, "Skipped '" +  SVNFormatUtil.formatPath(file).replace('/', File.separatorChar) + "'");
+                        println(out, "Skipped '" +  SVNUtil.getPath(file).replace('/', File.separatorChar) + "'");
                     }
                     return;
                 }
@@ -55,7 +56,8 @@ public class UpdateCommand extends SVNCommand {
             try {
                 updater.doUpdate(file.getAbsoluteFile(), revision, !getCommandLine().hasArgument(SVNArgument.NON_RECURSIVE));
             } catch (Throwable th) {
-                SVNDebugLog.logInfo(th);
+                DebugLog.log("exception caught: " + th);
+                DebugLog.error(th);
                 println(err, th.getMessage());
                 println(err);
                 error = true;

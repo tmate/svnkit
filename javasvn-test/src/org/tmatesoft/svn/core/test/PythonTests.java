@@ -1,7 +1,7 @@
 /*
  * ====================================================================
  * Copyright (c) 2004 TMate Software Ltd.  All rights reserved.
- *
+" *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
  * are also available at http://tmate.org/svn/license.html.
@@ -29,7 +29,7 @@ import java.util.List;
 import java.util.Properties;
 import java.util.StringTokenizer;
 
-import org.tmatesoft.svn.util.SVNDebugLog;
+import org.tmatesoft.svn.util.DebugLog;
 
 /**
  * @author TMate Software Ltd.
@@ -38,13 +38,10 @@ public class PythonTests {
 
 	private static File ourPropertiesFile;
     private static Process ourSVNServer;
-    
-    private static AbstractPythonTestLogger[] ourLoggers; 
 
-    public static void main(String[] args) {
+	public static void main(String[] args) {
 		String fileName = args[0];
 		ourPropertiesFile = new File(fileName);
-        ourLoggers = new AbstractPythonTestLogger[] {new ConsoleLogger(), new XMLLogger()};
 
 		Properties properties = null;
 		String defaultTestSuite = null;
@@ -55,62 +52,37 @@ public class PythonTests {
 			System.out.println("can't load properties, exiting");
 			System.exit(1);
 		}
-        
-        for (int i = 0; i < ourLoggers.length; i++) {
-            try{
-                ourLoggers[i].startTests(properties);
-            }catch(IOException ioe){
-                ioe.getMessage();
-                ioe.printStackTrace();
-                System.exit(1);
-            }
-        }
 
-        String pythonTestsRoot = properties.getProperty("python.tests");
+
+		String pythonTestsRoot = properties.getProperty("python.tests");
 		properties.setProperty("repository.root", new File(pythonTestsRoot).getAbsolutePath());
 		String url = "svn://localhost";
 		if (Boolean.TRUE.toString().equals(properties.getProperty("python.svn"))) {
 			try {
 				startSVNServe(properties);
-                for (int i = 0; i < ourLoggers.length; i++) {
-                    ourLoggers[i].startServer("svnserve", url);
-                }
 				runPythonTests(properties, defaultTestSuite, url);
 			} catch (Throwable th) {
 				th.printStackTrace();
 			} finally {
 				stopSVNServe();
-                for (int i = 0; i < ourLoggers.length; i++) {
-                    ourLoggers[i].endServer("svnserve", url);
-                }
 			}
 		}
-
 		if (Boolean.TRUE.toString().equals(properties.getProperty("python.http"))) {
 			url = "http://localhost:" + properties.getProperty("apache.port", "8082");
 			properties.setProperty("apache.conf", "apache/python.template.conf");
 			try {
 				startApache(properties);
-			    for (int i = 0; i < ourLoggers.length; i++) {
-                    ourLoggers[i].startServer("apache", url);
-                }
 				runPythonTests(properties, defaultTestSuite, url);
 			} catch (Throwable th) {
 				th.printStackTrace();
 			} finally {
 				try {
 					stopApache(properties);
-                    for (int i = 0; i < ourLoggers.length; i++) {
-                        ourLoggers[i].endServer("apache", url);
-                    }
-                } catch (Throwable th) {
+				} catch (Throwable th) {
 					th.printStackTrace();
 				}
 			}
 		}
-        for (int i = 0; i < ourLoggers.length; i++) {
-            ourLoggers[i].endTests(properties);
-        }
 	}
 
 	private static void runPythonTests(Properties properties, String defaultTestSuite, String url) throws IOException {
@@ -122,12 +94,7 @@ public class PythonTests {
 			final String testFileString = tests.nextToken();
 			List tokens = tokenizeTestFileString(testFileString);
 
-            String suiteName = (String) tokens.get(0);
-			for (int i = 0; i < ourLoggers.length; i++) {
-                ourLoggers[i].startSuite(suiteName);
-            }
-			
-			final String testFile = suiteName + "_tests.py";
+			final String testFile = tokens.get(0) + "_tests.py";
 			tokens = tokens.subList(1, tokens.size());
 
 			if (tokens.isEmpty()) {
@@ -135,7 +102,7 @@ public class PythonTests {
 				processTestCase(pythonLauncher, testFile, options, "", url);
 			}
 			else {
-			    final List availabledTestCases = getAvailableTestCases(pythonLauncher, testFile);
+				final List availabledTestCases = getAvailableTestCases(pythonLauncher, testFile);
 				final List testCases = combineTestCases(tokens, availabledTestCases);
 
 				System.out.println("PROCESSING " + testFile + " " + testCases);
@@ -144,9 +111,6 @@ public class PythonTests {
 					processTestCase(pythonLauncher, testFile, options, String.valueOf(testCase), url);
 				}
 			}
-            for (int i = 0; i < ourLoggers.length; i++) {
-                ourLoggers[i].endSuite(suiteName);
-            }
 		}
 	}
 
@@ -301,19 +265,19 @@ public class PythonTests {
 		}
 
 		public void run() {
-		    try {
+			try {
 				String line;
 				while ((line = myInputStream.readLine()) != null) {
-					SVNDebugLog.logInfo(line);
-                    PythonTestResult testResult = PythonTestResult.parse(line);
-                    if (testResult != null) {
-                        for (int i = 0; i < ourLoggers.length; i++) {
-                            ourLoggers[i].handleTest(testResult);
-                        }
-                    }
+					DebugLog.logInfo(line);
 					if (myHelpStream != null) {
 						myHelpStream.println(line);
 						myHelpStream.flush();
+					}
+					System.err.flush();
+					System.out.flush();
+
+					if (line != null && (line.startsWith("PASS: ") || line.startsWith("FAIL: "))) {
+						System.out.println(line);
 					}
 				}
 			}

@@ -13,16 +13,16 @@ package org.tmatesoft.svn.core.internal.io.svn;
 
 import java.io.BufferedInputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.util.List;
 
 import org.tmatesoft.svn.core.SVNAuthenticationException;
 import org.tmatesoft.svn.core.SVNException;
-import org.tmatesoft.svn.core.SVNURL;
 import org.tmatesoft.svn.core.auth.ISVNAuthenticationManager;
 import org.tmatesoft.svn.core.auth.SVNPasswordAuthentication;
-import org.tmatesoft.svn.util.SVNDebugLog;
+import org.tmatesoft.svn.core.io.SVNRepositoryLocation;
+import org.tmatesoft.svn.util.DebugLog;
+import org.tmatesoft.svn.util.LoggingInputStream;
+import org.tmatesoft.svn.util.LoggingOutputStream;
 
 /**
  * @version 1.0
@@ -32,11 +32,11 @@ class SVNConnection {
 
     private final ISVNConnector myConnector;
     private ISVNAuthenticationManager myAuthManager;
-    private SVNURL myLocation;
+    private SVNRepositoryLocation myLocation;
     private String myRealm;
     private String myRoot;
-    private OutputStream myOutputStream;
-    private InputStream myInputStream;
+    private LoggingOutputStream myOutputStream;
+    private LoggingInputStream myInputStream;
 
     private static final String SUCCESS = "success";
     private static final String FAILURE = "failure";
@@ -44,7 +44,7 @@ class SVNConnection {
     private static final String EDIT_PIPELINE = "edit-pipeline";
 
     public SVNConnection(ISVNConnector connector,
-            SVNURL location, ISVNAuthenticationManager manager) {
+            SVNRepositoryLocation location, ISVNAuthenticationManager manager) {
         myConnector = connector;
         myAuthManager = manager;
         myLocation = location;
@@ -71,7 +71,6 @@ class SVNConnection {
     }
 
     private boolean myIsCredentialsReceived = false;
-    private InputStream myLoggingInputStream;
 
     public void authenticate(SVNRepositoryImpl repository) throws SVNException {
         // use provider to get creds.
@@ -108,10 +107,10 @@ class SVNConnection {
                                 + myLocation.getPort() + "> " + realm;
                     }
                     if (auth == null && myAuthManager != null) {
-                        auth = (SVNPasswordAuthentication) myAuthManager.getFirstAuthentication(ISVNAuthenticationManager.PASSWORD, realm, myLocation);
+                        auth = (SVNPasswordAuthentication) myAuthManager.getFirstAuthentication(ISVNAuthenticationManager.PASSWORD, realm);
                     } else if (myAuthManager != null) {
                         myAuthManager.acknowledgeAuthentication(false, ISVNAuthenticationManager.PASSWORD, realm, failureReason, auth);
-                        auth = (SVNPasswordAuthentication) myAuthManager.getNextAuthentication(ISVNAuthenticationManager.PASSWORD, realm, myLocation);
+                        auth = (SVNPasswordAuthentication) myAuthManager.getNextAuthentication(ISVNAuthenticationManager.PASSWORD, realm);
                     }
                     if (auth == null || auth.getUserName() == null || auth.getPassword() == null) {
                         failureReason = "no credentials for '" + mech + "'";
@@ -127,8 +126,9 @@ class SVNConnection {
                                 Object[] creds = read("[(S?S)]", null);
                                 if (creds != null && creds.length == 2
                                         && creds[0] != null && creds[1] != null) {
-                                    SVNURL rootURL = SVNURL.parseURIEncoded((String) creds[1]); 
-                                    repository.updateCredentials((String) creds[0], rootURL);
+                                    repository.updateCredentials(
+                                            (String) creds[0],
+                                            (String) creds[1]);
                                     if (myRealm == null) {
                                         myRealm = (String) creds[0];
                                     }
@@ -141,12 +141,15 @@ class SVNConnection {
                             failureReason = new String((byte[]) items[1]);
                             break;
                         } else if (STEP.equals(items[0])) {
-                            byte[] response = authenticator.buildChallengeReponse((byte[]) items[1]);
+                            byte[] response = authenticator
+                                    .buildChallengeReponse((byte[]) items[1]);
                             try {
                                 getOutputStream().write(response);
                             } catch (IOException e) {
                                 throw new SVNException(e);
-                            } 
+                            } finally {
+                                getOutputStream().log();
+                            }
                         }
                     }
                 }
@@ -166,8 +169,8 @@ class SVNConnection {
                 Object[] creds = read("[(?S?S)]", null);
                 if (repository != null
                         && repository.getRepositoryRoot() == null) {
-                    SVNURL rootURL = creds[1] != null ? SVNURL.parseURIEncoded((String) creds[1]) : null; 
-                    repository.updateCredentials((String) creds[0], rootURL);
+                    repository.updateCredentials((String) creds[0],
+                            (String) creds[1]);
                 }
                 if (myRealm == null) {
                     myRealm = (String) creds[0];
@@ -185,9 +188,6 @@ class SVNConnection {
     }
 
     public void close() throws SVNException {
-        myInputStream = null;
-        myLoggingInputStream = null;
-        myOutputStream = null;
         myConnector.close();
     }
 
@@ -195,7 +195,7 @@ class SVNConnection {
         try {
             return SVNReader.parse(getInputStream(), template, items);
         } finally {
-            SVNDebugLog.flushStream(myLoggingInputStream);
+            getInputStream().log();
         }
     }
 
@@ -210,14 +210,15 @@ class SVNConnection {
             } catch (SVNException e) {
                 //
             }
-            SVNDebugLog.flushStream(getOutputStream());
+            getOutputStream().log();
         }
     }
 
-    public OutputStream getOutputStream() throws SVNException {
+    public LoggingOutputStream getOutputStream() throws SVNException {
         if (myOutputStream == null) {
             try {
-                myOutputStream = SVNDebugLog.createLogStream(myConnector.getOutputStream());
+                return myOutputStream = DebugLog.getLoggingOutputStream("svn",
+                        myConnector.getOutputStream());
             } catch (IOException ex) {
                 throw new SVNException(ex);
             }
@@ -225,12 +226,12 @@ class SVNConnection {
         return myOutputStream;
     }
 
-    public InputStream getInputStream() throws SVNException {
+    public LoggingInputStream getInputStream() throws SVNException {
         if (myInputStream == null) {
             try {
-                myInputStream = SVNDebugLog.createLogStream(new BufferedInputStream(myConnector.getInputStream()));
-                myLoggingInputStream = myInputStream;
-                myInputStream = new RollbackInputStream(myInputStream);
+                myInputStream = DebugLog.getLoggingInputStream("svn",
+                        new RollbackInputStream(new BufferedInputStream(
+                                myConnector.getInputStream())));
             } catch (IOException ex) {
                 throw new SVNException(ex);
             }

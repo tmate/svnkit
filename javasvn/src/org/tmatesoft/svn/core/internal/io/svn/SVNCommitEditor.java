@@ -19,12 +19,13 @@ import java.util.Date;
 
 import org.tmatesoft.svn.core.SVNCommitInfo;
 import org.tmatesoft.svn.core.SVNException;
-import org.tmatesoft.svn.core.internal.util.SVNEncodingUtil;
-import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
 import org.tmatesoft.svn.core.io.ISVNEditor;
 import org.tmatesoft.svn.core.io.ISVNWorkspaceMediator;
+import org.tmatesoft.svn.core.io.SVNRepositoryLocation;
 import org.tmatesoft.svn.core.io.diff.SVNDiffWindow;
 import org.tmatesoft.svn.core.io.diff.SVNDiffWindowBuilder;
+import org.tmatesoft.svn.util.DebugLog;
+import org.tmatesoft.svn.util.PathUtil;
 
 /**
  * @version 1.0
@@ -62,9 +63,9 @@ class SVNCommitEditor implements ISVNEditor {
     }
 
     public void openRoot(long revision) throws SVNException {
-        myCurrentPath = "";
+        myCurrentPath = "/";
         myConnection.write("(w((n)s))", new Object[] { "open-root",
-                getRevisionObject(revision), "" });
+                getRevisionObject(revision), "/" });
     }
 
     public void deleteEntry(String path, long revision) throws SVNException {
@@ -75,8 +76,16 @@ class SVNCommitEditor implements ISVNEditor {
     public void addDir(String path, String copyFromPath, long copyFromRevision)
             throws SVNException {
         if (copyFromPath != null) {
-            String rootURL = myRepository.getRepositoryRoot().toString();
-            copyFromPath = SVNPathUtil.append(rootURL, SVNEncodingUtil.uriEncode(myRepository.getRepositoryPath(copyFromPath)));
+            SVNRepositoryLocation location = myRepository.getLocation();
+            String host = myRepository.getFullRoot();
+            if (host == null) {
+                host = location.getProtocol() + "://" + location.getHost()
+                        + ":" + location.getPort();
+                host = PathUtil.append(host, PathUtil.encode(myRepository
+                        .getRepositoryRoot()));
+            }
+            copyFromPath = PathUtil.append(host, PathUtil.encode(myRepository
+                    .getRepositoryPath(copyFromPath)));
             myConnection.write("(w(sss(sn)))", new Object[] { "add-dir", path,
                     myCurrentPath, path, copyFromPath,
                     getRevisionObject(copyFromRevision) });
@@ -108,8 +117,16 @@ class SVNCommitEditor implements ISVNEditor {
     public void addFile(String path, String copyFromPath, long copyFromRevision)
             throws SVNException {
         if (copyFromPath != null) {
-            String host = myRepository.getRepositoryRoot().toString();
-            copyFromPath = SVNPathUtil.append(host, SVNEncodingUtil.uriEncode(myRepository.getRepositoryPath(copyFromPath)));
+            SVNRepositoryLocation location = myRepository.getLocation();
+            String host = myRepository.getFullRoot();
+            if (host == null) {
+                host = location.getProtocol() + "://" + location.getHost()
+                        + ":" + location.getPort();
+                host = PathUtil.append(host, PathUtil.encode(myRepository
+                        .getRepositoryRoot()));
+            }
+            copyFromPath = PathUtil.append(host, PathUtil.encode(myRepository
+                    .getRepositoryPath(copyFromPath)));
             myConnection.write("(w(sss(sn)))", new Object[] { "add-file", path,
                     myCurrentPath, path, copyFromPath,
                     getRevisionObject(copyFromRevision) });
@@ -155,6 +172,7 @@ class SVNCommitEditor implements ISVNEditor {
                         path, source });
                 is.close();
             }
+            DebugLog.log("new data sent" + length);
         } catch (IOException e) {
             throw new SVNException();
         } finally {
@@ -172,6 +190,7 @@ class SVNCommitEditor implements ISVNEditor {
     public void closeFile(String path, String textChecksum) throws SVNException {
         myConnection.write("(w(s(s)))", new Object[] { "close-file", path,
                 textChecksum });
+        // myCurrentPath = computeParentPath(myCurrentPath);
     }
 
     public SVNCommitInfo closeEdit() throws SVNException {
@@ -194,7 +213,7 @@ class SVNCommitEditor implements ISVNEditor {
     }
 
     private static String computeParentPath(String path) {
-        return SVNPathUtil.removeTail(path);
+        return PathUtil.removeTail(path);
     }
 
     private static Long getRevisionObject(long rev) {

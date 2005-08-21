@@ -15,8 +15,6 @@ package org.tmatesoft.svn.core.io.diff;
 import java.io.IOException;
 import java.io.InputStream;
 
-import org.tmatesoft.svn.core.SVNException;
-
 
 /**
  * @version 1.0
@@ -24,11 +22,9 @@ import org.tmatesoft.svn.core.SVNException;
  */
 public interface ISVNRAData {
     
-    public InputStream readAll() throws SVNException;
+    public InputStream read(long offset, long length) throws IOException;
     
-    public InputStream read(long offset, long length) throws SVNException;
-    
-    public void append(InputStream source, long length) throws SVNException;
+    public void append(InputStream source, long length) throws IOException;
     
     public long length();
     

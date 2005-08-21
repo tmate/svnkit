@@ -109,28 +109,22 @@ public class QSequenceDifferenceAssemblyTest extends TestCase {
 	private static String createLine(Random random) {
 		String line = "";
 		for (int charIndex = 0; charIndex < LINE_LENGTH; charIndex++) {
-			line += String.valueOf((char)('a' + (char)(Math.abs(random.nextInt()) % ALPHABET_SIZE)));
+			line += (char)('a' + (char)(Math.abs(random.nextInt()) % ALPHABET_SIZE));
 		}
 		return line;
 	}
 
 	private void testDiff(String[] left, String[] right) throws QSequenceException {
-		testDiff(left, right, Integer.MAX_VALUE);
-		testDiff(left, right, (int)Math.sqrt(left.length + right.length));
-		testDiff(left, right, 2);
-	}
-
-	private void testDiff(String[] left, String[] right, int maximumSearchDepth) throws QSequenceException {
 		final QSequenceTestMedia testMedia = QSequenceTestMedia.createStringMedia(left, right);
-		testDiff(left, right, testMedia, new QSequenceMediaDummyIndexTransformer(testMedia.getLeftLength(), testMedia.getRightLength()), null, maximumSearchDepth);
+		testDiff(left, right, testMedia, new QSequenceMediaDummyIndexTransformer(testMedia.getLeftLength(), testMedia.getRightLength()), null);
 
 		final QSequenceCachingMedia cachingMedia = new QSequenceCachingMedia(testMedia, new QSequenceDummyCanceller());
 		final QSequenceDiscardingMedia media = new QSequenceDiscardingMedia(cachingMedia, new QSequenceDiscardingMediaNoConfusionDectector(true), new QSequenceDummyCanceller());
-		testDiff(left, right, media, media, cachingMedia, maximumSearchDepth);
+		testDiff(left, right, media, media, cachingMedia);
 	}
 
-	private void testDiff(String[] left, String[] right, QSequenceMedia media, QSequenceMediaIndexTransformer indexTransformer, QSequenceCachingMedia cachingMedia, int maximumSearchDepth) throws QSequenceException {
-		final List blocks = new QSequenceDifference(media, indexTransformer, maximumSearchDepth).getBlocks();
+	private void testDiff(String[] left, String[] right, QSequenceMedia media, QSequenceMediaIndexTransformer indexTransformer, QSequenceCachingMedia cachingMedia) throws QSequenceException {
+		final List blocks = new QSequenceDifference(media, indexTransformer).getBlocks();
 		if (cachingMedia != null) {
 			new QSequenceDifferenceBlockShifter(cachingMedia, cachingMedia).shiftBlocks(blocks);
 		}

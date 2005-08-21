@@ -18,7 +18,6 @@ import java.io.InputStream;
 import java.io.RandomAccessFile;
 
 import org.tmatesoft.svn.core.SVNException;
-import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 
 /**
@@ -28,47 +27,39 @@ import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 public class SVNRAFileData implements ISVNRAData {
 
     private RandomAccessFile myFile;
+
     private File myRawFile;
+
+    private byte[] myBuffer;
+
     private boolean myIsReadonly;
 
     public SVNRAFileData(File file, boolean readonly) {
         myRawFile = file;
         myIsReadonly = readonly;
     }
-    
-    public InputStream readAll() throws SVNException {
-        return SVNFileUtil.openFileForReading(myRawFile);
-    }
 
-    public InputStream read(final long offset, final long length) throws SVNException {
+    public InputStream read(final long offset, final long length)
+            throws IOException {
         byte[] resultingArray = new byte[(int) length];
-        int read = 0;
-        try {
-            getRAFile().seek(offset);
-            read = getRAFile().read(resultingArray);
-        } catch (IOException e) {
-            SVNErrorManager.error(e.getMessage());
-        } 
+        getRAFile().seek(offset);
+        int read = getRAFile().read(resultingArray);
         for (int i = read; i < length; i++) {
             resultingArray[i] = resultingArray[i - read];
         }
-        return new LocalInputStream(resultingArray);
+        return new ByteArrayInputStream(resultingArray);
     }
 
-    public void append(InputStream source, long length) throws SVNException {
-        try {
-            getRAFile().seek(getRAFile().length());
-            if (source instanceof LocalInputStream) {
-                byte[] bytes = ((LocalInputStream) source).getBuffer();
-                getRAFile().write(bytes, 0, (int) length);
-            } else {
-                byte[] bytes = new byte[(int) length];
-                source.read(bytes, 0, (int) length);
-                getRAFile().write(bytes, 0, (int) length);
-            }
-        } catch (IOException e) {
-            SVNErrorManager.error(e.getMessage());
-        } 
+    public void append(InputStream source, long length) throws IOException {
+        int lLength = (int) length;
+        if (myBuffer == null || myBuffer.length < length) {
+            myBuffer = new byte[lLength];
+        }
+
+        int read;
+        read = source.read(myBuffer, 0, lLength);
+        getRAFile().seek(getRAFile().length());
+        getRAFile().write(myBuffer, 0, read);
     }
 
     public void close() throws IOException {
@@ -92,7 +83,8 @@ public class SVNRAFileData implements ISVNRAData {
             if (!myRawFile.exists()) {
                 myRawFile.getParentFile().mkdirs();
                 myRawFile.createNewFile();
-            } else if (!myIsReadonly) {
+            }
+            if (!myIsReadonly) {
                 try {
                     SVNFileUtil.setReadonly(myRawFile, false);
                 } catch (SVNException e) {
@@ -102,17 +94,5 @@ public class SVNRAFileData implements ISVNRAData {
             myFile = new RandomAccessFile(myRawFile, myIsReadonly ? "r" : "rw");
         }
         return myFile;
-    }
-
-    private static class LocalInputStream extends ByteArrayInputStream {
-
-        public LocalInputStream(byte[] buffer) {
-            super(buffer);
-        }
-        
-        public byte[] getBuffer() {
-            return buf;
-        }
-        
     }
 }

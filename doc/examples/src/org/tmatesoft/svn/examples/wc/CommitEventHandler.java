@@ -62,6 +62,9 @@ public class CommitEventHandler implements ISVNEventHandler {
                 System.out.println("Adding         "
                         + event.getPath());
             }
+        } else if (action == SVNEventAction.COPY){
+            System.out.println("A  +  " + event.getPath());
+            return;
         }
 
     }

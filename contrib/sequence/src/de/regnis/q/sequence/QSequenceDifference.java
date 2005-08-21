@@ -28,15 +28,10 @@ public class QSequenceDifference
 	private final QSequenceMediaIndexTransformer indexTransformer;
 	private final boolean[] leftCommonPoints;
 	private final boolean[] rightCommonPoints;
-	private final int maximumSearchDepth;
 
 	// Setup ==================================================================
 
 	public QSequenceDifference(QSequenceMedia media, QSequenceMediaIndexTransformer indexTransformer) {
-		this(media, indexTransformer, Integer.MAX_VALUE);
-	}
-
-	public QSequenceDifference(QSequenceMedia media, QSequenceMediaIndexTransformer indexTransformer, int maximumSearchDepth) {
 		QSequenceAssert.assertNotNull(media);
 		QSequenceAssert.assertNotNull(indexTransformer);
 
@@ -44,7 +39,6 @@ public class QSequenceDifference
 		this.indexTransformer = indexTransformer;
 		this.leftCommonPoints = new boolean[indexTransformer.getMediaLeftLength()];
 		this.rightCommonPoints = new boolean[indexTransformer.getMediaRightLength()];
-		this.maximumSearchDepth = maximumSearchDepth;
 	}
 
 	// Implemented ============================================================
@@ -72,7 +66,7 @@ public class QSequenceDifference
 	// Accessing ==============================================================
 
 	public List getBlocks() throws QSequenceException {
-		final QSequenceAlgorithm algorithm = new QSequenceAlgorithm(media, this, maximumSearchDepth);
+		final QSequenceAlgorithm algorithm = new QSequenceAlgorithm(media, this);
 		algorithm.produceSnakesInOrder();
 		return QSequenceCommonBlocks.createBlocks(leftCommonPoints, rightCommonPoints, this);
 	}

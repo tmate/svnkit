@@ -28,9 +28,10 @@ import org.tmatesoft.svn.core.SVNDirEntry;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNLock;
 import org.tmatesoft.svn.core.SVNNodeKind;
-import org.tmatesoft.svn.core.internal.util.SVNTimeUtil;
 import org.tmatesoft.svn.core.io.ISVNEditor;
-import org.tmatesoft.svn.util.SVNDebugLog;
+import org.tmatesoft.svn.util.DebugLog;
+import org.tmatesoft.svn.util.LoggingInputStream;
+import org.tmatesoft.svn.util.TimeUtil;
 
 /**
  * @author Alexander Kitaev
@@ -39,7 +40,7 @@ class SVNReader {
 
     public static Date getDate(Object[] items, int index) {
         String str = getString(items, index);
-        return SVNTimeUtil.parseDate(str);
+        return TimeUtil.parseDate(str);
     }
 
     public static long getLong(Object[] items, int index) {
@@ -159,7 +160,7 @@ class SVNReader {
      * 
      */
 
-    public static Object[] parse(InputStream is, String templateStr, Object[] target) throws SVNException {
+    public static Object[] parse(LoggingInputStream is, String templateStr, Object[] target) throws SVNException {
         if (!is.markSupported()) {
             throw new SVNException(
                     "SVNReader works only with markable input streams");
@@ -297,9 +298,11 @@ class SVNReader {
                 } else if (ch == '(') {
                     readChar(is, '(');
                 } else if (ch == 'd') {
-                    result = readDirEntry(new RollbackInputStream(is));
+                    result = readDirEntry(DebugLog.getLoggingInputStream("svn",
+                            new RollbackInputStream(is)));
                 } else if (ch == 'f') {
-                    result = readStatEntry(new RollbackInputStream(is));
+                    result = readStatEntry(DebugLog.getLoggingInputStream(
+                            "svn", new RollbackInputStream(is)));
                 } else if (ch == 'e') {
                     if (editorBaton == null) {
                         editorBaton = new SVNEditModeReader();
@@ -315,7 +318,7 @@ class SVNReader {
                         hasMore = editorBaton.processCommand(commandName, is);
                     } catch (Throwable th) {
                         unconditionalThrow = true;
-                        SVNDebugLog.logInfo(th);
+                        DebugLog.error(th);
                         if (th instanceof SVNException) {
                             throw ((SVNException) th);
                         }
@@ -335,7 +338,8 @@ class SVNReader {
                                         + word + "' read.");
                     }
                 } else if (ch == 'l') {
-                    result = readLock(new RollbackInputStream(is));
+                    result = readLock(DebugLog.getLoggingInputStream("svn",
+                            new RollbackInputStream(is)));
                 }
                 if (doRead) {
                     target = reportResult(target, targetIndex, result, multiple);
@@ -637,33 +641,39 @@ class SVNReader {
         return errorMessage;
     }
 
-    private static SVNDirEntry readDirEntry(InputStream is) throws SVNException {
+    private static SVNDirEntry readDirEntry(LoggingInputStream is)
+            throws SVNException {
         Object[] items = SVNReader.parse(is, "(SWNTN(?S)(?S))", null);
+        is.log();
 
         String name = SVNReader.getString(items, 0);
         SVNNodeKind kind = SVNNodeKind.parseKind(SVNReader.getString(items, 1));
         long size = SVNReader.getLong(items, 2);
         boolean hasProps = SVNReader.getBoolean(items, 3);
         long revision = SVNReader.getLong(items, 4);
-        Date date = items[5] != null ? SVNTimeUtil.parseDate(SVNReader.getString(items, 5)) : null;
+        Date date = items[5] != null ? TimeUtil.parseDate(SVNReader.getString(items, 5)) : null;
         String author = SVNReader.getString(items, 6);
-        return new SVNDirEntry(name, kind, size, hasProps, revision, date, author);
+        return new SVNDirEntry(name, kind, size, hasProps, revision, date,
+                author);
     }
 
-    private static SVNDirEntry readStatEntry(InputStream is) throws SVNException {
+    private static SVNDirEntry readStatEntry(LoggingInputStream is)
+            throws SVNException {
         Object[] items = SVNReader.parse(is, "(WNTN(?S)(?S))", null);
+        is.log();
 
         SVNNodeKind kind = SVNNodeKind.parseKind(SVNReader.getString(items, 0));
         long size = SVNReader.getLong(items, 1);
         boolean hasProps = SVNReader.getBoolean(items, 2);
         long revision = SVNReader.getLong(items, 3);
-        Date date = items[4] != null ? SVNTimeUtil.parseDate(SVNReader.getString(items, 4)) : null;
+        Date date = items[4] != null ? TimeUtil.parseDate(SVNReader.getString(items, 4)) : null;
         String author = SVNReader.getString(items, 5);
         return new SVNDirEntry(null, kind, size, hasProps, revision, date, author);
     }
 
-    private static SVNLock readLock(InputStream is) throws SVNException {
+    private static SVNLock readLock(LoggingInputStream is) throws SVNException {
         Object[] items = SVNReader.parse(is, "(SSS(?S)S(?S))", new Object[6]);
+        is.log();
 
         String path = (String) items[0];
         String id = (String) items[1];
@@ -671,9 +681,9 @@ class SVNReader {
         String comment = (String) items[3];
         String creationDate = (String) items[4];
         String expirationDate = (String) items[5];
-        Date created = creationDate != null ? SVNTimeUtil.parseDate(creationDate)
+        Date created = creationDate != null ? TimeUtil.parseDate(creationDate)
                 : null;
-        Date expires = expirationDate != null ? SVNTimeUtil
+        Date expires = expirationDate != null ? TimeUtil
                 .parseDate(expirationDate) : null;
 
         return new SVNLock(path, id, owner, comment, created, expires);

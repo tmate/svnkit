@@ -12,13 +12,15 @@
 
 package org.tmatesoft.svn.core.internal.io.dav.handlers;
 
-import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.OutputStream;
 
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.internal.io.dav.DAVElement;
-import org.tmatesoft.svn.core.internal.util.SVNBase64;
-import org.tmatesoft.svn.core.io.ISVNEditor;
+import org.tmatesoft.svn.core.io.diff.SVNDiffWindow;
 import org.tmatesoft.svn.core.io.diff.SVNDiffWindowBuilder;
+import org.tmatesoft.svn.util.Base64;
+import org.tmatesoft.svn.util.DebugLog;
 import org.xml.sax.SAXException;
 
 
@@ -33,18 +35,57 @@ public abstract class BasicDAVDeltaHandler extends BasicDAVHandler {
     private boolean myIsDeltaProcessing;
     private SVNDiffWindowBuilder myDiffBuilder;
     private StringBuffer myDeltaOutputStream;
-    private SequenceIntputStream myPreviousStream;
+    private byte[] myByteBuffer;
 
     protected void setDeltaProcessing(boolean processing) throws SVNException {
         myIsDeltaProcessing = processing;
-        myPreviousStream = null;
 
         if (!myIsDeltaProcessing) {
-            getEditor().textDeltaEnd(getCurrentPath());
+            SVNDiffWindow window = null;
+            OutputStream os = null;
+
+            myByteBuffer = Base64.base64ToByteArray(myDeltaOutputStream, myByteBuffer);
+            if (Base64.lastLength() == 4) {
+                try {
+                    handleDiffWindowClosed();
+                } catch (SVNException e) {
+                    DebugLog.error(e);
+                }
+                return;
+            }
+            int newOffset = myDiffBuilder.accept(myByteBuffer, 0);
+            window = myDiffBuilder.getDiffWindow();
+
+            while(window != null) {
+                try {
+                    os = handleDiffWindow(window);
+                    if (os != null) {
+                        os.write(myByteBuffer, newOffset, (int) window.getNewDataLength());
+                    }
+                } catch (IOException e) {
+                    throw new SVNException(e);
+                } finally {
+                    try {
+                        if (os != null) {
+                            os.close();
+                        }
+                    } catch (IOException e) {
+                        //
+                    }
+                }
+                newOffset = newOffset + (int) window.getNewDataLength();
+                if (newOffset < Base64.lastLength()) {
+                    myDiffBuilder.reset(1);
+                    newOffset = myDiffBuilder.accept(myByteBuffer, newOffset);
+                    window = myDiffBuilder.getDiffWindow();
+                } else {
+                    window = null;
+                }
+            }
+            handleDiffWindowClosed();
         } else {
             myDiffBuilder.reset();
             myDeltaOutputStream.delete(0, myDeltaOutputStream.length());
-            myPreviousStream = null;
         }
     }
     
@@ -53,16 +94,12 @@ public abstract class BasicDAVDeltaHandler extends BasicDAVHandler {
         myDeltaOutputStream = new StringBuffer();
         super.init();
     }
-    
-    private int eolCount;
 
     public void characters(char[] ch, int start, int length) throws SAXException {
         if (myIsDeltaProcessing) {
             int offset = start;
-            
             for(int i = start; i < start + length; i++) {
                 if (ch[i] == '\r' || ch[i] == '\n') {
-                    eolCount++;
                     myDeltaOutputStream.append(ch, offset, i - offset);
                     offset = i + 1;
                     if (i + 1 < (start + length) && ch[i + 1] == '\n') {
@@ -74,53 +111,12 @@ public abstract class BasicDAVDeltaHandler extends BasicDAVHandler {
             if (offset < start + length) {
                 myDeltaOutputStream.append(ch, offset, start + length - offset);
             }
-            // decode (those dividable by 4) 
-            int stored = myDeltaOutputStream.length();
-            if (stored < 4) {
-                return;
-            }
-            int segmentsCount = stored/4;
-            int remains = stored - (segmentsCount*4);
-            
-            StringBuffer toDecode = new StringBuffer();
-            toDecode.append(myDeltaOutputStream);
-            toDecode.delete(myDeltaOutputStream.length() - remains, myDeltaOutputStream.length());
-            
-            byte[] decoded = SVNBase64.base64ToByteArray(toDecode, null);
-            myPreviousStream = new SequenceIntputStream(decoded, myPreviousStream);
-            try {
-                while(true) {
-                    boolean needsMore = myDiffBuilder.accept(myPreviousStream, getEditor(), getCurrentPath());
-                    if (needsMore && myPreviousStream.available() > 0) {
-                        continue;
-                    }
-                    break;
-                }
-                // delete saved bytes.
-            } catch (SVNException e) {
-                throw new SAXException(e);
-            }
-            myDeltaOutputStream.delete(0, toDecode.length());
         } else {
             super.characters(ch, start, length);
         }
     }
 
-    protected abstract String getCurrentPath();
-
-    protected abstract ISVNEditor getEditor();
+    protected abstract OutputStream handleDiffWindow(SVNDiffWindow window) throws SVNException;
     
-    private static class SequenceIntputStream extends ByteArrayInputStream {
-        SequenceIntputStream(byte[] bytes, SequenceIntputStream previous) {
-            super(bytes);
-            if (previous != null && previous.available() > 0) {
-                byte[] realBytes = new byte[bytes.length + previous.available()];
-                System.arraycopy(previous.buf, previous.pos, realBytes, 0, previous.available());
-                System.arraycopy(bytes, 0, realBytes, previous.available(), bytes.length);
-                buf = realBytes;
-                count = buf.length;
-                pos = 0;
-            }
-        }
-    }
+    protected abstract void handleDiffWindowClosed() throws SVNException;
 }

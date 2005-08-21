@@ -9,8 +9,8 @@ final class QSequenceLineFileSystemCache implements QSequenceLineCache {
 
 	// Static =================================================================
 
-	public static QSequenceLineFileSystemCache create(QSequenceLineRAData data, File tempDirectory, byte[] customEolBytes, int maximumBytesInMemory, int maximumSegmentSize) throws IOException {
-		final QSequenceLineFileSystemCache cache = new QSequenceLineFileSystemCache(data, tempDirectory, maximumBytesInMemory, maximumSegmentSize);
+	public static QSequenceLineFileSystemCache create(QSequenceLineRAData data, File tempFile, byte[] customEolBytes) throws IOException {
+		final QSequenceLineFileSystemCache cache = new QSequenceLineFileSystemCache(data, tempFile);
 		final QSequenceLineReader reader = new QSequenceLineReader(customEolBytes);
 		final InputStream stream = data.read(0, data.length());
 		reader.read(stream, cache);
@@ -21,29 +21,39 @@ final class QSequenceLineFileSystemCache implements QSequenceLineCache {
 	// Fields =================================================================
 
 	private final QSequenceLineRAData data;
-	private final QSequenceLineFileSystemCacheSegments segments;
+	private final File indexFilePath;
+	private final RandomAccessFile indexFile;
 
 	private int lineCount;
 
 	// Setup ==================================================================
 
-	private QSequenceLineFileSystemCache(QSequenceLineRAData data, File tempDirectory, int maximumBytesInMemory, int maximumSegmentSize) {
+	private QSequenceLineFileSystemCache(QSequenceLineRAData data, File tempFile) throws IOException {
 		this.data = data;
-		this.segments = new QSequenceLineFileSystemCacheSegments(tempDirectory, maximumBytesInMemory, maximumSegmentSize);
+
+		if (tempFile.exists()) {
+			boolean deleted = tempFile.delete();
+			if (!deleted) {
+				throw new IOException("Couldn't delete file '" + tempFile + "'.");
+			}
+		}
+
+		this.indexFilePath = tempFile;
+		this.indexFile = new RandomAccessFile(tempFile, "rw");
+	}
+
+	// Accessing ==============================================================
+
+	public void close() throws IOException {
+		indexFile.close();
+		indexFilePath.delete();
 	}
 
 	// Implemented ============================================================
 
-	public void close() throws IOException {
-		segments.close();
-	}
-
 	public void addLine(QSequenceLine line) throws IOException {
-		segments.setFromLengthHash(lineCount, line.getFrom(), line.getLength(), new String(line.getBytes()).hashCode());
-		if (lineCount >= Integer.MAX_VALUE) {
-			throw new IOException("Too many lines."); 
-		}
-
+		indexFile.writeLong(line.getFrom());
+		indexFile.writeInt(line.getLength());
 		lineCount++;
 	}
 
@@ -52,14 +62,20 @@ final class QSequenceLineFileSystemCache implements QSequenceLineCache {
 	}
 
 	public QSequenceLine getLine(int index) throws IOException {
-		final long from = segments.getFrom(index);
-		final int length = segments.getLength(index);
+		indexFile.seek(index * (8 + 4));
+		final long from = indexFile.readLong();
+		final int length = indexFile.readInt();
+		final InputStream stream = data.read(from, length);
 		final byte[] bytes = new byte[length];
-		data.get(bytes, from, length);
-		return new QSequenceLine(from, bytes);
-	}
 
-	public int getLineHash(int index) throws IOException {
-		return segments.getHash(index);
+		int tempOffset = 0;
+		int tempLength = length;
+		for (; tempLength > 0;) {
+			final int readBytes = stream.read(bytes, tempOffset, tempLength);
+			tempOffset += readBytes;
+			tempLength -= readBytes;
+		}
+		stream.close();
+		return new QSequenceLine(from, bytes);
 	}
 }

@@ -47,7 +47,6 @@ public class SVNDirEntry implements Comparable {
     private Date myCreatedDate;
     private String myLastAuthor;
     private String myPath;
-    private String myCommitMessage;
 
     /**
      * Constructs an instance of <code>SVNDirEntry</code> given a directory entry's 
@@ -155,14 +154,6 @@ public class SVNDirEntry implements Comparable {
      */
     public void setName(String name) {
         myName = name;
-    }
-    
-    public String getCommitMessage() {
-        return myCommitMessage;
-    }
-    
-    public void setCommitMessage(String message) {
-        myCommitMessage = message;
     }
     
     /**

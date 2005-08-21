@@ -10,20 +10,21 @@
  */
 package org.tmatesoft.svn.core.internal.wc;
 
-import java.io.File;
+import org.tmatesoft.svn.core.SVNException;
+import org.tmatesoft.svn.core.SVNNodeKind;
+import org.tmatesoft.svn.core.io.ISVNWorkspaceMediator;
+import org.tmatesoft.svn.core.wc.SVNCommitItem;
+import org.tmatesoft.svn.util.PathUtil;
+import org.tmatesoft.svn.util.DebugLog;
+
+import java.io.OutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
+import java.io.File;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
-
-import org.tmatesoft.svn.core.SVNException;
-import org.tmatesoft.svn.core.SVNNodeKind;
-import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
-import org.tmatesoft.svn.core.io.ISVNWorkspaceMediator;
-import org.tmatesoft.svn.core.wc.SVNCommitItem;
 
 /**
  * @version 1.0
@@ -69,8 +70,8 @@ public class SVNCommitMediator implements ISVNWorkspaceMediator {
             dir = myWCAccess.getDirectory(item.getPath());
             target = "";
         } else {
-            dir = myWCAccess.getDirectory(SVNPathUtil.removeTail(item.getPath()));
-            target = SVNPathUtil.tail(item.getPath());
+            dir = myWCAccess.getDirectory(PathUtil.removeTail(item.getPath()));
+            target = PathUtil.tail(item.getPath());
         }
         SVNProperties wcProps = dir.getWCProperties(target);
         return wcProps.getPropertyValue(name);
@@ -81,7 +82,9 @@ public class SVNCommitMediator implements ISVNWorkspaceMediator {
         if (name == null) {
             return;
         }
+        DebugLog.log("setting wc props for path: " + path);
         SVNCommitItem item = (SVNCommitItem) myCommitItems.get(path);
+        DebugLog.log("item: " + item);
         if (!myWCPropsMap.containsKey(item)) {
             myWCPropsMap.put(item, new HashMap());
         }
@@ -98,8 +101,8 @@ public class SVNCommitMediator implements ISVNWorkspaceMediator {
             dir = myWCAccess.getDirectory(item.getPath());
             target = "";
         } else {
-            dir = myWCAccess.getDirectory(SVNPathUtil.removeTail(item.getPath()));
-            target = SVNPathUtil.tail(item.getPath());
+            dir = myWCAccess.getDirectory(PathUtil.removeTail(item.getPath()));
+            target = PathUtil.tail(item.getPath());
         }
         File tmpFile = dir.getFile(".svn/tmp/text-base");
         tmpFile = SVNFileUtil.createUniqueFile(tmpFile, target, ".tmp");

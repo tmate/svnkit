@@ -1,6 +1,9 @@
 package de.regnis.q.sequence.line;
 
-import java.io.*;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
 
 /**
  * @author Marc Strapetz
@@ -9,9 +12,9 @@ public final class QSequenceLineRAByteData implements QSequenceLineRAData {
 
 	// Constants ==============================================================
 
-	public static QSequenceLineRAByteData create(InputStream is) throws IOException {
+	public static final QSequenceLineRAByteData create(InputStream is) throws IOException {
 		final ByteArrayOutputStream os = new ByteArrayOutputStream();
-		for (; ;) {
+		for (;;) {
 			final int b = is.read();
 			if (b == -1) {
 				break;
@@ -36,15 +39,11 @@ public final class QSequenceLineRAByteData implements QSequenceLineRAData {
 
 	// Implemented ============================================================
 
-	public long length() {
+	public long length() throws IOException {
 		return bytes.length;
 	}
 
-	public void get(byte[] bytes, long offset, long length) {
-		System.arraycopy(this.bytes, (int)offset, bytes, 0, (int)length);
-	}
-
-	public InputStream read(long offset, long length) {
+	public InputStream read(long offset, long length) throws IOException {
 		return new ByteArrayInputStream(bytes, (int)offset, (int)length);
 	}
 }

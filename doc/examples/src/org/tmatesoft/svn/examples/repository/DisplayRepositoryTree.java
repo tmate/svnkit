@@ -17,12 +17,12 @@ import java.util.Iterator;
 import org.tmatesoft.svn.core.SVNDirEntry;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNNodeKind;
-import org.tmatesoft.svn.core.SVNURL;
 import org.tmatesoft.svn.core.auth.ISVNAuthenticationManager;
 import org.tmatesoft.svn.core.internal.io.dav.DAVRepositoryFactory;
 import org.tmatesoft.svn.core.internal.io.svn.SVNRepositoryFactoryImpl;
 import org.tmatesoft.svn.core.io.SVNRepository;
 import org.tmatesoft.svn.core.io.SVNRepositoryFactory;
+import org.tmatesoft.svn.core.io.SVNRepositoryLocation;
 import org.tmatesoft.svn.core.wc.SVNWCUtil;
 
 /*
@@ -93,15 +93,23 @@ public class DisplayRepositoryTree {
              */
             password = (args.length >= 3) ? args[2] : password;
         }
+        SVNRepositoryLocation location;
         SVNRepository repository = null;
         try {
+            /*
+             * Parses the URL string and creates an SVNRepositoryLocation which
+             * represents the repository location (you can think of this
+             * location as of a current repository session directory; it can be
+             * any versioned directory inside the repository).
+             */
+            location = SVNRepositoryLocation.parseURL(url);
             /*
              * Creates an instance of SVNRepository to work with the repository.
              * All user's requests to the repository are relative to the
              * repository location used to create this SVNRepository.
-             * SVNURL is a wrapper for URL strings that refer to repository locations.
+             *  
              */
-            repository = SVNRepositoryFactory.create(SVNURL.parseURIEncoded(url));
+            repository = SVNRepositoryFactory.create(location);
         } catch (SVNException svne) {
             /*
              * Perhaps a malformed URL is the cause of this exception
@@ -113,9 +121,10 @@ public class DisplayRepositoryTree {
         }
 
         /*
-         * User's authentication information is provided via an ISVNAuthenticationManager
-         * instance. SVNWCUtil creates a default usre's authentication manager given user's
-         * name and password.
+         * Creates a usre's authentication manager.
+         * readonly=true - should be always true when providing options to 
+         * SVNRepository since this low-level class is not intended to work
+         * with working copy config files 
          */
         ISVNAuthenticationManager authManager = SVNWCUtil.createDefaultAuthenticationManager(name, password);
 

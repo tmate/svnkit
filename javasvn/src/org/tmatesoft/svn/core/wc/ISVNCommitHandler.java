@@ -13,7 +13,7 @@ package org.tmatesoft.svn.core.wc;
 import org.tmatesoft.svn.core.SVNException;
 
 /**
- * The <b>ISVNCommitHandler</b> should be implemented to 
+ * The <span class="style0">ISVNCommitHandler</span> should be implemented to 
  * provide an ability to manage commit log messages for items to be committed in
  * a common transaction.
  * 
@@ -25,7 +25,6 @@ import org.tmatesoft.svn.core.SVNException;
  * 
  * @version 1.0
  * @author  TMate Software Ltd.
- * @see     DefaultSVNCommitHandler      
  */
 public interface ISVNCommitHandler {
     

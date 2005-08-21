@@ -10,6 +10,12 @@
  */
 package org.tmatesoft.svn.core.internal.wc;
 
+import org.tmatesoft.svn.core.SVNException;
+import org.tmatesoft.svn.core.SVNProperty;
+import org.tmatesoft.svn.util.PathUtil;
+import org.tmatesoft.svn.util.DebugLog;
+import org.tmatesoft.svn.util.TimeUtil;
+
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
@@ -17,17 +23,9 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.PushbackInputStream;
 import java.util.Collections;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.StringTokenizer;
-
-import org.tmatesoft.svn.core.SVNException;
-import org.tmatesoft.svn.core.SVNProperty;
-import org.tmatesoft.svn.core.internal.util.SVNEncodingUtil;
-import org.tmatesoft.svn.core.internal.util.SVNFormatUtil;
-import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
-import org.tmatesoft.svn.core.internal.util.SVNTimeUtil;
 
 /**
  * @version 1.0
@@ -99,6 +97,9 @@ public class SVNTranslator {
                 SVNFileUtil.copyFile(src, dst, true);
             } else if (expand) {
                 // create symlink to target, and create it at dst
+                DebugLog.log("creating symlink: ");
+                DebugLog.log("link file: " + dst);
+                DebugLog.log("link name file: " + src);
                 SVNFileUtil.createSymlink(dst, src);
             } else {
                 SVNFileUtil.detranslateSymlink(src, dst);
@@ -300,8 +301,6 @@ public class SVNTranslator {
         byte[] author = null;
         byte[] name = null;
         byte[] id = null;
-        
-        Date jDate = d == null ? null : SVNTimeUtil.parseDate(d);
 
         Map map = new HashMap();
         try {
@@ -309,7 +308,8 @@ public class SVNTranslator {
                     " \t\n\b\r\f"); tokens.hasMoreTokens();) {
                 String token = tokens.nextToken();
                 if ("LastChangedDate".equals(token) || "Date".equals(token)) {
-                    date = expand && date == null ? SVNFormatUtil.formatDate(jDate).getBytes("UTF-8") : date;
+                    date = expand && date == null ? TimeUtil.toHumanDate(d)
+                            .getBytes("UTF-8") : date;
                     map.put("LastChangedDate", date);
                     map.put("Date", date);
                 } else if ("LastChangedRevision".equals(token)
@@ -326,15 +326,16 @@ public class SVNTranslator {
                     map.put("LastChangedBy", author);
                     map.put("Author", author);
                 } else if ("HeadURL".equals(token) || "URL".equals(token)) {
-                    url = expand && url == null ? SVNEncodingUtil.uriDecode(u).getBytes(
+                    url = expand && url == null ? PathUtil.decode(u).getBytes(
                             "UTF-8") : url;
                     map.put("HeadURL", url);
                     map.put("URL", url);
                 } else if ("Id".equals(token)) {
                     if (expand && id == null) {
                         rev = rev == null ? r.getBytes("UTF-8") : rev;
-                        date = date == null ? SVNFormatUtil.formatDate(jDate).getBytes("UTF-8") : date;
-                        name = name == null ? SVNEncodingUtil.uriDecode(SVNPathUtil.tail(u))
+                        date = date == null ? TimeUtil.toHumanDate(d).getBytes(
+                                "UTF-8") : date;
+                        name = name == null ? PathUtil.decode(PathUtil.tail(u))
                                 .getBytes("UTF-8") : name;
                         author = author == null ? (a == null ? new byte[0] : a
                                 .getBytes("UTF-8")) : author;
@@ -369,6 +370,86 @@ public class SVNTranslator {
             return CRLF;
         }
         return null;
+    }
+
+    public static String xmlEncode(String value) {
+        StringBuffer result = new StringBuffer();
+        for (int i = 0; i < value.length(); i++) {
+            char ch = value.charAt(i);
+            switch (ch) {
+            case '&':
+                result.append("&amp;");
+                break;
+            case '<':
+                result.append("&lt;");
+                break;
+            case '>':
+                result.append("&gt;");
+                break;
+            case '\"':
+                result.append("&quot;");
+                break;
+            case '\'':
+                result.append("&apos;");
+                break;
+            case '\r':
+                result.append("&#13;");
+                break;
+            case '\n':
+                result.append("&#10;");
+                break;
+            case '\t':
+                result.append("&#9;");
+                break;
+            default:
+                result.append(ch);
+            }
+        }
+        return result.toString();
+    }
+
+    private static final Map XML_UNESCAPE_MAP = new HashMap();
+    static {
+        XML_UNESCAPE_MAP.put("&amp;", "&");
+        XML_UNESCAPE_MAP.put("&lt;", "<");
+        XML_UNESCAPE_MAP.put("&gt;", ">");
+        XML_UNESCAPE_MAP.put("&quot;", "\"");
+        XML_UNESCAPE_MAP.put("&apos;", "'");
+        XML_UNESCAPE_MAP.put("&#13;", "\r");
+        XML_UNESCAPE_MAP.put("&#10;", "\n");
+        XML_UNESCAPE_MAP.put("&#9;", "\t");
+    }
+
+    public static String xmlDecode(String value) {
+        StringBuffer result = new StringBuffer(value.length());
+        int l = value.length();
+        for (int i = 0; i < l; i++) {
+            char ch = value.charAt(i);
+            if (ch == '&') {
+                // check for escape sequence.
+                String replacement = null;
+                for (int j = i + 1; j < i + 6 && j < l; j++) {
+                    if (value.charAt(j) == ';' && j - i > 1) {
+                        // try to uescape from i + 1 to j - 1;
+                        String escape = value.substring(i, j + 1); // full
+                                                                    // token
+                                                                    // like &..;
+                        replacement = (String) XML_UNESCAPE_MAP.get(escape);
+                        if (replacement != null) {
+                            result.append(replacement);
+                            // change 'i' value
+                            i = j;
+                        }
+                        break;
+                    }
+                }
+                if (replacement != null) {
+                    continue;
+                }
+            }
+            result.append(ch);
+        }
+        return result.toString();
     }
 
     public static byte[] getBaseEOL(String eolStyle) {

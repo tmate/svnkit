@@ -26,7 +26,6 @@ import java.util.Map;
 import org.tmatesoft.svn.core.SVNCommitInfo;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNNodeKind;
-import org.tmatesoft.svn.core.SVNURL;
 import org.tmatesoft.svn.core.auth.ISVNAuthenticationManager;
 import org.tmatesoft.svn.core.internal.io.dav.DAVRepositoryFactory;
 import org.tmatesoft.svn.core.internal.io.svn.SVNRepositoryFactoryImpl;
@@ -36,10 +35,12 @@ import org.tmatesoft.svn.core.io.ISVNReporterBaton;
 import org.tmatesoft.svn.core.io.ISVNWorkspaceMediator;
 import org.tmatesoft.svn.core.io.SVNRepository;
 import org.tmatesoft.svn.core.io.SVNRepositoryFactory;
+import org.tmatesoft.svn.core.io.SVNRepositoryLocation;
 import org.tmatesoft.svn.core.io.diff.ISVNRAData;
 import org.tmatesoft.svn.core.io.diff.SVNDiffWindow;
 import org.tmatesoft.svn.core.io.diff.SVNRAFileData;
 import org.tmatesoft.svn.core.wc.SVNWCUtil;
+import org.tmatesoft.svn.util.PathUtil;
 
 /*
  * This example program illustrates how you can export a clean directory tree 
@@ -53,8 +54,8 @@ import org.tmatesoft.svn.core.wc.SVNWCUtil;
  * 0)first of all the library is initialized (setupLibrary() method) - it must be
  * done prior to using the library;
  * 
- * 1)an SVNRepository is created to the location (represented by a URL string) that 
- * will be the root of the repository tree to be exported;
+ * 1)an SVNRepository is created to the location (represented by an
+ * SVNRepositoryLocation) that will be the root of the repository tree to be exported;
  * 
  * 2)user's authentication is usually non-necessary for reading operations however the
  * repository may have a restriction to accept requests of only authenticated users;
@@ -134,15 +135,21 @@ public class Export {
         }
         exportDir.mkdirs();
 
+        SVNRepositoryLocation location;
         SVNRepository repository = null;
         try {
+            /*
+             * Parses the URL string and creates an SVNRepositoryLocation which
+             * represents the repository location - it can be any versioned
+             * entry inside the repository.
+             */
+            location = SVNRepositoryLocation.parseURL(url);
             /*
              * Creates an instance of SVNRepository to work with the repository.
              * All user's requests to the repository are relative to the
              * repository location used to create this SVNRepository.
-             * SVNURL is a wrapper for URL strings that refer to repository locations.
              */
-            repository = SVNRepositoryFactory.create(SVNURL.parseURIEncoded(url));
+            repository = SVNRepositoryFactory.create(location);
         } catch (SVNException svne) {
             /*
              * Perhaps a malformed URL is the cause of this exception.
@@ -154,9 +161,10 @@ public class Export {
         }
 
         /*
-         * User's authentication information is provided via an ISVNAuthenticationManager
-         * instance. SVNWCUtil creates a default usre's authentication manager given user's
-         * name and password.
+         * Creates a usre's authentication manager.
+         * readonly=true - should be always true when providing options to 
+         * SVNRepository since this low-level class is not intended to work
+         * with working copy config files
          */
         ISVNAuthenticationManager authManager = SVNWCUtil.createDefaultAuthenticationManager(name, password);
 
@@ -326,7 +334,7 @@ public class Export {
      *      
      * 		reporter.linkPath(newRepositoryLocation, path, lockToken, revision, false);   
      * 	 
-     * 	 newRepositoryLocation is a URL string which is the new parent root
+     * 	 newRepositoryLocation is an SVNRepositoryLocation which is the new parent root
      * 	 (meaning path is relative to this root since this moment). That's the only
      * 	 difference between just an update and a switch.
      * 
@@ -609,6 +617,17 @@ public class Export {
          */
         public void addDir(String path, String copyFromPath,
                 long copyFromRevision) throws SVNException {
+            /*
+             * PathUtil is a utility that helps to work with path strings.
+             * PathUtil.removeLeadingSlash removes the first '/' (if any) from the path
+             * string.
+             */
+            path = PathUtil.removeLeadingSlash(path);
+            /*
+             * PathUtil.removeTrailingSlash removes the last '/' (if any) from the path 
+             * string.
+             */
+            path = PathUtil.removeTrailingSlash(path);
             File newDir = new File(myRootDirectory, path);
             if (!newDir.exists()) {
                 if (!newDir.mkdirs()) {
@@ -626,6 +645,8 @@ public class Export {
          */
         public void addFile(String path, String copyFromPath,
                 long copyFromRevision) throws SVNException {
+            path = PathUtil.removeLeadingSlash(path);
+            path = PathUtil.removeTrailingSlash(path);
             File file = new File(myRootDirectory, path);
 
             if (file.exists()) {

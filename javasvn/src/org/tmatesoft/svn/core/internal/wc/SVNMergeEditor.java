@@ -11,12 +11,15 @@
 package org.tmatesoft.svn.core.internal.wc;
 
 import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 
 import org.tmatesoft.svn.core.ISVNDirEntryHandler;
@@ -24,15 +27,17 @@ import org.tmatesoft.svn.core.SVNCommitInfo;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNNodeKind;
 import org.tmatesoft.svn.core.SVNProperty;
-import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
 import org.tmatesoft.svn.core.io.ISVNEditor;
 import org.tmatesoft.svn.core.io.SVNRepository;
+import org.tmatesoft.svn.core.io.diff.ISVNRAData;
 import org.tmatesoft.svn.core.io.diff.SVNDiffWindow;
+import org.tmatesoft.svn.core.io.diff.SVNRAFileData;
 import org.tmatesoft.svn.core.wc.ISVNEventHandler;
 import org.tmatesoft.svn.core.wc.SVNEvent;
 import org.tmatesoft.svn.core.wc.SVNEventAction;
 import org.tmatesoft.svn.core.wc.SVNStatusType;
-import org.tmatesoft.svn.util.SVNDebugLog;
+import org.tmatesoft.svn.util.DebugLog;
+import org.tmatesoft.svn.util.PathUtil;
 
 /**
  * @version 1.0
@@ -48,7 +53,6 @@ public class SVNMergeEditor implements ISVNEditor {
     private SVNDirectoryInfo myCurrentDirectory;
     private SVNFileInfo myCurrentFile;
     private SVNMerger myMerger;
-    private SVNDeltaProcessor myDeltaProcessor;
 
     public SVNMergeEditor(SVNWCAccess wcAccess, SVNRepository repos,
             long revision1, long revision2, SVNMerger merger) {
@@ -57,8 +61,8 @@ public class SVNMergeEditor implements ISVNEditor {
         myRevision2 = revision2;
         myWCAccess = wcAccess;
         myMerger = merger;
-        myTarget = "".equals(myWCAccess.getTargetName()) ? null : myWCAccess.getTargetName();
-        myDeltaProcessor = new SVNDeltaProcessor();
+        myTarget = "".equals(myWCAccess.getTargetName()) ? null : myWCAccess
+                .getTargetName();
     }
 
     public void targetRevision(long revision) throws SVNException {
@@ -73,17 +77,24 @@ public class SVNMergeEditor implements ISVNEditor {
     }
 
     public void deleteEntry(String path, long revision) throws SVNException {
+        path = PathUtil.removeLeadingSlash(path);
+        path = PathUtil.removeTrailingSlash(path);
         SVNNodeKind nodeKind = myRepos.checkPath(path, myRevision1);
         SVNEventAction action = SVNEventAction.SKIP;
         SVNStatusType mergeResult = null;
 
-        path = SVNPathUtil.append(myTarget, path);
+        path = PathUtil.append(myTarget, path);
+        path = PathUtil.removeLeadingSlash(path);
+        path = PathUtil.removeTrailingSlash(path);
 
         if (nodeKind == SVNNodeKind.FILE) {
+            DebugLog.log("calling file deleted: " + path);
             mergeResult = myMerger.fileDeleted(path);
         } else if (nodeKind == SVNNodeKind.DIR) {
+            DebugLog.log("calling dir deleted: " + path);
             mergeResult = myMerger.directoryDeleted(path);
         }
+        DebugLog.log("merge result: " + mergeResult);
         if (mergeResult != SVNStatusType.OBSTRUCTED
                 && mergeResult != SVNStatusType.MISSING) {
             action = SVNEventAction.UPDATE_DELETE;
@@ -95,17 +106,23 @@ public class SVNMergeEditor implements ISVNEditor {
 
     public void addDir(String path, String copyFromPath, long copyFromRevision)
             throws SVNException {
+        path = PathUtil.removeLeadingSlash(path);
+        path = PathUtil.removeTrailingSlash(path);
+        DebugLog.log("add dir: " + path);
         myCurrentDirectory = new SVNDirectoryInfo(myCurrentDirectory, path,
                 true);
         myCurrentDirectory.myBaseProperties = Collections.EMPTY_MAP;
 
-        String wcPath = SVNPathUtil.append(myTarget, path);
+        String wcPath = PathUtil.append(myTarget, path);
+        wcPath = PathUtil.removeLeadingSlash(wcPath);
+        wcPath = PathUtil.removeTrailingSlash(wcPath);
         myCurrentDirectory.myWCPath = wcPath;
 
         // merge dir added.
-        SVNEventAction action = SVNEventAction.UPDATE_ADD;
+        SVNEventAction action = SVNEventAction.ADD;
         SVNStatusType mergeResult = myMerger.directoryAdded(
-                myCurrentDirectory.myWCPath, myCurrentDirectory.myEntryProps);
+                myCurrentDirectory.myWCPath, myCurrentDirectory.myEntryProps,
+                myRevision2);
         if (mergeResult == SVNStatusType.MISSING
                 || mergeResult == SVNStatusType.OBSTRUCTED) {
             action = SVNEventAction.SKIP;
@@ -120,7 +137,9 @@ public class SVNMergeEditor implements ISVNEditor {
                 false);
 
         myCurrentDirectory.myBaseProperties = new HashMap();
-        String wcPath = SVNPathUtil.append(myTarget, path);
+        String wcPath = PathUtil.append(myTarget, path);
+        wcPath = PathUtil.removeLeadingSlash(wcPath);
+        wcPath = PathUtil.removeTrailingSlash(wcPath);
         myCurrentDirectory.myWCPath = wcPath;
         myCurrentDirectory.loadFromRepository(myRepos, myRevision1);
     }
@@ -154,11 +173,14 @@ public class SVNMergeEditor implements ISVNEditor {
                 myWCAccess.handleEvent(event, ISVNEventHandler.UNKNOWN);
                 myCurrentDirectory = myCurrentDirectory.myParent;
                 return;
+            } else {
+                // no need to do this if it is dry run?
+                propStatus = myMerger.directoryPropertiesChanged(
+                        myCurrentDirectory.myWCPath,
+                        myCurrentDirectory.myBaseProperties,
+                        myCurrentDirectory.myPropertyDiff);
+
             }
-            // no need to do this if it is dry run?
-            propStatus = myMerger.directoryPropertiesChanged(
-                    myCurrentDirectory.myWCPath,
-                    myCurrentDirectory.myPropertyDiff);
         }
         if (propStatus != SVNStatusType.UNCHANGED) {
             SVNEvent event = SVNEventFactory.createMergeEvent(myWCAccess,
@@ -171,11 +193,20 @@ public class SVNMergeEditor implements ISVNEditor {
 
     public void addFile(String path, String copyFromPath, long copyFromRevision)
             throws SVNException {
+        path = PathUtil.removeLeadingSlash(path);
+        path = PathUtil.removeTrailingSlash(path);
+        DebugLog.log("add file: " + path);
+
         myCurrentFile = new SVNFileInfo(myCurrentDirectory, path, true);
         myCurrentFile.myBaseProperties = new HashMap();
     }
 
     public void openFile(String path, long revision) throws SVNException {
+        DebugLog.log("open file: " + path);
+        DebugLog.log("target: " + myTarget);
+        path = PathUtil.removeLeadingSlash(path);
+        path = PathUtil.removeTrailingSlash(path);
+
         myCurrentFile = new SVNFileInfo(myCurrentDirectory, path, false);
         // props only
         myCurrentFile.loadFromRepository(myCurrentFile.myBaseFile, myRepos,
@@ -199,8 +230,12 @@ public class SVNMergeEditor implements ISVNEditor {
         myCurrentFile.myPropertyDiff.put(name, value);
     }
 
-    public void applyTextDelta(String commitPath, String baseChecksum) throws SVNException {
-        myCurrentFile.myBaseFile = myMerger.getFile(myCurrentFile.myWCPath, true);
+    public void applyTextDelta(String commitPath, String baseChecksum)
+            throws SVNException {
+        myCurrentFile.myDiffWindows = new ArrayList();
+        myCurrentFile.myDataFiles = new ArrayList();
+        myCurrentFile.myBaseFile = myMerger.getFile(myCurrentFile.myWCPath,
+                true);
 
         if (myCurrentFile.myIsAdded) {
             SVNFileUtil.createEmptyFile(myCurrentFile.myBaseFile);
@@ -210,17 +245,45 @@ public class SVNMergeEditor implements ISVNEditor {
         }
         myCurrentFile.myFile = myMerger.getFile(myCurrentFile.myWCPath, false);
         SVNFileUtil.createEmptyFile(myCurrentFile.myFile);
+
+        DebugLog.log("tmp target file: " + myCurrentFile.myFile);
+        DebugLog.log("tmp base file: " + myCurrentFile.myBaseFile);
     }
 
-    public OutputStream textDeltaChunk(String commitPath, SVNDiffWindow diffWindow) throws SVNException {
-        File chunkFile = SVNFileUtil.createUniqueFile(myCurrentFile.myBaseFile.getParentFile(), SVNPathUtil.tail(myCurrentFile.myPath), ".chunk");
-        return myDeltaProcessor.textDeltaChunk(chunkFile, diffWindow);
+    public OutputStream textDeltaChunk(String commitPath,
+            SVNDiffWindow diffWindow) throws SVNException {
+        myCurrentFile.myDiffWindows.add(diffWindow);
+        File chunkFile = SVNFileUtil
+                .createUniqueFile(myCurrentFile.myBaseFile.getParentFile(),
+                        PathUtil.tail(myCurrentFile.myPath), ".chunk");
+        myCurrentFile.myDataFiles.add(chunkFile);
+        return SVNFileUtil.openFileForWriting(chunkFile);
     }
 
     public void textDeltaEnd(String commitPath) throws SVNException {
+        DebugLog.log("text delta end");
         File baseTmpFile = myCurrentFile.myBaseFile;
         File targetFile = myCurrentFile.myFile;
-        myDeltaProcessor.textDeltaEnd(baseTmpFile, targetFile);
+        ISVNRAData baseData = new SVNRAFileData(baseTmpFile, true);
+        ISVNRAData target = new SVNRAFileData(targetFile, false);
+        for (int i = 0; i < myCurrentFile.myDiffWindows.size(); i++) {
+            SVNDiffWindow window = (SVNDiffWindow) myCurrentFile.myDiffWindows
+                    .get(i);
+            File dataFile = (File) myCurrentFile.myDataFiles.get(i);
+            InputStream data = SVNFileUtil.openFileForReading(dataFile);
+            try {
+                window.apply(baseData, target, data, target.length());
+            } finally {
+                SVNFileUtil.closeFile(data);
+            }
+            dataFile.delete();
+        }
+        try {
+            target.close();
+            baseData.close();
+        } catch (IOException e) {
+            SVNErrorManager.error("svn: Cannot apply delta to '" + targetFile + "'");
+        }
     }
 
     public void closeFile(String commitPath, String textChecksum)
@@ -247,8 +310,10 @@ public class SVNMergeEditor implements ISVNEditor {
                 if (myCurrentFile.myPropertyDiff == null) {
                     myCurrentFile.myPropertyDiff = new HashMap();
                 }
+                DebugLog.log("m.type: " + mimeType1);
                 SVNStatusType[] result = null;
                 if (myCurrentFile.myIsAdded) {
+                    DebugLog.log("adding file: " + myCurrentFile.myWCPath);
                     try {
                         result = myMerger
                                 .fileAdded(
@@ -256,19 +321,21 @@ public class SVNMergeEditor implements ISVNEditor {
                                         myCurrentFile.myFile != null ? myCurrentFile.myBaseFile
                                                 : null, myCurrentFile.myFile,
                                         myRevision2, 0, mimeType1, mimeType2,
+                                        myCurrentFile.myBaseProperties,
                                         myCurrentFile.myPropertyDiff,
                                         myCurrentFile.myEntryProps);
                     } catch (Throwable th) {
-                        SVNDebugLog.logInfo(th);
+                        DebugLog.error(th);
                     }
                 } else {
                     try {
                         result = myMerger.fileChanged(myCurrentFile.myWCPath,
                                 myCurrentFile.myBaseFile, myCurrentFile.myFile,
                                 myRevision1, myRevision2, mimeType1, mimeType2,
+                                myCurrentFile.myBaseProperties,
                                 myCurrentFile.myPropertyDiff);
                     } catch (Throwable th) {
-                        SVNDebugLog.logInfo(th);
+                        DebugLog.error(th);
                     }
                 }
                 if (result != null) {
@@ -281,10 +348,11 @@ public class SVNMergeEditor implements ISVNEditor {
                     || contents == SVNStatusType.OBSTRUCTED) {
                 action = SVNEventAction.SKIP;
             } else if (myCurrentFile.myIsAdded) {
-                action = SVNEventAction.UPDATE_ADD;
+                action = SVNEventAction.ADD;
             } else {
                 action = SVNEventAction.UPDATE_UPDATE;
             }
+            DebugLog.log("close file, merge result: " + contents + ":" + props);
             SVNEvent event = SVNEventFactory.createMergeEvent(myWCAccess,
                     myCurrentFile.myWCPath, action, contents, props, SVNNodeKind.FILE);
             myWCAccess.handleEvent(event, ISVNEventHandler.UNKNOWN);
@@ -298,6 +366,7 @@ public class SVNMergeEditor implements ISVNEditor {
     }
 
     public SVNCommitInfo closeEdit() throws SVNException {
+        DebugLog.log("close edit");
         return null;
     }
 
@@ -350,7 +419,9 @@ public class SVNMergeEditor implements ISVNEditor {
 
         public SVNFileInfo(SVNDirectoryInfo parent, String path, boolean added) {
             myPath = path;
-            myWCPath = SVNPathUtil.append(parent.myWCPath, SVNPathUtil.tail(path));
+            myWCPath = PathUtil.append(parent.myWCPath, PathUtil.tail(path));
+            myWCPath = PathUtil.removeLeadingSlash(myWCPath);
+            myWCPath = PathUtil.removeTrailingSlash(myWCPath);
             myIsAdded = added;
             if (added) {
                 myEntryProps = new HashMap();
@@ -385,5 +456,7 @@ public class SVNMergeEditor implements ISVNEditor {
         private Map myBaseProperties;
         private Map myPropertyDiff;
         private Map myEntryProps;
+        private List myDiffWindows;
+        private List myDataFiles;
     }
 }

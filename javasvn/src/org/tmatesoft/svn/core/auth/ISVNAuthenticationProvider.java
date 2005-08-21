@@ -11,8 +11,6 @@
  */
 package org.tmatesoft.svn.core.auth;
 
-import org.tmatesoft.svn.core.SVNURL;
-
 /**
  * @version 1.0
  * @author  TMate Software Ltd.
@@ -24,8 +22,8 @@ public interface ISVNAuthenticationProvider {
     public int ACCEPTED = 2;
 
     public SVNAuthentication requestClientAuthentication(String kind,
-            SVNURL url, String realm, String errorMessage, SVNAuthentication previousAuth,
+            String url, String realm, String errorMessage, SVNAuthentication previousAuth,
             boolean authMayBeStored);
 
-    public int acceptServerAuthentication(SVNURL url, String realm, Object certificate, boolean resultMayBeStored);
+    public int acceptServerAuthentication(String url, String realm, Object certificate, boolean resultMayBeStored);
 }

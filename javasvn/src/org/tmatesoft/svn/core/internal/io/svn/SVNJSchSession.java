@@ -20,11 +20,9 @@ import java.util.Iterator;
 import java.util.Map;
 
 import org.tmatesoft.svn.core.SVNAuthenticationException;
-import org.tmatesoft.svn.core.SVNException;
-import org.tmatesoft.svn.core.SVNURL;
 import org.tmatesoft.svn.core.auth.SVNSSHAuthentication;
-import org.tmatesoft.svn.core.internal.util.SVNSocketFactory;
-import org.tmatesoft.svn.util.SVNDebugLog;
+import org.tmatesoft.svn.core.io.SVNRepositoryLocation;
+import org.tmatesoft.svn.util.DebugLog;
 
 import com.jcraft.jsch.JSch;
 import com.jcraft.jsch.JSchException;
@@ -42,7 +40,8 @@ public class SVNJSchSession {
 
     private static Map ourSessionsPool = new Hashtable();
 
-    static Session getSession(SVNURL location, SVNSSHAuthentication credentials) throws SVNAuthenticationException {
+    static Session getSession(SVNRepositoryLocation location,
+            SVNSSHAuthentication credentials) throws SVNAuthenticationException {
         if ("".equals(credentials.getUserName())
                 || credentials.getUserName() == null) {
             throw new SVNAuthenticationException(
@@ -53,6 +52,7 @@ public class SVNJSchSession {
         Session session = (Session) ourSessionsPool.get(key);
         if (session != null && !session.isConnected()) {
             ourSessionsPool.remove(key);
+            DebugLog.log("SESSION " + key + " disposed");
             session = null;
         }
         try {
@@ -76,18 +76,25 @@ public class SVNJSchSession {
                         credentials.getPassword(), passphrase);
                 session.setUserInfo(userInfo);
                 session.setSocketFactory(new SimpleSocketFactory());
+                DebugLog.log("SESSION " + key + " created");
                 session.setTimeout(TIMEOUT);
                 session.connect();
                 session.setTimeout(0);
                 ourSessionsPool.put(key, session);
-            } 
+                DebugLog.log("SESSION " + key + " connected");
+            } else {
+                DebugLog.log("SESSION " + key + " reused");
+            }
             return session;
         } catch (JSchException e) {
-            SVNDebugLog.logInfo(e);
+            DebugLog.error(e);
             if (session != null && session.isConnected()) {
                 session.disconnect();
+                DebugLog.log("DISCONNECTING: " + session);
             }
+            DebugLog.log("SESSION " + key + " diconnected");
             ourSessionsPool.remove(key);
+            DebugLog.log("SESSION " + key + " disposed");
             throw new SVNAuthenticationException(e);
         }
     }
@@ -98,6 +105,7 @@ public class SVNJSchSession {
                 Session session = (Session) (e.next());
                 try {
                     session.disconnect();
+                    DebugLog.log("DISCONNECTING: " + session);
                 } catch (Exception ee) {
                 }
             }
@@ -112,13 +120,8 @@ public class SVNJSchSession {
 
         public Socket createSocket(String host, int port) throws IOException,
                 UnknownHostException {
-            SVNDebugLog.logInfo("SSH: creating new TCP/IP socket");
-            Socket socket;
-            try {
-                socket = SVNSocketFactory.createPlainSocket(host, port);
-            } catch (SVNException e) {
-                throw new IOException(e.getMessage());
-            }
+            Socket socket = null;
+            socket = new Socket(host, port);
             socket.setKeepAlive(true);
             socket.setReuseAddress(true);
             return socket;
@@ -140,6 +143,7 @@ public class SVNJSchSession {
     private static class EmptyUserInfo implements UserInfo {
 
         private String myPassword;
+
         private String myPassphrase;
 
         public EmptyUserInfo(String password, String passphrase) {
@@ -168,6 +172,7 @@ public class SVNJSchSession {
         }
 
         public void showMessage(String arg0) {
+            DebugLog.log("jsch message: " + arg0);
         }
     }
 }

@@ -11,34 +11,11 @@
 package org.tmatesoft.svn.core.wc;
 
 /**
- * The <b>ISVNInfoHandler</b> interface should be implemented in order to
- * be further provided to some of <b>SVNWCClient</b>'s doInfo() methods
- * to process information about Working Copy as well as remote (located in a 
- * repository) items. 
- * 
- * <p>
- * When running a info operation using an info handler an 
- * <b>SVNWCClient</b>'s doInfo() method generates an <b>SVNInfo</b>
- * object per each interesting item and dispatches that object to the
- * info handler where it's up to a developer to retrieve detailes   
- * from the <b>SVNInfo</b> object and interprete them in a desired way.
- * <p>
- * All calls to a <b>handleInfo()</b> method are synchronous - that is the
- * caller is blocked till the method finishes.
- * 
  * @version 1.0
- * @author  TMate Software Ltd.
- * @see     SVNWCClient
- * @see     SVNInfo
- * @see     <a target="_top" href="http://tmate.org/svn/kb/examples/">Examples</a>
- * 
+ * @author TMate Software Ltd.
  */
 public interface ISVNInfoHandler {
-    /**
-     * Handles item's information using an <b>SVNInfo</b> object.
-     * 
-     * @param info an object that contain's item's information details
-     */
+
     public void handleInfo(SVNInfo info);
 
 }

@@ -19,8 +19,6 @@ final class QSequenceDeePathBackwardExtender extends QSequenceDeePathExtender {
 	// Fields =================================================================
 
 	private int delta;
-	private int mediaLeftLength;
-	private int mediaRightLength;
 
 	// Setup ==================================================================
 
@@ -48,14 +46,8 @@ final class QSequenceDeePathBackwardExtender extends QSequenceDeePathExtender {
 	}
 
 	protected final void reset(QSequenceMedia media, QSequenceDeePathExtenderArray xs) {
-		mediaLeftLength = media.getLeftLength();
-		mediaRightLength = media.getRightLength();
-		delta = mediaLeftLength - mediaRightLength;
+		delta = media.getLeftLength() - media.getRightLength();
 		xs.setDelta(delta);
-		xs.set(delta - 1, mediaLeftLength);
-	}
-
-	public int getProgress(int diagonal) {
-		return mediaLeftLength - getLeft(diagonal) + mediaRightLength - getRight(diagonal);
+		xs.set(delta - 1, media.getLeftLength());
 	}
 }

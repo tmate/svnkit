@@ -15,10 +15,13 @@ package org.tmatesoft.svn.core.internal.io.dav;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.StringTokenizer;
+import java.util.regex.Pattern;
 
 import org.tmatesoft.svn.core.SVNException;
-import org.tmatesoft.svn.core.internal.util.SVNEncodingUtil;
-import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
+import org.tmatesoft.svn.util.PathUtil;
+
+
 
 /**
  * @version 1.0
@@ -65,12 +68,12 @@ public class DAVUtil {
         info = info == null ? new DAVBaselineInfo() : info;
         info.baselinePath = baselineProperties.getHref();
         info.baselineBase = (String) baselineProperties.getPropertyValue(DAVElement.BASELINE_COLLECTION);
-        info.baselineBase = SVNEncodingUtil.uriEncode(info.baselineBase);
+        info.baselineBase = PathUtil.encode(info.baselineBase);
         if (includeRevision) {
             info.revision = Long.parseLong((String) baselineProperties.getPropertyValue(DAVElement.VERSION_NAME));
         }
         if (includeType) {
-            info.isDirectory = getPropertyValue(connection, SVNPathUtil.append(info.baselineBase, info.baselinePath),
+            info.isDirectory = getPropertyValue(connection, PathUtil.append(info.baselineBase, info.baselinePath),
                     null, DAVElement.RESOURCE_TYPE) != null;
         }
         return info;
@@ -86,9 +89,9 @@ public class DAVUtil {
             } catch (SVNException e) {
                 //
             }
-            loppedPath = SVNPathUtil.append(SVNPathUtil.tail(path), loppedPath);
-            path = SVNPathUtil.removeTail(path);
-            if ("".equals(path)) {
+            loppedPath = PathUtil.append(PathUtil.tail(path), loppedPath);
+            path = PathUtil.removeTail(path);
+            if (PathUtil.isEmpty(path)) {
                 break;
             }
         }
@@ -96,6 +99,7 @@ public class DAVUtil {
             throw new SVNException("resource " + path + " is not part of repository");
         }
         String vcc = (String) properties.getPropertyValue(DAVElement.VERSION_CONTROLLED_CONFIGURATION);
+        //vcc = PathUtil.encode(vcc);
         String baselineRelativePath = (String) properties.getPropertyValue(DAVElement.BASELINE_RELATIVE_PATH);
         if (vcc == null) {
             throw new SVNException("important properties are missing for " + path);
@@ -103,8 +107,10 @@ public class DAVUtil {
         if (baselineRelativePath == null) {
             baselineRelativePath = "";
         }
-        baselineRelativePath = SVNEncodingUtil.uriEncode(baselineRelativePath);
-        baselineRelativePath = SVNPathUtil.append(baselineRelativePath, loppedPath);
+        baselineRelativePath = PathUtil.encode(baselineRelativePath);
+        baselineRelativePath = PathUtil.append(baselineRelativePath, loppedPath);
+        baselineRelativePath = PathUtil.removeLeadingSlash(baselineRelativePath);
+        baselineRelativePath = PathUtil.removeTrailingSlash(baselineRelativePath);
 
         String label = null;
         if (revision < 0) {
@@ -164,6 +170,41 @@ public class DAVUtil {
         }
         return target;
 
+    }
+
+    public static boolean matchHost(String pattern, String host) {
+        if (pattern == null || host == null) {
+            return false;
+        }
+        for(StringTokenizer tokens = new StringTokenizer(pattern, ",|"); tokens.hasMoreTokens();) {
+            String token = tokens.nextToken();
+            token = token.replaceAll("\\.", "\\\\.");
+            token = token.replaceAll("\\*", ".*");
+            if (Pattern.matches(token, host)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public static String xmlEncode(String value) {
+        value = value.replaceAll("&", "&amp;");
+        value = value.replaceAll("<", "&lt;");
+        value = value.replaceAll(">", "&gt;");
+        value = value.replaceAll("\"", "&quot;");
+        value = value.replaceAll("'", "&apos;");
+        value = value.replaceAll("\t", "&#09;");
+        return value;
+    }
+
+    public static String xmlDecode(String value) {
+        value = value.replaceAll("&lt;", "<");
+        value = value.replaceAll("&gt;", ">");
+        value = value.replaceAll("&quot;", "\"");
+        value = value.replaceAll("&apos;", "'");
+        value = value.replaceAll("&#09;", "\t");
+        value = value.replaceAll("&amp;", "&");
+        return value;
     }
 
     public static Map parseAuthParameters(String source) {
@@ -228,4 +269,15 @@ public class DAVUtil {
         }
         return parameters;
     }
+
+    public static boolean isXMLSafe(String value) {
+        for (int i = 0; i < value.length(); i++) {
+            char ch = value.charAt(i);
+            if (ch < 0x20 && ch != 0x0A && ch != 0x0D && ch != 0x09 && ch != 0x08) {
+                return false;
+            }
+        }
+        return true;
+    }
+
 }

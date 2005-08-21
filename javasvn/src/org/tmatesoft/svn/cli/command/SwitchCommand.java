@@ -18,10 +18,9 @@ import java.io.PrintStream;
 import org.tmatesoft.svn.cli.SVNArgument;
 import org.tmatesoft.svn.cli.SVNCommand;
 import org.tmatesoft.svn.core.SVNException;
-import org.tmatesoft.svn.core.SVNURL;
 import org.tmatesoft.svn.core.wc.SVNRevision;
 import org.tmatesoft.svn.core.wc.SVNUpdateClient;
-import org.tmatesoft.svn.util.SVNDebugLog;
+import org.tmatesoft.svn.util.DebugLog;
 
 /**
  * @author TMate Software Ltd.
@@ -39,16 +38,13 @@ public class SwitchCommand extends SVNCommand {
         getClientManager().setEventHandler(new SVNCommandEventProcessor(out, err, false, false));
         SVNUpdateClient updater = getClientManager().getUpdateClient();
         try {
-            SVNURL switchURL = SVNURL.parseURIEncoded(url);
-            
             if (getCommandLine().hasArgument(SVNArgument.RELOCATE)) {
-                SVNURL targetURL = SVNURL.parseURIEncoded(getCommandLine().getURL(1));
-                updater.doRelocate(new File(absolutePath).getAbsoluteFile(), switchURL, targetURL, !getCommandLine().hasArgument(SVNArgument.NON_RECURSIVE));
+                updater.doRelocate(new File(absolutePath).getAbsoluteFile(), url, getCommandLine().getURL(1), !getCommandLine().hasArgument(SVNArgument.NON_RECURSIVE));
             } else {
-                updater.doSwitch(new File(absolutePath).getAbsoluteFile(), switchURL, revision, !getCommandLine().hasArgument(SVNArgument.NON_RECURSIVE));
+                updater.doSwitch(new File(absolutePath).getAbsoluteFile(), url, revision, !getCommandLine().hasArgument(SVNArgument.NON_RECURSIVE));
             }
         } catch (Throwable th) {
-            SVNDebugLog.logInfo(th);
+            DebugLog.error(th);
             println(err, th.getMessage());
             println(err);
             System.exit(1);

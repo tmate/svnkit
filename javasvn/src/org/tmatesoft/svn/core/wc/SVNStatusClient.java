@@ -20,8 +20,6 @@ import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNNodeKind;
 import org.tmatesoft.svn.core.SVNProperty;
 import org.tmatesoft.svn.core.auth.ISVNAuthenticationManager;
-import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
-import org.tmatesoft.svn.core.internal.wc.SVNCancellableEditor;
 import org.tmatesoft.svn.core.internal.wc.SVNEventFactory;
 import org.tmatesoft.svn.core.internal.wc.SVNExternalInfo;
 import org.tmatesoft.svn.core.internal.wc.SVNProperties;
@@ -30,25 +28,26 @@ import org.tmatesoft.svn.core.internal.wc.SVNStatusEditor;
 import org.tmatesoft.svn.core.internal.wc.SVNStatusReporter;
 import org.tmatesoft.svn.core.internal.wc.SVNWCAccess;
 import org.tmatesoft.svn.core.io.SVNRepository;
+import org.tmatesoft.svn.util.PathUtil;
 
 /**
  * This class provides methods to get information on the status of Working Copy items.
- * The functionality of <b>SVNStatusClient</b> corresponds to the 'svn status' command 
- * of the native SVN command line client. 
+ * The functionality of <span class="style0">SVNStatusClient</span> corresponds to the
+ * 'svn status' command of the native <span class="style2">SVN</span> command line client. 
  * 
  * <p>
- * One of the main advantage of <b>SVNStatusClient</b> lies in that fact
+ * One of the main advantage of <span class="style0">SVNStatusClient</span> lies in that fact
  * that for each processed item the status information is collected and incapsulated into
- * an <b>SVNStatus</b> object. Further there are two ways how this object
- * can be passed to a developer (depending on the version of the doStatus()
+ * an <span class="style0">SVNStatus</span> object. Further there are two ways how this object
+ * can be passed to a developer (depending on the version of the <span class="style3">doStatus(..)</span>
  * method that was invoked):
  * <ol>
- * <li>the <b>SVNStatus</b> can be passed to a 
- * developer's status handler (that should implement <b>ISVNStatusHandler</b>)
+ * <li>the <span class="style0">SVNStatus</span> can be passed to a 
+ * developer's <i>status handler</i> (that should implement <span class="style0">ISVNStatusHandler</span>)
  * in which the developer retrieves status information and decides how to interprete that
  * info;  
- * <li> another way is that an appropriate doStatus() method
- * just returns that <b>SVNStatus</b> object.
+ * <li> another way is that an appropriate <span class="style3">doStatus(..)</span> method
+ * just returns that <span class="style0">SVNStatus</span> object.
  * </ol>
  * 
  * The first variant can be called recursively - obtaining status information for all child entries, the second
@@ -58,7 +57,7 @@ import org.tmatesoft.svn.core.io.SVNRepository;
  * @author  TMate Software Ltd.
  * @see		ISVNStatusHandler
  * @see		SVNStatus
- * @see     <a target="_top" href="http://tmate.org/svn/kb/examples/">Examples</a>
+ * 
  */
 public class SVNStatusClient extends SVNBasicClient {
  
@@ -71,8 +70,7 @@ public class SVNStatusClient extends SVNBasicClient {
     }
     
     /**
-     * Collects status information on Working Copy items and passes
-     * it to a <code>handler</code>. 
+     * Collects status information on Working Copy items. 
      * 
      * @param  path				local item's path
      * @param  recursive		relevant only if <code>path</code> denotes a directory:
@@ -102,8 +100,7 @@ public class SVNStatusClient extends SVNBasicClient {
     }
     
     /**
-     * Collects status information on Working Copy items and passes
-     * it to a <code>handler</code> . 
+     * Collects status information on Working Copy items. 
      *
      *  
      * @param  path							local item's path
@@ -171,7 +168,7 @@ public class SVNStatusClient extends SVNBasicClient {
             String target = "".equals(wcAccess.getTargetName()) ? null
                             : wcAccess.getTargetName();
 
-            repos.status(-1, target, recursive, statusReporter, SVNCancellableEditor.newInstance(statusEditor, this));
+            repos.status(-1, target, recursive, statusReporter, statusEditor);
         }
         // to report all when there is completely no changes
         statusEditor.closeEdit();
@@ -304,7 +301,7 @@ public class SVNStatusClient extends SVNBasicClient {
         String baseName = path.getName();
         while(wcRoot.getParentFile() != null && new File(wcRoot.getParentFile(), ".svn").isDirectory()) {
           dirs.push(currentPath);
-          currentPath = SVNPathUtil.append(wcRoot.getName(), currentPath);
+          currentPath = PathUtil.append(wcRoot.getName(), currentPath);
           wcRoot = wcRoot.getParentFile();
         }
         dirs.push(currentPath);
@@ -333,7 +330,7 @@ public class SVNStatusClient extends SVNBasicClient {
             }
 
           }
-          wcRoot = new File(wcRoot, SVNPathUtil.head(currentPath));
+          wcRoot = new File(wcRoot, PathUtil.head(currentPath));
         }
         return externals;
     }

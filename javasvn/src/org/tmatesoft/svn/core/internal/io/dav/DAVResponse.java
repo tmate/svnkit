@@ -56,9 +56,6 @@ public class DAVResponse {
         myStatus = status;
     }
     public void setHref(String href) {
-        if (href != null && href.length() > 0 && href.charAt(href.length() - 1) == '/') {
-            href = href.substring(0, href.length() - 1);
-        }
         myHref = href;
     }
 }

@@ -10,19 +10,10 @@
  */
 package org.tmatesoft.svn.core.internal.wc;
 
-import java.io.File;
-import java.io.IOException;
-import java.util.Collection;
-import java.util.Iterator;
-import java.util.Map;
-import java.util.TreeMap;
-
 import org.tmatesoft.svn.core.SVNCommitInfo;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNNodeKind;
 import org.tmatesoft.svn.core.SVNProperty;
-import org.tmatesoft.svn.core.SVNURL;
-import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
 import org.tmatesoft.svn.core.io.ISVNEditor;
 import org.tmatesoft.svn.core.io.diff.ISVNDeltaGenerator;
 import org.tmatesoft.svn.core.io.diff.SVNAllDeltaGenerator;
@@ -32,6 +23,15 @@ import org.tmatesoft.svn.core.wc.ISVNEventHandler;
 import org.tmatesoft.svn.core.wc.SVNCommitItem;
 import org.tmatesoft.svn.core.wc.SVNEvent;
 import org.tmatesoft.svn.core.wc.SVNEventAction;
+import org.tmatesoft.svn.util.DebugLog;
+import org.tmatesoft.svn.util.PathUtil;
+
+import java.io.File;
+import java.io.IOException;
+import java.util.Collection;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.TreeMap;
 
 /**
  * @version 1.0
@@ -40,12 +40,17 @@ import org.tmatesoft.svn.core.wc.SVNEventAction;
 public class SVNCommitter implements ISVNCommitPathHandler {
 
     private Map myCommitItems;
+
     private Map myModifiedFiles;
+
     private SVNWCAccess myWCAccess;
+
     private Collection myTmpFiles;
+
     private String myRepositoryRoot;
 
-    public SVNCommitter(SVNWCAccess wcAccess, Map commitItems, String reposRoot, Collection tmpFiles) {
+    public SVNCommitter(SVNWCAccess wcAccess, Map commitItems,
+            String reposRoot, Collection tmpFiles) {
         myCommitItems = commitItems;
         myWCAccess = wcAccess;
         myModifiedFiles = new TreeMap();
@@ -53,14 +58,16 @@ public class SVNCommitter implements ISVNCommitPathHandler {
         myRepositoryRoot = reposRoot;
     }
 
-    public boolean handleCommitPath(String commitPath, ISVNEditor commitEditor) throws SVNException {
-        myWCAccess.checkCancelled();
+    public boolean handleCommitPath(String commitPath, ISVNEditor commitEditor)
+            throws SVNException {
         SVNCommitItem item = (SVNCommitItem) myCommitItems.get(commitPath);
         if (item.isCopied()) {
             if (item.getCopyFromURL() == null) {
-                SVNErrorManager.error("svn: Commit item '" + item.getFile() + "' has copy flag but no copyfrom URL");
+                SVNErrorManager.error("svn: Commit item '" + item.getFile()
+                        + "' has copy flag but no copyfrom URL");
             } else if (item.getRevision().getNumber() < 0) {
-                SVNErrorManager.error("svn: Commit item '" + item.getFile() + "' has copy flag but an invalid revision");
+                SVNErrorManager.error("svn: Commit item '" + item.getFile()
+                        + "' has copy flag but an invalid revision");
             }
         }
         SVNEvent event = null;
@@ -119,8 +126,10 @@ public class SVNCommitter implements ISVNCommitPathHandler {
             } else if (!item.isAdded()) {
                 // do not open dir twice.
                 if ("".equals(commitPath)) {
+                    DebugLog.log("comitter: open root: " + commitPath);
                     commitEditor.openRoot(rev);
                 } else {
+                    DebugLog.log("comitter: open dir: " + commitPath);
                     commitEditor.openDir(commitPath, rev);
                 }
                 closeDir = true;
@@ -139,28 +148,31 @@ public class SVNCommitter implements ISVNCommitPathHandler {
     }
 
     public void sendTextDeltas(ISVNEditor editor) throws SVNException {
-        for (Iterator paths = myModifiedFiles.keySet().iterator(); paths.hasNext();) {
+        for (Iterator paths = myModifiedFiles.keySet().iterator(); paths
+                .hasNext();) {
             String path = (String) paths.next();
             SVNCommitItem item = (SVNCommitItem) myModifiedFiles.get(path);
-            myWCAccess.checkCancelled();
 
             SVNEvent event = SVNEventFactory.createCommitEvent(myWCAccess
                     .getAnchor().getRoot(), item.getFile(),
                     SVNEventAction.COMMIT_DELTA_SENT, SVNNodeKind.FILE, null);
             myWCAccess.handleEvent(event, ISVNEventHandler.UNKNOWN);
 
-            SVNDirectory dir = myWCAccess.getDirectory(SVNPathUtil.removeTail(item.getPath()));
-            String name = SVNPathUtil.tail(item.getPath());
+            SVNDirectory dir = myWCAccess.getDirectory(PathUtil.removeTail(item
+                    .getPath()));
+            String name = PathUtil.tail(item.getPath());
             SVNEntry entry = dir.getEntries().getEntry(name, false);
 
             File tmpFile = dir.getBaseFile(name, true);
             myTmpFiles.add(tmpFile);
-            SVNTranslator.translate(dir, name, name, SVNFileUtil.getBasePath(tmpFile), false, false);
+            SVNTranslator.translate(dir, name, name, SVNFileUtil
+                    .getBasePath(tmpFile), false, false);
 
             String checksum = null;
             String newChecksum = SVNFileUtil.computeChecksum(tmpFile);
             if (!item.isAdded()) {
-                checksum = SVNFileUtil.computeChecksum(dir.getBaseFile(name, false));
+                checksum = SVNFileUtil.computeChecksum(dir.getBaseFile(name,
+                        false));
                 String realChecksum = entry.getChecksum();
                 if (realChecksum != null && !realChecksum.equals(checksum)) {
                     SVNErrorManager.error("svn: Checksum mismatch for '" + dir.getFile(name) + "'; expected '" + realChecksum + "', actual: '" + checksum + "'");
@@ -175,9 +187,10 @@ public class SVNCommitter implements ISVNCommitPathHandler {
             if (item.isAdded() || binary) {
                 generator = new SVNAllDeltaGenerator();
             } else {
-	            generator = new SVNSequenceDeltaGenerator(tmpFile.getParentFile());
+                generator = new SVNSequenceDeltaGenerator();
             }
-            SVNRAFileData base = new SVNRAFileData(dir.getBaseFile(name, false), true);
+            SVNRAFileData base = new SVNRAFileData(
+                    dir.getBaseFile(name, false), true);
             SVNRAFileData work = new SVNRAFileData(tmpFile, true);
             try {
                 generator.generateDiffWindow(path, editor, work, base);
@@ -206,8 +219,8 @@ public class SVNCommitter implements ISVNCommitPathHandler {
             dir = myWCAccess.getDirectory(item.getPath());
             name = "";
         } else {
-            dir = myWCAccess.getDirectory(SVNPathUtil.removeTail(item.getPath()));
-            name = SVNPathUtil.tail(item.getPath());
+            dir = myWCAccess.getDirectory(PathUtil.removeTail(item.getPath()));
+            name = PathUtil.tail(item.getPath());
         }
         SVNEntry entry = dir.getEntries().getEntry(name, false);
         boolean replaced = false;
@@ -234,15 +247,26 @@ public class SVNCommitter implements ISVNCommitPathHandler {
         }
     }
 
-    private String getCopyFromPath(SVNURL url) {
+    private String getCopyFromPath(String url) {
         if (url == null) {
             return null;
         }
-        String path = url.getPath();
-        if (myRepositoryRoot.equals(path)) {
+        if (url.indexOf("://") < 0) {
+            return url;
+        }
+        url = url.substring(url.indexOf("://") + 3);
+        if (url.indexOf("/") < 0) {
             return "/";
         }
-        return path.substring(myRepositoryRoot.length());
+        url = url.substring(url.indexOf("/"));
+        url = PathUtil.decode(url);
+        if (url.startsWith(myRepositoryRoot)) {
+            url = url.substring(myRepositoryRoot.length());
+            if (!url.startsWith("/")) {
+                url = "/" + url;
+            }
+        }
+        return url;
     }
 
     public static SVNCommitInfo commit(SVNWCAccess wcAccess,

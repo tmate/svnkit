@@ -241,7 +241,6 @@ public interface ISVNEditor {
     /**
      * Changes the value of a property of the currently "opened" file.
      * 
-     * @param  path				file's path
      * @param  name				a file property name
      * @param  value			a new value for the property
      * @throws SVNException

@@ -10,16 +10,17 @@
  */
 package org.tmatesoft.svn.core.internal.wc;
 
-import java.util.HashMap;
-import java.util.Map;
-
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNLock;
-import org.tmatesoft.svn.core.SVNURL;
-import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
 import org.tmatesoft.svn.core.io.ISVNReporter;
 import org.tmatesoft.svn.core.io.ISVNReporterBaton;
 import org.tmatesoft.svn.core.io.SVNRepository;
+import org.tmatesoft.svn.core.io.SVNRepositoryLocation;
+import org.tmatesoft.svn.util.PathUtil;
+import org.tmatesoft.svn.util.DebugLog;
+
+import java.util.Map;
+import java.util.HashMap;
 
 /**
  * @version 1.0
@@ -28,10 +29,15 @@ import org.tmatesoft.svn.core.io.SVNRepository;
 public class SVNStatusReporter implements ISVNReporterBaton, ISVNReporter {
 
     private ISVNReporter myReporter;
+
     private ISVNReporterBaton myBaton;
+
     private String myRepositoryLocation;
+
     private SVNRepository myRepository;
-    private SVNURL myRepositoryRoot;
+
+    private String myRepositoryRoot;
+
     private Map myLocks;
 
     private SVNStatusEditor myEditor;
@@ -45,20 +51,19 @@ public class SVNStatusReporter implements ISVNReporterBaton, ISVNReporter {
         myLocks = new HashMap();
     }
 
-    public SVNLock getLock(SVNURL url) {
-        // get decoded path
-        if (myRepositoryRoot == null || myLocks.isEmpty() || url == null) {
+    public SVNLock getLock(String url) {
+        DebugLog.log("fetching lock for " + url);
+        if (myRepositoryRoot == null || myLocks.isEmpty()) {
             return null;
         }
-        String urlString = url.getPath();
-        String root = myRepositoryRoot.getPath();
-        String path;
-        if (urlString.equals(root)) {
-            path = "/";
-        } else {
-            path = urlString.substring(root.length());
+        url = url.substring(url.indexOf("://") + 3);
+        url = url.substring(url.indexOf("/") + 1);
+        url = url.substring(myRepositoryRoot.length());
+        if (!url.startsWith("/")) {
+            url = "/" + url;
         }
-        return (SVNLock) myLocks.get(path);
+        url = PathUtil.decode(url);
+        return (SVNLock) myLocks.get(url);
     }
 
     public void report(ISVNReporter reporter) throws SVNException {
@@ -75,23 +80,28 @@ public class SVNStatusReporter implements ISVNReporterBaton, ISVNReporter {
         myReporter.deletePath(path);
     }
 
-    public void linkPath(SVNURL url, String path,
+    public void linkPath(SVNRepositoryLocation repository, String path,
             String lockToken, long revison, boolean startEmtpy)
             throws SVNException {
-        String rootURL = SVNPathUtil.getCommonURLAncestor(url.toString(), myRepositoryLocation);
+        String url = repository.toString();
+        String rootURL = SVNPathUtil.getCommonURLAncestor(url,
+                myRepositoryLocation);
         if (rootURL.length() < myRepositoryLocation.length()) {
             myRepositoryLocation = rootURL;
         }
-        myReporter.linkPath(url, path, lockToken, revison, startEmtpy);
+        myReporter.linkPath(repository, path, lockToken, revison, startEmtpy);
     }
 
     public void finishReport() throws SVNException {
         myReporter.finishReport();
         // collect locks
+        String path = myRepositoryLocation.substring(myRepository.getLocation()
+                .toString().length());
         SVNLock[] locks = null;
         try {
             myRepositoryRoot = myRepository.getRepositoryRoot(true);
-            locks = myRepository.getLocks("");
+            myRepositoryRoot = PathUtil.encode(myRepositoryRoot);
+            locks = myRepository.getLocks(path);
         } catch (SVNException e) {
             //
         }
@@ -101,6 +111,9 @@ public class SVNStatusReporter implements ISVNReporterBaton, ISVNReporter {
                 myLocks.put(lock.getPath(), lock);
             }
         }
+        DebugLog.log("collected locks : " + myLocks);
+        DebugLog.log("status call root: " + myRepositoryLocation);
+        DebugLog.log("repository root : " + myRepositoryRoot);
         myEditor.setStatusReporter(this);
     }
 

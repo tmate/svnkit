@@ -18,8 +18,9 @@ import java.util.Date;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNLock;
 import org.tmatesoft.svn.core.internal.io.dav.DAVElement;
-import org.tmatesoft.svn.core.internal.util.SVNBase64;
-import org.tmatesoft.svn.core.internal.util.SVNTimeUtil;
+import org.tmatesoft.svn.core.internal.io.dav.DAVUtil;
+import org.tmatesoft.svn.util.Base64;
+import org.tmatesoft.svn.util.TimeUtil;
 import org.xml.sax.Attributes;
 
 /**
@@ -78,23 +79,25 @@ public class DAVGetLocksHandler extends BasicDAVHandler {
             myCreationDate = null;
             myExpirationDate = null;
         } else if (element == DAVElement.SVN_LOCK_PATH && cdata != null) {
-            myPath = cdata.toString();
+            myPath = DAVUtil.xmlDecode(cdata.toString());
         } else if (element == DAVElement.SVN_LOCK_TOKEN && cdata != null) {
-            myToken = cdata.toString();
+            myToken = DAVUtil.xmlDecode(cdata.toString());
         } else if (element == DAVElement.SVN_LOCK_OWNER && cdata != null) {
-            myOwner = cdata.toString();
+            myOwner = DAVUtil.xmlDecode(cdata.toString());
             if (myIsBase64) {
-                myOwner = new String(SVNBase64.base64ToByteArray(new StringBuffer(myComment), null));
+                myOwner = new String(Base64.base64ToByteArray(new StringBuffer(myComment), null));
             }
         } else if (element == DAVElement.SVN_LOCK_COMMENT && cdata != null) {
-            myComment = cdata.toString();
+            myComment = DAVUtil.xmlDecode(cdata.toString());
             if (myIsBase64) {
-                myComment = new String(SVNBase64.base64ToByteArray(new StringBuffer(myComment), null));
+                myComment = new String(Base64.base64ToByteArray(new StringBuffer(myComment), null));
             }
         } else if (element == DAVElement.SVN_LOCK_CREATION_DATE && cdata != null) {
-            myCreationDate = SVNTimeUtil.parseDate(cdata.toString());
+            String dateStr = DAVUtil.xmlDecode(cdata.toString());
+            myCreationDate = TimeUtil.parseDate(dateStr);
         } else if (element == DAVElement.SVN_LOCK_EXPIRATION_DATE && cdata != null) {
-            myExpirationDate = SVNTimeUtil.parseDate(cdata.toString());
+            String dateStr = DAVUtil.xmlDecode(cdata.toString());
+            myExpirationDate = TimeUtil.parseDate(dateStr);
         }
         myIsBase64 = false;
     }

@@ -13,12 +13,9 @@ package org.tmatesoft.svn.core.internal.wc;
 import java.util.Iterator;
 import java.util.Map;
 
-import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNNodeKind;
 import org.tmatesoft.svn.core.SVNProperty;
-import org.tmatesoft.svn.core.SVNURL;
-import org.tmatesoft.svn.core.internal.util.SVNEncodingUtil;
-import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
+import org.tmatesoft.svn.util.PathUtil;
 
 /**
  * @version 1.0
@@ -58,20 +55,9 @@ public class SVNEntry implements Comparable {
         String url = myEntries.getPropertyValue(myName, SVNProperty.URL);
         if (url == null && !"".equals(myName)) {
             url = myEntries.getPropertyValue("", SVNProperty.URL);
-            url = SVNPathUtil.append(url, SVNEncodingUtil.uriEncode(myName));
+            url = PathUtil.append(url, PathUtil.encode(myName));
         }
         return url;
-    }
-    
-    public SVNURL getSVNURL() {
-        String url = getURL();
-        if (url != null) {
-            try {
-                return SVNURL.parseURIEncoded(url);
-            } catch (SVNException e) {
-            }
-        }
-        return null;
     }
 
     public String getName() {
@@ -235,7 +221,7 @@ public class SVNEntry implements Comparable {
         }
         return SVNNodeKind.UNKNOWN;
     }
-    
+
     public String getTextTime() {
         return myEntries.getPropertyValue(myName, SVNProperty.TEXT_TIME);
     }
@@ -300,17 +286,6 @@ public class SVNEntry implements Comparable {
 
     public String getCopyFromURL() {
         return myEntries.getPropertyValue(myName, SVNProperty.COPYFROM_URL);
-    }
-
-    public SVNURL getCopyFromSVNURL() {
-        String url = getCopyFromURL();
-        if (url != null) {
-            try {
-                return SVNURL.parseURIEncoded(url);
-            } catch (SVNException e) {
-            }
-        }
-        return null;
     }
 
     public long getCopyFromRevision() {

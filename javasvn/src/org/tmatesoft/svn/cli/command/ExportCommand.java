@@ -18,7 +18,6 @@ import java.io.PrintStream;
 import org.tmatesoft.svn.cli.SVNArgument;
 import org.tmatesoft.svn.cli.SVNCommand;
 import org.tmatesoft.svn.core.SVNException;
-import org.tmatesoft.svn.core.SVNURL;
 import org.tmatesoft.svn.core.wc.SVNRevision;
 import org.tmatesoft.svn.core.wc.SVNUpdateClient;
 
@@ -47,7 +46,7 @@ public class ExportCommand extends SVNCommand {
             if (revision != SVNRevision.HEAD && revision.getDate() == null && revision.getNumber() < 0) {
                 revision = SVNRevision.HEAD;
             }
-            updater.doExport(SVNURL.parseURIEncoded(url), new File(path).getAbsoluteFile(), revision, revision, eol, 
+            updater.doExport(url, new File(path).getAbsoluteFile(), revision, revision, eol, 
                     getCommandLine().hasArgument(SVNArgument.FORCE), !getCommandLine().hasArgument(SVNArgument.NON_RECURSIVE));
         } else if (srcPath != null) {
             if (revision == SVNRevision.UNDEFINED) {

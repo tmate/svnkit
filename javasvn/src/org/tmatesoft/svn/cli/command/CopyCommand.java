@@ -12,16 +12,16 @@
 
 package org.tmatesoft.svn.cli.command;
 
-import java.io.File;
-import java.io.PrintStream;
-
 import org.tmatesoft.svn.cli.SVNArgument;
 import org.tmatesoft.svn.cli.SVNCommand;
 import org.tmatesoft.svn.core.SVNCommitInfo;
 import org.tmatesoft.svn.core.SVNException;
-import org.tmatesoft.svn.core.SVNURL;
 import org.tmatesoft.svn.core.wc.SVNCopyClient;
 import org.tmatesoft.svn.core.wc.SVNRevision;
+import org.tmatesoft.svn.util.PathUtil;
+
+import java.io.File;
+import java.io.PrintStream;
 
 /**
  * @author TMate Software Ltd.
@@ -57,11 +57,15 @@ public class CopyCommand extends SVNCommand {
             return;
         }
 
+        SVNRevision srcRevision = SVNRevision.WORKING;
+        if (getCommandLine().hasArgument(SVNArgument.REVISION)) {
+            srcRevision = SVNRevision.parse((String) getCommandLine().getArgumentValue(SVNArgument.REVISION));
+        }
+
         getClientManager().setEventHandler(new SVNCommandEventProcessor(out, err, false));
         SVNCopyClient updater = getClientManager().getCopyClient();
         boolean force = getCommandLine().hasArgument(SVNArgument.FORCE);
-        SVNRevision srcRevision = SVNRevision.parse((String) getCommandLine().getArgumentValue(SVNArgument.REVISION));
-        updater.doCopy(new File(absoluteSrcPath), srcRevision, new File(absoluteDstPath), force, false);
+        updater.doCopy(new File(absoluteSrcPath), null, srcRevision, new File(absoluteDstPath), null, SVNRevision.WORKING, force, false, null);
     }
 
     private void runRemote(PrintStream out, PrintStream err) throws SVNException {
@@ -70,16 +74,18 @@ public class CopyCommand extends SVNCommand {
         }
         String srcURL = getCommandLine().getURL(0);
         SVNRevision srcRevision = SVNRevision.parse((String) getCommandLine().getArgumentValue(SVNArgument.REVISION));
+        SVNRevision srcPegRevision = getCommandLine().getPegRevision(0);
         String dstURL = getCommandLine().getURL(1);
+        SVNRevision dstPegRevision = getCommandLine().getPegRevision(1);
 
-        if (matchTabsInURL(srcURL, err) || matchTabsInURL(dstURL, err)) {
+        if (matchTabsInPath(srcURL, err) || matchTabsInPath(dstURL, err)) {
             return;
         }
 
         String commitMessage = (String) getCommandLine().getArgumentValue(SVNArgument.MESSAGE);
         getClientManager().setEventHandler(new SVNCommandEventProcessor(out, err, false));
         SVNCopyClient updater = getClientManager().getCopyClient();
-        SVNCommitInfo result = updater.doCopy(SVNURL.parseURIEncoded(srcURL), srcRevision, SVNURL.parseURIEncoded(dstURL), false, commitMessage);
+        SVNCommitInfo result = updater.doCopy(srcURL, srcPegRevision, srcRevision, dstURL, dstPegRevision, false, commitMessage);
         if (result != SVNCommitInfo.NULL) {
             out.println();
             out.println("Committed revision " + result.getNewRevision() + ".");
@@ -95,13 +101,13 @@ public class CopyCommand extends SVNCommand {
         }
         getClientManager().setEventHandler(new SVNCommandEventProcessor(out, err, false));
         SVNCopyClient updater = getClientManager().getCopyClient();
-        updater.doCopy(SVNURL.parseURIEncoded(srcURL), revision, new File(dstPath));
+        updater.doCopy(srcURL, getCommandLine().getPegRevision(0), revision, new File(dstPath), null, SVNRevision.WORKING, false, null);
     }
     
     private void runLocalToRemote(final PrintStream out, PrintStream err) throws SVNException {
         final String dstURL = getCommandLine().getURL(0);
         String srcPath = getCommandLine().getPathAt(0);
-        if (matchTabsInPath(srcPath, err) || matchTabsInURL(dstURL, err)) {
+        if (matchTabsInPath(srcPath, err) || matchTabsInPath(PathUtil.decode(dstURL), err)) {
             return;
         }
         String message = (String) getCommandLine().getArgumentValue(SVNArgument.MESSAGE);
@@ -111,9 +117,7 @@ public class CopyCommand extends SVNCommand {
         }
         getClientManager().setEventHandler(new SVNCommandEventProcessor(out, err, false));
         SVNCopyClient updater = getClientManager().getCopyClient();
-
-        SVNRevision srcRevision = SVNRevision.parse((String) getCommandLine().getArgumentValue(SVNArgument.REVISION));
-        SVNCommitInfo info = updater.doCopy(new File(srcPath), srcRevision, SVNURL.parseURIEncoded(dstURL), message);
+        SVNCommitInfo info = updater.doCopy(new File(srcPath), getCommandLine().getPathPegRevision(0), revision, dstURL, getCommandLine().getPegRevision(0), false, message);
         if (info != SVNCommitInfo.NULL) {
             out.println();
             out.println("Committed revision " + info.getNewRevision() + ".");

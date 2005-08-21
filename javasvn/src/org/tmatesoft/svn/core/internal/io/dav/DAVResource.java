@@ -17,7 +17,6 @@ import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
-import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -28,10 +27,9 @@ import java.util.List;
 import java.util.Map;
 
 import org.tmatesoft.svn.core.SVNException;
-import org.tmatesoft.svn.core.internal.util.IMeasurable;
-import org.tmatesoft.svn.core.internal.util.SVNEncodingUtil;
-import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
 import org.tmatesoft.svn.core.io.ISVNWorkspaceMediator;
+import org.tmatesoft.svn.util.DebugLog;
+import org.tmatesoft.svn.util.PathUtil;
 
 /**
  * @author TMate Software Ltd.
@@ -58,8 +56,10 @@ class DAVResource {
     public DAVResource(ISVNWorkspaceMediator mediator, DAVConnection connection, String path, long revision, boolean isCopy) {
         myPath = path;
         myMediator = mediator;
-        String locationPath = SVNEncodingUtil.uriEncode(connection.getLocation().getPath());
-        myURL = SVNPathUtil.append(locationPath, path);
+        myURL = PathUtil.append(connection.getLocation().getPath(), path);
+        if (myURL.endsWith("/")) {
+            myURL = PathUtil.removeTrailingSlash(myURL);
+        }
         myRevision = revision;
         myConnection = connection;
         myIsCopy = isCopy;
@@ -89,7 +89,8 @@ class DAVResource {
         // do fetch from server if empty...
         if (myVURL == null) {
             if (myMediator != null) {
-                myVURL = myMediator.getWorkspaceProperty(SVNEncodingUtil.uriDecode(myPath), "svn:wc:ra_dav:version-url");
+                myVURL = myMediator.getWorkspaceProperty(PathUtil.decode(myPath), "svn:wc:ra_dav:version-url");
+                DebugLog.log("cached vURL for " + myPath + " : " + myVURL);
                 if (myVURL != null) {
                     return myVURL;
                 }
@@ -98,7 +99,8 @@ class DAVResource {
             if (myRevision >= 0) {
                 // get baseline collection url for revision from public url.
                 DAVBaselineInfo info = DAVUtil.getBaselineInfo(myConnection, path, myRevision, false, false, null);
-                path = SVNPathUtil.append(info.baselineBase, info.baselinePath);
+                DebugLog.log("base line path: " + info.baselineBase + " + " + info.baselinePath);
+                path = PathUtil.append(info.baselineBase, info.baselinePath);
             }
             // get "checked-in" property from baseline collection or from HEAD, this will be vURL.
             // this shouldn't be called for copied urls.
@@ -119,7 +121,7 @@ class DAVResource {
         if (myMediator != null) {
             Object id = new Integer(myDeltaFiles.size());
             myDeltaFiles.add(id);
-            return myMediator.createTemporaryLocation(SVNEncodingUtil.uriDecode(myPath), id);
+            return myMediator.createTemporaryLocation(PathUtil.decode(myPath), id);
         }
         File tempFile = File.createTempFile("svn", "temp");
         tempFile.deleteOnExit();
@@ -133,11 +135,10 @@ class DAVResource {
     
     public InputStream getTextDelta(int i) throws IOException {
         if (myMediator != null) {
-            long length = myMediator.getLength(new Integer(i));
-            return new MeasurableStream(myMediator.getTemporaryLocation(new Integer(i)), length);
+            return myMediator.getTemporaryLocation(new Integer(i));
         }
         File file = (File) myDeltaFiles.get(i);
-        return new MeasurableStream(new BufferedInputStream(new FileInputStream(file)), file.length());
+        return new BufferedInputStream(new FileInputStream(file));
     }
     
     public void dispose() {
@@ -182,21 +183,6 @@ class DAVResource {
         sb.append(myPath);
         sb.append("]");
         return sb.toString();
-    }
-    
-    private static class MeasurableStream extends FilterInputStream implements IMeasurable {
-
-        private long myLength;
-
-        protected MeasurableStream(InputStream in, long length) {
-            super(in);
-            myLength = length;
-        }
-
-        public long getLength() {
-            return myLength;
-        }
-        
     }
 
 }

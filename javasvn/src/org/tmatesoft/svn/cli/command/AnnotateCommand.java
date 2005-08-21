@@ -19,11 +19,11 @@ import java.util.Date;
 import org.tmatesoft.svn.cli.SVNArgument;
 import org.tmatesoft.svn.cli.SVNCommand;
 import org.tmatesoft.svn.core.SVNException;
-import org.tmatesoft.svn.core.SVNURL;
-import org.tmatesoft.svn.core.internal.util.SVNFormatUtil;
 import org.tmatesoft.svn.core.wc.ISVNAnnotateHandler;
 import org.tmatesoft.svn.core.wc.SVNLogClient;
 import org.tmatesoft.svn.core.wc.SVNRevision;
+import org.tmatesoft.svn.util.TimeUtil;
+import org.tmatesoft.svn.util.SVNUtil;
 
 /**
  * @author TMate Software Ltd.
@@ -45,7 +45,7 @@ public class AnnotateCommand extends SVNCommand implements ISVNAnnotateHandler {
             String url = getCommandLine().getURL(i);
             SVNRevision pegRevision = getCommandLine().getPegRevision(i);
             try {
-                logClient.doAnnotate(SVNURL.parseURIEncoded(url), pegRevision, SVNRevision.UNDEFINED, endRevision, this);
+                logClient.doAnnotate(url, pegRevision, SVNRevision.UNDEFINED, endRevision, this);
             } catch (SVNException e) {
                 if (e.getMessage() != null && e.getMessage().indexOf("binary") >= 0) {
                     out.println("Skipping binary file: '" + url + "'");
@@ -65,7 +65,7 @@ public class AnnotateCommand extends SVNCommand implements ISVNAnnotateHandler {
                 logClient.doAnnotate(path, pegRevision, SVNRevision.UNDEFINED, endRevision, this);
             } catch (SVNException e) {
                 if (e.getMessage() != null && e.getMessage().indexOf("binary") >= 0) {
-                    out.println("Skipping binary file: '" + SVNFormatUtil.formatPath(path) + "'");
+                    out.println("Skipping binary file: '" + SVNUtil.getPath(path) + "'");
                 } else {
                     throw e;
                 }
@@ -77,17 +77,17 @@ public class AnnotateCommand extends SVNCommand implements ISVNAnnotateHandler {
         if (myIsVerbose) {
             result.append(Long.toString(revision));
             result.append(' ');
-            result.append(author != null ? SVNFormatUtil.formatString(author, 10, false) : "         -");
+            result.append(author != null ? SVNUtil.formatString(author, 10, false) : "         -");
             result.append(' ');
             if (date != null) {
-                result.append(SVNFormatUtil.formatDate(date));
+                result.append(TimeUtil.toHumanDate(TimeUtil.formatDate(date)));
             } else {
                 result.append("                                           -");
             }
             result.append(' ');
         } else {
             result.append(Long.toString(revision));
-            result.append(author != null ? SVNFormatUtil.formatString(author, 10, false) : "         -");
+            result.append(author != null ? SVNUtil.formatString(author, 10, false) : "         -");
             result.append(' ');
         }
         result.append(line);

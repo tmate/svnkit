@@ -19,7 +19,7 @@ import java.security.KeyStore;
 import javax.net.ssl.KeyManager;
 import javax.net.ssl.KeyManagerFactory;
 
-import org.tmatesoft.svn.util.SVNDebugLog;
+import org.tmatesoft.svn.util.DebugLog;
 
 class DAVKeyManager {
     
@@ -38,6 +38,7 @@ class DAVKeyManager {
         if (certFileName == null) {
             return null;
         }
+        DebugLog.log("SSL: using client certificate file: " + certFileName);
         char[] passphrase = null;
         if (System.getProperty(CERTIFICATE_PASSPHRASE) != null) {
             passphrase = System.getProperty(CERTIFICATE_PASSPHRASE).toCharArray();
@@ -51,7 +52,7 @@ class DAVKeyManager {
                 keyStore.load(is, passphrase);                    
             }
         } catch (Throwable th) {
-            SVNDebugLog.logInfo(th);
+            DebugLog.error(th);
         } finally {
             if (is != null) {
                 try {
@@ -69,7 +70,7 @@ class DAVKeyManager {
                     ourKeyManagers = kmf.getKeyManagers();
                 }
             } catch (Throwable e) {
-                SVNDebugLog.logInfo(e);
+                DebugLog.error(e);
             } 
         }
         return ourKeyManagers; 

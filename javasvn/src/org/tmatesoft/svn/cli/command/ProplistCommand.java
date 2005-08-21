@@ -18,12 +18,11 @@ import java.io.PrintStream;
 import org.tmatesoft.svn.cli.SVNArgument;
 import org.tmatesoft.svn.cli.SVNCommand;
 import org.tmatesoft.svn.core.SVNException;
-import org.tmatesoft.svn.core.SVNURL;
-import org.tmatesoft.svn.core.internal.util.SVNFormatUtil;
 import org.tmatesoft.svn.core.wc.ISVNPropertyHandler;
 import org.tmatesoft.svn.core.wc.SVNPropertyData;
 import org.tmatesoft.svn.core.wc.SVNRevision;
 import org.tmatesoft.svn.core.wc.SVNWCClient;
+import org.tmatesoft.svn.util.SVNUtil;
 
 /**
  * @author TMate Software Ltd.
@@ -49,16 +48,16 @@ public class ProplistCommand extends SVNCommand implements ISVNPropertyHandler {
         if (getCommandLine().hasURLs()) {
             String url = getCommandLine().getURL(0);
             if (myIsRevProp) {
-                wcClient.doGetRevisionProperty(SVNURL.parseURIEncoded(url), null, revision, this);
+                wcClient.doGetRevisionProperty(url, null, revision, this);
             } else {
                 SVNRevision pegRevision = getCommandLine().getPegRevision(0);
-                wcClient.doGetProperty(SVNURL.parseURIEncoded(url), null, pegRevision, revision, myIsRecursive, this);
+                wcClient.doGetProperty(url, null, pegRevision, revision, myIsRecursive, this);
             }
         } else if (getCommandLine().getPathCount() > 0) {
             String path = getCommandLine().getPathAt(0);
             SVNRevision pegRevision = getCommandLine().getPathPegRevision(0);
             if (myIsRevProp) {
-                wcClient.doGetRevisionProperty(new File(path), null, revision, this);
+                wcClient.doGetRevisionProperty(new File(path), null, pegRevision, revision, this);
             } else {
                 wcClient.doGetProperty(new File(path), null, pegRevision, revision, myIsRecursive, this);
             }
@@ -66,11 +65,11 @@ public class ProplistCommand extends SVNCommand implements ISVNPropertyHandler {
     }
 
     private File myCurrentFile;
-    private SVNURL myCurrentURL;
+    private String myCurrentURL;
 
     public void handleProperty(File path, SVNPropertyData property) throws SVNException {
         if (!path.equals(myCurrentFile)) {
-            myOut.println("Properties on '" + SVNFormatUtil.formatPath(path) + "':");
+            myOut.println("Properties on '" + SVNUtil.getPath(path) + "':");
             myCurrentFile = path;
         }
         myOut.print("  ");
@@ -81,7 +80,7 @@ public class ProplistCommand extends SVNCommand implements ISVNPropertyHandler {
         myOut.println();
     }
 
-    public void handleProperty(SVNURL url, SVNPropertyData property) throws SVNException {
+    public void handleProperty(String url, SVNPropertyData property) throws SVNException {
         if (!myIsRevProp) {
             if (!url.equals(myCurrentURL)) {
                 myOut.println("Properties on '" + url + "':");
@@ -97,8 +96,5 @@ public class ProplistCommand extends SVNCommand implements ISVNPropertyHandler {
             myOut.print(" : " + property.getValue());
         }
         myOut.println();
-    }
-    
-    public void handleProperty(long revision, SVNPropertyData property) throws SVNException {        
     }
 }

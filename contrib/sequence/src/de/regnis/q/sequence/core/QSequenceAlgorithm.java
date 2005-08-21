@@ -28,24 +28,22 @@ public class QSequenceAlgorithm {
 
 	// Setup ==================================================================
 
-	public QSequenceAlgorithm(QSequenceMedia media, QSequenceSnakeRegister snakeRegister, int maximumSearchDepth) {
-		QSequenceAssert.assertTrue(maximumSearchDepth >= 2); // Because for dee == 1, there is a special treatment in produceSnakesInOrder.
-
+	public QSequenceAlgorithm(QSequenceMedia media, QSequenceSnakeRegister snakeRegister) {
 		this.mainMedia = media;
 		this.snakeRegister = snakeRegister;
-		this.finder = new QSequenceMiddleSnakeFinder(media.getLeftLength(), media.getRightLength(), maximumSearchDepth);
+		this.finder = new QSequenceMiddleSnakeFinder(media.getLeftLength(), media.getRightLength());
 	}
 
 	// Accessing ==============================================================
 
 	public void produceSnakesInOrder() throws QSequenceException {
 		final QSequenceRestrictedMedia media = new QSequenceRestrictedMedia(mainMedia);
-		produceSnakesInOrder(media);
+		producesSnakesInOrder(media);
 	}
 
 	// Utils ==================================================================
 
-	private void produceSnakesInOrder(QSequenceRestrictedMedia media) throws QSequenceException {
+	private void producesSnakesInOrder(QSequenceRestrictedMedia media) throws QSequenceException {
 		final int leftLength = media.getLeftLength();
 		final int rightLength = media.getRightLength();
 
@@ -59,19 +57,19 @@ public class QSequenceAlgorithm {
 			return;
 		}
 
-		final int leftFrom = finder.getResult().getLeftFrom();
-		final int rightFrom = finder.getResult().getRightFrom();
-		final int leftTo = finder.getResult().getLeftTo();
-		final int rightTo = finder.getResult().getRightTo();
-
 		if (dee == 1) {
+			final int leftStart = finder.getResult().getLeftStart();
+			final int rightStart = finder.getResult().getRightStart();
+
+			QSequenceAssert.assertTrue(leftStart >= 0 && rightStart >= 0);
+
 			if (rightLength == leftLength + 1) {
-				registerSnake(media, 1, leftFrom, 1, rightFrom - 1);
-				registerSnake(media, leftFrom + 1, leftTo, rightFrom + 1, rightTo);
+				registerSnake(media, 1, rightStart, 1, rightStart);
+				registerSnake(media, rightStart + 1, leftLength, rightStart + 2, rightLength);
 			}
 			else if (leftLength == rightLength + 1) {
-				registerSnake(media, 1, leftFrom - 1, 1, rightFrom);
-				registerSnake(media, leftFrom + 1, leftTo, rightFrom + 1, rightTo);
+				registerSnake(media, 1, leftStart, 1, leftStart);
+				registerSnake(media, leftStart + 2, leftLength, leftStart + 1, rightLength);
 			}
 			else {
 				QSequenceAssert.assertTrue(false);
@@ -80,6 +78,10 @@ public class QSequenceAlgorithm {
 			return;
 		}
 
+		final int leftFrom = finder.getResult().getLeftFrom();
+		final int rightFrom = finder.getResult().getRightFrom();
+		final int leftTo = finder.getResult().getLeftTo();
+		final int rightTo = finder.getResult().getRightTo();
 		final int leftMin = media.getLeftMin();
 		final int rightMin = media.getRightMin();
 		final int leftMax = media.getLeftMax();
@@ -87,11 +89,11 @@ public class QSequenceAlgorithm {
 
 		try {
 			media.restrictTo(leftMin, leftMin + leftFrom - 1, rightMin, rightMin + rightFrom - 1);
-			produceSnakesInOrder(media);
+			producesSnakesInOrder(media);
 			media.restrictTo(leftMin, leftMax, rightMin, rightMax);
 			registerSnake(media, leftFrom + 1, leftTo, rightFrom + 1, rightTo);
 			media.restrictTo(leftMin + leftTo - 1 + 1, leftMax, rightMin + rightTo - 1 + 1, rightMax);
-			produceSnakesInOrder(media);
+			producesSnakesInOrder(media);
 		}
 		finally {
 			media.restrictTo(leftMin, leftMax, rightMin, rightMax);

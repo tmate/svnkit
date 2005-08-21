@@ -12,7 +12,6 @@
 package org.tmatesoft.svn.core.auth;
 
 import org.tmatesoft.svn.core.SVNException;
-import org.tmatesoft.svn.core.SVNURL;
 
 /**
  * @version 1.0
@@ -25,13 +24,13 @@ public interface ISVNAuthenticationManager {
 
     public void setAuthenticationProvider(ISVNAuthenticationProvider provider);
     
-    public ISVNProxyManager getProxyManager(SVNURL url) throws SVNException;
+    public ISVNProxyManager getProxyManager(String url) throws SVNException;
     
-    public ISVNSSLManager getSSLManager(SVNURL url) throws SVNException;
+    public ISVNSSLManager getSSLManager(String url) throws SVNException;
     
-    public SVNAuthentication getFirstAuthentication(String kind, String realm, SVNURL url) throws SVNException;
+    public SVNAuthentication getFirstAuthentication(String kind, String realm) throws SVNException;
 
-    public SVNAuthentication getNextAuthentication(String kind, String realm, SVNURL url) throws SVNException;
+    public SVNAuthentication getNextAuthentication(String kind, String realm) throws SVNException;
     
     public void acknowledgeAuthentication(boolean accepted, String kind, String realm, String errorMessage, SVNAuthentication authentication);
     
