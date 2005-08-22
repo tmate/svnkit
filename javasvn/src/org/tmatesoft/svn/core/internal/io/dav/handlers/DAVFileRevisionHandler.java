@@ -12,19 +12,21 @@
 
 package org.tmatesoft.svn.core.internal.io.dav.handlers;
 
-import org.tmatesoft.svn.core.SVNException;
-import org.tmatesoft.svn.core.internal.io.dav.DAVElement;
-import org.tmatesoft.svn.core.internal.io.dav.DAVUtil;
-import org.tmatesoft.svn.core.io.ISVNFileRevisionHandler;
-import org.tmatesoft.svn.core.io.SVNFileRevision;
-import org.tmatesoft.svn.core.io.diff.SVNDiffWindow;
-import org.tmatesoft.svn.util.Base64;
-import org.xml.sax.Attributes;
-
 import java.io.OutputStream;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+
+import org.tmatesoft.svn.core.SVNCommitInfo;
+import org.tmatesoft.svn.core.SVNException;
+import org.tmatesoft.svn.core.internal.io.dav.DAVElement;
+import org.tmatesoft.svn.core.internal.util.SVNBase64;
+import org.tmatesoft.svn.core.internal.util.SVNEncodingUtil;
+import org.tmatesoft.svn.core.io.ISVNEditor;
+import org.tmatesoft.svn.core.io.ISVNFileRevisionHandler;
+import org.tmatesoft.svn.core.io.SVNFileRevision;
+import org.tmatesoft.svn.core.io.diff.SVNDiffWindow;
+import org.xml.sax.Attributes;
 
 
 /**
@@ -44,7 +46,7 @@ public class DAVFileRevisionHandler extends BasicDAVDeltaHandler {
         if (endRevision >= 0) {
         	buffer.append("<S:end-revision>"  + endRevision + "</S:end-revision>");
         }
-        buffer.append("<S:path>"  + DAVUtil.xmlEncode(path) + "</S:path>");
+        buffer.append("<S:path>"  + SVNEncodingUtil.xmlEncodeCDATA(path) + "</S:path>");
         buffer.append("</S:file-revs-report>");
         return buffer;
 	}
@@ -64,10 +66,12 @@ public class DAVFileRevisionHandler extends BasicDAVDeltaHandler {
     private String myPropertyEncoding;
 	
     private int myCount;
+    private SVNEditorWrapper myEditor;
 
 	public DAVFileRevisionHandler(ISVNFileRevisionHandler handler) {
 		myFileRevisionsHandler = handler;
 		myCount = 0;
+        myEditor = new SVNEditorWrapper(handler);
 		init();
 	}
 	
@@ -117,7 +121,7 @@ public class DAVFileRevisionHandler extends BasicDAVDeltaHandler {
             if (myPropertyName != null) {
                 String value;
                 if ("base64".equals(myPropertyEncoding)) {
-                    byte[] bytes = Base64.base64ToByteArray(cdata, null);
+                    byte[] bytes = SVNBase64.base64ToByteArray(cdata, null);
                     value = new String(bytes);
                 } else {
                     value = cdata.toString();
@@ -141,12 +145,82 @@ public class DAVFileRevisionHandler extends BasicDAVDeltaHandler {
 	public int getEntriesCount() {
 		return myCount;
 	}
-
-    protected void handleDiffWindowClosed() throws SVNException {
-        myFileRevisionsHandler.handleDiffWindowClosed(myPath);
+    
+    protected ISVNEditor getEditor() {
+        return myEditor;
     }
     
-    protected OutputStream handleDiffWindow(SVNDiffWindow window) throws SVNException {
-        return myFileRevisionsHandler.handleDiffWindow(myPath, window);
+    protected String getCurrentPath() {
+        return myPath;
+    }
+    
+    private static class SVNEditorWrapper implements ISVNEditor {
+        
+        private ISVNFileRevisionHandler myHandler;
+
+        public SVNEditorWrapper(ISVNFileRevisionHandler handler) {
+            myHandler = handler;
+        }
+
+        public void targetRevision(long revision) throws SVNException {
+        }
+
+        public void openRoot(long revision) throws SVNException {
+        }
+
+        public void deleteEntry(String path, long revision) throws SVNException {
+        }
+
+        public void absentDir(String path) throws SVNException {
+        }
+
+        public void absentFile(String path) throws SVNException {
+        }
+
+        public void addDir(String path, String copyFromPath, long copyFromRevision) throws SVNException {
+        }
+
+        public void openDir(String path, long revision) throws SVNException {
+        }
+
+        public void changeDirProperty(String name, String value) throws SVNException {
+        }
+
+        public void closeDir() throws SVNException {
+        }
+
+        public void addFile(String path, String copyFromPath, long copyFromRevision) throws SVNException {
+        }
+
+        public void openFile(String path, long revision) throws SVNException {
+        }
+
+        public void applyTextDelta(String path, String baseChecksum) throws SVNException {
+        }
+
+        public OutputStream textDeltaChunk(String path, SVNDiffWindow diffWindow) throws SVNException {
+            return myHandler != null ? myHandler.handleDiffWindow(path, diffWindow) : null;
+        }
+
+        public void textDeltaEnd(String path) throws SVNException {
+            if (myHandler != null) {
+                myHandler.handleDiffWindowClosed(path);
+            }
+        }
+
+        public void changeFileProperty(String path, String name, String value) throws SVNException {
+        }
+
+        public void closeFile(String path, String textChecksum) throws SVNException {
+        }
+
+        public SVNCommitInfo closeEdit() throws SVNException {
+            return null;
+        }
+
+        public void abortEdit() throws SVNException {
+        }
+        
     }
 }
+ 

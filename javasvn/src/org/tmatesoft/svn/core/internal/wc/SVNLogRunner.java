@@ -21,11 +21,10 @@ import java.util.Map;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNNodeKind;
 import org.tmatesoft.svn.core.SVNProperty;
+import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
+import org.tmatesoft.svn.core.internal.util.SVNTimeUtil;
 import org.tmatesoft.svn.core.wc.SVNStatusType;
 import org.tmatesoft.svn.core.wc.SVNWCUtil;
-import org.tmatesoft.svn.util.DebugLog;
-import org.tmatesoft.svn.util.TimeUtil;
-import org.tmatesoft.svn.util.PathUtil;
 
 /**
  * @version 1.0
@@ -38,7 +37,6 @@ public class SVNLogRunner {
     public void runCommand(SVNDirectory dir, String name, Map attributes)
             throws SVNException {
         String fileName = (String) attributes.remove(SVNLog.NAME_ATTR);
-        DebugLog.log("running: " + name + ":" + fileName + " : " + attributes);
         if (SVNLog.DELETE_ENTRY.equals(name)) {
             // check if it is not disjoint entry not to delete another wc?
             dir.destroy(fileName, true);
@@ -59,12 +57,12 @@ public class SVNLogRunner {
                         String path = "".equals(fileName) ? ".svn/dir-props"
                                 : ".svn/props/" + fileName + ".svn-work";
                         File file = new File(dir.getRoot(), path);
-                        value = TimeUtil.formatDate(new Date(file
+                        value = SVNTimeUtil.formatDate(new Date(file
                                 .lastModified()));
                     } else if (SVNProperty.TEXT_TIME.equals(attName)) {
                         String path = "".equals(fileName) ? "" : fileName;
                         File file = new File(dir.getRoot(), path);
-                        value = TimeUtil.formatDate(new Date(file
+                        value = SVNTimeUtil.formatDate(new Date(file
                                 .lastModified()));
                     }
                 }
@@ -128,7 +126,7 @@ public class SVNLogRunner {
             }
         } else if (SVNLog.SET_TIMESTAMP.equals(name)) {
             File file = new File(dir.getRoot(), fileName);
-            Date time = TimeUtil.parseDate((String) attributes
+            Date time = SVNTimeUtil.parseDate((String) attributes
                     .get(SVNLog.TIMESTAMP_ATTR));
             file.setLastModified(time.getTime());
         } else if (SVNLog.MAYBE_READONLY.equals(name)) {
@@ -143,7 +141,7 @@ public class SVNLogRunner {
             File dst = new File(dir.getRoot(), dstName);
             // get properties for this entry.
             SVNProperties props = dir.getProperties(dstName, false);
-            boolean executable = props.getPropertyValue(SVNProperty.EXECUTABLE) != null;
+            boolean executable = SVNFileUtil.isWindows ? false : props.getPropertyValue(SVNProperty.EXECUTABLE) != null;
 
             SVNTranslator
                     .translate(dir, dstName, fileName, dstName, true, true);
@@ -195,9 +193,6 @@ public class SVNLogRunner {
             SVNEntry entry = dir.getEntries().getEntry(fileName, true);
             if (entry == null
                     || (!"".equals(fileName) && entry.getKind() != SVNNodeKind.FILE)) {
-                DebugLog.log("entry: " + entry);
-                DebugLog.log("kind: " + entry.getKind());
-                DebugLog.log("name: " + fileName);
                 SVNErrorManager.error("svn: Log command for directory '"
                         + dir.getRoot() + "' is mislocated");
             }
@@ -372,9 +367,9 @@ public class SVNLogRunner {
             entry.unschedule();
             entry.setCopied(false);
             entry.setDeleted(false);
-            entry.setTextTime(textTime == 0 ? null : TimeUtil
+            entry.setTextTime(textTime == 0 ? null : SVNTimeUtil
                     .formatDate(new Date(textTime)));
-            entry.setPropTime(propTime == 0 ? null : TimeUtil
+            entry.setPropTime(propTime == 0 ? null : SVNTimeUtil
                     .formatDate(new Date(propTime)));
             entry.setConflictNew(null);
             entry.setConflictOld(null);
@@ -392,11 +387,7 @@ public class SVNLogRunner {
             if (SVNWCUtil.isWorkingCopyRoot(dirFile, true)) {
                 return;
             }
-            String parentPath = "".equals(dir.getPath()) ? null : PathUtil
-                    .removeTail(dir.getPath());
-            if (PathUtil.isEmpty(parentPath)) {
-                parentPath = "";
-            }
+            String parentPath = SVNPathUtil.removeTail(dir.getPath());
             SVNDirectory parentDir = dir.getWCAccess().getDirectory(parentPath);
             SVNWCAccess parentAccess = null;
             if (parentDir == null) {
@@ -442,11 +433,7 @@ public class SVNLogRunner {
             if (SVNWCUtil.isWorkingCopyRoot(dirFile, true)) {
                 return;
             }
-            String parentPath = "".equals(dir.getPath()) ? null : PathUtil
-                    .removeTail(dir.getPath());
-            if (PathUtil.isEmpty(parentPath)) {
-                parentPath = "";
-            }
+            String parentPath = SVNPathUtil.removeTail(dir.getPath());
             SVNDirectory parentDir = dir.getWCAccess().getDirectory(parentPath);
             SVNWCAccess parentAccess = null;
             if (parentDir == null) {

@@ -37,6 +37,7 @@ import org.apache.commons.httpclient.protocol.ProtocolSocketFactory;
 import org.tmatesoft.svn.core.SVNAuthenticationException;
 import org.tmatesoft.svn.core.SVNCancelException;
 import org.tmatesoft.svn.core.SVNException;
+import org.tmatesoft.svn.core.SVNURL;
 import org.tmatesoft.svn.core.auth.ISVNAuthenticationManager;
 import org.tmatesoft.svn.core.auth.ISVNProxyManager;
 import org.tmatesoft.svn.core.auth.ISVNSSLManager;
@@ -60,7 +61,7 @@ import org.xml.sax.helpers.DefaultHandler;
  */
 class CommonsHttpConnection {
 
-    private SVNRepositoryLocation mySVNRepositoryLocation;
+    private SVNURL mySVNRepositoryLocation;
     private SAXParser mySAXParser;
 
     private static SAXParserFactory ourSAXParserFactory;
@@ -74,7 +75,7 @@ class CommonsHttpConnection {
     private BasicHttpMethod myHttpMethod;
     private String myLastStatusText;
 
-    public CommonsHttpConnection(SVNRepositoryLocation location, SVNRepository repos) {
+    public CommonsHttpConnection(SVNURL location, SVNRepository repos) {
         mySVNRepositoryLocation = location;
         myAuthManager = repos.getAuthenticationManager();
     }
@@ -83,14 +84,14 @@ class CommonsHttpConnection {
         close();
         String host = mySVNRepositoryLocation.getHost();
         int port = mySVNRepositoryLocation.getPort();
-        myProxyAuth = myAuthManager != null ? myAuthManager.getProxyManager(mySVNRepositoryLocation.toCanonicalForm()) : null;
+        myProxyAuth = myAuthManager != null ? myAuthManager.getProxyManager(mySVNRepositoryLocation) : null;
         myClient = new HttpClient();
         
         String protocol = mySVNRepositoryLocation.getProtocol();
         if("https".equals(protocol)){
             try {
                 ProtocolSocketFactory factory =
-                    new SSLProtocolSocketFactory(myAuthManager.getSSLManager(mySVNRepositoryLocation.toCanonicalForm()).getSSLContext());
+                    new SSLProtocolSocketFactory(myAuthManager.getSSLManager(mySVNRepositoryLocation).getSSLContext());
                 Protocol myProtocol = new Protocol(protocol, factory, 443);
                 myClient.getHostConfiguration().setHost(host, port, myProtocol);
             } catch (IOException e) {
@@ -255,10 +256,10 @@ class CommonsHttpConnection {
                     throw new SVNAuthenticationException("No credentials defined");
                 }
                 if (auth == null) {
-                    auth = myAuthManager.getFirstAuthentication(ISVNAuthenticationManager.PASSWORD, realm);
+                    auth = myAuthManager.getFirstAuthentication(ISVNAuthenticationManager.PASSWORD, realm, mySVNRepositoryLocation);
                 } else {
                     myAuthManager.acknowledgeAuthentication(false, ISVNAuthenticationManager.PASSWORD, realm, null, auth);
-                    auth = myAuthManager.getNextAuthentication(ISVNAuthenticationManager.PASSWORD, realm);
+                    auth = myAuthManager.getNextAuthentication(ISVNAuthenticationManager.PASSWORD, realm, mySVNRepositoryLocation);
                 }
                 
                 // reset stream!
@@ -487,7 +488,7 @@ class CommonsHttpConnection {
             return;
         }
         if (myAuthManager != null) {
-            ISVNSSLManager sslManager = myAuthManager.getSSLManager(mySVNRepositoryLocation.toCanonicalForm());
+            ISVNSSLManager sslManager = myAuthManager.getSSLManager(mySVNRepositoryLocation);
             if (sslManager != null) {
                 sslManager.acknowledgeSSLContext(accepted, null);
             }

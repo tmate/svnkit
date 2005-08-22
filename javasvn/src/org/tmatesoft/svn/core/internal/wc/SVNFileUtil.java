@@ -10,14 +10,9 @@
  */
 package org.tmatesoft.svn.core.internal.wc;
 
-import org.tmatesoft.svn.core.SVNException;
-import org.tmatesoft.svn.util.DebugLog;
-import org.tmatesoft.svn.util.PathUtil;
-
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.BufferedReader;
-import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -33,6 +28,10 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.StringTokenizer;
 
+import org.tmatesoft.svn.core.SVNException;
+import org.tmatesoft.svn.core.wc.ISVNEventHandler;
+import org.tmatesoft.svn.util.SVNDebugLog;
+
 /**
  * @version 1.0
  * @author TMate Software Ltd.
@@ -43,6 +42,11 @@ public class SVNFileUtil {
     public final static boolean isWindows;
     public final static OutputStream DUMMY_OUT = new OutputStream() {
         public void write(int b) throws IOException {
+        }
+    };
+    public final static InputStream DUMMY_IN = new InputStream() {
+        public int read() throws IOException {
+            return -1;
         }
     };
     
@@ -104,6 +108,10 @@ public class SVNFileUtil {
     }
 
     public static void rename(File src, File dst) throws SVNException {
+        boolean renamed = src.renameTo(dst);
+        if (renamed) {
+            return;
+        }
         if (!src.exists() && !isSymlink(src)) {
             SVNErrorManager.error("svn: Cannot rename file '"
                     + src.getAbsolutePath() + "' : file doesn't exist");
@@ -112,7 +120,6 @@ public class SVNFileUtil {
             SVNErrorManager.error("svn: Cannot overwrite file '"
                     + dst.getAbsolutePath() + "' : it is a directory");
         }
-        boolean renamed = src.renameTo(dst);
         if (!renamed) {
             if (dst.exists()) {
                 boolean deleted = dst.delete();
@@ -137,6 +144,9 @@ public class SVNFileUtil {
         if (readonly) {
             return file.setReadOnly();
         }
+        if (file.canWrite()) {
+            return true;
+        }
         File tmpFile = createUniqueFile(file.getParentFile(), file.getName(), ".tmp");
         copyFile(file, tmpFile, false);
         rename(tmpFile, file);
@@ -151,7 +161,7 @@ public class SVNFileUtil {
             execCommand(new String[] { "chmod", executable ? "ugo+x" : "ugo-x",
                     file.getAbsolutePath() });
         } catch (Throwable th) {
-            DebugLog.error(th);
+            SVNDebugLog.logInfo(th);
         }
     }
 
@@ -164,26 +174,18 @@ public class SVNFileUtil {
         return line != null && line.startsWith("l");
     }
 
-    public static void copy(File src, File dst, boolean safe,
-            boolean copyAdminDirectories) throws SVNException {
+    public static void copy(File src, File dst, boolean safe, boolean copyAdminDirectories) throws SVNException {
         SVNFileType srcType = SVNFileType.getType(src);
         if (srcType == SVNFileType.FILE) {
             copyFile(src, dst, safe);
         } else if (srcType == SVNFileType.DIRECTORY) {
-            copyDirectory(src, dst, copyAdminDirectories);
+            copyDirectory(src, dst, copyAdminDirectories, null);
         } else if (srcType == SVNFileType.SYMLINK) {
             String name = SVNFileUtil.getSymlinkName(src);
             if (name != null) {
                 SVNFileUtil.createSymlink(dst, name);
             }
         }
-    }
-
-    public static void copy(InputStream is, OutputStream os) throws IOException {
-        int r;
-        while((r = is.read()) >= 0) {
-            os.write(r);
-        }        
     }
 
     public static void copyFile(File src, File dst, boolean safe)
@@ -201,8 +203,7 @@ public class SVNFileUtil {
         File tmpDst = dst;
         if (dst.exists()) {
             if (safe) {
-                tmpDst = createUniqueFile(dst.getParentFile(), dst.getName(),
-                        ".tmp");
+                tmpDst = createUniqueFile(dst.getParentFile(), dst.getName(), ".tmp");
             } else {
                 dst.delete();
             }
@@ -264,8 +265,6 @@ public class SVNFileUtil {
     }
 
     public static boolean createSymlink(File link, String linkName) {
-        DebugLog.log("running command: ln -s " + linkName + " "
-                + link.getAbsolutePath());
         execCommand(new String[] { "ln", "-s", linkName, link.getAbsolutePath() });
         return isSymlink(link);
     }
@@ -297,21 +296,9 @@ public class SVNFileUtil {
         if (isWindows || link == null) {
             return null;
         }
-        String ls = execCommand(new String[] { "ls", "-ld",
-                link.getAbsolutePath() });
+        String ls = execCommand(new String[] { "ls", "-ld", link.getAbsolutePath() });
         if (ls == null || ls.lastIndexOf(" -> ") < 0) {
-            String linkPath = null;
-            try {
-                linkPath = link.getCanonicalPath();
-                String locationPath = link.getAbsolutePath();
-                if (linkPath.startsWith(locationPath)) {
-                    linkPath = PathUtil.removeLeadingSlash(linkPath
-                            .substring(locationPath.length()));
-                }
-            } catch (IOException e) {
-                //
-            }
-            return linkPath;
+            return null;
         }
         return ls.substring(ls.lastIndexOf(" -> ") + " -> ".length()).trim();
     }
@@ -335,7 +322,7 @@ public class SVNFileUtil {
     }
 
     public static String computeChecksum(File file) throws SVNException {
-        if (file == null || !file.exists() || file.isDirectory()) {
+        if (file == null || file.isDirectory() || !file.exists()) {
             return null;
         }
         MessageDigest digest;
@@ -346,13 +333,14 @@ public class SVNFileUtil {
             return null;
         }
         InputStream is = openFileForReading(file);
+        byte[] buffer = new byte[1024*16];
         try {
             while (true) {
-                int b = is.read();
-                if (b < 0) {
+                int l = is.read(buffer);
+                if (l <= 0) {
                     break;
                 }
-                digest.update((byte) (b & 0xFF));
+                digest.update(buffer, 0, l);
             }
         } catch (IOException e) {
             SVNErrorManager.error("svn: I/O error while computing checksum for '" + file + "'");
@@ -420,19 +408,35 @@ public class SVNFileUtil {
         }
     }
 
-    public static void deleteAll(File dir) {
-        deleteAll(dir, true);
+    public static void deleteAll(File dir, ISVNEventHandler cancelBaton) throws SVNException {
+        deleteAll(dir, true, cancelBaton);
     }
 
     public static void deleteAll(File dir, boolean deleteDirs) {
+      try {
+        deleteAll(dir, deleteDirs, null);
+      }
+      catch (SVNException e) {
+        // should never happen as cancell handler is null.
+      }
+
+    }
+
+    public static void deleteAll(File dir, boolean deleteDirs, ISVNEventHandler cancelBaton) throws SVNException {
         if (dir == null) {
             return;
         }
         File[] children = dir.listFiles();
         if (children != null) {
+            if (cancelBaton != null) {
+                cancelBaton.checkCancelled();
+            }
             for (int i = 0; i < children.length; i++) {
                 File child = children[i];
-                deleteAll(child, deleteDirs);
+                deleteAll(child, deleteDirs, cancelBaton);
+            }
+            if (cancelBaton != null) {
+                cancelBaton.checkCancelled();
             }
         }
         if (dir.isDirectory() && !deleteDirs) {
@@ -473,11 +477,7 @@ public class SVNFileUtil {
     }
 
     public static long roundTimeStamp(long tstamp) {
-        long remainder = tstamp - ((tstamp / 1000) * 1000);
-        if (remainder < 500) {
-            return (tstamp / 1000) * 1000;
-        }
-        return (tstamp / 1000) * 1000 + 1000;
+        return (tstamp / 1000) * 1000;
     }
 
     public static void sleepForTimestamp() {
@@ -570,8 +570,7 @@ public class SVNFileUtil {
         }
     }
 
-    public static void copyDirectory(File srcDir, File dstDir,
-            boolean copyAdminDir) throws SVNException {
+    public static void copyDirectory(File srcDir, File dstDir, boolean copyAdminDir, ISVNEventHandler cancel) throws SVNException {
         if (!dstDir.exists()) {
             dstDir.mkdirs();
             dstDir.setLastModified(srcDir.lastModified());
@@ -582,6 +581,9 @@ public class SVNFileUtil {
             if (file.getName().equals("..") || file.getName().equals(".")
                     || file.equals(dstDir)) {
                 continue;
+            }
+            if (cancel != null) {
+                cancel.checkCancelled();
             }
             if (!copyAdminDir && file.getName().equals(".svn")) {
                 continue;
@@ -596,7 +598,7 @@ public class SVNFileUtil {
                     setExecutable(dst, executable);
                 }
             } else if (fileType == SVNFileType.DIRECTORY) {
-                copyDirectory(file, dst, copyAdminDir);
+                copyDirectory(file, dst, copyAdminDir, cancel);
                 if (file.isHidden() || ".svn".equals(file.getName())) {
                     setHidden(dst, true);
                 }
@@ -617,11 +619,14 @@ public class SVNFileUtil {
         if (file == null) {
             return null;
         }
+        /*
         if (file.exists() && (!file.isFile() || !file.canWrite())) {
             SVNErrorManager.error("svn: Cannot write to '" + file
                     + "': path refers to directory or write access denied");
+        }*/
+        if (!file.getParentFile().exists()) {
+            file.getParentFile().mkdirs();
         }
-        file.getParentFile().mkdirs();
         try {
             return new BufferedOutputStream(new FileOutputStream(file, append));
         } catch (FileNotFoundException e) {
@@ -636,17 +641,15 @@ public class SVNFileUtil {
             return null;
         }
         if (!file.isFile() || !file.canRead()) {
-            SVNErrorManager.error("svn: Cannot read from '" + file
-                    + "': path refers to directory or read access denied");
+            SVNErrorManager.error("svn: Cannot read from '" + file + "': path refers to directory or read access denied");
         }
         if (!file.exists()) {
-            return new ByteArrayInputStream(new byte[0]);
+            return DUMMY_IN;
         }
         try {
             return new BufferedInputStream(new FileInputStream(file));
         } catch (FileNotFoundException e) {
-            SVNErrorManager.error("svn: Cannot read from '" + file + "': "
-                    + e.getMessage());
+            SVNErrorManager.error("svn: Cannot read from '" + file + "': " + e.getMessage());
         }
         return null;
     }
@@ -689,9 +692,9 @@ public class SVNFileUtil {
             }
             return result.toString().trim();
         } catch (IOException e) {
-            DebugLog.error(e);
+            SVNDebugLog.logInfo(e);
         } catch (InterruptedException e) {
-            DebugLog.error(e);
+            SVNDebugLog.logInfo(e);
         } finally {
             closeFile(is);
         }

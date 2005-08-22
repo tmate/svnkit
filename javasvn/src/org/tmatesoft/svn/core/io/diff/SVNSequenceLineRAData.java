@@ -14,6 +14,8 @@ package org.tmatesoft.svn.core.io.diff;
 import java.io.IOException;
 import java.io.InputStream;
 
+import org.tmatesoft.svn.core.SVNException;
+
 import de.regnis.q.sequence.line.QSequenceLineRAData;
 
 
@@ -33,7 +35,19 @@ public class SVNSequenceLineRAData implements QSequenceLineRAData {
 		return myData.length();
 	}
 
+	public void get(byte[] bytes, long offset, long length) throws IOException {
+		final InputStream stream = read(offset, length);
+
+		for (int pos = 0; pos < length;) {
+			pos += stream.read(bytes, pos, (int)(length - pos));
+		}
+	}
+
 	public InputStream read(long offset, long length) throws IOException {
-		return myData.read(offset, length);
+		try {
+            return myData.read(offset, length);
+        } catch (SVNException e) {
+            throw new IOException(e.getMessage());
+        }
 	}
 }

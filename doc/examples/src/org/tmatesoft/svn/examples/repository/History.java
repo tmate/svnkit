@@ -18,20 +18,20 @@ import java.util.Set;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNLogEntry;
 import org.tmatesoft.svn.core.SVNLogEntryPath;
+import org.tmatesoft.svn.core.SVNURL;
 import org.tmatesoft.svn.core.auth.ISVNAuthenticationManager;
 import org.tmatesoft.svn.core.internal.io.dav.DAVRepositoryFactory;
 import org.tmatesoft.svn.core.internal.io.svn.SVNRepositoryFactoryImpl;
 import org.tmatesoft.svn.core.io.SVNRepository;
 import org.tmatesoft.svn.core.io.SVNRepositoryFactory;
-import org.tmatesoft.svn.core.io.SVNRepositoryLocation;
 import org.tmatesoft.svn.core.wc.SVNWCUtil;
 
 /*
  * The following example program demonstrates how you can use SVNRepository to
  * obtain a history for a range of revisions including (for each revision): all
- * changed paths, log message, the author of the commit, the timestamp it was
- * made. It is similar to the "svn log" command supported by the Subversion
- * client library.
+ * changed paths, log message, the author of the commit, the timestamp when the 
+ * commit was made. It is similar to the "svn log" command supported by the 
+ * Subversion client library.
  * 
  * As an example here's a part of one of the program layouts (for the default
  * values):
@@ -56,6 +56,9 @@ import org.tmatesoft.svn.core.wc.SVNWCUtil;
  * M /branches/0.9.0/doc/examples/src/org/tmatesoft/svn/examples/repository/Commit.java
  * M /branches/0.9.0/doc/examples/src/org/tmatesoft/svn/examples/repository/DisplayFile.java
  * A /branches/0.9.0/doc/examples/src/org/tmatesoft/svn/examples/repository/Export.java
+ * 
+ * ...
+ * 
  */
 public class History {
     /*
@@ -104,22 +107,16 @@ public class History {
             password = (args.length >= 5) ? args[4] : password;
         }
 
-        SVNRepositoryLocation location;
         SVNRepository repository = null;
         
         try {
             /*
-             * Parses the URL string and creates an SVNRepositoryLocation which
-             * represents the repository location - it can be any versioned
-             * entry inside the repository.
-             */
-            location = SVNRepositoryLocation.parseURL(url);
-            /*
              * Creates an instance of SVNRepository to work with the repository.
              * All user's requests to the repository are relative to the
              * repository location used to create this SVNRepository.
+             * SVNURL is a wrapper for URL strings that refer to repository locations.
              */
-            repository = SVNRepositoryFactory.create(location);
+            repository = SVNRepositoryFactory.create(SVNURL.parseURIEncoded(url));
         } catch (SVNException svne) {
             /*
              * Perhaps a malformed URL is the cause of this exception.
@@ -131,10 +128,9 @@ public class History {
         }
 
         /*
-         * Creates a usre's authentication manager.
-         * readonly=true - should be always true when providing options to 
-         * SVNRepository since this low-level class is not intended to work
-         * with working copy config files 
+         * User's authentication information is provided via an ISVNAuthenticationManager
+         * instance. SVNWCUtil creates a default usre's authentication manager given user's
+         * name and password.
          */
         ISVNAuthenticationManager authManager = SVNWCUtil.createDefaultAuthenticationManager(name, password);
 

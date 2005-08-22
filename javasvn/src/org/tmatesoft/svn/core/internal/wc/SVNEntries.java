@@ -30,7 +30,8 @@ import java.util.TreeSet;
 
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNProperty;
-import org.tmatesoft.svn.util.PathUtil;
+import org.tmatesoft.svn.core.internal.util.SVNEncodingUtil;
+import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
 
 /**
  * @version 1.0
@@ -79,7 +80,7 @@ public class SVNEntries {
                     String name = line.substring(0, line.indexOf('='));
                     String value = line.substring(line.indexOf('\"') + 1, 
                             line.lastIndexOf('\"'));
-                    value = SVNTranslator.xmlDecode(value);
+                    value = SVNEncodingUtil.xmlDecode(value);
                     entry.put(SVNProperty.SVN_ENTRY_PREFIX + name, value);
                     if (line.charAt(line.length() - 1) == '>') {
                         String entryName = (String) entry.get(SVNProperty.NAME);
@@ -94,7 +95,7 @@ public class SVNEntries {
                                 if (entry.get(SVNProperty.URL) == null) {
                                     String url = (String) rootEntry.get(SVNProperty.URL);
                                     if (url != null) {
-                                        url = PathUtil.append(url, PathUtil.encode(entryName));
+                                        url = SVNPathUtil.append(url, SVNEncodingUtil.uriEncode(entryName));
                                     }
                                     entry.put(SVNProperty.URL, url);
                                 }
@@ -143,7 +144,7 @@ public class SVNEntries {
                         continue;
                     }
                     if (!"".equals(name)) {
-                        Object expectedValue = null;
+                        Object expectedValue;
                         if (SVNProperty.KIND_DIR.equals(entry
                                 .get(SVNProperty.KIND))) {
                             if (SVNProperty.UUID.equals(propName)
@@ -153,9 +154,9 @@ public class SVNEntries {
                             }
                         } else {
                             if (SVNProperty.URL.equals(propName)) {
-                                expectedValue = PathUtil.append(
+                                expectedValue = SVNPathUtil.append(
                                         (String) rootEntry.get(propName),
-                                        PathUtil.encode(name));
+                                        SVNEncodingUtil.uriEncode(name));
                             } else if (SVNProperty.UUID.equals(propName)
                                     || SVNProperty.REVISION.equals(propName)) {
                                 expectedValue = rootEntry.get(propName);
@@ -169,7 +170,7 @@ public class SVNEntries {
                     }
                     propName = propName.substring(SVNProperty.SVN_ENTRY_PREFIX
                             .length());
-                    propValue = SVNTranslator.xmlEncode(propValue);
+                    propValue = SVNEncodingUtil.xmlEncodeAttr(propValue);
                     os.write("\n   ");
                     os.write(propName);
                     os.write("=\"");
@@ -236,9 +237,8 @@ public class SVNEntries {
             }
             if (propertyValue == null) {
                 return entry.remove(propertyName) != null;
-            } else {
-                return entry.put(propertyName, propertyValue) != null;
             }
+            return entry.put(propertyName, propertyValue) != null;            
         }
         return false;
     }

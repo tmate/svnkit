@@ -18,7 +18,7 @@ import org.tmatesoft.svn.cli.SVNCommandLine;
 import org.tmatesoft.svn.cli.SVNCommandStatusHandler;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.wc.SVNStatusClient;
-import org.tmatesoft.svn.util.DebugLog;
+import org.tmatesoft.svn.util.SVNDebugLog;
 
 import java.io.File;
 import java.io.PrintStream;
@@ -57,11 +57,10 @@ public class StatusCommand extends SVNCommand {
         for (int i = 0; i < getCommandLine().getPathCount(); i++) {
               String path = getCommandLine().getPathAt(i);
               File file = new File(path).getAbsoluteFile();
-              DebugLog.log("calling status on: " + file);
               try {
                 stClient.doStatus(file, recursive, showUpdates, reportAll, ignored, handler);
               } catch (SVNException e) {
-                  DebugLog.error(e);
+                  SVNDebugLog.logInfo(e);
                   err.println(e.getMessage());
                   error = true;
               }

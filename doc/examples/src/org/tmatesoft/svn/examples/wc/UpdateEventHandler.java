@@ -56,9 +56,8 @@ public class UpdateEventHandler implements ISVNEventHandler {
              * been updated).
              */
             /*
-             * Gets the status of a file, directory or symbolic link and/or file
-             * contents. It is SVNStatusType who contains information on the
-             * state of an item.
+             * Gets the status of file/directory item contents. It is 
+             * SVNStatusType who contains information on the state of an item.
              */
             SVNStatusType contentsStatus = event.getContentsStatus();
             if (contentsStatus == SVNStatusType.CHANGED) {
@@ -99,7 +98,14 @@ public class UpdateEventHandler implements ISVNEventHandler {
         } else if (action == SVNEventAction.DELETE){
             System.out.println("D     " + event.getPath());
             return;
+        } else if (action == SVNEventAction.LOCKED){
+            System.out.println("L     " + event.getPath());
+            return;
+        } else if (action == SVNEventAction.LOCK_FAILED){
+            System.out.println("failed to lock    " + event.getPath());
+            return;
         }
+
         /*
          * Now getting the status of properties of an item. SVNStatusType also
          * contains information on the properties state.
@@ -138,13 +144,8 @@ public class UpdateEventHandler implements ISVNEventHandler {
              * The lock is broken by someone.
              */
             lockLabel = "B";
-        } else if (lockType == SVNStatusType.LOCK_LOCKED){
-            /*
-             * The lock is broken by someone.
-             */
-            lockLabel = "K";
         }
-
+        
         System.out.println(pathChangeType
                 + propertiesChangeType
                 + lockLabel
