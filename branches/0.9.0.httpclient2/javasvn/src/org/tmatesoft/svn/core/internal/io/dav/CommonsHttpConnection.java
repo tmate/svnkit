@@ -59,7 +59,7 @@ import org.xml.sax.helpers.DefaultHandler;
  * @author TMate Software Ltd.
  *
  */
-class CommonsHttpConnection {
+class CommonsHttpConnection implements IHttpConnection {
 
     private SVNURL mySVNRepositoryLocation;
     private SAXParser mySAXParser;
