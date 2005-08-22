@@ -43,9 +43,9 @@ import org.tmatesoft.svn.core.auth.ISVNProxyManager;
 import org.tmatesoft.svn.core.auth.ISVNSSLManager;
 import org.tmatesoft.svn.core.auth.SVNAuthentication;
 import org.tmatesoft.svn.core.auth.SVNPasswordAuthentication;
+import org.tmatesoft.svn.core.internal.util.IMeasurable;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.io.SVNRepository;
-import org.tmatesoft.svn.core.io.SVNRepositoryLocation;
 import org.tmatesoft.svn.util.DebugLog;
 import org.tmatesoft.svn.util.LoggingInputStream;
 import org.tmatesoft.svn.util.PathUtil;
@@ -199,12 +199,19 @@ class CommonsHttpConnection {
             DAVStatus status;
             try {
                 connect();
-                int bodyLength = -1;
-                if(requestBody != null){
+                long bodyLength = 0;
+                boolean chunked = false;
+                if (requestBody instanceof ByteArrayInputStream) {
                     bodyLength = requestBody.available();
+                } else if (requestBody instanceof IMeasurable) { 
+                    bodyLength = ((IMeasurable) requestBody).getLength();
+                } else if (requestBody != null) {
+                    chunked = true;
                 }
-                myHttpMethod = new BasicHttpMethod(method, path, requestBody);
-                if(bodyLength > -1){
+                myHttpMethod = new BasicHttpMethod(method, path, requestBody, chunked);
+                if(chunked){
+                    myHttpMethod.addRequestHeader("Transfer-Encoding","chunked");
+                }else{
                     myHttpMethod.addRequestHeader("Content-Length", ""+bodyLength);
                 }
                 for (Iterator iter = header.keySet().iterator(); iter.hasNext();) {
