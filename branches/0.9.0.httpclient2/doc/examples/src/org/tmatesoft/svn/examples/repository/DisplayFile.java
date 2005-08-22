@@ -20,12 +20,12 @@ import java.util.Map;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNNodeKind;
 import org.tmatesoft.svn.core.SVNProperty;
+import org.tmatesoft.svn.core.SVNURL;
 import org.tmatesoft.svn.core.auth.ISVNAuthenticationManager;
 import org.tmatesoft.svn.core.internal.io.dav.DAVRepositoryFactory;
 import org.tmatesoft.svn.core.internal.io.svn.SVNRepositoryFactoryImpl;
 import org.tmatesoft.svn.core.io.SVNRepository;
 import org.tmatesoft.svn.core.io.SVNRepositoryFactory;
-import org.tmatesoft.svn.core.io.SVNRepositoryLocation;
 import org.tmatesoft.svn.core.wc.SVNWCUtil;
 
 /*
@@ -100,21 +100,15 @@ public class DisplayFile {
              */
             password = (args.length >= 4) ? args[3] : password;
         }
-        SVNRepositoryLocation location;
         SVNRepository repository = null;
         try {
-            /*
-             * Parses the URL string and creates an SVNRepositoryLocation which
-             * represents the repository location - it can be
-             * any versioned entry inside the repository.
-             */
-            location = SVNRepositoryLocation.parseURL(url);
             /*
              * Creates an instance of SVNRepository to work with the repository.
              * All user's requests to the repository are relative to the
              * repository location used to create this SVNRepository.
+             * SVNURL is a wrapper for URL strings that refer to repository locations.
              */
-            repository = SVNRepositoryFactory.create(location);
+            repository = SVNRepositoryFactory.create(SVNURL.parseURIEncoded(url));
         } catch (SVNException svne) {
             /*
              * Perhaps a malformed URL is the cause of this exception
@@ -126,10 +120,9 @@ public class DisplayFile {
         }
 
         /*
-         * Creates a usre's authentication manager.
-         * readonly=true - should be always true when providing options to 
-         * SVNRepository since this low-level class is not intended to work
-         * with working copy config files 
+         * User's authentication information is provided via an ISVNAuthenticationManager
+         * instance. SVNWCUtil creates a default usre's authentication manager given user's
+         * name and password.
          */
         ISVNAuthenticationManager authManager = SVNWCUtil.createDefaultAuthenticationManager(name, password);
 
@@ -184,7 +177,7 @@ public class DisplayFile {
         String mimeType = (String) fileProperties.get(SVNProperty.MIME_TYPE);
 
         /*
-         * SVNProperty.isTextType method checks up the value of the mime-type
+         * SVNProperty.isTextMimeType(..) method checks up the value of the mime-type
          * file property and says if the file is a text (true) or not (false).
          */
         boolean isTextType = SVNProperty.isTextMimeType(mimeType);

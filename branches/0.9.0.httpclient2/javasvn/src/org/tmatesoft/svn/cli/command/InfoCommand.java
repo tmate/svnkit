@@ -23,13 +23,13 @@ import org.tmatesoft.svn.cli.SVNCommand;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNLock;
 import org.tmatesoft.svn.core.SVNNodeKind;
+import org.tmatesoft.svn.core.SVNURL;
+import org.tmatesoft.svn.core.internal.util.SVNFormatUtil;
+import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
 import org.tmatesoft.svn.core.wc.ISVNInfoHandler;
 import org.tmatesoft.svn.core.wc.SVNInfo;
 import org.tmatesoft.svn.core.wc.SVNRevision;
 import org.tmatesoft.svn.core.wc.SVNWCClient;
-import org.tmatesoft.svn.util.DebugLog;
-import org.tmatesoft.svn.util.PathUtil;
-import org.tmatesoft.svn.util.SVNUtil;
 
 /**
  * @author TMate Software Ltd.
@@ -59,25 +59,22 @@ public class InfoCommand extends SVNCommand implements ISVNInfoHandler {
         for (int i = 0; i < getCommandLine().getURLCount(); i++) {
             String url = getCommandLine().getURL(i);
             SVNRevision peg = getCommandLine().getPegRevision(i);
-            wcClient.doInfo(url, peg, revision, recursive, this);
+            wcClient.doInfo(SVNURL.parseURIEncoded(url), peg, revision, recursive, this);
         }
     }
 
     private static void print(String str, PrintStream out) {
         out.println(str);
-        DebugLog.log(str);
     }
 
     public void handleInfo(SVNInfo info) {
         if (!info.isRemote()) {
-            print("Path: " + SVNUtil.getPath(info.getFile()), myOut);
+            print("Path: " + SVNFormatUtil.formatPath(info.getFile()), myOut);
         } else if (info.getPath() != null) {
             String path = info.getPath();
-            path = PathUtil.removeLeadingSlash(path);
-            path = PathUtil.removeTrailingSlash(path);
             if (myBaseFile != null) {
                 File file = new File(myBaseFile, path);
-                path = SVNUtil.getPath(file);
+                path = SVNFormatUtil.formatPath(file);
             } else {
                 path = path.replace('/', File.separatorChar);
             }
@@ -85,7 +82,7 @@ public class InfoCommand extends SVNCommand implements ISVNInfoHandler {
         }
         if (info.getKind() != SVNNodeKind.DIR) {
             if (info.isRemote()) {
-                print("Name: " + PathUtil.tail(info.getPath()), myOut);
+                print("Name: " + SVNPathUtil.tail(info.getPath()), myOut);
             } else {
                 print("Name: " + info.getFile().getName(), myOut);
             }

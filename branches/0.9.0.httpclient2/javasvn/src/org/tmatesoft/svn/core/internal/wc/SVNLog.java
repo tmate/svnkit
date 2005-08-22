@@ -12,6 +12,7 @@ package org.tmatesoft.svn.core.internal.wc;
 
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNProperty;
+import org.tmatesoft.svn.core.internal.util.SVNEncodingUtil;
 import org.tmatesoft.svn.core.wc.SVNStatusType;
 
 import java.io.BufferedReader;
@@ -126,7 +127,7 @@ public class SVNLog {
                 } else if (propValue != null) {
                     command.put(propName, propValue);
                     addCommand(SVNLog.MODIFY_ENTRY, command, false);
-                    command.remove(SVNTranslator.xmlEncode(propName));
+                    command.remove(SVNEncodingUtil.xmlEncodeAttr(propName));
                 }
             }
         }
@@ -171,7 +172,7 @@ public class SVNLog {
                     if (value == null) {
                         continue;
                     }
-                    value = SVNTranslator.xmlEncode(value);
+                    value = SVNEncodingUtil.xmlEncodeAttr(value);
                     os.write("\n   ");
                     os.write(attr);
                     os.write("=\"");
@@ -207,24 +208,23 @@ public class SVNLog {
                 if (line.startsWith("<")) {
                     name = line.substring(1);
                     continue;
-                } else {
-                    int index = line.indexOf('=');
-                    if (index > 0) {
-                        String attrName = line.substring(0, index).trim();
-                        String value = line.substring(index + 1).trim();
-                        if (value.endsWith("/>")) {
-                            value = value.substring(0, value.length()
-                                    - "/>".length());
-                        }
-                        if (value.startsWith("\"")) {
-                            value = value.substring(1);
-                        }
-                        if (value.endsWith("\"")) {
-                            value = value.substring(0, value.length() - 1);
-                        }
-                        value = SVNTranslator.xmlDecode(value);
-                        attrs.put(attrName, value);
+                }
+                int index = line.indexOf('=');
+                if (index > 0) {
+                    String attrName = line.substring(0, index).trim();
+                    String value = line.substring(index + 1).trim();
+                    if (value.endsWith("/>")) {
+                        value = value.substring(0, value.length()
+                                - "/>".length());
                     }
+                    if (value.startsWith("\"")) {
+                        value = value.substring(1);
+                    }
+                    if (value.endsWith("\"")) {
+                        value = value.substring(0, value.length() - 1);
+                    }
+                    value = SVNEncodingUtil.xmlDecode(value);
+                    attrs.put(attrName, value);
                 }
                 if (line.endsWith("/>") && name != null) {
                     // run command

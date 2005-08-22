@@ -11,6 +11,7 @@
 package org.tmatesoft.svn.core.wc;
 
 import org.tmatesoft.svn.core.SVNException;
+import org.tmatesoft.svn.core.SVNURL;
 import org.tmatesoft.svn.core.io.SVNRepository;
 
 /**
@@ -19,5 +20,5 @@ import org.tmatesoft.svn.core.io.SVNRepository;
  */
 public interface ISVNRepositoryFactory {
 
-    public SVNRepository createRepository(String url) throws SVNException;
+    public SVNRepository createRepository(SVNURL url) throws SVNException;
 }

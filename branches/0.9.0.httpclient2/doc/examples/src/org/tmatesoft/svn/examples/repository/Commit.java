@@ -22,6 +22,7 @@ import java.util.Map;
 import org.tmatesoft.svn.core.SVNCommitInfo;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNNodeKind;
+import org.tmatesoft.svn.core.SVNURL;
 import org.tmatesoft.svn.core.auth.ISVNAuthenticationManager;
 import org.tmatesoft.svn.core.internal.io.dav.DAVRepositoryFactory;
 import org.tmatesoft.svn.core.internal.io.svn.SVNRepositoryFactoryImpl;
@@ -29,7 +30,6 @@ import org.tmatesoft.svn.core.io.ISVNEditor;
 import org.tmatesoft.svn.core.io.ISVNWorkspaceMediator;
 import org.tmatesoft.svn.core.io.SVNRepository;
 import org.tmatesoft.svn.core.io.SVNRepositoryFactory;
-import org.tmatesoft.svn.core.io.SVNRepositoryLocation;
 import org.tmatesoft.svn.core.io.diff.SVNDiffWindow;
 import org.tmatesoft.svn.core.io.diff.SVNDiffWindowBuilder;
 import org.tmatesoft.svn.core.wc.SVNWCUtil;
@@ -42,9 +42,9 @@ import org.tmatesoft.svn.core.wc.SVNWCUtil;
  * Main aspects of performing a commit with the help of ISVNEditor:
  * 0)initialize the library (this is done in setupLibrary() method);
  * 
- * 1)create an SVNRepository to the location (represented by an
- * SVNRepositoryLocation) that will be the root for committing - that is all
- * paths that are being committed will be below that root;
+ * 1)create an SVNRepository to the location (represented by a URL string) that will 
+ * be the root for committing - that is all paths that are being committed will be 
+ * below that root;
  * 
  * 2)provide user's authentication (committing generally requires authentication);
  * 
@@ -182,21 +182,15 @@ public class Commit {
             commitMessage = (args.length >= 7) ? args[6] : commitMessage;
         }
 
-        SVNRepositoryLocation location;
         SVNRepository repository = null;
         try {
-            /*
-             * Parses the URL string and creates an SVNRepositoryLocation which
-             * represents the repository location - it can be
-             * any versioned entry inside the repository.
-             */
-            location = SVNRepositoryLocation.parseURL(url);
-            /*
-             * Creates an instance of SVNRepository to work with the repository.
-             * All user's requests to the repository are relative to the
-             * repository location used to create this SVNRepository.
-             */
-            repository = SVNRepositoryFactory.create(location);
+           /*
+            * Creates an instance of SVNRepository to work with the repository.
+            * All user's requests to the repository are relative to the
+            * repository location used to create this SVNRepository.
+            * SVNURL is a wrapper for URL strings that refer to repository locations.
+            */
+            repository = SVNRepositoryFactory.create(SVNURL.parseURIEncoded(url));
         } catch (SVNException svne) {
             /*
              * Perhaps a malformed URL is the cause of this exception.
@@ -208,10 +202,9 @@ public class Commit {
         }
 
         /*
-         * Creates a usre's authentication manager.
-         * readonly=true - should be always true when providing options to 
-         * SVNRepository since this low-level class is not intended to work
-         * with working copy config files 
+         * User's authentication information is provided via an ISVNAuthenticationManager
+         * instance. SVNWCUtil creates a default usre's authentication manager given user's
+         * name and password.
          */
         ISVNAuthenticationManager authManager = SVNWCUtil.createDefaultAuthenticationManager(name, password);
 

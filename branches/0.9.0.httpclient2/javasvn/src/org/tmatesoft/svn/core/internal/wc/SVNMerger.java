@@ -19,11 +19,12 @@ import org.tmatesoft.svn.core.SVNCancelException;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNNodeKind;
 import org.tmatesoft.svn.core.SVNProperty;
+import org.tmatesoft.svn.core.internal.util.SVNEncodingUtil;
+import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
 import org.tmatesoft.svn.core.wc.ISVNEventHandler;
 import org.tmatesoft.svn.core.wc.SVNEvent;
 import org.tmatesoft.svn.core.wc.SVNStatusType;
-import org.tmatesoft.svn.util.DebugLog;
-import org.tmatesoft.svn.util.PathUtil;
+import org.tmatesoft.svn.util.SVNDebugLog;
 
 /**
  * @version 1.0
@@ -52,15 +53,13 @@ public class SVNMerger {
         return myIsDryRun;
     }
 
-    public SVNStatusType directoryDeleted(final String path)
-            throws SVNException {
+    public SVNStatusType directoryDeleted(final String path) {
         SVNDirectory parentDir = getParentDirectory(path);
         if (parentDir == null) {
             return SVNStatusType.MISSING;
         }
-        String name = PathUtil.tail(path);
+        String name = SVNPathUtil.tail(path);
         File targetFile = parentDir.getFile(name);
-        DebugLog.log("target file for deletion: " + targetFile);
         if (targetFile.isDirectory()) {
             // check for normal entry?
             final ISVNEventHandler oldDispatcher = myWCAccess
@@ -88,9 +87,7 @@ public class SVNMerger {
                     try {
                         parentDir.canScheduleForDeletion(name);
                     } catch (SVNException e) {
-                        DebugLog.log("can't schedule for deletion: "
-                                + targetFile);
-                        DebugLog.error(e);
+                        SVNDebugLog.logInfo(e);
                         return SVNStatusType.OBSTRUCTED;
                     }
                 }
@@ -111,12 +108,12 @@ public class SVNMerger {
         return SVNStatusType.MISSING;
     }
 
-    public SVNStatusType fileDeleted(String path) throws SVNException {
+    public SVNStatusType fileDeleted(String path) {
         SVNDirectory parentDir = getParentDirectory(path);
         if (parentDir == null) {
             return SVNStatusType.MISSING;
         }
-        String name = PathUtil.tail(path);
+        String name = SVNPathUtil.tail(path);
         File targetFile = parentDir.getFile(name);
         if (targetFile.isDirectory()) {
             return SVNStatusType.OBSTRUCTED;
@@ -146,8 +143,7 @@ public class SVNMerger {
         return SVNStatusType.MISSING;
     }
 
-    public SVNStatusType directoryAdded(String path, Map entryProps,
-            long revision) throws SVNException {
+    public SVNStatusType directoryAdded(String path, Map entryProps) throws SVNException {
         SVNDirectory parentDir = getParentDirectory(path);
         if (parentDir == null) {
             if (myIsDryRun && myAddedPath != null
@@ -156,7 +152,7 @@ public class SVNMerger {
             }
             return SVNStatusType.MISSING;
         }
-        String name = PathUtil.tail(path);
+        String name = SVNPathUtil.tail(path);
         File file = parentDir.getFile(name);
         if (!file.exists()) {
             SVNEntry entry = parentDir.getEntries().getEntry(name, true);
@@ -166,8 +162,7 @@ public class SVNMerger {
             }
             if (!myIsDryRun) {
                 file.mkdirs();
-                String url = PathUtil.append(myURL, PathUtil
-                        .encode(getPathInURL(path)));
+                String url = SVNPathUtil.append(myURL, SVNEncodingUtil.uriEncode(getPathInURL(path)));
                 addDirectory(parentDir, name, url, myTargetRevision, entryProps);
             } else {
                 myAddedPath = path + "/";
@@ -179,15 +174,13 @@ public class SVNMerger {
                 if (myIsDryRun) {
                     myAddedPath = path + "/";
                 } else {
-                    String url = PathUtil.append(myURL, PathUtil
-                            .encode(getPathInURL(path)));
+                    String url = SVNPathUtil.append(myURL, SVNEncodingUtil.uriEncode(getPathInURL(path)));
                     addDirectory(parentDir, name, url, myTargetRevision,
                             entryProps);
                 }
                 return SVNStatusType.CHANGED;
-            } else {
-                return SVNStatusType.OBSTRUCTED;
             }
+            return SVNStatusType.OBSTRUCTED;            
         } else if (file.isFile()) {
             if (myIsDryRun) {
                 myAddedPath = null;
@@ -199,10 +192,10 @@ public class SVNMerger {
 
     public SVNStatusType[] fileChanged(String path, File older, File yours,
             long rev1, long rev2, String mimeType1, String mimeType2,
-            Map baseProps, Map propDiff) throws SVNException {
+            Map propDiff) throws SVNException {
         SVNStatusType[] result = new SVNStatusType[] { SVNStatusType.UNKNOWN,
                 SVNStatusType.UNKNOWN };
-        String parentPath = PathUtil.removeTail(path);
+        String parentPath = SVNPathUtil.removeTail(path);
         SVNDirectory parentDir = myWCAccess.getDirectory(parentPath);
         if (parentDir == null) {
             result[0] = SVNStatusType.MISSING;
@@ -210,7 +203,7 @@ public class SVNMerger {
             return result;
         }
 
-        String name = PathUtil.tail(path);
+        String name = SVNPathUtil.tail(path);
         File mine = parentDir.getFile(name);
         SVNEntry entry = parentDir.getEntries().getEntry(name, true);
 
@@ -220,7 +213,7 @@ public class SVNMerger {
             return result;
         }
         if (propDiff != null && !propDiff.isEmpty()) {
-            result[1] = propertiesChanged(parentPath, name, baseProps, propDiff);
+            result[1] = propertiesChanged(parentPath, name, propDiff);
         } else {
             result[1] = SVNStatusType.UNCHANGED;
         }
@@ -246,7 +239,6 @@ public class SVNMerger {
                 String targetLabel = ".working";
                 String leftLabel = ".merge-left.r" + rev1;
                 String rightLabel = ".merge-right.r" + rev2;
-                DebugLog.log("merging: " + name + " in dir: " + parentDir.getPath());
                 mergeResult = parentDir.mergeText(minePath, olderPath,
                         yoursPath, targetLabel, leftLabel, rightLabel,
                         myIsLeaveConflicts, myIsDryRun);
@@ -268,13 +260,11 @@ public class SVNMerger {
 
     public SVNStatusType[] fileAdded(String path, File older, File yours,
             long rev1, long rev2, String mimeType1, String mimeType2,
-            Map baseProps, Map propDiff, Map entryProps) throws SVNException {
+            Map propDiff, Map entryProps) throws SVNException {
         SVNStatusType[] result = new SVNStatusType[] { SVNStatusType.UNKNOWN,
                 SVNStatusType.UNKNOWN };
         SVNDirectory parentDir = getParentDirectory(path);
         if (parentDir == null) {
-            DebugLog.log("parent dir is null for: " + path);
-            DebugLog.log("added path: " + myAddedPath);
             if (myIsDryRun && myAddedPath != null
                     && path.startsWith(myAddedPath)) {
                 result[0] = SVNStatusType.CHANGED;
@@ -285,7 +275,7 @@ public class SVNMerger {
             }
             return result;
         }
-        String name = PathUtil.tail(path);
+        String name = SVNPathUtil.tail(path);
         File mine = parentDir.getFile(name);
 
         if (!mine.exists()) {
@@ -295,8 +285,7 @@ public class SVNMerger {
                 return result;
             } else if (!myIsDryRun) {
                 String pathInURL = getPathInURL(path);
-                String copyFromURL = PathUtil.append(myURL, PathUtil
-                        .encode(pathInURL));
+                String copyFromURL = SVNPathUtil.append(myURL, SVNEncodingUtil.uriEncode(pathInURL));
                 addFile(parentDir, name, SVNFileUtil.getBasePath(yours),
                         propDiff, copyFromURL, myTargetRevision, entryProps);
             }
@@ -312,7 +301,7 @@ public class SVNMerger {
                 result[0] = SVNStatusType.OBSTRUCTED;
             } else {
                 return fileChanged(path, older, yours, rev1, rev2, mimeType1,
-                        mimeType2, baseProps, propDiff);
+                        mimeType2, propDiff);
             }
         }
         return result;
@@ -327,29 +316,21 @@ public class SVNMerger {
                 pathInURL = "";
             }
         }
-        pathInURL = PathUtil.removeLeadingSlash(pathInURL);
-        pathInURL = PathUtil.removeTrailingSlash(pathInURL);
         return pathInURL;
     }
 
-    public SVNStatusType directoryPropertiesChanged(String path, Map baseProps,
-            Map propDiff) throws SVNException {
-        return propertiesChanged(path, "", baseProps, propDiff);
+    public SVNStatusType directoryPropertiesChanged(String path, Map propDiff) throws SVNException {
+        return propertiesChanged(path, "", propDiff);
     }
 
     public File getFile(String path, boolean base) {
         SVNDirectory dir = null;
-        DebugLog.log("fetching tmp file, added path: " + myAddedPath);
-        // if (myIsDryRun) {
         String parentPath = path;
-        while (dir == null && !PathUtil.isEmpty(parentPath)) {
+        while (dir == null && !"".equals(parentPath)) {
             dir = getParentDirectory(parentPath);
-            parentPath = PathUtil.removeTail(parentPath);
+            parentPath = SVNPathUtil.removeTail(parentPath);
         }
-        // } else {
-        // dir = getParentDirectory(path);
-        // }
-        String name = PathUtil.tail(path);
+        String name = SVNPathUtil.tail(path);
         if (dir != null) {
             String extension = base ? ".tmp-base" : ".tmp-work";
             return SVNFileUtil.createUniqueFile(dir.getFile(".svn/tmp/text-base"), name , extension);
@@ -357,8 +338,7 @@ public class SVNMerger {
         return null;
     }
 
-    private SVNStatusType propertiesChanged(String path, String name,
-            Map baseProps, Map propDiff) throws SVNException {
+    private SVNStatusType propertiesChanged(String path, String name, Map propDiff) throws SVNException {
         if (propDiff == null || propDiff.isEmpty()) {
             return SVNStatusType.UNCHANGED;
         }
@@ -374,28 +354,13 @@ public class SVNMerger {
         // 1. convert props to diff (need we?), just use remote diff
         // ->
         // 2. get local mods.
-        DebugLog.log("entry name: " + name);
         SVNProperties localBaseProps = dir.getBaseProperties(name, false);
         SVNProperties localWCProps = dir.getProperties(name, false);
 
         // will contain all deleted and added, but not unchanged.
-        Map wcProps = localWCProps.asMap();
         Map localDiff = localBaseProps.compareTo(localWCProps);
-        // now add all non-null from wc to localDiff.
-        DebugLog.log("all wc props: " + wcProps);
-        /*
-         * for(Iterator wcPropsNames = wcProps.keySet().iterator();
-         * wcPropsNames.hasNext();) { String wcPropName = (String)
-         * wcPropsNames.next(); DebugLog.log("wc prop: " + wcPropName); if
-         * (!localDiff.containsKey(wcPropName)) { DebugLog.log("not modified: " +
-         * wcProps.get(wcPropName)); localDiff.put(wcPropName,
-         * wcProps.get(wcPropName)); } }
-         */
         // 3. merge
-        DebugLog.log("merging props, remote diff:" + propDiff);
-        DebugLog.log("merging props, local diff:" + localDiff);
         result = dir.mergeProperties(name, propDiff, localDiff, false, log);
-        DebugLog.log("running log: " + log);
         if (log != null) {
             log.save();
             dir.runLogs();
@@ -427,8 +392,7 @@ public class SVNMerger {
             entry.loadProperties(entryProps);
             entry.setKind(SVNNodeKind.DIR);
             entry.scheduleForAddition();
-            url = PathUtil.append(entries.getEntry("", true).getURL(), PathUtil
-                    .encode(name));
+            url = SVNPathUtil.append(entries.getEntry("", true).getURL(), SVNEncodingUtil.uriEncode(name));
         }
         entry.setCopied(true);
         entry.setCopyFromURL(copyFromURL);
@@ -476,8 +440,8 @@ public class SVNMerger {
         entry.setCopied(true);
         entry.setCopyFromURL(copyFromURL);
         entry.setCopyFromRevision(copyFromRev);
-        String url = PathUtil.append(entries.getEntry("", true).getURL(),
-                PathUtil.encode(name));
+        String url = SVNPathUtil.append(entries.getEntry("", true).getURL(),
+                SVNEncodingUtil.uriEncode(name));
         entries.save(false);
         parentDir.getWCProperties(name).delete();
 
@@ -562,8 +526,7 @@ public class SVNMerger {
     }
 
     private SVNDirectory getParentDirectory(String path) {
-        path = PathUtil.removeTail(path);
-        path = PathUtil.removeLeadingSlash(path);
+        path = SVNPathUtil.removeTail(path);
         return myWCAccess.getDirectory(path);
     }
 }

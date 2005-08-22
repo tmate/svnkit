@@ -4,32 +4,34 @@
 package org.tigris.subversion.javahl;
 
 import java.io.File;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
-import java.util.Collection;
-import java.util.ArrayList;
 
 import org.tmatesoft.svn.core.SVNDirEntry;
+import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNLock;
 import org.tmatesoft.svn.core.SVNLogEntry;
 import org.tmatesoft.svn.core.SVNLogEntryPath;
 import org.tmatesoft.svn.core.SVNNodeKind;
 import org.tmatesoft.svn.core.SVNProperty;
+import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
 import org.tmatesoft.svn.core.wc.SVNCommitItem;
+import org.tmatesoft.svn.core.wc.SVNEvent;
 import org.tmatesoft.svn.core.wc.SVNEventAction;
 import org.tmatesoft.svn.core.wc.SVNInfo;
 import org.tmatesoft.svn.core.wc.SVNRevision;
 import org.tmatesoft.svn.core.wc.SVNStatus;
 import org.tmatesoft.svn.core.wc.SVNStatusType;
-import org.tmatesoft.svn.util.DebugLog;
-import org.tmatesoft.svn.util.PathUtil;
+import org.tmatesoft.svn.util.SVNDebugLog;
 
 /**
  * @author evgeny
  */
-public class SVNConverterUtil {
+public class JavaHLObjectFactory {
 
     private static final Map STATUS_CONVERSION_MAP = new HashMap();
     private static final Map REVISION_KIND_CONVERSION_MAP = new HashMap();
@@ -106,20 +108,30 @@ public class SVNConverterUtil {
         if(status == null){
             return null;
         }
-        String url = status.getURL();
+        String url = status.getURL() != null ? status.getURL().toString() : null;
+        if (url == null && status.getEntryProperties() != null) {
+            url = (String) status.getEntryProperties().get(SVNProperty.URL);
+        }
+        if (url == null && status.getRemoteURL() != null) {
+            url = status.getRemoteURL().toString();
+        }
         int nodeKind = getNodeKind(status.getKind());
         if (status.getContentsStatus() == SVNStatusType.STATUS_IGNORED) {
             nodeKind = NodeKind.unknown;
         }
         long revision = status.getRevision().getNumber();
-        long lastChangedRevision = 0;
+        long lastChangedRevision = -1;
         if(status.getCommittedRevision() != null){
             lastChangedRevision = status.getCommittedRevision().getNumber();
         }
+        if (status.getRemoteRevision() != null && 
+                status.getRemoteRevision() != SVNRevision.UNDEFINED) {
+            lastChangedRevision = status.getRemoteRevision().getNumber();
+        }
         Date d = status.getCommittedDate();
-        long lastChangedDate = 0;
+        long lastChangedDate = -1;
         if(d != null){
-            lastChangedDate = d.getTime();
+            lastChangedDate = d.getTime() * 1000;
         }
         String lastCommitAuthor = status.getAuthor();
         int textStatus = getStatusValue(status.getContentsStatus());
@@ -132,15 +144,15 @@ public class SVNConverterUtil {
 
         String conflictOld = "";
         if(status.getConflictOldFile()!=null){
-            conflictOld = status.getConflictOldFile().getAbsolutePath();
+            conflictOld = status.getConflictOldFile().getName();
         }
         String conflictNew = "";
         if(status.getConflictNewFile()!=null){
-            conflictNew = status.getConflictNewFile().getAbsolutePath();
+            conflictNew = status.getConflictNewFile().getName();
         }
         String conflictWorking = "";
         if(status.getConflictWrkFile()!=null){
-            conflictWorking = status.getConflictWrkFile().getAbsolutePath();
+            conflictWorking = status.getConflictWrkFile().getName();
         }
         String urlCopiedFrom = status.getCopyFromURL();
         long revisionCopiedFrom = status.getCopyFromRevision().getNumber();
@@ -152,14 +164,16 @@ public class SVNConverterUtil {
             lockToken = status.getLocalLock().getID();
             lockOwner = status.getLocalLock().getOwner();
             lockComment = status.getLocalLock().getComment();
-            lockCreationDate = status.getLocalLock().getCreationDate().getTime();
+            lockCreationDate = status.getLocalLock().getCreationDate().getTime() * 1000;
         }
         Lock reposLock = createLock(status.getRemoteLock());
+        if (path != null) {
+            path = path.replace(File.separatorChar, '/');
+        }
 
         Status st = new Status(path, url, nodeKind, revision, lastChangedRevision, lastChangedDate, lastCommitAuthor, textStatus, propStatus,
                 repositoryTextStatus, repositoryPropStatus, locked, copied, conflictOld, conflictNew, conflictWorking, urlCopiedFrom, revisionCopiedFrom,
                 switched, lockToken, lockOwner, lockComment, lockCreationDate, reposLock);
-        DebugLog.log(path + ": created status: " + st.getTextStatus() + ":" + st.getPropStatus() + ":" + st.getNodeKind());
         return st;
     }
 
@@ -273,7 +287,9 @@ public class SVNConverterUtil {
                 if(sc.isCopied()){
                     stateFlag += CommitItemStateFlags.IsCopy;
                 }
-                items[i] = new CommitItem(sc.getPath(), getNodeKind(sc.getKind()), stateFlag, sc.getURL(), sc.getCopyFromURL(), sc.getRevision().getNumber());
+                items[i] = new CommitItem(sc.getPath(), getNodeKind(sc.getKind()), stateFlag, 
+                        sc.getURL() != null ? sc.getURL().toString() : null, 
+                        sc.getCopyFromURL() != null ? sc.getCopyFromURL().toString() : null, sc.getRevision().getNumber());
             }
         }
         return items;
@@ -284,8 +300,8 @@ public class SVNConverterUtil {
             return null;
         }
         return new Lock(svnLock.getOwner(), svnLock.getPath(), svnLock.getID(),
-                svnLock.getComment(), svnLock.getCreationDate() != null ? svnLock.getCreationDate().getTime() : 0,
-                svnLock.getExpirationDate() != null ? svnLock.getExpirationDate().getTime() : 0);
+                svnLock.getComment(), svnLock.getCreationDate() != null ? svnLock.getCreationDate().getTime() * 1000 : 0,
+                svnLock.getExpirationDate() != null ? svnLock.getExpirationDate().getTime() * 1000 : 0);
     }
 
     public static Info createInfo(SVNInfo info) {
@@ -304,19 +320,23 @@ public class SVNConverterUtil {
         boolean absent = !deleted && !file.exists();
         boolean incomplete = false;
 
-        long copyRev = info.getCopyFromRevision().getNumber();
-        String copyUrl = info.getCopyFromURL();
+        long copyRev = info.getCommittedRevision() != null ? info.getCopyFromRevision().getNumber(): - 1;
+        String copyUrl = info.getCopyFromURL() != null ? info.getCopyFromURL().toString() : null;
 
+        String path = info.getFile() != null ? info.getFile().getName() : SVNPathUtil.tail(info.getPath());
+        if (path != null) {
+            path = path.replace(File.separatorChar, '/');
+        }
         return new Info(
-                info.getFile() != null ? info.getFile().getName() : PathUtil.tail(info.getPath()),
-                info.getURL(),
+                path,
+                info.getURL() != null ? info.getURL().toString() : null,
                 info.getRepositoryUUID(),
-                info.getRepositoryRootURL(),
+                info.getRepositoryRootURL() != null ? info.getRepositoryRootURL().toString() : null,
                 schedule,
                 getNodeKind(info.getKind()),
                 info.getAuthor(),
-                info.getRevision().getNumber(),
-                info.getCommittedRevision().getNumber(),
+                info.getRevision() != null ? info.getRevision().getNumber() : -1,
+                info.getCommittedRevision() != null ? info.getCommittedRevision().getNumber() : - 1,
                 info.getCommittedDate(),
                 info.getTextTime(),
                 info.getPropTime(),
@@ -335,29 +355,59 @@ public class SVNConverterUtil {
         } else if (SVNProperty.SCHEDULE_DELETE.equals(info.getSchedule())) {
             schedule = ScheduleKind.delete;
         }
-        long copyRev = info.getCopyFromRevision().getNumber();
-        String copyUrl = info.getCopyFromURL();
+        long copyRev = info.getCopyFromRevision() != null ? info.getCopyFromRevision().getNumber() : -1;
+        String copyUrl = info.getCopyFromURL() != null ? info.getCopyFromURL().toString() : null;
 
+        String path = info.getFile() != null ? info.getFile().getAbsolutePath() : info.getPath();
+        if (path != null) {
+            path = path.replace(File.separatorChar, '/');
+        }
         return new Info2(
-                info.getFile() != null ? info.getFile().getAbsolutePath() : info.getPath(),
-                info.getURL(),
-                info.getRevision().getNumber(),
+                path,
+                info.getURL() != null ? info.getURL().toString() : null,
+                info.getRevision() != null ? info.getRevision().getNumber() : -1,
                 getNodeKind(info.getKind()),
-                info.getRepositoryRootURL(),
+                info.getRepositoryRootURL() != null ? info.getRepositoryRootURL().toString() : null,
                 info.getRepositoryUUID(),
-                info.getCommittedRevision().getNumber(),
-                info.getCommittedDate() != null ? info.getCommittedDate().getTime() : 0,
+                info.getCommittedRevision() != null ? info.getCommittedRevision().getNumber() : - 1,
+                info.getCommittedDate() != null ? info.getCommittedDate().getTime() * 1000 : 0,
                 info.getAuthor(),
                 createLock(info.getLock()),
                 !info.isRemote(),
                 schedule, copyUrl, copyRev,
-                info.getTextTime() != null  ? info.getTextTime().getTime() : 0,
-                info.getPropTime() != null ? info.getPropTime().getTime() : 0,
+                info.getTextTime() != null  ? info.getTextTime().getTime() * 1000 : 0,
+                info.getPropTime() != null ? info.getPropTime().getTime() * 1000 : 0,
                 info.getChecksum(),
                 info.getConflictOldFile() != null ? info.getConflictOldFile().getName() : null,
                 info.getConflictNewFile() != null ? info.getConflictNewFile().getName() : null,
                 info.getConflictWrkFile() != null ? info.getConflictWrkFile().getName() : null,
                 info.getPropConflictFile() != null ? info.getPropConflictFile().getName() : null
                 );
+    }
+    
+    public static PropertyData createPropertyData(SVNClient client, String path, String name, String value, byte[] data) {
+        return new PropertyData(client, path, name, value, data);
+    }
+
+    public static NotifyInformation createNotifyInformation(SVNEvent event, String path) {
+        return new NotifyInformation(
+                path,
+                JavaHLObjectFactory.getNotifyActionValue(event.getAction()),
+                JavaHLObjectFactory.getNodeKind(event.getNodeKind()),
+                event.getMimeType(),
+                JavaHLObjectFactory.createLock(event.getLock()),
+                event.getErrorMessage(),
+                JavaHLObjectFactory.getStatusValue(event.getContentsStatus()),
+                JavaHLObjectFactory.getStatusValue(event.getPropertiesStatus()),
+                JavaHLObjectFactory.getLockStatusValue(event.getLockStatus()),
+                event.getRevision()
+                );
+    }
+
+    public static void throwException(SVNException e) throws ClientException {
+        ClientException ec = new ClientException(e.getMessage(), "", 0);
+        SVNDebugLog.logInfo(ec);
+        SVNDebugLog.logInfo(e);
+        throw ec;
     }
 }

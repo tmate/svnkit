@@ -1,27 +1,31 @@
 /*
  * Created on 25.06.2005
  */
-package org.tigris.subversion.javahl;
+package org.tmatesoft.svn.core.javahl;
 
 import java.io.File;
 import java.security.MessageDigest;
 import java.security.cert.X509Certificate;
 
+import org.tigris.subversion.javahl.PromptUserPassword;
+import org.tigris.subversion.javahl.PromptUserPassword2;
+import org.tigris.subversion.javahl.PromptUserPassword3;
+import org.tmatesoft.svn.core.SVNURL;
 import org.tmatesoft.svn.core.auth.ISVNAuthenticationManager;
 import org.tmatesoft.svn.core.auth.ISVNAuthenticationProvider;
 import org.tmatesoft.svn.core.auth.SVNAuthentication;
 import org.tmatesoft.svn.core.auth.SVNPasswordAuthentication;
 import org.tmatesoft.svn.core.auth.SVNSSHAuthentication;
 
-public class PromptAuthenticationProvider implements ISVNAuthenticationProvider {
+class JavaHLAuthenticationProvider implements ISVNAuthenticationProvider {
     
-    PromptUserPassword myPrompt;
+    private PromptUserPassword myPrompt;
     
-    public PromptAuthenticationProvider(PromptUserPassword prompt){
+    public JavaHLAuthenticationProvider(PromptUserPassword prompt){
         myPrompt = prompt;
     }
 
-    public SVNAuthentication requestClientAuthentication(String kind, String url, String realm, String errorMessage, SVNAuthentication previousAuth, boolean authMayBeStored) {
+    public SVNAuthentication requestClientAuthentication(String kind, SVNURL url, String realm, String errorMessage, SVNAuthentication previousAuth, boolean authMayBeStored) {
         if (ISVNAuthenticationManager.SSH.equals(kind) && previousAuth == null) {
             String keyPath = System.getProperty("javasvn.ssh2.key");
             String userName = System.getProperty("javasvn.ssh2.username");
@@ -44,17 +48,23 @@ public class PromptAuthenticationProvider implements ISVNAuthenticationProvider 
         if (myPrompt instanceof PromptUserPassword3) {
             PromptUserPassword3 prompt3 = (PromptUserPassword3) myPrompt;
             if(prompt3.prompt(realm, userName, authMayBeStored)){
+                if (ISVNAuthenticationManager.SSH.equals(kind)) {
+                    return new SVNSSHAuthentication(prompt3.getUsername(), prompt3.getPassword(), prompt3.userAllowedSave());
+                } 
                 return new SVNPasswordAuthentication(prompt3.getUsername(), prompt3.getPassword(), prompt3.userAllowedSave());
             }
         }else{
             if(myPrompt.prompt(realm, userName)){
+                if (ISVNAuthenticationManager.SSH.equals(kind)) {
+                    return new SVNSSHAuthentication(userName, myPrompt.getPassword(), true);
+                } 
                 return new SVNPasswordAuthentication(myPrompt.getUsername(), myPrompt.getPassword(), true);
             }
         }
         return null;
     }
 
-    public int acceptServerAuthentication(String url, String realm, Object serverAuth,  boolean resultMayBeStored) {
+    public int acceptServerAuthentication(SVNURL url, String realm, Object serverAuth,  boolean resultMayBeStored) {
         if (serverAuth != null && myPrompt instanceof PromptUserPassword2) {
             PromptUserPassword2 sslPrompt = (PromptUserPassword2) myPrompt;
             serverAuth = serverAuth instanceof X509Certificate ? 

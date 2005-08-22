@@ -10,18 +10,19 @@
  */
 package org.tmatesoft.svn.core.internal.wc;
 
-import org.tmatesoft.svn.core.SVNException;
-import org.tmatesoft.svn.core.SVNProperty;
-import org.tmatesoft.svn.core.io.ISVNReporter;
-import org.tmatesoft.svn.core.io.ISVNReporterBaton;
-import org.tmatesoft.svn.core.io.SVNRepositoryLocation;
-import org.tmatesoft.svn.util.DebugLog;
-import org.tmatesoft.svn.util.PathUtil;
-import org.tmatesoft.svn.util.TimeUtil;
-
 import java.io.File;
 import java.util.Date;
 import java.util.Iterator;
+
+import org.tmatesoft.svn.core.SVNException;
+import org.tmatesoft.svn.core.SVNProperty;
+import org.tmatesoft.svn.core.SVNURL;
+import org.tmatesoft.svn.core.internal.util.SVNEncodingUtil;
+import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
+import org.tmatesoft.svn.core.internal.util.SVNTimeUtil;
+import org.tmatesoft.svn.core.io.ISVNReporter;
+import org.tmatesoft.svn.core.io.ISVNReporterBaton;
+import org.tmatesoft.svn.util.SVNDebugLog;
 
 /**
  * @version 1.0
@@ -30,9 +31,7 @@ import java.util.Iterator;
 public class SVNReporter implements ISVNReporterBaton {
 
     private SVNWCAccess myWCAccess;
-
     private boolean myIsRecursive;
-
     private boolean myIsRestore;
 
     public SVNReporter(SVNWCAccess wcAccess, boolean restoreFiles,
@@ -46,14 +45,12 @@ public class SVNReporter implements ISVNReporterBaton {
         try {
             SVNEntries targetEntries = myWCAccess.getTarget().getEntries();
             SVNEntries anchorEntries = myWCAccess.getAnchor().getEntries();
-            SVNEntry targetEntry = anchorEntries.getEntry(myWCAccess
-                    .getTargetName(), true);
+            SVNEntry targetEntry = anchorEntries.getEntry(myWCAccess.getTargetName(), true);
 
             if (targetEntry == null
                     || targetEntry.isHidden()
                     || (targetEntry.isDirectory() && targetEntry
                             .isScheduledForAddition())) {
-                DebugLog.log("deleted file reported");
                 long revision = anchorEntries.getEntry("", true).getRevision();
                 reporter
                         .setPath("", null, revision,
@@ -63,8 +60,7 @@ public class SVNReporter implements ISVNReporterBaton {
                 reporter.finishReport();
                 return;
             }
-            long revision = targetEntry.isFile() ? targetEntry.getRevision()
-                    : targetEntries.getEntry("", true).getRevision();
+            long revision = targetEntry.isFile() ? targetEntry.getRevision() : targetEntries.getEntry("", true).getRevision();
             if (revision < 0) {
                 revision = anchorEntries.getEntry("", true).getRevision();
             }
@@ -76,7 +72,6 @@ public class SVNReporter implements ISVNReporterBaton {
                 if (missing) {
                     reporter.deletePath("");
                 } else {
-                    DebugLog.log("reporting dir entries: " + myIsRecursive);
                     reportEntries(reporter, myWCAccess.getTarget(), "",
                             targetEntry.isIncomplete(), myIsRecursive);
                 }
@@ -88,14 +83,13 @@ public class SVNReporter implements ISVNReporterBaton {
                 String url = targetEntry.getURL();
                 SVNEntry parentEntry = targetEntries.getEntry("", true);
                 String parentURL = parentEntry.getURL();
-                String expectedURL = PathUtil.append(parentURL, PathUtil
-                        .encode(targetEntry.getName()));
+                String expectedURL = SVNPathUtil.append(parentURL, SVNEncodingUtil.uriEncode(targetEntry.getName()));
                 if (!expectedURL.equals(url)) {
-                    reporter.linkPath(SVNRepositoryLocation.parseURL(url), "",
+                    SVNURL svnURL = SVNURL.parseURIEncoded(url);
+                    reporter.linkPath(svnURL, "",
                             targetEntry.getLockToken(), targetEntry
                                     .getRevision(), false);
-                } else if (targetEntry.getRevision() != parentEntry
-                        .getRevision()
+                } else if (targetEntry.getRevision() != parentEntry.getRevision()
                         || targetEntry.getLockToken() != null) {
                     reporter.setPath("", targetEntry.getLockToken(),
                             targetEntry.getRevision(), false);
@@ -103,11 +97,11 @@ public class SVNReporter implements ISVNReporterBaton {
             }
             reporter.finishReport();
         } catch (Throwable th) {
-            DebugLog.error(th);
+            SVNDebugLog.logInfo(th);
             try {
                 reporter.abortReport();
             } catch (SVNException e) {
-                DebugLog.error(e);
+                SVNDebugLog.logInfo(e);
             }
             if (th instanceof SVNException) {
                 throw (SVNException) th;
@@ -137,7 +131,7 @@ public class SVNReporter implements ISVNReporterBaton {
             if ("".equals(entry.getName())) {
                 continue;
             }
-            String path = "".equals(dirPath) ? entry.getName() : PathUtil
+            String path = "".equals(dirPath) ? entry.getName() : SVNPathUtil
                     .append(dirPath, entry.getName());
             if (entry.isDeleted() || entry.isAbsent()) {
                 if (!reportAll) {
@@ -171,13 +165,13 @@ public class SVNReporter implements ISVNReporterBaton {
                 String url = entry.getURL();
                 String parentURL = entries
                         .getPropertyValue("", SVNProperty.URL);
-                String expectedURL = PathUtil.append(parentURL, PathUtil
-                        .encode(entry.getName()));
+                String expectedURL = SVNPathUtil.append(parentURL, SVNEncodingUtil.uriEncode(entry.getName()));
                 if (reportAll) {
                     if (!url.equals(expectedURL)
                             && !entry.isScheduledForAddition()
                             && !entry.isScheduledForReplacement()) {
-                        reporter.linkPath(SVNRepositoryLocation.parseURL(url),
+                        SVNURL svnURL = SVNURL.parseURIEncoded(url);
+                        reporter.linkPath(svnURL,
                                 path, entry.getLockToken(),
                                 entry.getRevision(), false);
                     } else {
@@ -187,7 +181,8 @@ public class SVNReporter implements ISVNReporterBaton {
                 } else if (!entry.isScheduledForReplacement()
                         && !url.equals(expectedURL)) {
                     // link path
-                    reporter.linkPath(SVNRepositoryLocation.parseURL(url),
+                    SVNURL svnURL = SVNURL.parseURIEncoded(url);
+                    reporter.linkPath(svnURL,
                             path, entry.getLockToken(), entry.getRevision(),
                             false);
                 } else if (entry.getRevision() != baseRevision
@@ -212,7 +207,8 @@ public class SVNReporter implements ISVNReporterBaton {
                 String url = childEntry.getURL();
                 if (reportAll) {
                     if (!url.equals(entry.getURL())) {
-                        reporter.linkPath(SVNRepositoryLocation.parseURL(url),
+                        SVNURL svnURL = SVNURL.parseURIEncoded(url);
+                        reporter.linkPath(svnURL,
                                 path, childEntry.getLockToken(), childEntry
                                         .getRevision(), childEntry
                                         .isIncomplete());
@@ -222,7 +218,8 @@ public class SVNReporter implements ISVNReporterBaton {
                                         .isIncomplete());
                     }
                 } else if (!url.equals(entry.getURL())) {
-                    reporter.linkPath(SVNRepositoryLocation.parseURL(url),
+                    SVNURL svnURL = SVNURL.parseURIEncoded(url);
+                    reporter.linkPath(svnURL,
                             path, childEntry.getLockToken(), childEntry
                                     .getRevision(), childEntry.isIncomplete());
                 } else if (childEntry.getLockToken() != null
@@ -263,10 +260,10 @@ public class SVNReporter implements ISVNReporterBaton {
         long tstamp = dst.lastModified();
         if (myWCAccess.getOptions().isUseCommitTimes() && !special) {
             entry.setTextTime(entry.getCommittedDate());
-            tstamp = TimeUtil.parseDate(entry.getCommittedDate()).getTime();
+            tstamp = SVNTimeUtil.parseDate(entry.getCommittedDate()).getTime();
             dst.setLastModified(tstamp);
         } else {
-            entry.setTextTime(TimeUtil.formatDate(new Date(tstamp)));
+            entry.setTextTime(SVNTimeUtil.formatDate(new Date(tstamp)));
         }
         dir.getEntries().save(false);
 

@@ -11,25 +11,20 @@
 package org.tmatesoft.svn.core.internal.wc;
 
 import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
 import java.io.OutputStream;
-import java.util.Collection;
 import java.util.HashMap;
-import java.util.Iterator;
-import java.util.LinkedList;
 import java.util.Map;
 
 import org.tmatesoft.svn.core.SVNCommitInfo;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNNodeKind;
 import org.tmatesoft.svn.core.SVNProperty;
+import org.tmatesoft.svn.core.internal.util.SVNEncodingUtil;
+import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
+import org.tmatesoft.svn.core.internal.util.SVNTimeUtil;
 import org.tmatesoft.svn.core.io.ISVNEditor;
 import org.tmatesoft.svn.core.io.diff.SVNDiffWindow;
-import org.tmatesoft.svn.core.io.diff.SVNRAFileData;
 import org.tmatesoft.svn.core.wc.ISVNEventHandler;
-import org.tmatesoft.svn.util.PathUtil;
-import org.tmatesoft.svn.util.TimeUtil;
 
 /**
  * @version 1.0
@@ -38,30 +33,18 @@ import org.tmatesoft.svn.util.TimeUtil;
 public class SVNExportEditor implements ISVNEditor {
 
     private File myRoot;
-
     private boolean myIsForce;
-
     private String myEOLStyle;
-
     private File myCurrentDirectory;
-
     private File myCurrentFile;
-
     private File myCurrentTmpFile;
-
     private String myCurrentPath;
-
     private Map myExternals;
-
     private Map myFileProperties;
-
-    private Collection myDiffWindows;
-
-    private Collection myDataFiles;
-
     private ISVNEventHandler myEventDispatcher;
-
     private String myURL;
+    
+    private SVNDeltaProcessor myDeltaProcessor;
 
     public SVNExportEditor(ISVNEventHandler eventDispatcher, String url,
             File dstPath, boolean force, String eolStyle) {
@@ -71,6 +54,7 @@ public class SVNExportEditor implements ISVNEditor {
         myExternals = new HashMap();
         myEventDispatcher = eventDispatcher;
         myURL = url;
+        myDeltaProcessor = new SVNDeltaProcessor();
     }
 
     public Map getCollectedExternals() {
@@ -82,20 +66,19 @@ public class SVNExportEditor implements ISVNEditor {
         addDir("", null, -1);
     }
 
-    public void addDir(String path, String copyFromPath, long copyFromRevision)
-            throws SVNException {
-        path = PathUtil.removeLeadingSlash(path);
-        path = PathUtil.removeTrailingSlash(path);
+    public void addDir(String path, String copyFromPath, long copyFromRevision) throws SVNException {
         myCurrentDirectory = new File(myRoot, path);
         myCurrentPath = path;
 
-        if (!myIsForce && myCurrentDirectory.isFile()) {
+        SVNFileType dirType = SVNFileType.getType(myCurrentDirectory);
+        if (dirType == SVNFileType.FILE || dirType == SVNFileType.SYMLINK) {
             // export is obstructed.
-            SVNErrorManager.error("svn: Failed to add directory '" + myCurrentDirectory + "': file of the same name already exists; use 'force' to overwrite exsiting file");
-        } else if (myIsForce && myCurrentDirectory.exists()) {
-            SVNFileUtil.deleteAll(myCurrentDirectory);
-        }
-        if (!myCurrentDirectory.exists()) {
+            if (!myIsForce) {
+                SVNErrorManager.error("svn: Failed to add directory '" + myCurrentDirectory + "': file of the same name already exists; use 'force' to overwrite existing file");
+            } else {
+                SVNFileUtil.deleteAll(myCurrentDirectory, myEventDispatcher);
+            }
+        } else if (dirType == SVNFileType.NONE) {
             if (!myCurrentDirectory.mkdirs()) {
                 SVNErrorManager.error("svn: Failed to add directory '" + myCurrentDirectory + "'");
             }
@@ -113,13 +96,11 @@ public class SVNExportEditor implements ISVNEditor {
 
     public void closeDir() throws SVNException {
         myCurrentDirectory = myCurrentDirectory.getParentFile();
-        myCurrentPath = PathUtil.tail(myCurrentPath);
+        myCurrentPath = SVNPathUtil.tail(myCurrentPath);
     }
 
     public void addFile(String path, String copyFromPath, long copyFromRevision)
             throws SVNException {
-        path = PathUtil.removeLeadingSlash(path);
-        path = PathUtil.removeTrailingSlash(path);
         File file = new File(myRoot, path);
 
         if (!myIsForce && file.exists()) {
@@ -138,73 +119,25 @@ public class SVNExportEditor implements ISVNEditor {
             throws SVNException {
     }
 
-    public OutputStream textDeltaChunk(String commitPath,
-            SVNDiffWindow diffWindow) throws SVNException {
-        if (myDiffWindows == null) {
-            myDiffWindows = new LinkedList();
-            myDataFiles = new LinkedList();
-        }
-        myDiffWindows.add(diffWindow);
-        File tmpFile = SVNFileUtil.createUniqueFile(myCurrentDirectory,
-                myCurrentFile.getName(), ".tmp");
-        myDataFiles.add(tmpFile);
-
-        return SVNFileUtil.openFileForWriting(tmpFile);
+    public OutputStream textDeltaChunk(String commitPath, SVNDiffWindow diffWindow) throws SVNException {
+        File tmpFile = SVNFileUtil.createUniqueFile(myCurrentDirectory,  myCurrentFile.getName(), ".tmp");
+        return myDeltaProcessor.textDeltaChunk(tmpFile, diffWindow);
     }
 
     public void textDeltaEnd(String commitPath) throws SVNException {
         // apply all deltas
-        myCurrentTmpFile = SVNFileUtil.createUniqueFile(myCurrentDirectory,
-                myCurrentFile.getName(), ".tmp");
+        myCurrentTmpFile = SVNFileUtil.createUniqueFile(myCurrentDirectory, myCurrentFile.getName(), ".tmp");
         SVNFileUtil.createEmptyFile(myCurrentTmpFile);
-
-        SVNRAFileData target = new SVNRAFileData(myCurrentTmpFile, false);
-        File fakeBase = SVNFileUtil.createUniqueFile(myCurrentDirectory,
-                myCurrentFile.getName(), ".tmp");
-        SVNRAFileData base = new SVNRAFileData(fakeBase, true);
-
+        File fakeBase = SVNFileUtil.createUniqueFile(myCurrentDirectory, myCurrentFile.getName(), ".tmp");
         try {
-            Iterator windows = myDiffWindows.iterator();
-            for (Iterator files = myDataFiles.iterator(); files.hasNext();) {
-                File dataFile = (File) files.next();
-                SVNDiffWindow window = (SVNDiffWindow) windows.next();
-                // apply to tmp file, use 'fake' base.
-                InputStream is = SVNFileUtil.openFileForReading(dataFile);
-                try {
-                    window.apply(base, target, is, target.length());
-                } finally {
-                    SVNFileUtil.closeFile(is);
-                }
-            }
+            myDeltaProcessor.textDeltaEnd(fakeBase, myCurrentTmpFile);
         } finally {
-            if (target != null) {
-                try {
-                    target.close();
-                } catch (IOException e) {
-                    //
-                }
-            }
-            if (base != null) {
-                try {
-                    base.close();
-                } catch (IOException e) {
-                    //
-                }
-            }
-            for (Iterator files = myDataFiles.iterator(); files.hasNext();) {
-                File file = (File) files.next();
-                file.delete();
-            }
-            if (myDiffWindows != null) {
-                myDataFiles.clear();
-                myDiffWindows.clear();
-            }
             fakeBase.delete();
         }
     }
 
-    public void closeFile(String commitPath, String textChecksum)
-            throws SVNException {
+    public void closeFile(String commitPath, String textChecksum) throws SVNException {
+        myDeltaProcessor.close();
         if (textChecksum == null) {
             textChecksum = (String) myFileProperties.get(SVNProperty.CHECKSUM);
         }
@@ -225,10 +158,8 @@ public class SVNExportEditor implements ISVNEditor {
                     .get(SVNProperty.KEYWORDS);
             Map keywordsMap = null;
             if (keywords != null) {
-                String url = PathUtil.append(myURL, PathUtil
-                        .encode(myCurrentPath));
-                url = PathUtil.append(url, PathUtil.encode(myCurrentFile
-                        .getName()));
+                String url = SVNPathUtil.append(myURL, SVNEncodingUtil.uriEncode(myCurrentPath));
+                url = SVNPathUtil.append(url, SVNEncodingUtil.uriEncode(myCurrentFile.getName()));
                 String author = (String) myFileProperties
                         .get(SVNProperty.LAST_AUTHOR);
                 String revStr = (String) myFileProperties
@@ -248,7 +179,7 @@ public class SVNExportEditor implements ISVNEditor {
                 SVNFileUtil.setExecutable(myCurrentFile, true);
             }
             if (!special && date != null) {
-                myCurrentFile.setLastModified(TimeUtil.parseDate(date)
+                myCurrentFile.setLastModified(SVNTimeUtil.parseDate(date)
                         .getTime());
             }
             myEventDispatcher.handleEvent(SVNEventFactory

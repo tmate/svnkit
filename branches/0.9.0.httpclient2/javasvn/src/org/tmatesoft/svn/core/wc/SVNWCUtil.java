@@ -28,22 +28,9 @@ import org.tmatesoft.svn.core.internal.wc.SVNWCAccess;
  */
 public class SVNWCUtil {
 
-    public static String getURL(File versionedFile) {
-        SVNWCAccess wcAccess;
-        try {
-            wcAccess = SVNWCAccess.create(versionedFile);
-            return wcAccess.getTargetEntryProperty(SVNProperty.URL);
-        } catch (SVNException e) {
-            //
-        }
-        return null;
-    }
-    
-
     public static File getDefaultConfigurationDirectory() {
         if (SVNFileUtil.isWindows) {
-            return new File(System.getProperty("user.home"),
-                    "Application Data/Subversion");
+            return new File(System.getProperty("user.home"), "Application Data/Subversion");
         }
         return new File(System.getProperty("user.home"), ".subversion");
     }
@@ -67,15 +54,15 @@ public class SVNWCUtil {
     }
     
     public static ISVNAuthenticationManager createDefaultAuthenticationManager(File configDir, String userName, String password, boolean storeAuth) {
-        return new DefaultSVNAuthenticationManager(getDefaultConfigurationDirectory(), storeAuth, userName, password);
+        return new DefaultSVNAuthenticationManager(configDir, storeAuth, userName, password);
     }
 
     public static ISVNOptions createDefaultOptions(File dir, boolean readonly) {
-        return new DefaultSVNOptions(dir, !readonly);
+        return new DefaultSVNOptions(dir, readonly);
     }
 
     public static ISVNOptions createDefaultOptions(boolean readonly) {
-        return new DefaultSVNOptions(null, !readonly);
+        return new DefaultSVNOptions(null, readonly);
     }
 
     public static boolean isVersionedDirectory(File dir) {
@@ -83,7 +70,7 @@ public class SVNWCUtil {
     }
 
     public static boolean isWorkingCopyRoot(final File versionedDir, final boolean considerExternalAsRoot) {
-        if (versionedDir == null || !SVNWCAccess.isVersionedDirectory(versionedDir)) {
+        if (versionedDir == null || !isVersionedDirectory(versionedDir)) {
             // unversioned.
             return false;
         }
@@ -125,8 +112,7 @@ public class SVNWCUtil {
             boolean stopOnExtenrals) {
         versionedDir = versionedDir.getAbsoluteFile();
         if (versionedDir == null
-                || (!SVNWCAccess.isVersionedDirectory(versionedDir) && !SVNWCAccess
-                        .isVersionedDirectory(versionedDir.getParentFile()))) {
+                || (!isVersionedDirectory(versionedDir) && !isVersionedDirectory(versionedDir.getParentFile()))) {
             // both this dir and its parent are not versioned.
             return null;
         }
@@ -169,14 +155,12 @@ public class SVNWCUtil {
                 parent = parent.getParentFile();
             }
             return versionedDir;
-        } else {
-            // if dir is not a root -> just recurse till root, the call get root
-            // again.
-            if (versionedDir.getParentFile() != null) {
-                return getWorkingCopyRoot(versionedDir.getParentFile(),
-                        stopOnExtenrals);
-            }
-            return versionedDir;
         }
+        // if dir is not a root -> just recurse till root, the call get root
+        // again.
+        if (versionedDir.getParentFile() != null) {
+            return getWorkingCopyRoot(versionedDir.getParentFile(), stopOnExtenrals);
+        }
+        return versionedDir;
     }
 }

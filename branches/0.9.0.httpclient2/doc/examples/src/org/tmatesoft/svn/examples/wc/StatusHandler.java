@@ -38,8 +38,9 @@ import org.tmatesoft.svn.core.wc.SVNEventAction;
  * ISVNEventHandler.handleEvent(SVNEvent event, double progress)). 
  */
 public class StatusHandler implements ISVNStatusHandler, ISVNEventHandler {
-
-    public StatusHandler() {
+    private boolean myIsRemote;
+    public StatusHandler(boolean isRemote) {
+        myIsRemote = isRemote;
     }
     /*
      * This is an implementation of ISVNStatusHandler.handleStatus(SVNStatus status)
@@ -108,8 +109,8 @@ public class StatusHandler implements ISVNStatusHandler, ISVNEventHandler {
              * but is missing or somehow incomplete. The item can be missing if it's 
              * removed using a command incompatible with the native Subversion command
              * line client (for example, just removed from the filesystem). In the case
-             * of a directory, it can be incomplete if the user happened to interrupt a
-             * checkout or update.
+             * the item is a directory, it can be incomplete if the user happened to 
+             * interrupt a checkout or update.
              */
             pathChangeType = "!";
         } else if (contentsStatus == SVNStatusType.STATUS_OBSTRUCTED) {
@@ -126,8 +127,8 @@ public class StatusHandler implements ISVNStatusHandler, ISVNEventHandler {
             /*
              * The file, directory or symbolic link item was Replaced in the user's 
              * working copy; that is, the item was deleted, and a new item with the same
-             * name was added. While they may have the same name, the repository 
-             * considers them to be distinct objects with distinct histories.
+             * name was added (within a single revision). While they may have the same name, 
+             * the repository considers them to be distinct objects with distinct histories.
              */
             pathChangeType = "R";
         } else if (contentsStatus == SVNStatusType.STATUS_NONE
@@ -140,21 +141,17 @@ public class StatusHandler implements ISVNStatusHandler, ISVNEventHandler {
         
         /*
          * If SVNStatusClient.doStatus(..) was invoked with remote = true
-         * and the current item was changed in the repository the following 
-         * code finds out the type of the changes made  
+         * the following code finds out whether the current item had been 
+         * changed in the repository   
          */
-        SVNStatusType remoteContentsStatus = status.getRemoteContentsStatus();
-        String pathRemoteChangeType = " ";
+        String remoteChangeType = " ";
 
-        if(remoteContentsStatus!=null){
-            if(remoteContentsStatus == SVNStatusType.STATUS_MODIFIED ||
-               remoteContentsStatus == SVNStatusType.STATUS_DELETED  ||
-               remoteContentsStatus == SVNStatusType.STATUS_REPLACED){
-                /*
-                 * the local item is out of date
-                 */
-                pathRemoteChangeType = "*";
-            }
+        if(status.getRemotePropertiesStatus() != SVNStatusType.STATUS_NONE || 
+           status.getRemoteContentsStatus() != SVNStatusType.STATUS_NONE) {
+            /*
+             * the local item is out of date
+             */
+            remoteChangeType = "*";
         }
         /*
          * Now getting the status of properties of an item. SVNStatusType also contains
@@ -184,7 +181,7 @@ public class StatusHandler implements ISVNStatusHandler, ISVNEventHandler {
          */
         boolean isLocked = status.isLocked();
         /*
-         * Whether the item is switshed to a different URL (branch).
+         * Whether the item is switched to a different URL (branch).
          */
         boolean isSwitched = status.isSwitched();
         /*
@@ -205,18 +202,21 @@ public class StatusHandler implements ISVNStatusHandler, ISVNEventHandler {
             lockLabel = "K";
             if (remoteLock != null) {
                 /*
-                 * author of the local lock differs from the author of the
-                 * remote lock - the lock was sTolen!
+                 * if the lock-token of the local lock differs from the lock-token 
+                 * of the remote lock - the lock was sTolen!
                  */
-                if (!remoteLock.getOwner().equals(localLock.getOwner())) {
+                if (!remoteLock.getID().equals(localLock.getID())) {
                     lockLabel = "T";
                 }
             } else {
-                /*
-                 * the local lock presents but there's no lock in the
-                 * repository - the lock was Broken.
-                 */
-                lockLabel = "B";
+                if(myIsRemote){
+	                /*
+	                 * the local lock presents but there's no lock in the
+	                 * repository - the lock was Broken. This is true only
+	                 * if doStatus(..) was invoked with remote=true.
+	                 */
+	                lockLabel = "B";
+                }
             }
         } else if (remoteLock != null) {
             /*
@@ -256,7 +256,7 @@ public class StatusHandler implements ISVNStatusHandler, ISVNEventHandler {
                 + (isSwitched ? "S" : " ")
                 + lockLabel
                 + "  "
-                + pathRemoteChangeType//((myIsRemote && pathChangeType.equals("M")) ? "*" : " ")
+                + remoteChangeType
                 + "  "
                 + workingRevision
                 + offsets[0]
@@ -280,7 +280,7 @@ public class StatusHandler implements ISVNStatusHandler, ISVNEventHandler {
         /*
          * Print out the revision against which the status was performed.
          * This event is dispatched when the SVNStatusClient.doStatus() was 
-         * invoked with the flag remote set to true - this is for a local status
+         * invoked with the flag remote set to true - that is for a local status
          * it won't be dispatched.
          */
         if(action == SVNEventAction.STATUS_COMPLETED){
