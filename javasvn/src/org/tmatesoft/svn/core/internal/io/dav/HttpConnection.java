@@ -60,7 +60,7 @@ import org.xml.sax.helpers.DefaultHandler;
  * @author TMate Software Ltd.
  *
  */
-class HttpConnection {
+class HttpConnection implements IHttpConnection {
 
     private OutputStream myOutputStream;
     private InputStream myInputStream;

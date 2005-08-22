@@ -44,7 +44,7 @@ import org.xml.sax.helpers.DefaultHandler;
 public class DAVConnection {
     
     private SVNURL myLocation;
-    private CommonsHttpConnection myHttpConnection;
+    private IHttpConnection myHttpConnection;
     private String myActivityCollectionURL;
     private Map myLocks;
     private boolean myKeepLocks;
@@ -73,7 +73,7 @@ public class DAVConnection {
     
     public void open(DAVRepository repository) throws SVNException {
         if (myHttpConnection == null) {
-        	myHttpConnection = new CommonsHttpConnection(myLocation, repository);
+        	myHttpConnection = HttpConnectionFactory.generateHttpConnection(myLocation, repository, true /*XXX: insert 'use httpclient' parameter here*/);
             if (repository.getRepositoryUUID() == null) {
                 String path = myLocation.getPath();
                 path = SVNEncodingUtil.uriEncode(path);
