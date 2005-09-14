@@ -57,7 +57,7 @@ public class SVNWCUtil {
     
     /**
      * Creates a default authentication manager that uses the default SVN's
-     * <i>servers</i> configuration and authentication storage. Whether
+     * <i>servers</i> configuration file and authentication storage. Whether
      * the default auth storage is used or not depends on the 'store-auth-creds'</i> 
      * option that can be found in the SVN's <i>config</i> file under the 
      * <i>[auth]</i> section.
@@ -72,7 +72,7 @@ public class SVNWCUtil {
 
     /**
      * Creates a default authentication manager that uses the <i>servers</i> 
-     * configuration and authentication storage located in the provided
+     * configuration file and authentication storage located in the provided
      * directory. The authentication storage is enabled.
      * 
      * @param  configDir  a new location of the run-time configuration
@@ -86,7 +86,7 @@ public class SVNWCUtil {
     
     /**
      * Creates a default authentication manager that uses the default SVN's
-     * <i>servers</i> configuration and provided user's credentials. 
+     * <i>servers</i> configuration file and provided user's credentials. 
      * Whether the default auth storage is used or not depends on the 
      * 'store-auth-creds'</i> option that can be found in the SVN's 
      * <i>config</i> file under the <i>[auth]</i> section.

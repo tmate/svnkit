@@ -60,6 +60,8 @@ public class SVNURL {
         DEFAULT_PORTS.put("svn+ssh", new Integer(22));
         DEFAULT_PORTS.put("http", new Integer(80));
         DEFAULT_PORTS.put("https", new Integer(443));
+        DEFAULT_PORTS.put("file", new Integer(-1));
+    
     }
     
     private String myURL;
@@ -87,6 +89,43 @@ public class SVNURL {
         if (!DEFAULT_PORTS.containsKey(myProtocol)) {
             SVNErrorManager.error("svn: invalid URL '" + url + "': protocol '" + myProtocol + "' is not supported");
         }
+
+        URL tempURL=null;
+
+        if("file".equals(myProtocol.toLowerCase())){
+            //file protocol specifics - may be make this common?
+            try {
+                tempURL = new URL(myProtocol + url.substring(index));
+            } catch (MalformedURLException e) {
+                SVNErrorManager.error("svn: invalid URL '" + url + "': " + e.getMessage());
+            }
+            if(tempURL.getPath()==null || "".equals(tempURL.getPath())){
+                //no path, only host - follow subversion behaviour
+                SVNErrorManager.error("svn: Local URL '" + url + "' contains only a hostname, no path");
+            }
+        }else{
+            String testURL = "http" + url.substring(index);
+            try {
+                tempURL = new URL(testURL);
+            } catch (MalformedURLException e) {
+                SVNErrorManager.error("svn: invalid URL '" + url + "': " + e.getMessage());
+            }
+        }
+
+        myHost = tempURL.getHost();
+        if (uriEncoded) {
+            // autoencode it.
+            myEncodedPath = SVNEncodingUtil.autoURIEncode(tempURL.getPath());
+            SVNEncodingUtil.assertURISafe(myEncodedPath);
+            myPath = SVNEncodingUtil.uriDecode(myEncodedPath);
+        } else {
+            myPath = tempURL.getPath();
+            myEncodedPath = SVNEncodingUtil.uriEncode(myPath);
+        }
+        myUserName = tempURL.getUserInfo();
+        myPort = tempURL.getPort();
+        
+        /*        
         String testURL = "http" + url.substring(index);
         URL httpURL;
         try {
@@ -107,6 +146,7 @@ public class SVNURL {
         }
         myUserName = httpURL.getUserInfo();
         myPort = httpURL.getPort();
+*/        
         myIsDefaultPort = myPort < 0;
         if (myPort < 0) {
             Integer defaultPort = (Integer) DEFAULT_PORTS.get(myProtocol);

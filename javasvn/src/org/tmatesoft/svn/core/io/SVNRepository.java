@@ -34,25 +34,21 @@ import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.io.diff.SVNDiffWindow;
 
 /**
- * The abstract class <b>SVNRepository</b> declares all the basic
- * interface methods as well as implements commonly used ones to work with
- * a Subversion repository. It is the skeleton of the low-level mechanism of 
- * accessing a repository. In the model of the Subversion distributed system of
- * versioning and sharing data this mechanism corresponds to the Repository 
- * Access (RA) Layer.
+ * The abstract class <b>SVNRepository</b> provides an interface for protocol
+ * specific drivers used for direct working with a Subversion repository. 
+ * <b>SVNRepository</b> joins all low-level API methods needed for repository
+ * access operations.
  * 
  * <p>
- * Actually, the high-level library API rests upon this basis: for example, 
- * manipulations with a working copy (which need an access to a repository), say,
- * commiting it, uses an appropriate implementation (depending on the protocol 
- * that is chosen to access the repository) of <code>SVNRepository</code> as an
- * engine that carries out the commit itself.
+ * In particular this low-level protocol driver is used by the high-level API 
+ * (represented by the <B><A HREF="../wc/package-summary.html">org.tmatesoft.svn.core.wc</A></B> package) 
+ * when an access to a repository is needed. 
  * 
  * <p>
  * It is important to say that before using the library it must be configured 
  * according to implimentations to be used. That is if a repository is assumed
  * to be accessed via the <i>WebDAV</i> protocol (<code>http://</code> or 
- * <code>https://</code>) or a custom SVN one 
+ * <code>https://</code>) or a custom <i>svn</i> one 
  * (<code>svn://</code> or <code>svn+ssh://</code>) a user must initialize the library
  * in this way:
  * <pre class="javacode">
@@ -220,16 +216,6 @@ public abstract class SVNRepository {
         return myPegRevision;
     }
     
-    /**
-     * Stores the identification parameters for the repository.
-     * 
-     * @param uuid 		the repository's Universal Unique IDentifier 
-     * 					(UUID) used to differentiate between one
-     * 					repository and another. 
-     * @param rootURL	the repository's root URL.
-     * @see 			#getRepositoryRoot()
-     * @see 			#getRepositoryUUID()
-     */
     protected void setRepositoryCredentials(String uuid, SVNURL rootURL) {
         if (uuid != null && rootURL != null) {
             myRepositoryUUID = uuid;
@@ -758,6 +744,7 @@ public abstract class SVNRepository {
      * @see 					ISVNEditor
 	 */
     public abstract void diff(SVNURL url, long revision, String target, boolean ignoreAncestry, boolean recursive, ISVNReporterBaton reporter, ISVNEditor editor) throws SVNException;
+    
     public abstract void diff(SVNURL url, long targetRevision, long revision, String target, boolean ignoreAncestry, boolean recursive, ISVNReporterBaton reporter, ISVNEditor editor) throws SVNException;
     
     /**
@@ -1158,17 +1145,6 @@ public abstract class SVNRepository {
         return myOptions;
     }
     
-    /**
-     * Locks the current session <code>SVNRepository</code> object. It prevents
-     * from using non-reenterable methods of this object (for example, while having
-     * not finished updating the working copy yet, the client can not call the 
-     * <code>status</code> method from within a reporter baton). If the client
-     * tries to lock the object that has been already locked, this method throws
-     * a non catchable <code>Error</code> exception that immediately terminates
-     * the application. 
-     * 
-     * @see 	#unlock()
-     */
     protected synchronized void lock() {
         try {
             synchronized(this) {
@@ -1186,18 +1162,6 @@ public abstract class SVNRepository {
     	}
     }
     
-    /**
-     * Unlocks the current <code>SVNRepository</code> object making it free
-     * for using. 
-     * 
-     * <p>
-     * <b>NOTE:</b> while a current Repository Access operation is not completed,
-     * this <code>SVNRepository</code> object must remain locked to be guaranteed 
-     * that no other Repository Access operation will be started while a current one
-     * finishes.
-     *   
-     * @see 	#lock()
-     */
     protected synchronized void unlock() {
         synchronized(this) {
             if (--myLockCount <= 0) {
@@ -1208,50 +1172,18 @@ public abstract class SVNRepository {
         }
     }
     
-    /**
-     * Checks if the <code>revision</code> number is invalid (that is &lt 0); 
-     * 
-     * @param revision 		the revision number to be checked for invalidity.
-     * @return 				<code>true</code> if <code>revision</code> is invalid,
-     * 						<code>false</code> otherwise.
-     */
     protected static boolean isInvalidRevision(long revision) {
         return revision < 0;
     }    
     
-    /**
-     * Says if the <code>revision</code> number is valid (i.e. &gt or == 0); 
-     * 
-     * @param revision 	the revision number to be checked for validity
-     * @return 			<code>true</code> if valid, <code>false</code> otherwise
-     * 
-     */
     protected static boolean isValidRevision(long revision) {
         return revision >= 0;
     }
     
-    /**
-     * Checks the passed revision number for validity and if valid returns
-     * it in the <code>Long</code> representation.
-     *  
-     * @param revision 		a revision number
-     * @return 				a <code>Long</code> representation of the revision 
-     * 						number or <code>null</code> if the passed revision
-     * 						number is invalid. 
-     * @see 				#isInvalidRevision(long)
-     */
     protected static Long getRevisionObject(long revision) {
         return isValidRevision(revision) ? new Long(revision) : null;
     }
     
-    /**
-     * This assertion method checks if the revision number can be assumed as valid.
-     * Note that only numbers &gt or = 0 can be applied for revisioning! 
-     * 
-     * @param  revision 		the revision number to be checked for validity.  
-     * @throws SVNException		
-     * @see 					#isValidRevision(long)
-     */
     protected static void assertValidRevision(long revision) throws SVNException {
         if (!isValidRevision(revision)) {
             SVNErrorManager.error("svn: Invalid revision number '" + revision + "'");

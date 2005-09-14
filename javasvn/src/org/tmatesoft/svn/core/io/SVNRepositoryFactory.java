@@ -22,9 +22,9 @@ import org.tmatesoft.svn.core.SVNURL;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 
 /**
- * <b>SVNRepositoryFactory</b> is an abstract class that is responsible
- * for creating an appropriate <b>SVNRepository</b>-extansion that 
- * will be used to interact with a Subversion repository.
+ * <b>SVNRepositoryFactory</b> is an abstract factory that is responsible
+ * for creating an appropriate <b>SVNRepository</b> driver specific for the 
+ * protocol (svn, http) to use.
  * 
  * <p>
  * Depending on what protocol a user exactly would like to use
@@ -37,7 +37,7 @@ import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
  * <span class="javakeyword">import</span> org.tmatesoft.svn.core.internal.io.svn.SVNRepositoryFactoryImpl;
  * ...		
  *     <span class="javacomment">//do it once in your application prior to using the library</span>
- *     <span class="javacomment">//via the SVN-protocol (over svn and svn+ssh)</span>
+ *     <span class="javacomment">//enables working with a repository via the svn-protocol (over svn and svn+ssh)</span>
  *     SVNRepositoryFactoryImpl.setup();
  * ...</pre><br />
  * That <b>setup()</b> method registers an 
@@ -60,7 +60,7 @@ import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
  * ...
  * 
  *     <span class="javacomment">//do it once in your application prior to using the library</span>
- *     <span class="javacomment">//via the DAV-protocol (over http and https)</span>
+ *     <span class="javacomment">//enables working with a repository via the DAV-protocol (over http and https)</span>
  *     DAVRepositoryFactory.setup();
  * ...</pre>
  * <p>
@@ -77,17 +77,6 @@ public abstract class SVNRepositoryFactory {
     
     private static final Map myFactoriesMap = new HashMap();
     
-    /**
-     * Registers a protocol dependent factory (extending this factory class) that
-     * will be further used to create protocol dependent instances of 
-     * <code>SVNRepository</code>.
-     * 
-     * @param protocol	a string describing the protocol to be used
-     * @param factory	a factory to be registered for creating instances of 
-     * 					<code>SVNRepository</code> specialized for the 
-     * 					specified <code>protocol</code>
-     * @see 			SVNRepository
-     */
     protected static void registerRepositoryFactory(String protocol, SVNRepositoryFactory factory) {
         if (protocol != null && factory != null) {
             if (!myFactoriesMap.containsKey(protocol)) {
@@ -108,31 +97,65 @@ public abstract class SVNRepositoryFactory {
      * used to access a repository.
      * 
      * <p>
-     * The protocol is defined as the beginning part of the URL schema (used to connect to the 
-     * repository) incapsulated in the <code>url</code> parameter.
+     * The protocol is defined as the beginning part of the URL schema. Currently
+     * JavaSVN supports only <i>svn://</i> (<i>svn+ssh://</i>) and <i>http://</i> (<i>https://</i>)
+     * schemas.
      * 
      * <p>
-     * In fact, this method doesn't create an <code>SVNRepository</code> instance but
-     * calls the {@link #createRepositoryImpl(SVNURL)} of the registered
-     * factory (protocol specific extension of this class) that essentially creates the
-     * instance; then this routine simply returns it to the caller.
-     *  
-     * @param  url				a url (to connect to a repository) 
-     * 							as an <code>SVNURL</code> object
-     * @return					a new instance of <code>SVNRepository</code> to interact
-     * 							with the repository
+     * JavaSVN provides an ability to keep the socket connection (so called 'session mode') opened 
+     * since it was once opened during the whole runtime. When using this session mode
+     * JavaSVN methods do run faster than the same methods run with the session mode switched off, since
+     * time is not wasted on opening and closing socket connections for every operation
+     * of an <b>SVNRepository</b> driver that accesses a repository. However this method
+     * does not provide this enhancement. An <b>SVNRepository</b> driver created by this
+     * method always closes a socket connection when an operation finishes. To use a session
+     * mode, refer to this {@link #create(SVNURL, boolean) create()} method instead.  
+     *     
+     * @param  url				a repository location URL  
+     * @return					a protocol specific <b>SVNRepository</b> driver
      * @throws SVNException		if there's no implementation for the specified protocol
      * 							(the user may have forgotten to register a specific 
-     * 							factory that creates <code>SVNRepository</code>
-     * 							instances for that protocol or the <i>JavaSVN</i> 
+     * 							factory that creates <b>SVNRepository</b>
+     * 							instances for that protocol or the JavaSVN 
      * 							library does not support that protocol at all)
-     * @see						#createRepositoryImpl(SVNURL)
      * @see 					SVNRepository
      */
     public static SVNRepository create(SVNURL url) throws SVNException {
         return create(url, null);
         
     }
+    
+    /**
+     * Creates an <code>SVNRepository</code> according to the protocol that is to be 
+     * used to access a repository.
+     * 
+     * <p>
+     * The protocol is defined as the beginning part of the URL schema. Currently
+     * JavaSVN supports only <i>svn://</i> (<i>svn+ssh://</i>) and <i>http://</i> (<i>https://</i>)
+     * schemas.
+     * 
+     * <p>
+     * JavaSVN provides an ability to keep the socket connection (so called 'session mode') opened 
+     * since it was once opened during the whole runtime. When using this session mode
+     * JavaSVN methods do run faster than the same methods run with the session mode switched off, since
+     * time is not wasted on opening and closing socket connections for every operation
+     * of an <b>SVNRepository</b> driver that accesses a repository. The session mode is enabled/disabled
+     * by the <code>sessionMode</code> parameter.  
+     * 
+     * @param  url              a repository location URL  
+     * @param  sessionMode      if <span class="javakeyword">true</span> then the
+     *                          session mode is enabled (socket connection is kept opened), 
+     *                          otherwise disabled
+     * @return                  a protocol specific <b>SVNRepository</b> driver
+     * @throws SVNException     if there's no implementation for the specified protocol
+     *                          (the user may have forgotten to register a specific 
+     *                          factory that creates <b>SVNRepository</b>
+     *                          instances for that protocol or the JavaSVN 
+     *                          library does not support that protocol at all)
+     * @see                     #create(SVNURL)
+     * @see                     SVNRepository
+     * 
+     */
     public static SVNRepository create(SVNURL url, ISVNSession options) throws SVNException {
         String urlString = url.toString();
     	for(Iterator keys = myFactoriesMap.keySet().iterator(); keys.hasNext();) {
