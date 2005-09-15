@@ -14,7 +14,6 @@ package org.tmatesoft.svn.core.internal.io.fs;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.BufferedInputStream;
-import java.io.ByteArrayInputStream;
 import java.io.InputStreamReader;
 import java.io.FileInputStream;
 import java.nio.channels.FileChannel;
@@ -82,12 +81,20 @@ public class FSRepository extends SVNRepository {
     private String SVN_REPOS_DB_CURRENT = "current";
     private String SVN_REPOS_FORMAT = "format";
     private int    SVN_REPOS_FORMAT_NUMBER = 3;
-    private String SVN_FS_FORMAT = "format";
+    private String SVN_REPOS_FS_FORMAT = "format";
     private int    SVN_FS_FORMAT_NUMBER = 1;
     private String SVN_FS_TYPE_FILENAME = "fs-type";
+    private String SVN_REPOS_UUID_FILE = "uuid";
+    //uuid format - 36 symbols
+    private int SVN_UUID_FILE_LENGTH = 36;
+    //if > svn stops working
+    private int SVN_UUID_FILE_MAX_LENGTH = SVN_UUID_FILE_LENGTH + 1;
     
     private FileLock myDBSharedLock;
-
+    //svn gets the mutex for buffered i/o, should i do the same?  
+    private static Object myMutex;
+    private String myURL;
+    
     protected FSRepository(SVNURL location, ISVNSession options) {
         super(location, options);
     }
@@ -135,7 +142,7 @@ public class FSRepository extends SVNRepository {
                     //
                 }
             }            
-            throw new SVNException("svn: Can't open file '" + file + "'", fnfe);
+            throw new SVNException("svn: Can't open file '" + file.getAbsolutePath() + "'", fnfe);
         }
 
         try {
@@ -146,7 +153,7 @@ public class FSRepository extends SVNRepository {
                 }
             }
         } catch (IOException ioe) {
-            throw new SVNException("svn: Can't read length line in file '" + file + "'", ioe);
+            throw new SVNException("svn: Can't read length line in file '" + file.getAbsolutePath() + "'", ioe);
         } finally {
             if(is!=null){
                 try {
@@ -167,14 +174,23 @@ public class FSRepository extends SVNRepository {
     }
 
     private void checkFSFormat(String reposRootPath) throws SVNException{
-        int formatNumber =  getFormat(reposRootPath, SVN_FS_FORMAT);
+        File dbFSFormat = new File(reposRootPath, SVN_REPOS_DB_DIR);
+        int formatNumber = -1;
+        try{
+            formatNumber =  getFormat(dbFSFormat.getAbsolutePath(), SVN_REPOS_FS_FORMAT);
+        }catch(SVNException svne){
+            if(svne.getCause() instanceof FileNotFoundException){
+                formatNumber = SVN_FS_FORMAT_NUMBER;
+            }
+        }
+        
         if(formatNumber!=SVN_FS_FORMAT_NUMBER){
             throw new SVNException("svn: Expected FS format '" + SVN_FS_FORMAT_NUMBER + "'; found format '" + formatNumber + "'");
         }
     }
     
-    private int getFormat(String reposRootPath, String format) throws SVNException {
-        File formatFile = new File(reposRootPath, format);
+    private int getFormat(String reposPath, String format) throws SVNException {
+        File formatFile = new File(reposPath, format);
         
         BufferedReader br=null;
         try{
@@ -187,7 +203,7 @@ public class FSRepository extends SVNRepository {
                     //
                 }
             }
-            throw new SVNException("svn: Can't open file '" + formatFile + "'", fnfe);
+            throw new SVNException("svn: Can't open file '" + formatFile.getAbsolutePath() + "'", fnfe);
         }
 
         String firstLine=null;
@@ -195,7 +211,7 @@ public class FSRepository extends SVNRepository {
         try{
             firstLine = br.readLine();
         }catch(IOException ioe){
-            throw new SVNException("svn: Can't read file '" + formatFile + "'", ioe);
+            throw new SVNException("svn: Can't read file '" + formatFile.getAbsolutePath() + "'", ioe);
         }finally{
             if(br!=null){
                 try{
@@ -207,22 +223,21 @@ public class FSRepository extends SVNRepository {
         }
         
         if(firstLine==null){
-            throw new SVNException("svn: Can't read file '" + formatFile + "': End of file found");
+            throw new SVNException("svn: Can't read file '" + formatFile.getAbsolutePath() + "': End of file found");
         }
         
         //checking for non-digits 
         for(int i=0; i < firstLine.length(); i++){
             if(!Character.isDigit(firstLine.charAt(i))){
-                throw new SVNException("First line of '" + formatFile +  "' contains non-digit");
+                throw new SVNException("First line of '" + formatFile.getAbsolutePath() +  "' contains non-digit");
             }
         }
         return Integer.parseInt(firstLine);
     }
     
     private void lockDBFile(String reposRootPath) throws SVNException{
-        //1. open db.lock for shared reading & writing (?? just like in the svn code)
-        File locksDir = new File(reposRootPath, SVN_REPOS_LOCKS_DIR);
-        File dbLockFile = new File(locksDir, SVN_REPOS_DB_LOCKFILE);
+        //1. open db.lock for shared reading (?? just like in the svn code)
+        File dbLockFile = new File(new File(reposRootPath, SVN_REPOS_LOCKS_DIR), SVN_REPOS_DB_LOCKFILE);
         
         if(!dbLockFile.exists()){
             throw new SVNException("svn: Error opening db lockfile" + SVNTranslator.getEOL(SVNProperty.EOL_STYLE_NATIVE) + "svn: Can't open file '" + dbLockFile.getAbsolutePath() + "'");
@@ -230,7 +245,7 @@ public class FSRepository extends SVNRepository {
         
         RandomAccessFile rafile = null;
         try{
-            rafile = new RandomAccessFile(dbLockFile, "rw");
+            rafile = new RandomAccessFile(dbLockFile, "r");
         }catch(FileNotFoundException fnfe){
             throw new SVNException("svn: Error opening db lockfile" + SVNTranslator.getEOL(SVNProperty.EOL_STYLE_NATIVE) + "svn: Can't open file '" + dbLockFile.getAbsolutePath() + "'");
         }
@@ -240,42 +255,144 @@ public class FSRepository extends SVNRepository {
         try{
             myDBSharedLock = fch.lock(0, Long.MAX_VALUE, true);
         }catch(IOException ioe){
-            throw new SVNException("svn: Error opening db lockfile" + SVNTranslator.getEOL(SVNProperty.EOL_STYLE_NATIVE) + "svn: Can't get shared lock on file '" + dbLockFile + "'");
+            throw new SVNException("svn: Error opening db lockfile" + SVNTranslator.getEOL(SVNProperty.EOL_STYLE_NATIVE) + "svn: Can't get shared lock on file '" + dbLockFile.getAbsolutePath() + "'");
         }
     }
     
     private void openRepository() throws SVNException {
+        lock();
+        
         String eolBytes = new String(SVNTranslator.getEOL(SVNProperty.EOL_STYLE_NATIVE));
         String errorMessage = "svn: Unable to open an ra_local session to URL" + eolBytes + "svn: Unable to open repository '" + getLocation() + "'";
-        
-        //1. find repos root 
+        //Perform steps similar to svn's ones
+        //1. Find repos root 
         String reposRoot=null;
+        myURL = SVNEncodingUtil.uriDecode(getLocation().getPath());
         try{
-            reposRoot = findRepositoryRoot(SVNEncodingUtil.uriDecode(getLocation().getPath()));
+            reposRoot = findRepositoryRoot(myURL);
         }catch(SVNException svne){
             throw new SVNException(errorMessage);
         }
         
-        //2. check repos format (the format file must exist!)
+        //2. Check repos format (the format file must exist!)
         try{
             checkReposFormat(reposRoot);
         }catch(SVNException svne){
             throw new SVNException(errorMessage + eolBytes + svne.getMessage());
         }
 
-        //3. lock 'db.lock' file non-exclusively, blocking, for reading only
+        //3. Lock 'db.lock' file non-exclusively, blocking, for reading only
         try{
             lockDBFile(reposRoot);
         }catch(SVNException svne){
             throw new SVNException(errorMessage + eolBytes + svne.getMessage());
         }
         
-        //4. check FS type for 'fsfs'
+        //4. Check FS type for 'fsfs'
         try{
             checkFSType(reposRoot);
         }catch(SVNException svne){
             throw new SVNException(errorMessage + eolBytes + svne.getMessage());
         }
+        
+        //5. Attempt to open the 'current' file of this repository
+        File dbCurrentFile = new File(new File(reposRoot, SVN_REPOS_DB_DIR), SVN_REPOS_DB_CURRENT);
+        FileInputStream fis = null;
+        try{
+            fis = new FileInputStream(dbCurrentFile);
+        }catch(FileNotFoundException fnfe){
+            throw new SVNException(errorMessage + eolBytes + "svn: Can't open file '" + dbCurrentFile.getAbsolutePath() + "'");
+        }finally{
+            if(fis!=null){
+                try{
+                    fis.close();
+                }catch(IOException ioe){
+                    //
+                }
+            }
+        }
+        
+        /*
+         * 6. Check the FS format number (db/format). Treat an absent
+         * format file as format 1. Do not try to create the format file 
+         * on the fly, because the repository might be read-only for us, 
+         * or we might have a umask such that even if we did create the 
+         * format file, subsequent users would not be able to read it. See 
+         * thread starting at http://subversion.tigris.org/servlets/ReadMsg?list=dev&msgNo=97600
+         * for more.
+         */
+        try{
+            checkFSFormat(reposRoot);
+        }catch(SVNException svne){
+            throw new SVNException(errorMessage + eolBytes + svne.getMessage());
+        }
+        
+        //7. Read and cache repository UUID
+        String uuid=null;
+        try{
+            uuid = readReposUUID(reposRoot);
+        }catch(SVNException svne){
+            throw new SVNException(errorMessage + eolBytes + svne.getMessage());
+        }
+        
+        int index = getLocation().toString().indexOf(reposRoot);
+        String rootURL = getLocation().toString().substring(0, index+reposRoot.length());    
+        setRepositoryCredentials(uuid, SVNURL.parseURIEncoded(rootURL));
+        
+        
+    }
+    
+    private void closeRepository() throws SVNException{
+        
+        unlock();
+    }
+    
+    private String readReposUUID(String reposRootPath) throws SVNException{
+        String uuidLine=null;
+        File uuidFile=null;
+
+        //svn makes synchronization
+        synchronized(myMutex){
+            uuidFile = new File(new File(reposRootPath, SVN_REPOS_DB_DIR), SVN_REPOS_UUID_FILE);
+            
+            BufferedReader br=null;
+            try{
+                br = new BufferedReader(new InputStreamReader(new FileInputStream(uuidFile)));
+            }catch(FileNotFoundException fnfe){
+                if(br!=null){
+                    try{
+                        br.close();
+                    }catch(IOException ioe){
+                        //
+                    }
+                }
+                throw new SVNException("svn: Can't open file '" + uuidFile.getAbsolutePath() + "'", fnfe);
+            }
+    
+    
+            try{
+                uuidLine = br.readLine();
+            }catch(IOException ioe){
+                throw new SVNException("svn: Can't read file '" + uuidFile.getAbsolutePath() + "'", ioe);
+            }finally{
+                if(br!=null){
+                    try{
+                        br.close();
+                    }catch(IOException iioe){
+                        //
+                    }
+                }
+            }
+        }
+       
+        if(uuidLine==null){
+            throw new SVNException("svn: Can't read file '" + uuidFile.getAbsolutePath() + "': End of file found");
+        }
+        
+        if(uuidLine.length() > SVN_UUID_FILE_MAX_LENGTH){
+            throw new SVNException("svn: Can't read length line in file '" + uuidFile.getAbsolutePath() + "'");
+        }
+        return uuidLine;
     }
     
     private void checkFSType(String reposRootPath) throws SVNException{
@@ -291,7 +408,7 @@ public class FSRepository extends SVNRepository {
                     //
                 }
             }
-            throw new SVNException("svn: Can't open file '" + fsTypeFile + "'", fnfe);
+            throw new SVNException("svn: Can't open file '" + fsTypeFile.getAbsolutePath() + "'", fnfe);
         }
 
         String fsType=null;
@@ -299,7 +416,7 @@ public class FSRepository extends SVNRepository {
         try{
             fsType = br.readLine();
         }catch(IOException ioe){
-            throw new SVNException("svn: Can't read file '" + fsTypeFile + "'", ioe);
+            throw new SVNException("svn: Can't read file '" + fsTypeFile.getAbsolutePath() + "'", ioe);
         }finally{
             if(br!=null){
                 try{
@@ -311,7 +428,7 @@ public class FSRepository extends SVNRepository {
         }
        
         if(fsType==null){
-            throw new SVNException("svn: Can't read file '" + fsTypeFile + "': End of file found");
+            throw new SVNException("svn: Can't read file '" + fsTypeFile.getAbsolutePath() + "': End of file found");
         }
         
         if(!fsType.equals(SVN_REPOS_FSFS_FORMAT)){
@@ -321,13 +438,51 @@ public class FSRepository extends SVNRepository {
     
     public long getLatestRevision() throws SVNException {
         openRepository();
-        
+
         String reposRoot = findRepositoryRoot(getLocation().getPath());
-        File dbDir = new File(reposRoot, SVN_REPOS_DB_DIR);
-        File dbCurrentFile = new File(dbDir, SVN_REPOS_DB_CURRENT);
-        byte[] buffer = new byte[256];
-        String[] result = new String(readBytesFromFile(buffer, dbCurrentFile)).split(" ");
-        return Long.parseLong(result[0]);
+        File dbCurrentFile = new File(new File(reposRoot, SVN_REPOS_DB_DIR), SVN_REPOS_DB_CURRENT);
+
+        BufferedReader br=null;
+        try{
+            br = new BufferedReader(new InputStreamReader(new FileInputStream(dbCurrentFile)));
+        }catch(FileNotFoundException fnfe){
+            if(br!=null){
+                try{
+                    br.close();
+                }catch(IOException ioe){
+                    //
+                }
+            }
+            throw new SVNException("svn: Can't open file '" + dbCurrentFile.getAbsolutePath() + "'", fnfe);
+        }
+
+        String firstLine=null;
+
+        try{
+            firstLine = br.readLine();
+        }catch(IOException ioe){
+            throw new SVNException("svn: Can't read file '" + dbCurrentFile.getAbsolutePath() + "'", ioe);
+        }finally{
+            if(br!=null){
+                try{
+                    br.close();
+                }catch(IOException iioe){
+                    //
+                }
+            }
+        }
+       
+        if(firstLine==null){
+            throw new SVNException("svn: Can't read file '" + dbCurrentFile.getAbsolutePath() + "': End of file found");
+        }
+        
+        long latestRev = -1;
+        try{
+            latestRev = Long.parseLong(firstLine);
+        }catch(NumberFormatException nfe){
+            throw new SVNException("");//???? in progress
+        }
+        return latestRev;
     }
 
     public long getDatedRevision(Date date) throws SVNException {
