@@ -29,7 +29,7 @@ public class FSRepositoryFactory extends SVNRepositoryFactory {
         }
     }
     
-    protected SVNRepository createRepositoryImpl(SVNURL url, ISVNSession options) {
-        return new FSRepository(url, options);
+    protected SVNRepository createRepositoryImpl(SVNURL url, ISVNSession session) {
+        return new FSRepository(url, session);
     }
 }
