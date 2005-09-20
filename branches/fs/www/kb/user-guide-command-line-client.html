@@ -1,6 +1,6 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" >
-<head><title>Customizing network connections</title>
+<head><title>JavaSVN command line client</title>
 <meta name="keywords" content="Subversion,SVN,Version Control,Java,Library,Development,Team,Teamwork,Configuration Management,Software Configuration Management,SCM,CM,Revision Control,Collaboration,Open Source,Software Development,Collaborative Software Development">   
 <meta name="description" content="Pure Java Subversion Library. Open Source, provided by TMate Software">
 <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
@@ -13,8 +13,9 @@
 
 <div class="leftedge" >
 <div class="rightedge">
+<!--<div style="width: 900px; background: url(bottombg.gif) repeat-x bottom; width: 99.5%;" >-->
 
-<table  cellpadding="0" align="center" width="870" style="height: 1000px" border="0"  cellspacing="0">
+<table  cellpadding="0" align="center" width="870" border="0" style="height: 1000px" cellspacing="0">
 <tr align="center" valign="top">
 <td align="left" valign="top" style="padding: 20px 20px 20px 20px;">
 
@@ -51,69 +52,47 @@
 </tr>
 </table>
 
-<h1>Customizing network connections</h1>
-<p>
-For accessing a repository via the <code>http://</code> (<code>https://</code>) protocol JavaSVN uses the
-<code>IHTTPConnection</code> interface. And <code>IHTTPConnection</code> objects are
-provided by <code>IHTTPConnectionFactory</code>. Both these interfaces can be found
-in the <b>org.tmatesoft.svn.core.internal.io.dav</b> package. 
+<h1>JavaSVN command line client</h1>
+<p>JavaSVN provides its own command line client realization (like svn.exe).
+In fact, it's a script file (specific for an OS) that invokes the main command driver class - 
+<code>SVN</code> (<b>org.tmatesoft.svn.cli</b>), the one which redirects parameters to an 
+appropriate command class (located in <b>org.tmatesoft.svn.cli.command</b>). Command classes
+use the JavaSVN API to perform an operation. 
 </p>
-<h4>Using your custom implementations</h4>
 <p>
-To make JavaSVN use your implementations of <code>IHTTPConnection</code> and 
-<code>IHTTPConnectionFactory</code> provide your factory implementation to
-<code>DAVRepositoryFactory</code> when setting up the library for using
-via the <code>http://</code> protocol:
-<pre class="javaCode">
-...
-<span class="javaKeyword">import</span> org.tmatesoft.svn.core.internal.io.dav;
-...
-    IHTTPConnectionFactory factory = <span class="javaKeyword">new</span> YourCustomHTTPConnectionFactory();
-    DAVRepositoryFactory.setup(factory);
-</pre>
+The JavaSVN command line client supports all the most important commands which svn.exe supports. Commands
+have got the same syntax (names, options) as svn.exe has.
 </p>
-<h4>JavaSVN default implementations</h4>
+<h4>Script files</h4>
 <p>
-When you call <code>DAVRepositoryFactory.setup()</code>, JavaSVN takes into use a default
-implementation of <code>IHTTPConnectionFactory</code> - <code>IHTTPConnectionFactory.DEFAULT</code>.
-Depending on use conditions this implementation can produce two kinds of <code>IHTTPConnection</code>
-implementations:
+In a JavaSVN distribution you can find the following script files:
 <ul>
-<li>One that uses the jakarta Commons-HttpClient library - <code>CommonsHTTPConnection</code> 
-(<b>org.tmatesoft.svn.core.internal.io.dav.commons</b>).
-<li>Another one - <code>DefaultHTTPConnection</code> (<b>org.tmatesoft.svn.core.internal.io.dav</b>) -  a JavaSVN default HTTP connection
-implementation.
+<li>svn.bat (for Windows OS)
+<li>svn (shell script for Unix-like systems)
 </ul>
 </p>
-<h4>Differences between DefaultHTTPConnection and CommonsHTTPConnection</h4>
-<code>CommonsHTTPConnection</code> uses the <a href="http://jakarta.apache.org/commons/httpclient/">Commons-HttpClient</a> (apache's jakarta project)
-library which is a thorough realization of the HTTP protocol that implements all specifications
-and features of the protocol. Meanwhile using <code>DefaultHTTPConnection</code> you may
-probably experience problems with some servers. Thus, of the two implementations <code>CommonsHTTPConnection</code> is
-the one that is more stable and safe in usage with the <code>http://</code> protocol.
-<h4>Switching between JavaSVN implementations of IHTTPConnection</h4>
-<code>CommonsHTTPConnection</code> is optional and not used by default. Instead <code>IHTTPConnectionFactory.DEFAULT</code> 
-provides <code>DefaultHTTPConnection</code> instances. To switch to using <code>CommonsHTTPConnection</code> you should:
-<ol>
-<li>place the commons-httpclient and commons-codec jar archive files onto your classpath (these archives are distributed along with the 
-JavaSVN builds, also they can be found in the <code>'contrib/httpclient'</code> directory of the
-JavaSVN project),
-<li>set the system property <code>"javasvn.httpclient"</code> to <code>"jakarta"</code> (see
-the IHTTPConnectionFactory source code for details).
-</ol>
-<br />
-<br />
+<h4>Usage</h4>
+<p>
+To use the JavaSVN command processor (<code>SVN</code> class) from a command line you should have script files and library jars 
+(such as <code>javasvn.jar</code>, <code>javasvn-cli.jar</code>) set on your PATH environment variable (script and jars must be in the same directory). Also you must have the JAVA_HOME variable
+set to the path where JVM is located on your system. 
+</p>
+<p>
+In addition you can use the <code>SVN</code> class in ant tasks, read <a href="user-guide-ant.html">more</a> about how to do it.
+</p>
+<br>
+<br>
 <p>If you have any questions regarding JavaSVN, would like to report a bug or contribute a patch, please write to 
 <a id="normal" href="mailto:support@tmatesoft.com">support@tmatesoft.com</a></p>
 <br />
 <table style="margin-top: 1em;" width="100%" cellpadding="0" cellspacing="0"><tr><td id="footer" align="left">Copyright &copy; 
 2004-2005, TMate Software</td><td align="right" id="footer">feedback is welcome at <a href="mailto:feedback%40tmatesoft.com">feedback@tmatesoft.com</a></td></tr></table>
-
 </td>
 </tr>
 </table>
 </div>
 </div>
+<!--</div>-->
 </td>
 </tr>
 </table>
