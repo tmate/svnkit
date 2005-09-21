@@ -26,9 +26,6 @@ import java.io.File;
 import java.util.Collection;
 import java.util.Date;
 import java.util.Map;
-import java.text.DateFormat;
-import java.text.ParseException;
-
 
 import org.tmatesoft.svn.core.ISVNDirEntryHandler;
 import org.tmatesoft.svn.core.ISVNLogEntryHandler;
@@ -48,6 +45,7 @@ import org.tmatesoft.svn.core.io.ISVNWorkspaceMediator;
 import org.tmatesoft.svn.core.io.SVNRepository;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
 import org.tmatesoft.svn.core.internal.util.SVNEncodingUtil;
+import org.tmatesoft.svn.core.internal.util.SVNTimeUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNTranslator;
 import org.tmatesoft.svn.core.SVNProperty;
 import org.tmatesoft.svn.core.SVNRevisionProperty;
@@ -90,21 +88,26 @@ public class FSRepository extends SVNRepository {
     private String SVN_FS_TYPE_FILENAME = "fs-type";
     private String SVN_REPOS_UUID_FILE = "uuid";
     private String SVN_REPOS_REVPROPS_DIR = "revprops";
-    
+    private String SVN_REPOS_REVS_DIR = "revs";
+
     //uuid format - 36 symbols
     private int SVN_UUID_FILE_LENGTH = 36;
     //if > max svn 1.2 stops working
     private int SVN_UUID_FILE_MAX_LENGTH = SVN_UUID_FILE_LENGTH + 1;
     
     private FileLock myDBSharedLock;
-    //svn gets the mutex for buffered i/o, should i do the same?  
-    private static Object myMutex;
-    //decoded url
-    private String myURL;
+    
+    /* svn gets the mutex for buffered i/o (locks a file that can potentially
+     * be changed by another thread of the same process during reading from it)
+     */  
+    private static Object myMutex = new Object();
 
     private String myReposRootPath;
     //db.lock file representation for synchronizing
     private RandomAccessFile myDBLockFile;
+
+    //to mean the end of a file 
+    private long FILE_END_POS = -1;
     
     protected FSRepository(SVNURL location, ISVNSession options) {
         super(location, options);
@@ -147,24 +150,33 @@ public class FSRepository extends SVNRepository {
         return true;
     }
     
-    private byte[] readBytesFromFile(byte[] buffer, File file) throws SVNException{
-        InputStream is=null;
+    private byte[] readBytesFromFile(long pos, long offset, byte[] buffer, long bytesToRead, File file) throws SVNException{
+        RandomAccessFile revRAF = null;
         try{
-            is = new BufferedInputStream(new FileInputStream(file));
+            revRAF = new RandomAccessFile(file, "r");
         }catch(FileNotFoundException fnfe){
-            if(is!=null){
-                try {
-                    is.close();
-                } catch (IOException e) {
-                    //
-                }
-            }            
-            throw new SVNException("svn: Can't open file '" + file.getAbsolutePath() + "'", fnfe);
+            throw new SVNException("svn: Can't open file '" + file.getAbsolutePath() + "': " + fnfe.getMessage());
         }
-
+        
+        long fileLength = -1;
+        try{
+            fileLength = revRAF.length();
+        }catch(IOException ioe){
+            throw new SVNException("svn: Can't open file '" + file.getAbsolutePath() + "': " + ioe.getMessage());
+        }
+        
+        if(pos == FILE_END_POS){
+            pos = fileLength - 1 + offset;
+        }else{
+            pos = pos + offset;
+        }
+        if(bytesToRead > buffer.length || bytesToRead < 0){
+            bytesToRead = buffer.length;
+        }
+        
         try {
             while (true) {
-                int l = is.read(buffer);
+                int l = revRAF.read(buffer, (int)(pos + 1), (int)bytesToRead);
                 if (l <= 0) {
                     break;
                 }
@@ -172,9 +184,9 @@ public class FSRepository extends SVNRepository {
         } catch (IOException ioe) {
             throw new SVNException("svn: Can't read length line in file '" + file.getAbsolutePath() + "'", ioe);
         } finally {
-            if(is!=null){
+            if(revRAF!=null){
                 try {
-                    is.close();
+                    revRAF.close();
                 } catch (IOException e) {
                     //
                 }
@@ -339,9 +351,8 @@ public class FSRepository extends SVNRepository {
         //Perform steps similar to svn's ones
         //1. Find repos root 
         if(myReposRootPath==null){
-            myURL = SVNEncodingUtil.uriDecode(getLocation().getPath());
             try{
-                myReposRootPath = findRepositoryRoot(myURL);
+                myReposRootPath = findRepositoryRoot(getLocation().getPath());
             }catch(SVNException svne){
                 throw new SVNException(errorMessage);
             }
@@ -407,8 +418,9 @@ public class FSRepository extends SVNRepository {
         }catch(SVNException svne){
             throw new SVNException(errorMessage + eolBytes + svne.getMessage());
         }
-        int index = getLocation().toString().indexOf(myReposRootPath);
-        String rootURL = getLocation().toString().substring(0, index+myReposRootPath.length());    
+        
+        String decodedURL = SVNEncodingUtil.uriDecode(getLocation().toString());
+        String rootURL = decodedURL.substring(0, decodedURL.indexOf(myReposRootPath) + myReposRootPath.length());    
         setRepositoryCredentials(uuid, SVNURL.parseURIEncoded(rootURL));
     }
     
@@ -582,14 +594,50 @@ public class FSRepository extends SVNRepository {
             }
         }
 
-        DateFormat dateFormatter = DateFormat.getDateInstance();
         Date date=null;
-        try{
-            date = dateFormatter.parse(timeString);
-        }catch(ParseException pe){
-            throw new SVNException("svn: Can't parse date (bogus date) on revision " + revision);
+        date = SVNTimeUtil.parseDate(timeString);//dateFormatter.parse(timeString);
+        if(date==null){
+            throw new SVNException("svn: Can't parse date on revision " + revision);
         }
         return date;
+    }
+    
+    private long getDatedRev(String reposRootPath, Date date) throws SVNException{
+        long latestRev = getYoungestRev(reposRootPath); 
+        long topRev = latestRev;
+        long botRev = 0;
+        long midRev;
+        Date curTime=null;
+        
+        while(botRev <= topRev){
+            midRev = (topRev + botRev)/2;
+            curTime = getTime(midRev);
+            
+            if(curTime.compareTo(date)>0){//overshot
+                if((midRev - 1) < 0){
+                    return 0;
+                }
+                Date prevTime = getTime(midRev-1);
+                // see if time falls between midRev and midRev-1: 
+                if(prevTime.compareTo(date)<0){
+                    return midRev - 1;
+                }
+                topRev = midRev - 1;
+            } else if (curTime.compareTo(date)<0){//undershot
+                if((midRev + 1) > latestRev){
+                    return latestRev;
+                }
+                Date nextTime = getTime(midRev+1);
+                // see if time falls between midRev and midRev+1:
+                if(nextTime.compareTo(date)>0){
+                    return midRev+1;
+                }
+                botRev = midRev + 1;
+            } else {
+                return midRev;//exact match!
+            }
+        }
+        return 0;
     }
     
     public long getDatedRevision(Date date) throws SVNException {
@@ -599,42 +647,7 @@ public class FSRepository extends SVNRepository {
 
         try{
             openRepository();
-            
-            long latestRev = getYoungestRev(myReposRootPath); 
-            long topRev = latestRev;
-            long botRev = 0;
-            long midRev;
-            Date curTime=null;
-            
-            while(botRev <= topRev){
-                midRev = (topRev + botRev)/2;
-                curTime = getTime(midRev);
-                
-                if(curTime.compareTo(date)>0){//we've overshot
-                    if((midRev - 1) < 0){
-                        return 0;
-                    }
-                    Date prevTime = getTime(midRev-1);
-                    // see if time falls between midRev and midRev-1: 
-                    if(prevTime.compareTo(date)<0){
-                        return midRev - 1;
-                    }
-                    topRev = midRev - 1;
-                } else if (curTime.compareTo(date)<0){//we've undershot
-                    if(midRev > latestRev){
-                        return latestRev;
-                    }
-                    Date nextTime = getTime(midRev+1);
-                    // see if time falls between midRev and midRev+1:
-                    if(nextTime.compareTo(date)>0){
-                        return midRev+1;
-                    }
-                    botRev = midRev + 1;
-                } else {
-                    return midRev;//exact match!
-                }
-            }
-            return 0;
+            return getDatedRev(myReposRootPath, date);
         }finally{
             closeRepository();
         }
@@ -669,9 +682,6 @@ public class FSRepository extends SVNRepository {
         return null;
     }
     
-    public SVNDirEntry getDir(String path, long revision, boolean includeCommitMessages, Collection entries) throws SVNException{
-        return null;
-    }
     
     /**
      * @param path
@@ -694,7 +704,40 @@ public class FSRepository extends SVNRepository {
     public long getFile(String path, long revision, Map properties, OutputStream contents) throws SVNException {
         return 0;
     }
+    
+    /**
+     * 
+     * @param path
+     * @param revision
+     * @param includeCommitMessages
+     * @param entries
+     * @return
+     * @throws SVNException
+     */
+    public SVNDirEntry getDir(String path, long revision, boolean includeCommitMessages, Collection entries) throws SVNException{
+        return null;
+    }
 
+    private void getRootChangesOffset(String reposRootPath, long revision, long rootOffset, long changesOffset) throws SVNException{
+        String eolBytes = new String(SVNTranslator.getEOL(SVNProperty.EOL_STYLE_NATIVE));
+        
+        File revsDir = new File(new File(reposRootPath, SVN_REPOS_DB_DIR), SVN_REPOS_REVS_DIR);
+        File revFile = new File(revsDir, String.valueOf(revision));
+        byte[] buffer = new byte[64];
+        
+        try{
+            /* svn: We will assume that the last line containing the two offsets
+             * will never be longer than 64 characters.
+             * Read in this last block, from which we will identify the last line. 
+             */
+            readBytesFromFile(FILE_END_POS, -64, buffer, 64, revFile);
+        }catch(SVNException svne){
+            throw new SVNException(svne.getMessage() + eolBytes + "svn: No such revision " + revision);
+        }
+        
+        
+    }
+    
     /**
      * @param path
      * @param revision
@@ -704,6 +747,18 @@ public class FSRepository extends SVNRepository {
      * @throws SVNException
      */
     public long getDir(String path, long revision, Map properties, ISVNDirEntryHandler handler) throws SVNException {
+        
+        try{
+            openRepository();
+            
+            path = getRepositoryPath(path);
+            if(!super.isValidRevision(revision)){
+                revision = getYoungestRev(myReposRootPath);
+            }
+            
+        }finally{
+            closeRepository();
+        }
         return 0;
     }
 
@@ -746,15 +801,6 @@ public class FSRepository extends SVNRepository {
         return 0;
     }
 
-    /**
-     * @param path
-     * @param revision
-     * @return
-     * @throws SVNException
-     */
-    public Collection getDir(String path, long revision) throws SVNException {
-        return null;
-    }
 
     /**
      * @param url
