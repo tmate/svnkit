@@ -107,7 +107,7 @@ public class FSRepository extends SVNRepository {
     private RandomAccessFile myDBLockFile;
 
     //to mean the end of a file 
-    private long FILE_END_POS = -1;
+    static long FILE_END_POS = -1;
     
     protected FSRepository(SVNURL location, ISVNSession options) {
         super(location, options);

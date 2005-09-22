@@ -48,6 +48,16 @@ public class SVNRevFileReader {
         myChangesOffset = -1;
     }
     
+    public SVNRevisionNode getRootNode() throws SVNException{
+        SVNRevisionNode rootNode = new SVNRevisionNode();
+        
+        getRootOffset();
+        byte[] buffer = new byte[1024];
+
+        while(true){
+        }
+    }
+    
     public long getRootOffset() throws SVNException{
         if(myRootOffset == -1){
             readRootAndChangesOffset();
@@ -73,7 +83,7 @@ public class SVNRevFileReader {
              * will never be longer than 64 characters.
              * Read in this last block, from which we will identify the last line. 
              */
-            myFSRepos.readBytesFromFile(FILE_END_POS, -size, buffer, size, myRevisionFile);
+            myFSRepos.readBytesFromFile(FSRepository.FILE_END_POS, -size, buffer, size, myRevisionFile);
         }catch(SVNException svne){
             throw new SVNException(svne.getMessage() + eolBytes + "svn: No such revision " + myRevision);
         }
@@ -84,13 +94,13 @@ public class SVNRevFileReader {
         }
         String bytesAsString = new String(buffer);
         if(bytesAsString.indexOf('\n')==bytesAsString.lastIndexOf('\n')){
-            throw new SVNException("Final line in revision file '" + myRevisionFile + "' is longer than 64 characters");
+            throw new SVNException("svn: Final line in revision file '" + myRevisionFile + "' is longer than 64 characters");
         }
         String[] lines = bytesAsString.split("\n");
         String lastLine = lines[lines.length - 1];
         String[] offsetsValues = lastLine.split(" ");
         if(offsetsValues.length < 2){
-            throw new SVNException("Final line in revision file '" + myRevisionFile + "' missing space");
+            throw new SVNException("svn: Final line in revision file '" + myRevisionFile + "' missing space");
         }
         
         try{
