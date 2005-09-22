@@ -150,7 +150,7 @@ public class FSRepository extends SVNRepository {
         return true;
     }
     
-    private byte[] readBytesFromFile(long pos, long offset, byte[] buffer, long bytesToRead, File file) throws SVNException{
+    byte[] readBytesFromFile(long pos, long offset, byte[] buffer, long bytesToRead, File file) throws SVNException{
         RandomAccessFile revRAF = null;
         try{
             revRAF = new RandomAccessFile(file, "r");
@@ -448,19 +448,17 @@ public class FSRepository extends SVNRepository {
     
         String uuidLine=null;
 
-        //svn makes synchronization
-        synchronized(myMutex){
-            try{
-                uuidLine = br.readLine();
-            }catch(IOException ioe){
-                throw new SVNException("svn: Can't read file '" + uuidFile.getAbsolutePath() + "'", ioe);
-            }finally{
-                if(br!=null){
-                    try{
-                        br.close();
-                    }catch(IOException iioe){
-                        //
-                    }
+
+        try{
+            uuidLine = br.readLine();
+        }catch(IOException ioe){
+            throw new SVNException("svn: Can't read file '" + uuidFile.getAbsolutePath() + "'", ioe);
+        }finally{
+            if(br!=null){
+                try{
+                    br.close();
+                }catch(IOException iioe){
+                    //
                 }
             }
         }
@@ -539,19 +537,16 @@ public class FSRepository extends SVNRepository {
     
         String firstLine = null;
 
-        //svn makes synchronization
-        synchronized(myMutex){
-            try{
-                firstLine = br.readLine();
-            }catch(IOException ioe){
-                throw new SVNException("svn: Can't read file '" + dbCurrentFile.getAbsolutePath() + "'", ioe);
-            }finally{
-                if(br!=null){
-                    try{
-                        br.close();
-                    }catch(IOException iioe){
-                        //
-                    }
+        try{
+            firstLine = br.readLine();
+        }catch(IOException ioe){
+            throw new SVNException("svn: Can't read file '" + dbCurrentFile.getAbsolutePath() + "'", ioe);
+        }finally{
+            if(br!=null){
+                try{
+                    br.close();
+                }catch(IOException iioe){
+                    //
                 }
             }
         }
@@ -585,13 +580,14 @@ public class FSRepository extends SVNRepository {
     private Date getTime(long revision) throws SVNException{
         File revPropFile = new File(getRevpropsDir(), String.valueOf(revision));
         SVNProperties revProps = new SVNProperties(revPropFile, null);
+        
         String timeString=null;
         
-        synchronized(myMutex){
-            timeString =  revProps.getPropertyValue(SVNRevisionProperty.DATE);
-            if(timeString==null){
-                throw new SVNException("svn: Failed to find time on revision " + revision);
-            }
+
+        timeString =  revProps.getPropertyValue(SVNRevisionProperty.DATE);
+        
+        if(timeString==null){
+            throw new SVNException("svn: Failed to find time on revision " + revision);
         }
 
         Date date=null;
@@ -718,24 +714,15 @@ public class FSRepository extends SVNRepository {
         return null;
     }
 
-    private void getRootChangesOffset(String reposRootPath, long revision, long rootOffset, long changesOffset) throws SVNException{
+    private void getRootChangesOffset(String reposRootPath, long revision) throws SVNException{
         String eolBytes = new String(SVNTranslator.getEOL(SVNProperty.EOL_STYLE_NATIVE));
         
         File revsDir = new File(new File(reposRootPath, SVN_REPOS_DB_DIR), SVN_REPOS_REVS_DIR);
         File revFile = new File(revsDir, String.valueOf(revision));
-        byte[] buffer = new byte[64];
         
-        try{
-            /* svn: We will assume that the last line containing the two offsets
-             * will never be longer than 64 characters.
-             * Read in this last block, from which we will identify the last line. 
-             */
-            readBytesFromFile(FILE_END_POS, -64, buffer, 64, revFile);
-        }catch(SVNException svne){
-            throw new SVNException(svne.getMessage() + eolBytes + "svn: No such revision " + revision);
-        }
-        
-        
+        SVNRevFileReader revReader = new SVNRevFileReader(revFile, revision, this);
+        long rootOffset = revReader.getRootOffset();
+
     }
     
     /**
