@@ -107,7 +107,7 @@ public class FSRepository extends SVNRepository {
     private RandomAccessFile myDBLockFile;
 
     //to mean the end of a file 
-    static long FILE_END_POS = -1;
+//    static long FILE_END_POS = -1;
     
     protected FSRepository(SVNURL location, ISVNSession options) {
         super(location, options);
@@ -150,51 +150,6 @@ public class FSRepository extends SVNRepository {
         return true;
     }
     
-    byte[] readBytesFromFile(long pos, long offset, byte[] buffer, long bytesToRead, File file) throws SVNException{
-        RandomAccessFile revRAF = null;
-        try{
-            revRAF = new RandomAccessFile(file, "r");
-        }catch(FileNotFoundException fnfe){
-            throw new SVNException("svn: Can't open file '" + file.getAbsolutePath() + "': " + fnfe.getMessage());
-        }
-        
-        long fileLength = -1;
-        try{
-            fileLength = revRAF.length();
-        }catch(IOException ioe){
-            throw new SVNException("svn: Can't open file '" + file.getAbsolutePath() + "': " + ioe.getMessage());
-        }
-        
-        if(pos == FILE_END_POS){
-            pos = fileLength - 1 + offset;
-        }else{
-            pos = pos + offset;
-        }
-        if(bytesToRead > buffer.length || bytesToRead < 0){
-            bytesToRead = buffer.length;
-        }
-        
-        try {
-            while (true) {
-                int l = revRAF.read(buffer, (int)(pos + 1), (int)bytesToRead);
-                if (l <= 0) {
-                    break;
-                }
-            }
-        } catch (IOException ioe) {
-            throw new SVNException("svn: Can't read length line in file '" + file.getAbsolutePath() + "'", ioe);
-        } finally {
-            if(revRAF!=null){
-                try {
-                    revRAF.close();
-                } catch (IOException e) {
-                    //
-                }
-            }
-        }
-        return buffer;
-    }
-    
     private void checkReposFormat(String reposRootPath) throws SVNException{
         int formatNumber =  getFormat(reposRootPath, SVN_REPOS_FORMAT);
         if(formatNumber!=SVN_REPOS_FORMAT_NUMBER){
@@ -221,37 +176,9 @@ public class FSRepository extends SVNRepository {
     private int getFormat(String reposPath, String format) throws SVNException {
         File formatFile = new File(reposPath, format);
         
-        BufferedReader br=null;
-        try{
-            br = new BufferedReader(new InputStreamReader(new FileInputStream(formatFile)));
-        }catch(FileNotFoundException fnfe){
-            if(br!=null){
-                try{
-                    br.close();
-                }catch(IOException ioe){
-                    //
-                }
-            }
-            throw new SVNException("svn: Can't open file '" + formatFile.getAbsolutePath() + "'", fnfe);
-        }
+        String firstLine = SVNFSReader.readSingleLine(formatFile);
 
-        String firstLine=null;
-
-        try{
-            firstLine = br.readLine();
-        }catch(IOException ioe){
-            throw new SVNException("svn: Can't read file '" + formatFile.getAbsolutePath() + "'", ioe);
-        }finally{
-            if(br!=null){
-                try{
-                    br.close();
-                }catch(IOException iioe){
-                    //
-                }
-            }
-        }
-        
-        if(firstLine==null){
+        if(firstLine == null){
             throw new SVNException("svn: Can't read file '" + formatFile.getAbsolutePath() + "': End of file found");
         }
         
@@ -432,37 +359,8 @@ public class FSRepository extends SVNRepository {
     private String readReposUUID(String reposRootPath) throws SVNException{
         File uuidFile = new File(new File(reposRootPath, SVN_REPOS_DB_DIR), SVN_REPOS_UUID_FILE);
             
-        BufferedReader br=null;
-        try{
-            br = new BufferedReader(new InputStreamReader(new FileInputStream(uuidFile)));
-        }catch(FileNotFoundException fnfe){
-            if(br!=null){
-                try{
-                    br.close();
-                }catch(IOException ioe){
-                    //
-                }
-            }
-            throw new SVNException("svn: Can't open file '" + uuidFile.getAbsolutePath() + "'", fnfe);
-        }
-    
-        String uuidLine=null;
+        String uuidLine = SVNFSReader.readSingleLine(uuidFile);
 
-
-        try{
-            uuidLine = br.readLine();
-        }catch(IOException ioe){
-            throw new SVNException("svn: Can't read file '" + uuidFile.getAbsolutePath() + "'", ioe);
-        }finally{
-            if(br!=null){
-                try{
-                    br.close();
-                }catch(IOException iioe){
-                    //
-                }
-            }
-        }
-       
         if(uuidLine==null){
             throw new SVNException("svn: Can't read file '" + uuidFile.getAbsolutePath() + "': End of file found");
         }
@@ -475,36 +373,9 @@ public class FSRepository extends SVNRepository {
     
     private void checkFSType(String reposRootPath) throws SVNException{
         File fsTypeFile = new File(new File(reposRootPath, SVN_REPOS_DB_DIR), SVN_FS_TYPE_FILENAME);
-        BufferedReader br=null;
-        try{
-            br = new BufferedReader(new InputStreamReader(new FileInputStream(fsTypeFile)));
-        }catch(FileNotFoundException fnfe){
-            if(br!=null){
-                try{
-                    br.close();
-                }catch(IOException ioe){
-                    //
-                }
-            }
-            throw new SVNException("svn: Can't open file '" + fsTypeFile.getAbsolutePath() + "'", fnfe);
-        }
 
-        String fsType=null;
+        String fsType = SVNFSReader.readSingleLine(fsTypeFile);
 
-        try{
-            fsType = br.readLine();
-        }catch(IOException ioe){
-            throw new SVNException("svn: Can't read file '" + fsTypeFile.getAbsolutePath() + "'", ioe);
-        }finally{
-            if(br!=null){
-                try{
-                    br.close();
-                }catch(IOException iioe){
-                    //
-                }
-            }
-        }
-       
         if(fsType==null){
             throw new SVNException("svn: Can't read file '" + fsTypeFile.getAbsolutePath() + "': End of file found");
         }
@@ -521,35 +392,7 @@ public class FSRepository extends SVNRepository {
     private long getYoungestRev(String reposRootPath) throws SVNException{
         File dbCurrentFile = new File(new File(reposRootPath, SVN_REPOS_DB_DIR), SVN_REPOS_DB_CURRENT);
     
-        BufferedReader br=null;
-        try{
-            br = new BufferedReader(new InputStreamReader(new FileInputStream(dbCurrentFile)));
-        }catch(FileNotFoundException fnfe){
-            if(br!=null){
-                try{
-                    br.close();
-                }catch(IOException ioe){
-                    //
-                }
-            }
-            throw new SVNException("svn: Can't open file '" + dbCurrentFile.getAbsolutePath() + "'", fnfe);
-        }
-    
-        String firstLine = null;
-
-        try{
-            firstLine = br.readLine();
-        }catch(IOException ioe){
-            throw new SVNException("svn: Can't read file '" + dbCurrentFile.getAbsolutePath() + "'", ioe);
-        }finally{
-            if(br!=null){
-                try{
-                    br.close();
-                }catch(IOException iioe){
-                    //
-                }
-            }
-        }
+        String firstLine = SVNFSReader.readSingleLine(dbCurrentFile);
 
         if(firstLine==null){
             throw new SVNException("svn: Can't read file '" + dbCurrentFile.getAbsolutePath() + "': End of file found");
@@ -582,7 +425,6 @@ public class FSRepository extends SVNRepository {
         SVNProperties revProps = new SVNProperties(revPropFile, null);
         
         String timeString=null;
-        
 
         timeString =  revProps.getPropertyValue(SVNRevisionProperty.DATE);
         
@@ -720,7 +562,7 @@ public class FSRepository extends SVNRepository {
         File revsDir = new File(new File(reposRootPath, SVN_REPOS_DB_DIR), SVN_REPOS_REVS_DIR);
         File revFile = new File(revsDir, String.valueOf(revision));
         
-        SVNRevFileReader revReader = new SVNRevFileReader(revFile, revision, this);
+        SVNFSReader revReader = new SVNFSReader(revFile, revision);
         long rootOffset = revReader.getRootOffset();
 
     }
