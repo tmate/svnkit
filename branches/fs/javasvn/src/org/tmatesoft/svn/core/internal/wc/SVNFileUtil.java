@@ -478,7 +478,60 @@ public class SVNFileUtil {
         }
         return hexDigest;
     }
+    
+    public static String toHexDigest(byte[] digest) {
+        if (digest == null) {
+            return null;
+        }
 
+        String hexDigest = "";
+        for (int i = 0; i < digest.length; i++) {
+            byte b = digest[i];
+            int lo = b & 0xf;
+            int hi = (b >> 4) & 0xf;
+            hexDigest += Integer.toHexString(hi) + Integer.toHexString(lo);
+        }
+        return hexDigest;
+    }
+
+    public static byte[] fromHexDigest(String hexDigest){
+        if(hexDigest == null || hexDigest.length()==0){
+            return null;
+        }
+        
+        String hexMD5Digest = hexDigest.toLowerCase();
+        
+        int digestLength = hexMD5Digest.length()/2;
+        
+        if(digestLength==0 || 2*digestLength != hexMD5Digest.length()){
+            return null;
+        }
+        
+        byte[] digest = new byte[digestLength];
+        for(int i = 0; i < hexMD5Digest.length()/2; i++){
+            if(!isHex(hexMD5Digest.charAt(2*i)) || !isHex(hexMD5Digest.charAt(2*i + 1))){
+                return null;
+            }
+            
+            int hi = Character.digit(hexMD5Digest.charAt(2*i), 16)<<4;
+
+            int lo =  Character.digit(hexMD5Digest.charAt(2*i + 1), 16);
+            Integer ib = new Integer(hi | lo);
+            byte b = ib.byteValue();
+            
+            digest[i] = b;
+        }
+        
+        return digest; 
+    }
+    
+    public static boolean isHex(char ch){
+        if(Character.isDigit(ch) || (ch - 'a' >= 0 && ch - 'a' < 6)){
+            return true;
+        }
+        return false;
+    }
+    
     public static long roundTimeStamp(long tstamp) {
         return (tstamp / 1000) * 1000;
     }
