@@ -20,10 +20,13 @@ public class SVNRevisionNode {
     private String myCopyID;
     private long myRevisionID;
     private long myOffset;
+    
     //type: 'dir' or 'file' 
     private SVNNodeKind myType;
+    
     //count:  count of revs since base
     private long myCount;
+    
     //(_)a.(_)b.tx-y
     private String myTxnID;
 
@@ -39,6 +42,13 @@ public class SVNRevisionNode {
     private long myTextLength;
     private long myTextSize;
     private String myTextDigest;
+    
+    //props: <rev> <offset> <length> <size> <digest>
+    private long myPropsRevisionID;
+    private long myPropsOffset;
+    private long myPropsLength;
+    private long myPropsSize;
+    private String myPropsDigest;
     
     //cpath: <path>
     private String myCreatedPath;
@@ -71,8 +81,8 @@ public class SVNRevisionNode {
         myOffset = offset;
     }
     
-    public void setType(SVNNodeKind nodeType){
-        myType = nodeType;
+    public void setType(SVNNodeKind nodeKind){
+        myType = nodeKind;
     }
 
     public void setCount(long count){
@@ -117,6 +127,26 @@ public class SVNRevisionNode {
     
     public void setTextDigest(String textDigest){
         myTextDigest = textDigest;
+    }
+
+    public void setPropsRevisionID(long propsRevID){
+        myPropsRevisionID = propsRevID;
+    }
+
+    public void setPropsOffset(long propsOffset){
+        myPropsOffset = propsOffset;
+    }
+
+    public void setPropsLength(long propsLength){
+        myPropsLength = propsLength;
+    }
+
+    public void setPropsSize(long propsSize){
+        myPropsSize = propsSize;
+    }
+    
+    public void setPropsDigest(String propsDigest){
+        myPropsDigest = propsDigest;
     }
 
     public void setCreatedPath(String cpath){
@@ -183,6 +213,7 @@ public class SVNRevisionNode {
         return myPredOffset;
     }
 
+    //text
     public long getTextRevisionID(){
         return myTextRevisionID;
     }
@@ -201,6 +232,27 @@ public class SVNRevisionNode {
     
     public String getTextDigest(){
         return myTextDigest;
+    }
+
+    //props
+    public long getPropsRevisionID(){
+        return myPropsRevisionID;
+    }
+
+    public long getPropsOffset(){
+        return myPropsOffset;
+    }
+
+    public long getPropsLength(){
+        return myPropsLength;
+    }
+
+    public long getPropsSize(){
+        return myPropsSize;
+    }
+    
+    public String getPropsDigest(){
+        return myPropsDigest;
     }
 
     public String getCreatedPath(){

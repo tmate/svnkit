@@ -13,7 +13,9 @@ package org.tmatesoft.svn.core.internal.io.fs;
 
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNProperty;
+import org.tmatesoft.svn.core.SVNNodeKind;
 import org.tmatesoft.svn.core.internal.wc.SVNTranslator;
+import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -53,7 +55,8 @@ public class SVNFSReader {
     static String HEADER_PRED = "pred";
     static String HEADER_COPYFROM = "copyfrom";
     static String HEADER_COPYROOT = "copyroot";
-
+    static int MD5_DIGESTSIZE = 16;
+    
     public SVNFSReader(File revFile, long myRevision){
         myRevisionFile = revFile;
         myRootOffset = -1;
@@ -69,18 +72,126 @@ public class SVNFSReader {
         revNode.setOffset(offset);
         
         Map headers = readRevNodeHeaders(revFile, revNode.getOffset());
+        
+        // Read the node-rev id.
         String revNodeId = (String)headers.get(HEADER_ID);
         if(revNodeId == null){
             throw new SVNException("svn: Missing node-id in node-rev in revision file '" + revFile + "'");
         }
+        parseID(revFile, revNodeId, revNode, false);
+
+        // Read the type. 
+        SVNNodeKind nodeKind = SVNNodeKind.parseKind((String)headers.get(HEADER_TYPE));
+        if(nodeKind == SVNNodeKind.NONE || nodeKind == SVNNodeKind.UNKNOWN){
+            throw new SVNException("svn: Missing kind field in node-rev in revision file '" + revFile.getAbsolutePath() + "'");
+        }
+        revNode.setType(nodeKind);
         
-        parseRevNodeID(revFile, revNodeId, revNode);
+        // Read the 'count' field.
+        String countString = (String)headers.get(HEADER_COUNT);
+        if(countString == null){
+            revNode.setCount(0);
+        }else{
+            long cnt = -1;
+            try{
+                cnt = Long.parseLong(countString);
+                if(cnt < 0){
+                    throw new NumberFormatException();
+                }
+            }catch(NumberFormatException nfe){
+                throw new SVNException("svn: Corrupt count in node-rev in revision file '" + revFile.getAbsolutePath() + "'");
+            }
+            revNode.setCount(cnt);
+        }
+
+        // Get the properties location (if any).
+        String propsRepr = (String)headers.get(HEADER_PROPS);
+        if(propsRepr != null){
+            parseRepresentation(revFile, propsRepr, revNode, false);
+        }
         
+        // Get the data location (if any).
+        String textRepr = (String)headers.get(HEADER_TEXT);
+        if(textRepr != null){
+            parseRepresentation(revFile, textRepr, revNode, true);
+        }
+
+        // Get the created path.
+        String cpath = (String)headers.get(HEADER_CPATH);
+        if(cpath == null){
+            throw new SVNException("svn: Missing cpath in node-rev in revision file '" + revFile.getAbsolutePath() + "'");
+        }
+        revNode.setCreatedPath(cpath);
         
-        return null;
+        // Get the predecessor ID (if any).
+        String predId = (String)headers.get(HEADER_PRED);
+        if(predId != null){
+            parseID(revFile, predId, revNode, true);
+        }
+        
+        // Get the copyroot.
+        String copyroot = (String)headers.get(HEADER_COPYROOT);
+        if(copyroot == null){
+            revNode.setCopyRootPath(revNode.getCreatedPath());
+            revNode.setCopyRootRevisionID(revNode.getRevisionID());
+        }else{
+            parseCopyRoot(revFile, copyroot, revNode);
+        }
+        
+        // Get the copyfrom.
+        String copyfrom = (String)headers.get(HEADER_COPYFROM);
+        if(copyfrom == null){
+            revNode.setCopyFromPath(null);
+            revNode.setCopyFromRevisionID(-1);//maybe this should be replaced with some constants
+        }else{
+            parseCopyFrom(revFile, copyfrom, revNode);
+        }
+        
+        return revNode;
     }
     
-    public static void parseRevNodeID(File revFile, String revNodeId, SVNRevisionNode revNode) throws SVNException{
+    //should it fail if revId is invalid? 
+    public static void parseCopyFrom(File revFile, String copyfrom, SVNRevisionNode revNode) throws SVNException {
+        if(copyfrom == null || copyfrom.length() == 0){
+            throw new SVNException("svn: Malformed copyfrom line in node-rev in revision file '" + revFile.getAbsolutePath() + "'");
+        }
+        
+        String[] cpyfrom = copyfrom.split(" ");
+        if(cpyfrom.length < 2){
+            throw new SVNException("svn: Malformed copyfrom line in node-rev in revision file '" + revFile.getAbsolutePath() + "'");
+        }
+        long revId = -1;
+        try{
+            Long.parseLong(cpyfrom[0]);
+        }catch(NumberFormatException nfe){
+            throw new SVNException("svn: Malformed copyfrom line in node-rev in revision file '" + revFile.getAbsolutePath() + "'");
+        }
+        revNode.setCopyFromRevisionID(revId);
+        revNode.setCopyFromPath(cpyfrom[1]);
+    }
+
+    //should it fail if revId is invalid? 
+    public static void parseCopyRoot(File revFile, String copyroot, SVNRevisionNode revNode) throws SVNException {
+        if(copyroot == null || copyroot.length() == 0){
+            throw new SVNException("svn: Malformed copyroot line in node-rev in revision file '" + revFile.getAbsolutePath() + "'");
+        }
+        
+        String[] cpyroot = copyroot.split(" ");
+        if(cpyroot.length < 2){
+            throw new SVNException("svn: Malformed copyroot line in node-rev in revision file '" + revFile.getAbsolutePath() + "'");
+        }
+        long revId = -1;
+        try{
+            Long.parseLong(cpyroot[0]);
+        }catch(NumberFormatException nfe){
+            throw new SVNException("svn: Malformed copyroot line in node-rev in revision file '" + revFile.getAbsolutePath() + "'");
+        }
+        revNode.setCopyRootRevisionID(revId);
+        revNode.setCopyRootPath(cpyroot[1]);
+    }
+    
+    //isPred - if true - predecessor's id, otherwise a node's id
+    public static void parseID(File revFile, String revNodeId, SVNRevisionNode revNode, boolean isPred) throws SVNException{
         if(revNode == null){
             return;
         }
@@ -110,12 +221,89 @@ public class SVNFSReader {
             throw new SVNException("svn: Corrupt node-id in node-rev in revision file '" + revFile + "'");
         }
         
-        revNode.setNodeID(nodeId);
-        revNode.setCopyID(copyId);
-        revNode.setRevisionID(revID);
-        revNode.setOffset(offset);
+        if(!isPred){
+            revNode.setNodeID(nodeId);
+            revNode.setCopyID(copyId);
+            revNode.setRevisionID(revID);
+            revNode.setOffset(offset);
+        }else{
+            revNode.setPredNodeID(nodeId);
+            revNode.setPredCopyID(copyId);
+            revNode.setPredRevisionID(revID);
+            revNode.setPredOffset(offset);
+        }
     }
-    
+
+    //isData - if true - text, otherwise - props
+    public static void parseRepresentation(File revFile, String representation, SVNRevisionNode revNode, boolean isData) throws SVNException{
+        if(revNode == null){
+            return;
+        }
+        String[] offsets = representation.split(" ");
+        if(offsets == null || offsets.length == 0 || offsets.length < 5){
+            throw new SVNException("svn: Malformed text rep offset line in node-rev '" + revFile.getAbsolutePath() + "'");
+        }
+        
+        long revId = -1;
+        try{
+            revId = Long.parseLong(offsets[0]);
+            if(revId < 0){
+                throw new NumberFormatException();
+            }
+        }catch(NumberFormatException nfe){
+            throw new SVNException("svn: Malformed text rep offset line in node-rev '" + revFile.getAbsolutePath() + "'");
+        }
+        
+        long offset = -1;
+        try{
+            offset = Long.parseLong(offsets[1]);
+            if(offset < 0){
+                throw new NumberFormatException();
+            }
+        }catch(NumberFormatException nfe){
+            throw new SVNException("svn: Malformed text rep offset line in node-rev '" + revFile.getAbsolutePath() + "'");
+        }
+
+        long length = -1;
+        try{
+            length = Long.parseLong(offsets[2]);
+            if(length < 0){
+                throw new NumberFormatException();
+            }
+        }catch(NumberFormatException nfe){
+            throw new SVNException("svn: Malformed text rep offset line in node-rev '" + revFile.getAbsolutePath() + "'");
+        }
+        
+        long size = -1;
+        try{
+            size = Long.parseLong(offsets[3]);
+            if(size < 0){
+                throw new NumberFormatException();
+            }
+        }catch(NumberFormatException nfe){
+            throw new SVNException("svn: Malformed text rep offset line in node-rev '" + revFile.getAbsolutePath() + "'");
+        }
+        
+        String hexDigest = offsets[4];
+        if(hexDigest.length() != 2*MD5_DIGESTSIZE ||  SVNFileUtil.fromHexDigest(hexDigest)==null){
+            throw new SVNException("svn: Malformed text rep offset line in node-rev '" + revFile.getAbsolutePath() + "'");
+        }
+            
+        if(isData){
+            revNode.setTextRevisionID(revId);
+            revNode.setTextOffset(offset);
+            revNode.setTextLength(length);
+            revNode.setTextSize(size);
+            revNode.setTextDigest(hexDigest);
+        }else{
+            revNode.setPropsRevisionID(revId);
+            revNode.setPropsOffset(offset);
+            revNode.setPropsLength(length);
+            revNode.setPropsSize(size);
+            revNode.setPropsDigest(hexDigest);
+        }
+    }
+
     public long getRootOffset() throws SVNException{
         if(myRootOffset == -1){
             readRootAndChangesOffset();
@@ -149,7 +337,7 @@ public class SVNFSReader {
         try{
             while(true){
                 String line = readNextLine(revFile, reader, offset);
-                if(line==null || line.length()==0){
+                if(line == null || line.length() == 0){
                     break;
                 }
                 if(isFirstLine){
