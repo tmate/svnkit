@@ -62,6 +62,13 @@ public class SVNFSReader {
         myRootOffset = -1;
         myChangesOffset = -1;
     }
+
+    public void getDirEntries(SVNRevisionNode revNode, Map entries) throws SVNException{
+        if(revNode.getType() != SVNNodeKind.DIR){
+            throw new SVNException("svn: Can't get entries of non-directory");
+        }
+        
+    }
     
     public SVNRevisionNode getRootRevNode() throws SVNException{
         return getRevNode(myRevisionFile, getRootOffset());
@@ -69,9 +76,8 @@ public class SVNFSReader {
     
     public SVNRevisionNode getRevNode(File revFile, long offset) throws SVNException{
         SVNRevisionNode revNode = new SVNRevisionNode();
-        revNode.setOffset(offset);
         
-        Map headers = readRevNodeHeaders(revFile, revNode.getOffset());
+        Map headers = readRevNodeHeaders(revFile, offset);
         
         // Read the node-rev id.
         String revNodeId = (String)headers.get(HEADER_ID);
@@ -133,7 +139,7 @@ public class SVNFSReader {
         String copyroot = (String)headers.get(HEADER_COPYROOT);
         if(copyroot == null){
             revNode.setCopyRootPath(revNode.getCreatedPath());
-            revNode.setCopyRootRevisionID(revNode.getRevisionID());
+            revNode.setCopyRootRevision(revNode.getRevNodeID().getRevision());
         }else{
             parseCopyRoot(revFile, copyroot, revNode);
         }
@@ -142,7 +148,7 @@ public class SVNFSReader {
         String copyfrom = (String)headers.get(HEADER_COPYFROM);
         if(copyfrom == null){
             revNode.setCopyFromPath(null);
-            revNode.setCopyFromRevisionID(-1);//maybe this should be replaced with some constants
+            revNode.setCopyFromRevision(-1);//maybe this should be replaced with some constants
         }else{
             parseCopyFrom(revFile, copyfrom, revNode);
         }
@@ -160,13 +166,13 @@ public class SVNFSReader {
         if(cpyfrom.length < 2){
             throw new SVNException("svn: Malformed copyfrom line in node-rev in revision file '" + revFile.getAbsolutePath() + "'");
         }
-        long revId = -1;
+        long rev = -1;
         try{
-            Long.parseLong(cpyfrom[0]);
+            rev = Long.parseLong(cpyfrom[0]);
         }catch(NumberFormatException nfe){
             throw new SVNException("svn: Malformed copyfrom line in node-rev in revision file '" + revFile.getAbsolutePath() + "'");
         }
-        revNode.setCopyFromRevisionID(revId);
+        revNode.setCopyFromRevision(rev);
         revNode.setCopyFromPath(cpyfrom[1]);
     }
 
@@ -180,13 +186,13 @@ public class SVNFSReader {
         if(cpyroot.length < 2){
             throw new SVNException("svn: Malformed copyroot line in node-rev in revision file '" + revFile.getAbsolutePath() + "'");
         }
-        long revId = -1;
+        long rev = -1;
         try{
-            Long.parseLong(cpyroot[0]);
+            rev = Long.parseLong(cpyroot[0]);
         }catch(NumberFormatException nfe){
             throw new SVNException("svn: Malformed copyroot line in node-rev in revision file '" + revFile.getAbsolutePath() + "'");
         }
-        revNode.setCopyRootRevisionID(revId);
+        revNode.setCopyRootRevision(rev);
         revNode.setCopyRootPath(cpyroot[1]);
     }
     
@@ -212,25 +218,20 @@ public class SVNFSReader {
         if(nodeId == null || nodeId.length() == 0 || copyId == null || copyId.length() == 0 ){
             throw new SVNException("svn: Corrupt node-id in node-rev in revision file '" + revFile + "'");
         }
-        long revID = -1;
+        long rev = -1;
         long offset = -1;
         try{
-            revID = Long.parseLong(revNodeId.substring(rInd + 1, slashInd));
+            rev = Long.parseLong(revNodeId.substring(rInd + 1, slashInd));
             offset = Long.parseLong(revNodeId.substring(slashInd + 1));
         }catch(NumberFormatException nfe){
             throw new SVNException("svn: Corrupt node-id in node-rev in revision file '" + revFile + "'");
         }
+        SVNID id = new SVNID(nodeId, SVNID.ID_INAPPLICABLE, copyId, rev, offset);
         
         if(!isPred){
-            revNode.setNodeID(nodeId);
-            revNode.setCopyID(copyId);
-            revNode.setRevisionID(revID);
-            revNode.setOffset(offset);
+            revNode.setRevNodeID(id);
         }else{
-            revNode.setPredNodeID(nodeId);
-            revNode.setPredCopyID(copyId);
-            revNode.setPredRevisionID(revID);
-            revNode.setPredOffset(offset);
+            revNode.setPredecessorRevNodeID(id);
         }
     }
 
@@ -244,10 +245,10 @@ public class SVNFSReader {
             throw new SVNException("svn: Malformed text rep offset line in node-rev '" + revFile.getAbsolutePath() + "'");
         }
         
-        long revId = -1;
+        long rev = -1;
         try{
-            revId = Long.parseLong(offsets[0]);
-            if(revId < 0){
+            rev = Long.parseLong(offsets[0]);
+            if(rev < 0){
                 throw new NumberFormatException();
             }
         }catch(NumberFormatException nfe){
@@ -264,20 +265,20 @@ public class SVNFSReader {
             throw new SVNException("svn: Malformed text rep offset line in node-rev '" + revFile.getAbsolutePath() + "'");
         }
 
-        long length = -1;
+        long size = -1;
         try{
-            length = Long.parseLong(offsets[2]);
-            if(length < 0){
+            size = Long.parseLong(offsets[2]);
+            if(size < 0){
                 throw new NumberFormatException();
             }
         }catch(NumberFormatException nfe){
             throw new SVNException("svn: Malformed text rep offset line in node-rev '" + revFile.getAbsolutePath() + "'");
         }
         
-        long size = -1;
+        long expandedSize = -1;
         try{
-            size = Long.parseLong(offsets[3]);
-            if(size < 0){
+            expandedSize = Long.parseLong(offsets[3]);
+            if(expandedSize < 0){
                 throw new NumberFormatException();
             }
         }catch(NumberFormatException nfe){
@@ -288,19 +289,12 @@ public class SVNFSReader {
         if(hexDigest.length() != 2*MD5_DIGESTSIZE ||  SVNFileUtil.fromHexDigest(hexDigest)==null){
             throw new SVNException("svn: Malformed text rep offset line in node-rev '" + revFile.getAbsolutePath() + "'");
         }
-            
+        SVNRepresentation represnt = new SVNRepresentation(rev, offset, size, expandedSize, hexDigest);
+        
         if(isData){
-            revNode.setTextRevisionID(revId);
-            revNode.setTextOffset(offset);
-            revNode.setTextLength(length);
-            revNode.setTextSize(size);
-            revNode.setTextDigest(hexDigest);
+            revNode.setTextRepresentation(represnt);
         }else{
-            revNode.setPropsRevisionID(revId);
-            revNode.setPropsOffset(offset);
-            revNode.setPropsLength(length);
-            revNode.setPropsSize(size);
-            revNode.setPropsDigest(hexDigest);
+            revNode.setPropsRepresentation(represnt);
         }
     }
 
