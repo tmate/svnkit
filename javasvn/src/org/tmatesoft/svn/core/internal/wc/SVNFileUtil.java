@@ -31,6 +31,7 @@ import java.security.NoSuchAlgorithmException;
 import java.util.StringTokenizer;
 
 import org.tmatesoft.svn.core.SVNException;
+import org.tmatesoft.svn.core.SVNProperty;
 import org.tmatesoft.svn.core.wc.ISVNEventHandler;
 import org.tmatesoft.svn.util.SVNDebugLog;
 
@@ -52,7 +53,7 @@ public class SVNFileUtil {
         }
     };
     
-
+    private static String nativeEOLMarker;
     private static String ourGroupID;
     private static String ourUserID;
     private static File ourAppDataPath;
@@ -525,11 +526,18 @@ public class SVNFileUtil {
         return digest; 
     }
     
-    public static boolean isHex(char ch){
+    private static boolean isHex(char ch){
         if(Character.isDigit(ch) || (ch - 'a' >= 0 && ch - 'a' < 6)){
             return true;
         }
         return false;
+    }
+    
+    public static String getNativeEOLMarker(){
+        if(nativeEOLMarker == null){
+            nativeEOLMarker = new String(SVNTranslator.getEOL(SVNProperty.EOL_STYLE_NATIVE));
+        }
+        return nativeEOLMarker;
     }
     
     public static long roundTimeStamp(long tstamp) {
