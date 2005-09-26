@@ -50,6 +50,7 @@ import org.tmatesoft.svn.core.internal.wc.SVNTranslator;
 import org.tmatesoft.svn.core.SVNProperty;
 import org.tmatesoft.svn.core.SVNRevisionProperty;
 import org.tmatesoft.svn.core.internal.wc.SVNProperties;
+import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 
 
 /**
@@ -57,38 +58,38 @@ import org.tmatesoft.svn.core.internal.wc.SVNProperties;
  * @author  TMate Software Ltd.
  */
 public class FSRepository extends SVNRepository {
-    private String SVN_REPOS_README = "README.txt";
-    private String SVN_REPOS_DB_DIR = "db";
-    private String SVN_REPOS_DAV_DIR = "dav";
-    private String SVN_REPOS_LOCKS_DIR = "locks";
-    private String SVN_REPOS_HOOKS_DIR = "hooks";
-    private String SVN_REPOS_CONF_DIR = "conf";
-    private String SVN_REPOS_DB_LOCKFILE = "db.lock";
-    private String SVN_REPOS_DB_LOGS_LCOKFILE = "db-logs.lock";
-    private String SVN_REPOS_HOOK_START_COMMIT = "start-commit";
-    private String SVN_REPOS_HOOK_PRE_COMMIT = "pre-commit";
-    private String SVN_REPOS_HOOK_POST_COMMIT = "post-commit";
-    private String SVN_REPOS_HOOK_READ_SENTINEL = "read-sentinels";
-    private String SVN_REPOS_HOOK_WRITE_SENTINEL = "write-sentinels";
-    private String SVN_REPOS_HOOK_PRE_REVPROP_CHANGE = "pre-revprop-change";
-    private String SVN_REPOS_HOOK_POST_REVPROP_CHANGE = "post-revprop-change";
-    private String SVN_REPOS_HOOK_PRE_LOCK = "pre-lock";
-    private String SVN_REPOS_HOOK_POST_LOCK = "post-lock";
-    private String SVN_REPOS_HOOK_PRE_UNLOCK = "pre-unlock";
-    private String SVN_REPOS_HOOK_POST_UNLOCK = "post-unlock";
-    private String SVN_REPOS_HOOK_DESC_EXT = ".tmpl";
-    private String SVN_REPOS_CONF_SVNSERVE_CONF = "svnserve.conf";
-    private String SVN_REPOS_CONF_PASSWD = "passwd";
-    private String SVN_REPOS_FSFS_FORMAT = "fsfs";
-    private String SVN_REPOS_DB_CURRENT = "current";
-    private String SVN_REPOS_FORMAT = "format";
+    static String SVN_REPOS_README = "README.txt";
+    static String SVN_REPOS_DB_DIR = "db";
+    static String SVN_REPOS_DAV_DIR = "dav";
+    static String SVN_REPOS_LOCKS_DIR = "locks";
+    static String SVN_REPOS_HOOKS_DIR = "hooks";
+    static String SVN_REPOS_CONF_DIR = "conf";
+    static String SVN_REPOS_DB_LOCKFILE = "db.lock";
+    static String SVN_REPOS_DB_LOGS_LCOKFILE = "db-logs.lock";
+    static String SVN_REPOS_HOOK_START_COMMIT = "start-commit";
+    static String SVN_REPOS_HOOK_PRE_COMMIT = "pre-commit";
+    static String SVN_REPOS_HOOK_POST_COMMIT = "post-commit";
+    static String SVN_REPOS_HOOK_READ_SENTINEL = "read-sentinels";
+    static String SVN_REPOS_HOOK_WRITE_SENTINEL = "write-sentinels";
+    static String SVN_REPOS_HOOK_PRE_REVPROP_CHANGE = "pre-revprop-change";
+    static String SVN_REPOS_HOOK_POST_REVPROP_CHANGE = "post-revprop-change";
+    static String SVN_REPOS_HOOK_PRE_LOCK = "pre-lock";
+    static String SVN_REPOS_HOOK_POST_LOCK = "post-lock";
+    static String SVN_REPOS_HOOK_PRE_UNLOCK = "pre-unlock";
+    static String SVN_REPOS_HOOK_POST_UNLOCK = "post-unlock";
+    static String SVN_REPOS_HOOK_DESC_EXT = ".tmpl";
+    static String SVN_REPOS_CONF_SVNSERVE_CONF = "svnserve.conf";
+    static String SVN_REPOS_CONF_PASSWD = "passwd";
+    static String SVN_REPOS_FSFS_FORMAT = "fsfs";
+    static String SVN_REPOS_DB_CURRENT = "current";
+    static String SVN_REPOS_FORMAT = "format";
     private int    SVN_REPOS_FORMAT_NUMBER = 3;
-    private String SVN_REPOS_FS_FORMAT = "format";
+    static String SVN_REPOS_FS_FORMAT = "format";
     private int    SVN_FS_FORMAT_NUMBER = 1;
-    private String SVN_FS_TYPE_FILENAME = "fs-type";
-    private String SVN_REPOS_UUID_FILE = "uuid";
-    private String SVN_REPOS_REVPROPS_DIR = "revprops";
-    private String SVN_REPOS_REVS_DIR = "revs";
+    static String SVN_FS_TYPE_FILENAME = "fs-type";
+    static String SVN_REPOS_UUID_FILE = "uuid";
+    static String SVN_REPOS_REVPROPS_DIR = "revprops";
+    static String SVN_REPOS_REVS_DIR = "revs";
 
     //uuid format - 36 symbols
     private int SVN_UUID_FILE_LENGTH = 36;
@@ -196,7 +197,7 @@ public class FSRepository extends SVNRepository {
         File dbLockFile = new File(new File(reposRootPath, SVN_REPOS_LOCKS_DIR), SVN_REPOS_DB_LOCKFILE);
         
         if(!dbLockFile.exists()){
-            throw new SVNException("svn: Error opening db lockfile" + SVNTranslator.getEOL(SVNProperty.EOL_STYLE_NATIVE) + "svn: Can't open file '" + dbLockFile.getAbsolutePath() + "'");
+            throw new SVNException("svn: Error opening db lockfile" + SVNFileUtil.getNativeEOLMarker() + "svn: Can't open file '" + dbLockFile.getAbsolutePath() + "'");
         }
         
         myDBLockFile = null;
@@ -210,7 +211,7 @@ public class FSRepository extends SVNRepository {
                     //
                 }
             }
-            throw new SVNException("svn: Error opening db lockfile" + SVNTranslator.getEOL(SVNProperty.EOL_STYLE_NATIVE) + "svn: Can't open file '" + dbLockFile.getAbsolutePath() + "'");
+            throw new SVNException("svn: Error opening db lockfile" + SVNFileUtil.getNativeEOLMarker() + "svn: Can't open file '" + dbLockFile.getAbsolutePath() + "'");
         }
         
         //2. lock db.lock blocking, not exclusively 
@@ -232,7 +233,7 @@ public class FSRepository extends SVNRepository {
                     //
                 }
             }
-            throw new SVNException("svn: Error opening db lockfile" + SVNTranslator.getEOL(SVNProperty.EOL_STYLE_NATIVE) + "svn: Can't get shared lock on file '" + dbLockFile.getAbsolutePath() + "'");
+            throw new SVNException("svn: Error opening db lockfile" + SVNFileUtil.getNativeEOLMarker() + "svn: Can't get shared lock on file '" + dbLockFile.getAbsolutePath() + "'");
         }
     }
     
@@ -271,9 +272,9 @@ public class FSRepository extends SVNRepository {
     private void openRepository() throws SVNException {
         lock();
         
-        String eolBytes = new String(SVNTranslator.getEOL(SVNProperty.EOL_STYLE_NATIVE));
+        String eol = SVNFileUtil.getNativeEOLMarker();
         
-        String errorMessage = "svn: Unable to open an ra_local session to URL" + eolBytes + "svn: Unable to open repository '" + getLocation() + "'";
+        String errorMessage = "svn: Unable to open an ra_local session to URL" + eol + "svn: Unable to open repository '" + getLocation() + "'";
         
         //Perform steps similar to svn's ones
         //1. Find repos root 
@@ -289,21 +290,21 @@ public class FSRepository extends SVNRepository {
         try{
             checkReposFormat(myReposRootPath);
         }catch(SVNException svne){
-            throw new SVNException(errorMessage + eolBytes + svne.getMessage());
+            throw new SVNException(errorMessage + eol + svne.getMessage());
         }
     
         //3. Lock 'db.lock' file non-exclusively, blocking, for reading only
         try{
             lockDBFile(myReposRootPath);
         }catch(SVNException svne){
-            throw new SVNException(errorMessage + eolBytes + svne.getMessage());
+            throw new SVNException(errorMessage + eol + svne.getMessage());
         }
             
         //4. Check FS type for 'fsfs'
         try{
             checkFSType(myReposRootPath);
         }catch(SVNException svne){
-            throw new SVNException(errorMessage + eolBytes + svne.getMessage());
+            throw new SVNException(errorMessage + eol + svne.getMessage());
         }
             
         //5. Attempt to open the 'current' file of this repository
@@ -312,7 +313,7 @@ public class FSRepository extends SVNRepository {
         try{
             fis = new FileInputStream(dbCurrentFile);
         }catch(FileNotFoundException fnfe){
-            throw new SVNException(errorMessage + eolBytes + "svn: Can't open file '" + dbCurrentFile.getAbsolutePath() + "'");
+            throw new SVNException(errorMessage + eol + "svn: Can't open file '" + dbCurrentFile.getAbsolutePath() + "'");
         }finally{
             if(fis!=null){
                 try{
@@ -335,7 +336,7 @@ public class FSRepository extends SVNRepository {
         try{
             checkFSFormat(myReposRootPath);
         }catch(SVNException svne){
-            throw new SVNException(errorMessage + eolBytes + svne.getMessage());
+            throw new SVNException(errorMessage + eol + svne.getMessage());
         }
             
         //7. Read and cache repository UUID
@@ -343,7 +344,7 @@ public class FSRepository extends SVNRepository {
         try{
             uuid = readReposUUID(myReposRootPath);
         }catch(SVNException svne){
-            throw new SVNException(errorMessage + eolBytes + svne.getMessage());
+            throw new SVNException(errorMessage + eol + svne.getMessage());
         }
         
         String decodedURL = SVNEncodingUtil.uriDecode(getLocation().toString());
@@ -433,7 +434,7 @@ public class FSRepository extends SVNRepository {
         }
 
         Date date=null;
-        date = SVNTimeUtil.parseDate(timeString);//dateFormatter.parse(timeString);
+        date = SVNTimeUtil.parseDate(timeString);
         if(date==null){
             throw new SVNException("svn: Can't parse date on revision " + revision);
         }
@@ -557,13 +558,12 @@ public class FSRepository extends SVNRepository {
     }
 
     private void getRootChangesOffset(String reposRootPath, long revision) throws SVNException{
-        String eolBytes = new String(SVNTranslator.getEOL(SVNProperty.EOL_STYLE_NATIVE));
+        //String eol = SVNFileUtil.getNativeEOLMarker();
         
         File revsDir = new File(new File(reposRootPath, SVN_REPOS_DB_DIR), SVN_REPOS_REVS_DIR);
         File revFile = new File(revsDir, String.valueOf(revision));
         
-        SVNFSReader revReader = new SVNFSReader(revFile, revision);
-        long rootOffset = revReader.getRootOffset();
+        SVNFSReader revReader = SVNFSReader.getInstance(reposRootPath);
 
     }
     
