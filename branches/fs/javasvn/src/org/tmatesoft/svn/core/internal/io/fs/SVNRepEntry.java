@@ -20,14 +20,16 @@ import org.tmatesoft.svn.core.SVNNodeKind;
 public class SVNRepEntry {
     private SVNID myId;
     private SVNNodeKind myType;
+    private String myName;
     
     public SVNRepEntry(){
         
     }
     
-    public SVNRepEntry(SVNID id, SVNNodeKind type){
+    public SVNRepEntry(SVNID id, SVNNodeKind type, String name){
         myId = id;
         myType = type;
+        myName = name;
     }
     
     public void setId(SVNID id){
@@ -38,11 +40,19 @@ public class SVNRepEntry {
         myType = type;
     }
 
+    public void setName(String name){
+        myName = name;
+    }
+    
     public SVNID getId(){
         return myId;
     }
 
     public SVNNodeKind getType(){
         return myType;
+    }
+
+    public String getName(){
+        return myName;
     }
 }

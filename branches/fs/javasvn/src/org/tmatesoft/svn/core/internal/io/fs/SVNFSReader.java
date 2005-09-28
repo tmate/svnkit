@@ -22,7 +22,6 @@ import java.io.IOException;
 import java.io.FileReader;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.io.InputStreamReader;
 import java.io.Reader;
 import java.io.RandomAccessFile;
 import java.io.ByteArrayInputStream;
@@ -63,13 +62,7 @@ public class SVNFSReader {
     }
 
     private File getRevFile(long revision) throws SVNException{
-        File revsDir = new File(new File(myReposRootDir, FSRepository.SVN_REPOS_DB_DIR), FSRepository.SVN_REPOS_REVS_DIR);
-        File revFile = new File(revsDir, String.valueOf(revision));
-        if(!revFile.exists()){
-            throw new SVNException("svn: No such revision " + revision);
-        }
-
-        return revFile;
+        return FSRepository.getRevFile(myReposRootDir.getAbsolutePath(), revision);
     }
 
     public static SVNFSReader getInstance(String reposRootPath){
@@ -85,7 +78,7 @@ public class SVNFSReader {
     
     public SVNRevisionNode getChildDirNode(String child, SVNRevisionNode parent) throws SVNException{
         Map entries = getDirEntries(parent);
-        SVNRepEntry entry = (SVNRepEntry)entries.get(child);
+        SVNRepEntry entry = entries != null ? (SVNRepEntry)entries.get(child) : null;
         if(entry == null){
             return null;
             //throw new SVNException("svn: Attempted to open non-existent child node '" + child + "'");
@@ -239,7 +232,7 @@ public class SVNFSReader {
             if(!isProps){
                 SVNRepEntry nextRepEntry = null;
                 try{
-                    nextRepEntry = parseRepEntryValue(value);
+                    nextRepEntry = parseRepEntryValue(key, value);
                 }catch(SVNException svne){
                     throw new SVNException("svn: Directory entry '" + key + "' corrupt");
                 }
@@ -252,7 +245,7 @@ public class SVNFSReader {
         return representationMap;
     }
     
-    private SVNRepEntry parseRepEntryValue(String value) throws SVNException{
+    private SVNRepEntry parseRepEntryValue(String name, String value) throws SVNException{
         String[] values = value.split(" ");
         if(values == null || values.length < 2){
             throw new SVNException();
@@ -264,7 +257,7 @@ public class SVNFSReader {
         }
         
         SVNID id = parseID(values[1], null);
-        return new SVNRepEntry(id, type);
+        return new SVNRepEntry(id, type, name);
     }
 
     private static boolean readEntry(char type, InputStream is, OutputStream os) throws IOException {
