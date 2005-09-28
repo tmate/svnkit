@@ -42,7 +42,7 @@ public class SVNFSReader {
 
     static BufferedReader myCurReader;
     //to mean the end of a file 
-    static int FILE_END_POS = -1;
+    static long FILE_END_POS = -1;
     
     static String HEADER_ID = "id";
     static String HEADER_TYPE = "type";
@@ -83,14 +83,17 @@ public class SVNFSReader {
         return reader;
     }
     
-    public SVNID getChildDirId(String child, SVNRevisionNode parent) throws SVNException{
+    public SVNRevisionNode getChildDirNode(String child, SVNRevisionNode parent) throws SVNException{
         Map entries = getDirEntries(parent);
         SVNRepEntry entry = (SVNRepEntry)entries.get(child);
         if(entry == null){
-            throw new SVNException("svn: Attempted to open non-existent child node '" + child + "'");
+            return null;
+            //throw new SVNException("svn: Attempted to open non-existent child node '" + child + "'");
         }
+
         checkPathComponent(child);
-        return entry.getId(); 
+        
+        return getRevNode(entry.getId()); 
     }
     private void checkPathComponent(String name) throws SVNException{
         if(name == null || name.length() == 0 || "..".equals(name) || name.indexOf('/') != -1){
@@ -112,60 +115,70 @@ public class SVNFSReader {
     
     private Map getDirContents(SVNRepresentation represnt) throws SVNException {
         File revFile = getRevFile(represnt.getRevision());
-        
-        InputStream is = SVNFileUtil.openFileForReading(revFile);
-        
+        InputStream is = null;
         try{
-            readBytesFromStream(new Long(represnt.getOffset()).intValue(), is, null);
-        }catch(IOException ioe){
-            throw new SVNException("svn: Can't set position pointer in file '" + revFile + "'");
-        }
-        String header = null;
-        try{
-            header = readSingleLine(is);
-        }catch(FileNotFoundException fnfe){
-            throw new SVNException("svn: Can't open file '" + revFile.getAbsolutePath() + "'", fnfe);
-        } catch(IOException ioe){
-            throw new SVNException("svn: Can't read file '" + revFile.getAbsolutePath() + "'", ioe);
-        }
-        
-        if(!REP_PLAIN.equals(header)){
-            throw new SVNException("svn: Malformed representation header in revision file '" + revFile.getAbsolutePath() + "'");
-        }
-        
-        MessageDigest digest = null;
-        try{
-            digest = MessageDigest.getInstance("MD5");
-        }catch(NoSuchAlgorithmException nsae){
-            throw new SVNException("svn: Can't check the digest in revision file '" + revFile.getAbsolutePath() + "': "+nsae.getMessage());
-        }
-
-        ByteArrayOutputStream os = new ByteArrayOutputStream();
-        long readBytes = 0;
-        for(long i = 0; i < represnt.getSize(); i++){
+            is = SVNFileUtil.openFileForReading(revFile);
+            
             try{
-                readBytes += readBytesFromStream(1, is, os);
+                readBytesFromStream(new Long(represnt.getOffset()).intValue(), is, null);
             }catch(IOException ioe){
-                throw new SVNException("svn: Can't read representation in revision file '" + revFile.getAbsolutePath() + "': " + ioe.getMessage());            
+                throw new SVNException("svn: Can't set position pointer in file '" + revFile + "'");
             }
-        }
-        byte[] bytes = os.toByteArray();
-        digest.update(bytes);
-
-        // Compare read and expected checksums 
-        if(!MessageDigest.isEqual(SVNFileUtil.fromHexDigest(represnt.getHexDigest()), digest.digest())){
-            throw new SVNException("svn: Checksum mismatch while reading representation:" + SVNFileUtil.getNativeEOLMarker() + 
-                    "   expected:  " + represnt.getHexDigest() + SVNFileUtil.getNativeEOLMarker() + 
-                    "     actual:  " + SVNFileUtil.toHexDigest(digest));
-        }
-        
-        ByteArrayInputStream bais = new ByteArrayInputStream(bytes);
-        try{
-            return readPlainRepresentation(bais);
-        }catch(IOException ioe){
-            throw new SVNException("svn: Can't read representation in revision file '" + revFile.getAbsolutePath() + "': " + ioe.getMessage());
-        }catch(SVNException svne){
-            throw new SVNException("svn: Revision file '" + revFile.getAbsolutePath() + "' corrupt" + SVNFileUtil.getNativeEOLMarker() + svne.getMessage());
+            String header = null;
+            try{
+                header = readSingleLine(is);
+            }catch(FileNotFoundException fnfe){
+                throw new SVNException("svn: Can't open file '" + revFile.getAbsolutePath() + "'", fnfe);
+            } catch(IOException ioe){
+                throw new SVNException("svn: Can't read file '" + revFile.getAbsolutePath() + "'", ioe);
+            }
+            
+            if(!REP_PLAIN.equals(header)){
+                throw new SVNException("svn: Malformed representation header in revision file '" + revFile.getAbsolutePath() + "'");
+            }
+            
+            MessageDigest digest = null;
+            try{
+                digest = MessageDigest.getInstance("MD5");
+            }catch(NoSuchAlgorithmException nsae){
+                throw new SVNException("svn: Can't check the digest in revision file '" + revFile.getAbsolutePath() + "': "+nsae.getMessage());
+            }
+    
+            ByteArrayOutputStream os = new ByteArrayOutputStream();
+            long readBytes = 0;
+            for(long i = 0; i < represnt.getSize(); i++){
+                try{
+                    readBytes += readBytesFromStream(1, is, os);
+                }catch(IOException ioe){
+                    throw new SVNException("svn: Can't read representation in revision file '" + revFile.getAbsolutePath() + "': " + ioe.getMessage());            
+                }
+            }
+            byte[] bytes = os.toByteArray();
+            digest.update(bytes);
+            
+            // Compare read and expected checksums 
+            if(!MessageDigest.isEqual(SVNFileUtil.fromHexDigest(represnt.getHexDigest()), digest.digest())){
+                throw new SVNException("svn: Checksum mismatch while reading representation:" + SVNFileUtil.getNativeEOLMarker() + 
+                        "   expected:  " + represnt.getHexDigest() + SVNFileUtil.getNativeEOLMarker() + 
+                        "     actual:  " + SVNFileUtil.toHexDigest(digest));
+            }
+            
+            ByteArrayInputStream bais = new ByteArrayInputStream(bytes);
+            try{
+                return readPlainRepresentation(bais);
+            }catch(IOException ioe){
+                throw new SVNException("svn: Can't read representation in revision file '" + revFile.getAbsolutePath() + "': " + ioe.getMessage());
+            }catch(SVNException svne){
+                throw new SVNException("svn: Revision file '" + revFile.getAbsolutePath() + "' corrupt" + SVNFileUtil.getNativeEOLMarker() + svne.getMessage());
+            }
+        }finally{
+            if(is != null){
+                try{
+                    is.close();
+                }catch(IOException ioe){
+                    //
+                }
+            }
         }
     }
     
@@ -179,6 +192,7 @@ public class SVNFSReader {
                 throw new IOException("malformed file format");
             }
             String entryValue = new String(os.toByteArray(), "UTF-8");
+            os.reset();
             SVNRepEntry nextRepEntry = null;
             try{
                 nextRepEntry = parseRepEntryValue(entryValue);
@@ -421,7 +435,7 @@ public class SVNFSReader {
     public static SVNID parseID(String revNodeId, SVNID id) throws SVNException{
         int firstDotInd = revNodeId.indexOf('.');
         int secondDotInd = revNodeId.lastIndexOf('.');
-        int rInd = revNodeId.indexOf('r');
+        int rInd = revNodeId.indexOf('r', secondDotInd);
 
         if(rInd != -1){//we've a revision id
             int slashInd = revNodeId.indexOf('/');
@@ -582,7 +596,7 @@ public class SVNFSReader {
                 
                 String localName = line.substring(0, colonIndex);
                 String localValue = line.substring(colonIndex + 1);
-                map.put(localName, localValue);
+                map.put(localName, localValue.trim());
             }
         }finally{
             closeFile(reader);
@@ -590,7 +604,7 @@ public class SVNFSReader {
         return map;
     }
     
-    public static byte[] readBytesFromFile(int pos, int offset, int bytesToRead, File file) throws SVNException{
+    public static byte[] readBytesFromFile(long pos, long offset, int bytesToRead, File file) throws SVNException{
         if(bytesToRead < 0 || file == null){ 
             return null;
         }
@@ -606,9 +620,9 @@ public class SVNFSReader {
             throw new SVNException("svn: Can't open file '" + file.getAbsolutePath() + "': " + fnfe.getMessage());
         }
         
-        int fileLength = -1;
+        long fileLength = -1;
         try{
-            fileLength = (int)revRAF.length();
+            fileLength = revRAF.length();
         }catch(IOException ioe){
             throw new SVNException("svn: Can't open file '" + file.getAbsolutePath() + "': " + ioe.getMessage());
         }
@@ -622,7 +636,8 @@ public class SVNFSReader {
         
         int r = -1;
         try {
-            r = revRAF.read(buf, pos + 1, bytesToRead);
+            revRAF.seek(pos + 1);
+            r = revRAF.read(buf);
             
             if (r <= 0) {
                 throw new IOException("eof unexpectedly found");
@@ -649,10 +664,9 @@ public class SVNFSReader {
         if(is == null){
             return -1;
         }
-        
-        byte[] buffer = new byte[bytesToRead];
-        
+
         if(os != null){
+            byte[] buffer = new byte[bytesToRead];
             int r = is.read(buffer);
             os.write(buffer, 0, r);
             return r;
@@ -705,12 +719,18 @@ public class SVNFSReader {
         return line;
     }
 
+    //to read lines only from svn files ! (eol-specific)
     public static String readSingleLine(InputStream is) throws FileNotFoundException, IOException {
-        BufferedReader reader = null;
-        String line = null;
-        reader = new BufferedReader(new InputStreamReader(is));
-        line = reader.readLine();
-        return line;
+        ByteArrayOutputStream os = new ByteArrayOutputStream();
+        while(true){
+            int b = is.read();
+            if(b == -1 || '\n' == (byte)b){
+                break;
+            }
+            os.write(b);
+        }
+        
+        return new String(os.toByteArray());
     }
 
     static void closeFile(Reader is) {

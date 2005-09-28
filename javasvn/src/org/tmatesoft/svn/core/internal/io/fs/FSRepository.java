@@ -26,6 +26,10 @@ import java.io.File;
 import java.util.Collection;
 import java.util.Date;
 import java.util.Map;
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.Iterator;
+import java.util.Set;
 
 import org.tmatesoft.svn.core.ISVNDirEntryHandler;
 import org.tmatesoft.svn.core.ISVNLogEntryHandler;
@@ -557,14 +561,58 @@ public class FSRepository extends SVNRepository {
         return null;
     }
 
-    private void getRootChangesOffset(String reposRootPath, long revision) throws SVNException{
+//    private void getRootChangesOffset(String reposRootPath, long revision) throws SVNException{
         //String eol = SVNFileUtil.getNativeEOLMarker();
+//        File revsDir = new File(new File(reposRootPath, SVN_REPOS_DB_DIR), SVN_REPOS_REVS_DIR);
+//        File revFile = new File(revsDir, String.valueOf(revision));
+//    }
+    
+    //path is relative to this FSRepository's location
+    private Collection getDirEntries(String reposRootPath, String path, long revision) throws SVNException {
+        String absPath = getRepositoryPath(path);
+        SVNFSReader fsReader = SVNFSReader.getInstance(reposRootPath);
         
-        File revsDir = new File(new File(reposRootPath, SVN_REPOS_DB_DIR), SVN_REPOS_REVS_DIR);
-        File revFile = new File(revsDir, String.valueOf(revision));
+        String nextPathComponent = null;
+        SVNRevisionNode parent = fsReader.getRootRevNode(revision);
+        SVNRevisionNode child = null;
+        if(absPath.indexOf(':') != -1 || absPath.indexOf('|') != -1){
+            absPath = (absPath.indexOf('/') != -1) ? absPath.substring(absPath.indexOf('/')) : "";
+        }
         
-        SVNFSReader revReader = SVNFSReader.getInstance(reposRootPath);
-
+        while(true){
+            nextPathComponent = SVNPathUtil.head(absPath);
+            absPath = SVNPathUtil.removeHead(absPath);
+            
+            if(nextPathComponent.length() == 0){
+                child = parent;
+            }else{
+                child = fsReader.getChildDirNode(nextPathComponent, parent);
+                if(child == null){
+                    throw new SVNException("svn: Attempted to open non-existent child node '" + nextPathComponent + "'" + SVNFileUtil.getNativeEOLMarker() + "svn: File not found: revision " + revision + ", path '" + getRepositoryPath(path) + "'");
+                }
+                
+            }
+            parent = child;
+            
+            if("".equals(absPath)){
+                break;
+            }
+        }
+        
+        Map entries = fsReader.getDirEntries(parent);
+        Set keys = entries.keySet();
+        Iterator iter = keys.iterator();
+        Collection dirEntries = new LinkedList();
+        
+        
+        while(iter.hasNext()){
+            String name = (String)iter.next();
+            SVNRepEntry repEntry = (SVNRepEntry)entries.get(name);
+            //test!!!!!!!
+            dirEntries.add(new SVNDirEntry(name, repEntry.getType(), 0, false, repEntry.getId().getRevision(), null, ""));
+        }
+        
+        return dirEntries;
     }
     
     /**
@@ -576,19 +624,24 @@ public class FSRepository extends SVNRepository {
      * @throws SVNException
      */
     public long getDir(String path, long revision, Map properties, ISVNDirEntryHandler handler) throws SVNException {
-        
         try{
             openRepository();
-            
-            path = getRepositoryPath(path);
             if(!super.isValidRevision(revision)){
                 revision = getYoungestRev(myReposRootPath);
             }
             
+            Collection entries = getDirEntries(myReposRootPath, path, revision);
+            Iterator iterator = entries.iterator();
+            while(iterator.hasNext()){
+                SVNDirEntry entry = (SVNDirEntry)iterator.next();
+                handler.handleDirEntry(entry);
+            }
+            
+            
+            return revision;
         }finally{
             closeRepository();
         }
-        return 0;
     }
 
     /**
