@@ -12,14 +12,10 @@
 package org.tmatesoft.svn.core.internal.io.fs;
 
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.BufferedInputStream;
-import java.io.InputStreamReader;
 import java.io.FileInputStream;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
 import java.io.RandomAccessFile;
-import java.io.BufferedReader;
 import java.io.FileNotFoundException;
 import java.io.OutputStream;
 import java.io.File;
@@ -50,7 +46,6 @@ import org.tmatesoft.svn.core.io.SVNRepository;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
 import org.tmatesoft.svn.core.internal.util.SVNEncodingUtil;
 import org.tmatesoft.svn.core.internal.util.SVNTimeUtil;
-import org.tmatesoft.svn.core.internal.wc.SVNTranslator;
 import org.tmatesoft.svn.core.SVNProperty;
 import org.tmatesoft.svn.core.SVNRevisionProperty;
 import org.tmatesoft.svn.core.internal.wc.SVNProperties;
@@ -111,9 +106,6 @@ public class FSRepository extends SVNRepository {
     //db.lock file representation for synchronizing
     private RandomAccessFile myDBLockFile;
 
-    //to mean the end of a file 
-//    static long FILE_END_POS = -1;
-    
     protected FSRepository(SVNURL location, ISVNSession options) {
         super(location, options);
     }
@@ -390,8 +382,28 @@ public class FSRepository extends SVNRepository {
         }
     }
     
-    private File getRevpropsDir(){
-        return new File(new File(myReposRootPath, SVN_REPOS_DB_DIR), SVN_REPOS_REVPROPS_DIR);
+    static File getRevPropsFile(String reposRootPath, long revision) throws SVNException{
+        File revPropsFile = new File(getRevPropsDir(reposRootPath), String.valueOf(revision)); 
+        if(!revPropsFile.exists()){
+            throw new SVNException("svn: No such revision: " + revision);
+        }
+        return revPropsFile;
+    }
+    
+    static File getRevPropsDir(String reposRootPath){
+        return new File(new File(reposRootPath, SVN_REPOS_DB_DIR), SVN_REPOS_REVPROPS_DIR);
+    }
+    
+    static File getRevsDir(String reposRootPath) {
+        return new File(new File(reposRootPath, SVN_REPOS_DB_DIR), SVN_REPOS_REVS_DIR);
+    }
+
+    static File getRevFile(String reposRootPath, long revision) throws SVNException{
+        File revFile = new File(getRevsDir(reposRootPath), String.valueOf(revision));
+        if(!revFile.exists()){
+            throw new SVNException("svn: No such revision " + revision);
+        }
+        return revFile;
     }
     
     private long getYoungestRev(String reposRootPath) throws SVNException{
@@ -425,13 +437,10 @@ public class FSRepository extends SVNRepository {
         }
     }
     
-    private Date getTime(long revision) throws SVNException{
-        File revPropFile = new File(getRevpropsDir(), String.valueOf(revision));
-        SVNProperties revProps = new SVNProperties(revPropFile, null);
-        
-        String timeString=null;
+    private Date getTime(String reposRootPath, long revision) throws SVNException{
+        String timeString = null;
 
-        timeString =  revProps.getPropertyValue(SVNRevisionProperty.DATE);
+        timeString = getRevProperty(reposRootPath, revision, SVNRevisionProperty.DATE);
         
         if(timeString==null){
             throw new SVNException("svn: Failed to find time on revision " + revision);
@@ -445,6 +454,12 @@ public class FSRepository extends SVNRepository {
         return date;
     }
     
+    private String getRevProperty(String reposRootPath, long revision, String revName) throws SVNException{
+        File revPropFile = getRevPropsFile(reposRootPath, revision);
+        SVNProperties revProps = new SVNProperties(revPropFile, null);
+        return revProps.getPropertyValue(revName);
+    }
+    
     private long getDatedRev(String reposRootPath, Date date) throws SVNException{
         long latestRev = getYoungestRev(reposRootPath); 
         long topRev = latestRev;
@@ -454,13 +469,13 @@ public class FSRepository extends SVNRepository {
         
         while(botRev <= topRev){
             midRev = (topRev + botRev)/2;
-            curTime = getTime(midRev);
+            curTime = getTime(reposRootPath, midRev);
             
             if(curTime.compareTo(date)>0){//overshot
                 if((midRev - 1) < 0){
                     return 0;
                 }
-                Date prevTime = getTime(midRev-1);
+                Date prevTime = getTime(reposRootPath, midRev-1);
                 // see if time falls between midRev and midRev-1: 
                 if(prevTime.compareTo(date)<0){
                     return midRev - 1;
@@ -470,7 +485,7 @@ public class FSRepository extends SVNRepository {
                 if((midRev + 1) > latestRev){
                     return latestRev;
                 }
-                Date nextTime = getTime(midRev+1);
+                Date nextTime = getTime(reposRootPath, midRev+1);
                 // see if time falls between midRev and midRev+1:
                 if(nextTime.compareTo(date)>0){
                     return midRev+1;
@@ -496,79 +511,64 @@ public class FSRepository extends SVNRepository {
         }
     }
 
-    /**
-     * @param revision
-     * @param properties
-     * @return
-     * @throws SVNException
-     */
     public Map getRevisionProperties(long revision, Map properties) throws SVNException {
         return null;
     }
 
-    /**
-     * @param revision
-     * @param propertyName
-     * @param propertyValue
-     * @throws SVNException
-     */
     public void setRevisionPropertyValue(long revision, String propertyName, String propertyValue) throws SVNException {
     }
 
-    /**
-     * @param revision
-     * @param propertyName
-     * @return
-     * @throws SVNException
-     */
     public String getRevisionPropertyValue(long revision, String propertyName) throws SVNException {
         return null;
     }
     
-    
-    /**
-     * @param path
-     * @param revision
-     * @return
-     * @throws SVNException
-     */
     public SVNNodeKind checkPath(String path, long revision) throws SVNException {
         return null;
     }
 
-    /**
-     * @param path
-     * @param revision
-     * @param properties
-     * @param contents
-     * @return
-     * @throws SVNException
-     */
     public long getFile(String path, long revision, Map properties, OutputStream contents) throws SVNException {
         return 0;
     }
     
-    /**
-     * 
-     * @param path
-     * @param revision
-     * @param includeCommitMessages
-     * @param entries
-     * @return
-     * @throws SVNException
-     */
-    public SVNDirEntry getDir(String path, long revision, boolean includeCommitMessages, Collection entries) throws SVNException{
-        return null;
-    }
-
-//    private void getRootChangesOffset(String reposRootPath, long revision) throws SVNException{
-        //String eol = SVNFileUtil.getNativeEOLMarker();
-//        File revsDir = new File(new File(reposRootPath, SVN_REPOS_DB_DIR), SVN_REPOS_REVS_DIR);
-//        File revFile = new File(revsDir, String.valueOf(revision));
-//    }
-    
     //path is relative to this FSRepository's location
-    private Collection getDirEntries(String reposRootPath, String path, long revision) throws SVNException {
+    private Collection getDirEntries(SVNRevisionNode parent, String reposRootPath, Map parentDirProps, boolean includeLogs) throws SVNException {
+        SVNFSReader fsReader = SVNFSReader.getInstance(reposRootPath);
+        Map entries = fsReader.getDirEntries(parent);
+        Set keys = entries.keySet();
+        Iterator iter = keys.iterator();
+        Collection dirEntries = new LinkedList();
+        
+        
+        while(iter.hasNext()){
+            String name = (String)iter.next();
+            SVNRepEntry repEntry = (SVNRepEntry)entries.get(name);
+            if(repEntry != null){
+                dirEntries.add(buildDirEntry(repEntry, null, reposRootPath, includeLogs));
+            }
+        }
+
+        if(parentDirProps != null){
+            //first fetch out user props
+            Map dirProps = fsReader.getProperties(parent);
+            if(dirProps != null && dirProps.size() > 0){
+                parentDirProps.putAll(dirProps);
+            }
+            //now add special non-tweakable metadata props
+            Map metaprops = null;
+            try{
+                metaprops = getMetaProps(reposRootPath, parent.getRevNodeID().getRevision());
+            }catch(SVNException svne){
+                //
+            }
+            if(metaprops != null && metaprops.size() > 0){
+                parentDirProps.putAll(metaprops);
+            }
+        }
+        
+        return dirEntries;
+    }
+    
+    private SVNRevisionNode getParentNode(String reposRootPath, String path, long revision) throws SVNException{
         String absPath = getRepositoryPath(path);
         SVNFSReader fsReader = SVNFSReader.getInstance(reposRootPath);
         
@@ -598,50 +598,87 @@ public class FSRepository extends SVNRepository {
                 break;
             }
         }
-        
-        Map entries = fsReader.getDirEntries(parent);
-        Set keys = entries.keySet();
-        Iterator iter = keys.iterator();
-        Collection dirEntries = new LinkedList();
-        
-        
-        while(iter.hasNext()){
-            String name = (String)iter.next();
-            SVNRepEntry repEntry = (SVNRepEntry)entries.get(name);
-            SVNRevisionNode entryNode = fsReader.getRevNode(repEntry.getId());
-
-            //dir size is equated to 0
-            long size = 0;
-            
-            if(repEntry.getType() == SVNNodeKind.FILE){
-                size = entryNode.getTextRepresentation().getExpandedSize();
-            }
-            
-            Map props = fsReader.getProperties(entryNode);
-            boolean hasProps = (props == null || props.size() == 0) ? false : true;
-            
-            dirEntries.add(new SVNDirEntry(name, repEntry.getType(), size , hasProps, repEntry.getId().getRevision(), null, ""));
-        }
-        
-        return dirEntries;
+        return parent;
     }
     
-    /**
-     * @param path
-     * @param revision
-     * @param properties
-     * @param handler
-     * @return
-     * @throws SVNException
-     */
+    private SVNDirEntry buildDirEntry(SVNRepEntry repEntry, SVNRevisionNode revNode, String reposRootPath, boolean includeLogs) throws SVNException {
+        SVNFSReader fsReader = SVNFSReader.getInstance(reposRootPath);
+        SVNRevisionNode entryNode = revNode == null ? fsReader.getRevNode(repEntry.getId()) : revNode;
+
+        //dir size is equated to 0
+        long size = 0;
+        
+        if(entryNode.getType() == SVNNodeKind.FILE){
+            size = entryNode.getTextRepresentation().getExpandedSize();
+        }
+        
+        Map props = null;
+        props = fsReader.getProperties(entryNode);
+        boolean hasProps = (props == null || props.size() == 0) ? false : true;
+        
+        //should it be an exception if getting a rev property is impossible, hmmm?
+        Map revProps = null;
+        try{
+            revProps = getAllRevProps(reposRootPath, repEntry.getId().getRevision());
+        }catch(SVNException svne){
+            //
+        }
+        
+        String lastAuthor = null;
+        String log = null;
+        if(revProps != null && revProps.size() > 0){
+            lastAuthor = (String)revProps.get(SVNRevisionProperty.AUTHOR);
+            log = (String)revProps.get(SVNRevisionProperty.LOG);
+        }
+        log = log == null || !includeLogs ? "" : log;
+        
+        Date lastCommitDate = null;
+        try{
+            lastCommitDate = getTime(reposRootPath, repEntry.getId().getRevision());
+        }catch(SVNException svne){
+            //
+        }
+        
+        return new SVNDirEntry(repEntry.getName(), repEntry.getType(), size , hasProps, repEntry.getId().getRevision(), lastCommitDate, lastAuthor, log);
+    }
+    
+    private Map getMetaProps(String reposRootPath, long revision) throws SVNException {
+        Map metaProps = new HashMap();
+        Map revProps = null;
+        revProps = getAllRevProps(reposRootPath, revision);
+        String author = (String)revProps.get(SVNRevisionProperty.AUTHOR);
+        String date = (String)revProps.get(SVNRevisionProperty.DATE);
+        String uuid = super.getRepositoryUUID();
+        String rev = String.valueOf(revision);
+        
+        metaProps.put(SVNProperty.LAST_AUTHOR, author != null ? author : "");
+        metaProps.put(SVNProperty.COMMITTED_DATE, date != null ? date : "");
+        metaProps.put(SVNProperty.COMMITTED_REVISION, rev);
+        metaProps.put(SVNProperty.UUID, uuid != null ? uuid : "");
+        return metaProps;
+    }
+    
+    private Map getAllRevProps(String reposRootPath, long revision) throws SVNException {
+        Map allProps = new HashMap();
+        String author = getRevProperty(reposRootPath, revision, SVNRevisionProperty.AUTHOR);
+        String date = getRevProperty(reposRootPath, revision, SVNRevisionProperty.DATE);
+        String log = getRevProperty(reposRootPath, revision, SVNRevisionProperty.LOG);
+        
+        allProps.put(SVNRevisionProperty.AUTHOR, author);
+        allProps.put(SVNRevisionProperty.DATE, date);
+        allProps.put(SVNRevisionProperty.LOG, log);
+        
+        return allProps;
+    }
+    
     public long getDir(String path, long revision, Map properties, ISVNDirEntryHandler handler) throws SVNException {
         try{
             openRepository();
             if(!super.isValidRevision(revision)){
                 revision = getYoungestRev(myReposRootPath);
             }
-            
-            Collection entries = getDirEntries(myReposRootPath, path, revision);
+            SVNRevisionNode parent = getParentNode(myReposRootPath, path, revision); 
+            Collection entries = getDirEntries(parent, myReposRootPath, properties, false);
             Iterator iterator = entries.iterator();
             while(iterator.hasNext()){
                 SVNDirEntry entry = (SVNDirEntry)iterator.next();
@@ -653,171 +690,74 @@ public class FSRepository extends SVNRepository {
             closeRepository();
         }
     }
-
-    /**
-     * @param path
-     * @param startRevision
-     * @param endRevision
-     * @param handler
-     * @return
-     * @throws SVNException
-     */
+    
+    public SVNDirEntry getDir(String path, long revision, boolean includeCommitMessages, Collection entries) throws SVNException{
+        try{
+            openRepository();
+            if(!super.isValidRevision(revision)){
+                revision = getYoungestRev(myReposRootPath);
+            }
+            SVNRevisionNode parent = getParentNode(myReposRootPath, path, revision);
+            entries.addAll(getDirEntries(parent, myReposRootPath, null, includeCommitMessages));
+            SVNDirEntry parentDirEntry = null;
+            String parentName = SVNPathUtil.tail(parent.getCreatedPath());
+            parentName = parentName.length() > 0 ? parentName : "/"; 
+            parentDirEntry = buildDirEntry(new SVNRepEntry(parent.getRevNodeID(), parent.getType(), parentName), parent, myReposRootPath, includeCommitMessages);
+            return parentDirEntry;
+        }finally{
+            closeRepository();
+        }
+    }
+    
     public int getFileRevisions(String path, long startRevision, long endRevision, ISVNFileRevisionHandler handler) throws SVNException {
         return 0;
     }
 
-    /**
-     * @param targetPaths
-     * @param startRevision
-     * @param endRevision
-     * @param changedPath
-     * @param strictNode
-     * @param limit
-     * @param handler
-     * @return
-     * @throws SVNException
-     */
     public long log(String[] targetPaths, long startRevision, long endRevision, boolean changedPath, boolean strictNode, long limit, ISVNLogEntryHandler handler) throws SVNException {
         return 0;
     }
 
-    /**
-     * @param path
-     * @param pegRevision
-     * @param revisions
-     * @param handler
-     * @return
-     * @throws SVNException
-     */
     public int getLocations(String path, long pegRevision, long[] revisions, ISVNLocationEntryHandler handler) throws SVNException {
         return 0;
     }
 
-
-    /**
-     * @param url
-     * @param revision
-     * @param target
-     * @param ignoreAncestry
-     * @param recursive
-     * @param reporter
-     * @param editor
-     * @throws SVNException
-     */
     public void diff(SVNURL url, long revision, String target, boolean ignoreAncestry, boolean recursive, ISVNReporterBaton reporter, ISVNEditor editor) throws SVNException {
     }
 
-    /**
-     * @param url
-     * @param targetRevision
-     * @param revision
-     * @param target
-     * @param ignoreAncestry
-     * @param recursive
-     * @param reporter
-     * @param editor
-     * @throws SVNException
-     */
     public void diff(SVNURL url, long targetRevision, long revision, String target, boolean ignoreAncestry, boolean recursive, ISVNReporterBaton reporter, ISVNEditor editor) throws SVNException {
     }
 
-    /**
-     * @param revision
-     * @param target
-     * @param recursive
-     * @param reporter
-     * @param editor
-     * @throws SVNException
-     */
     public void update(long revision, String target, boolean recursive, ISVNReporterBaton reporter, ISVNEditor editor) throws SVNException {
     }
 
-    /**
-     * @param revision
-     * @param target
-     * @param recursive
-     * @param reporter
-     * @param editor
-     * @throws SVNException
-     */
     public void status(long revision, String target, boolean recursive, ISVNReporterBaton reporter, ISVNEditor editor) throws SVNException {
     }
 
-    /**
-     * @param url
-     * @param revision
-     * @param target
-     * @param recursive
-     * @param reporter
-     * @param editor
-     * @throws SVNException
-     */
     public void update(SVNURL url, long revision, String target, boolean recursive, ISVNReporterBaton reporter, ISVNEditor editor) throws SVNException {
     }
 
-    /**
-     * @param path
-     * @param revision
-     * @return
-     * @throws SVNException
-     */
     public SVNDirEntry info(String path, long revision) throws SVNException {
         return null;
     }
 
-    /**
-     * @param logMessage
-     * @param locks
-     * @param keepLocks
-     * @param mediator
-     * @return
-     * @throws SVNException
-     */
     public ISVNEditor getCommitEditor(String logMessage, Map locks, boolean keepLocks, ISVNWorkspaceMediator mediator) throws SVNException {
         return null;
     }
 
-    /**
-     * @param path
-     * @return
-     * @throws SVNException
-     */
     public SVNLock getLock(String path) throws SVNException {
         return null;
     }
 
-    /**
-     * @param path
-     * @return
-     * @throws SVNException
-     */
     public SVNLock[] getLocks(String path) throws SVNException {
         return null;
     }
 
-    /**
-     * @param pathsToRevisions
-     * @param comment
-     * @param force
-     * @param handler
-     * @throws SVNException
-     */
     public void lock(Map pathsToRevisions, String comment, boolean force, ISVNLockHandler handler) throws SVNException {
     }
 
-    /**
-     * @param pathToTokens
-     * @param force
-     * @param handler
-     * @throws SVNException
-     */
     public void unlock(Map pathToTokens, boolean force, ISVNLockHandler handler) throws SVNException {
     }
 
-    /**
-     * @throws SVNException
-     */
     public void closeSession() throws SVNException {
     }
-
 }
