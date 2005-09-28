@@ -101,10 +101,6 @@ public class SVNFSReader {
         }
     }
 
-//    public Map getDirEntries(SVNID id) throws SVNException {
-//        return getDirEntries(getRevNode(id));
-//    }
-    
     public Map getDirEntries(SVNRevisionNode revNode) throws SVNException {
         if(revNode.getType() != SVNNodeKind.DIR){
             throw new SVNException("svn: Can't get entries of non-directory");
@@ -113,7 +109,56 @@ public class SVNFSReader {
         return getDirContents(revNode.getTextRepresentation());
     }
     
+    public Map getProperties(SVNRevisionNode revNode) throws SVNException{
+        return getProplist(revNode.getPropsRepresentation());
+    }
+    
     private Map getDirContents(SVNRepresentation represnt) throws SVNException {
+        if(represnt == null){
+            return null;
+        }
+
+        InputStream is = readRepresentation(represnt, REP_PLAIN);
+        try{
+            return parsePlainRepresentation(is, false);
+        }catch(IOException ioe){
+            throw new SVNException("svn: Can't read representation in revision file '" + getRevFile(represnt.getRevision()).getAbsolutePath() + "': " + ioe.getMessage());
+        }catch(SVNException svne){
+            throw new SVNException("svn: Revision file '" + getRevFile(represnt.getRevision()).getAbsolutePath() + "' corrupt" + SVNFileUtil.getNativeEOLMarker() + svne.getMessage());
+        }finally{
+            if(is != null){
+                try{
+                    is.close();
+                }catch(IOException ioe){
+                    //
+                }
+            }
+        }
+    }
+    
+    private Map getProplist(SVNRepresentation represnt) throws SVNException {
+        if(represnt == null){
+            return null;
+        }
+        
+        InputStream is = readRepresentation(represnt, REP_PLAIN);
+        try{
+            return parsePlainRepresentation(is, true);
+        }catch(IOException ioe){
+            throw new SVNException("svn: Can't read representation in revision file '" + getRevFile(represnt.getRevision()).getAbsolutePath() + "': " + ioe.getMessage());
+        }catch(SVNException svne){
+            throw new SVNException("svn: Revision file '" + getRevFile(represnt.getRevision()).getAbsolutePath() + "' corrupt" + SVNFileUtil.getNativeEOLMarker() + svne.getMessage());
+        }finally{
+            if(is != null){
+                try{
+                    is.close();
+                }catch(IOException ioe){
+                    //
+                }
+            }
+        }
+    }
+    private InputStream readRepresentation(SVNRepresentation represnt, String repHeader) throws SVNException {
         File revFile = getRevFile(represnt.getRevision());
         InputStream is = null;
         try{
@@ -133,7 +178,7 @@ public class SVNFSReader {
                 throw new SVNException("svn: Can't read file '" + revFile.getAbsolutePath() + "'", ioe);
             }
             
-            if(!REP_PLAIN.equals(header)){
+            if(!repHeader.equals(header)){
                 throw new SVNException("svn: Malformed representation header in revision file '" + revFile.getAbsolutePath() + "'");
             }
             
@@ -163,14 +208,7 @@ public class SVNFSReader {
                         "     actual:  " + SVNFileUtil.toHexDigest(digest));
             }
             
-            ByteArrayInputStream bais = new ByteArrayInputStream(bytes);
-            try{
-                return readPlainRepresentation(bais);
-            }catch(IOException ioe){
-                throw new SVNException("svn: Can't read representation in revision file '" + revFile.getAbsolutePath() + "': " + ioe.getMessage());
-            }catch(SVNException svne){
-                throw new SVNException("svn: Revision file '" + revFile.getAbsolutePath() + "' corrupt" + SVNFileUtil.getNativeEOLMarker() + svne.getMessage());
-            }
+            return new ByteArrayInputStream(bytes);
         }finally{
             if(is != null){
                 try{
@@ -182,27 +220,36 @@ public class SVNFSReader {
         }
     }
     
-    private Map readPlainRepresentation(InputStream is) throws IOException, SVNException{
-        Map entriesMap = new HashMap();
+    /* 
+     * PLAIN hash format is common for dir contents as well as 
+     * for props representation - so, isProps is needed to differentiate
+     * between text and props repreentation
+     */
+    private Map parsePlainRepresentation(InputStream is, boolean isProps) throws IOException, SVNException{
+        Map representationMap = new HashMap();
         ByteArrayOutputStream os = new ByteArrayOutputStream();
         while(readEntry('K', is, os)){
-            String entryName = new String(os.toByteArray(), "UTF-8");
+            String key = new String(os.toByteArray(), "UTF-8");
             os.reset();
             if(!readEntry('V', is, os)){
                 throw new IOException("malformed file format");
             }
-            String entryValue = new String(os.toByteArray(), "UTF-8");
+            String value = new String(os.toByteArray(), "UTF-8");
             os.reset();
-            SVNRepEntry nextRepEntry = null;
-            try{
-                nextRepEntry = parseRepEntryValue(entryValue);
-            }catch(SVNException svne){
-                throw new SVNException("svn: Directory entry '" + entryName + "' corrupt");
+            if(!isProps){
+                SVNRepEntry nextRepEntry = null;
+                try{
+                    nextRepEntry = parseRepEntryValue(value);
+                }catch(SVNException svne){
+                    throw new SVNException("svn: Directory entry '" + key + "' corrupt");
+                }
+                representationMap.put(key, nextRepEntry);
+            }else{
+                representationMap.put(key, value);
             }
-            entriesMap.put(entryName, nextRepEntry);
         }
         
-        return entriesMap;
+        return representationMap;
     }
     
     private SVNRepEntry parseRepEntryValue(String value) throws SVNException{
@@ -841,66 +888,4 @@ public class SVNFSReader {
             return revision;
         }
     }
-    
-/*    private class RepresentationReadState{
-        private SVNRepresentation represnt;
-        // The starting offset for the raw svndiff/plaintext data minus header.
-        private long myStart;
-        // The end offset of the raw data.
-        private long myLength;
-        // The current offset into the file.
-        private long off;
-        // The stored checksum of the representation we are reading
-        private MessageDigest myChecksum;
-        
-        public RepresentationReadState(SVNRepresentation repr, long start, long len, long offset) throws NoSuchAlgorithmException{
-            represnt = repr;
-            myStart = start;
-            myLength = len;
-            off = offset;
-            myChecksum = MessageDigest.getInstance("MD5");
-        }
-        
-        public void setOffset(long offset){
-            off = offset;
-        }
-        
-        public void setStart(long start){
-            myStart = start;
-        }
-
-        public void setLength(long len){
-            myLength = len;
-        }
-
-        public void setRepresentation(SVNRepresentation repr){
-            represnt = repr;
-        }
-        
-        public long getOffset(){
-            return off;
-        }
-
-        public long getStart(){
-            return myStart;
-        }
-        
-        public long getLength(){
-            return myLength;
-        }
-        
-        public SVNRepresentation getRepresentation(){
-            return represnt;
-        }
-        
-        public void updateChecksum(byte[] input){
-            myChecksum.update(input);
-        }
-        
-        public byte[] getFinalChecksum(){
-            return myChecksum.digest();
-        }
-    }
-*/
-    
 }

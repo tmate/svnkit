@@ -608,8 +608,19 @@ public class FSRepository extends SVNRepository {
         while(iter.hasNext()){
             String name = (String)iter.next();
             SVNRepEntry repEntry = (SVNRepEntry)entries.get(name);
-            //test!!!!!!!
-            dirEntries.add(new SVNDirEntry(name, repEntry.getType(), 0, false, repEntry.getId().getRevision(), null, ""));
+            SVNRevisionNode entryNode = fsReader.getRevNode(repEntry.getId());
+
+            //dir size is equated to 0
+            long size = 0;
+            
+            if(repEntry.getType() == SVNNodeKind.FILE){
+                size = entryNode.getTextRepresentation().getExpandedSize();
+            }
+            
+            Map props = fsReader.getProperties(entryNode);
+            boolean hasProps = (props == null || props.size() == 0) ? false : true;
+            
+            dirEntries.add(new SVNDirEntry(name, repEntry.getType(), size , hasProps, repEntry.getId().getRevision(), null, ""));
         }
         
         return dirEntries;
@@ -636,7 +647,6 @@ public class FSRepository extends SVNRepository {
                 SVNDirEntry entry = (SVNDirEntry)iterator.next();
                 handler.handleDirEntry(entry);
             }
-            
             
             return revision;
         }finally{
