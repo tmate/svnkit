@@ -80,6 +80,17 @@ public class SVNPathUtil {
         return "";
     }
 
+    public static String removeHead(String path) {
+        for(int i = 0; i < path.length(); i++) {
+            if (path.charAt(i) == '/') {
+                if(i != path.length() - 1){
+                    return path.substring(i+1); 
+                }
+            }
+        }
+        return "";
+    }
+
     public static String getCommonPathAncestor(String path1, String path2) {
         if (path1 == null || path2 == null) {
             return null;
