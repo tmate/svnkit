@@ -1529,7 +1529,7 @@ public class SVNWCClient extends SVNBasicClient {
             revision = SVNRevision.HEAD;
         }
 
-        SVNRepository repos = createRepository(url, null, pegRevision, revision);;
+        SVNRepository repos = createRepository(url, null, pegRevision, revision);
         long revNum = getRevisionNumber(revision, repos, null);
         SVNDirEntry rootEntry = repos.info("", revNum);
         if (rootEntry == null || rootEntry.getKind() == SVNNodeKind.NONE) {

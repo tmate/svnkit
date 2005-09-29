@@ -74,6 +74,19 @@ public class SVNDirEntry implements Comparable {
         myLastAuthor = lastAuthor;
     }
 
+    public SVNDirEntry(String name, SVNNodeKind kind, long size,
+            boolean hasProperties, long firstRevision, Date createdDate,
+            String lastAuthor, String commitMessage) {
+        myName = name;
+        myKind = kind;
+        mySize = size;
+        myHasProperties = hasProperties;
+        myFirstRevision = firstRevision;
+        myCreatedDate = createdDate;
+        myLastAuthor = lastAuthor;
+        myCommitMessage = commitMessage;
+    }
+    
     public void setPath(String path) {
         myPath = path;
     }
