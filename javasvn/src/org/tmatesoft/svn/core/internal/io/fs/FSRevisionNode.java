@@ -14,9 +14,9 @@ package org.tmatesoft.svn.core.internal.io.fs;
 import org.tmatesoft.svn.core.SVNNodeKind;
 
 
-public class SVNRevisionNode {
+public class FSRevisionNode {
     //id: a.b.r<revID>/offset
-    private SVNID myRevNodeId;
+    private FSID myRevNodeId;
     
     //type: 'dir' or 'file' 
     private SVNNodeKind myType;
@@ -28,13 +28,13 @@ public class SVNRevisionNode {
     private String myTxnID;
 
     //pred: a.b.r<revID>/offset
-    private SVNID myPredRevNodeId;
+    private FSID myPredRevNodeId;
     
     //text: <rev> <offset> <length> <size> <digest>
-    private SVNRepresentation myTextRepresentation;
+    private FSRepresentation myTextRepresentation;
     
     //props: <rev> <offset> <length> <size> <digest>
-    private SVNRepresentation myPropsRepresentation;
+    private FSRepresentation myPropsRepresentation;
     
     //cpath: <path>
     private String myCreatedPath;
@@ -47,10 +47,10 @@ public class SVNRevisionNode {
     private long myCopyRootRevision;    
     private String myCopyRootPath;
     
-    public SVNRevisionNode(){
+    public FSRevisionNode(){
     }
     
-    public void setRevNodeID(SVNID revNodeID){
+    public void setRevNodeID(FSID revNodeID){
         myRevNodeId = revNodeID;
     }
 
@@ -66,15 +66,15 @@ public class SVNRevisionNode {
         myTxnID = txnID;
     }
 
-    public void setPredecessorRevNodeID(SVNID predRevNodeId){
+    public void setPredecessorRevNodeID(FSID predRevNodeId){
         myPredRevNodeId = predRevNodeId;
     }
 
-    public void setTextRepresentation(SVNRepresentation textRepr){
+    public void setTextRepresentation(FSRepresentation textRepr){
         myTextRepresentation = textRepr;
     }
 
-    public void setPropsRepresentation(SVNRepresentation propsRepr){
+    public void setPropsRepresentation(FSRepresentation propsRepr){
         myPropsRepresentation = propsRepr;
     }
 
@@ -98,7 +98,7 @@ public class SVNRevisionNode {
         myCopyRootPath = copyRootPath;
     }
 
-    public SVNID getRevNodeID(){
+    public FSID getRevNodeID(){
         return myRevNodeId;
     }
 
@@ -115,17 +115,17 @@ public class SVNRevisionNode {
         return myTxnID;
     }
 
-    public SVNID getPredecessorRevNodeId(){
+    public FSID getPredecessorRevNodeId(){
         return myPredRevNodeId;
     }
 
     //text
-    public SVNRepresentation getTextRepresentation(){
+    public FSRepresentation getTextRepresentation(){
         return myTextRepresentation;
     }
 
     //props
-    public SVNRepresentation getPropsRepresentation(){
+    public FSRepresentation getPropsRepresentation(){
         return myPropsRepresentation;
     }
 

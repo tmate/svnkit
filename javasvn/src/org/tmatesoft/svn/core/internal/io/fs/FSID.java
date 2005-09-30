@@ -16,7 +16,7 @@ package org.tmatesoft.svn.core.internal.io.fs;
  * @version 1.0
  * @author  TMate Software Ltd.
  */
-public class SVNID {
+public class FSID {
     public static String ID_INAPPLICABLE = new String();
     
     private String myNodeID;
@@ -25,7 +25,7 @@ public class SVNID {
     private long myRevision;
     private long myOffset;
 
-    public SVNID(){
+    public FSID(){
         myNodeID = ID_INAPPLICABLE;
         myCopyID = ID_INAPPLICABLE;
         myTxnID = ID_INAPPLICABLE;
@@ -40,7 +40,7 @@ public class SVNID {
         return false;
     }
     
-    public SVNID(String nodeId, String txnId, String copyId, long revision, long offset){
+    public FSID(String nodeId, String txnId, String copyId, long revision, long offset){
         myNodeID = (nodeId == null) ? ID_INAPPLICABLE :  nodeId;
         myCopyID = copyId;
         myTxnID = (txnId == null) ? ID_INAPPLICABLE :  txnId; 
