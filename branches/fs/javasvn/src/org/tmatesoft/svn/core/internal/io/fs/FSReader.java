@@ -33,7 +33,7 @@ import java.util.HashMap;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 
-public class SVNFSReader {
+public class FSReader {
     private static Map myReaders = new HashMap();
     
     private File myReposRootDir;
@@ -57,7 +57,7 @@ public class SVNFSReader {
     
     static int MD5_DIGESTSIZE = 16;
     
-    private SVNFSReader(String reposRootPath){
+    private FSReader(String reposRootPath){
         myReposRootDir = new File(reposRootPath);
     }
 
@@ -65,20 +65,20 @@ public class SVNFSReader {
         return FSRepository.getRevFile(myReposRootDir.getAbsolutePath(), revision);
     }
 
-    public static SVNFSReader getInstance(String reposRootPath){
-        SVNFSReader reader = (SVNFSReader)myReaders.get(reposRootPath);
+    public static FSReader getInstance(String reposRootPath){
+        FSReader reader = (FSReader)myReaders.get(reposRootPath);
         if(reader != null){
             return reader;
         }
         
-        reader = new SVNFSReader(reposRootPath);
+        reader = new FSReader(reposRootPath);
         myReaders.put(reposRootPath, reader);
         return reader;
     }
     
-    public SVNRevisionNode getChildDirNode(String child, SVNRevisionNode parent) throws SVNException{
+    public FSRevisionNode getChildDirNode(String child, FSRevisionNode parent) throws SVNException{
         Map entries = getDirEntries(parent);
-        SVNRepEntry entry = entries != null ? (SVNRepEntry)entries.get(child) : null;
+        FSRepEntry entry = entries != null ? (FSRepEntry)entries.get(child) : null;
         if(entry == null){
             return null;
             //throw new SVNException("svn: Attempted to open non-existent child node '" + child + "'");
@@ -94,7 +94,7 @@ public class SVNFSReader {
         }
     }
 
-    public Map getDirEntries(SVNRevisionNode revNode) throws SVNException {
+    public Map getDirEntries(FSRevisionNode revNode) throws SVNException {
         if(revNode.getType() != SVNNodeKind.DIR){
             throw new SVNException("svn: Can't get entries of non-directory");
         }
@@ -102,11 +102,11 @@ public class SVNFSReader {
         return getDirContents(revNode.getTextRepresentation());
     }
     
-    public Map getProperties(SVNRevisionNode revNode) throws SVNException{
+    public Map getProperties(FSRevisionNode revNode) throws SVNException{
         return getProplist(revNode.getPropsRepresentation());
     }
     
-    private Map getDirContents(SVNRepresentation represnt) throws SVNException {
+    private Map getDirContents(FSRepresentation represnt) throws SVNException {
         if(represnt == null){
             return null;
         }
@@ -129,7 +129,7 @@ public class SVNFSReader {
         }
     }
     
-    private Map getProplist(SVNRepresentation represnt) throws SVNException {
+    private Map getProplist(FSRepresentation represnt) throws SVNException {
         if(represnt == null){
             return null;
         }
@@ -151,7 +151,7 @@ public class SVNFSReader {
             }
         }
     }
-    private InputStream readRepresentation(SVNRepresentation represnt, String repHeader) throws SVNException {
+    private InputStream readRepresentation(FSRepresentation represnt, String repHeader) throws SVNException {
         File revFile = getRevFile(represnt.getRevision());
         InputStream is = null;
         try{
@@ -230,7 +230,7 @@ public class SVNFSReader {
             String value = new String(os.toByteArray(), "UTF-8");
             os.reset();
             if(!isProps){
-                SVNRepEntry nextRepEntry = null;
+                FSRepEntry nextRepEntry = null;
                 try{
                     nextRepEntry = parseRepEntryValue(key, value);
                 }catch(SVNException svne){
@@ -245,7 +245,7 @@ public class SVNFSReader {
         return representationMap;
     }
     
-    private SVNRepEntry parseRepEntryValue(String name, String value) throws SVNException{
+    private FSRepEntry parseRepEntryValue(String name, String value) throws SVNException{
         String[] values = value.split(" ");
         if(values == null || values.length < 2){
             throw new SVNException();
@@ -256,8 +256,8 @@ public class SVNFSReader {
             throw new SVNException();
         }
         
-        SVNID id = parseID(values[1], null);
-        return new SVNRepEntry(id, type, name);
+        FSID id = parseID(values[1], null);
+        return new FSRepEntry(id, type, name);
     }
 
     private static boolean readEntry(char type, InputStream is, OutputStream os) throws IOException {
@@ -315,16 +315,16 @@ public class SVNFSReader {
         throw new IOException("malformed file format");
     }
     
-    public SVNRevisionNode getRootRevNode(long revision) throws SVNException{
-        SVNID id = new SVNID(SVNID.ID_INAPPLICABLE, SVNID.ID_INAPPLICABLE, SVNID.ID_INAPPLICABLE, revision, getRootOffset(revision));
+    public FSRevisionNode getRootRevNode(long revision) throws SVNException{
+        FSID id = new FSID(FSID.ID_INAPPLICABLE, FSID.ID_INAPPLICABLE, FSID.ID_INAPPLICABLE, revision, getRootOffset(revision));
         return getRevNode(id);
     }
     
     
-    public SVNRevisionNode getRevNode(SVNID id) throws SVNException{
+    public FSRevisionNode getRevNode(FSID id) throws SVNException{
         File revFile = getRevFile(id.getRevision());
         
-        SVNRevisionNode revNode = new SVNRevisionNode();
+        FSRevisionNode revNode = new FSRevisionNode();
         long offset = id.getOffset();
         
         Map headers = readRevNodeHeaders(revFile, offset);
@@ -432,7 +432,7 @@ public class SVNFSReader {
     }
     
     //should it fail if revId is invalid? 
-    public static void parseCopyFrom(String copyfrom, SVNRevisionNode revNode) throws SVNException {
+    public static void parseCopyFrom(String copyfrom, FSRevisionNode revNode) throws SVNException {
         if(copyfrom == null || copyfrom.length() == 0){
             throw new SVNException();
         }
@@ -452,7 +452,7 @@ public class SVNFSReader {
     }
 
     //should it fail if revId is invalid? 
-    public static void parseCopyRoot(String copyroot, SVNRevisionNode revNode) throws SVNException {
+    public static void parseCopyRoot(String copyroot, FSRevisionNode revNode) throws SVNException {
         if(copyroot == null || copyroot.length() == 0){
             throw new SVNException();
         }
@@ -472,7 +472,7 @@ public class SVNFSReader {
     }
     
     //isPred - if true - predecessor's id, otherwise a node id
-    public static SVNID parseID(String revNodeId, SVNID id) throws SVNException{
+    public static FSID parseID(String revNodeId, FSID id) throws SVNException{
         int firstDotInd = revNodeId.indexOf('.');
         int secondDotInd = revNodeId.lastIndexOf('.');
         int rInd = revNodeId.indexOf('r', secondDotInd);
@@ -502,7 +502,7 @@ public class SVNFSReader {
             
             
             if(id == null){
-                id = new SVNID(nodeId, SVNID.ID_INAPPLICABLE, copyId, rev, offset);
+                id = new FSID(nodeId, FSID.ID_INAPPLICABLE, copyId, rev, offset);
                 return id;
             }
     
@@ -520,7 +520,7 @@ public class SVNFSReader {
     }
 
     //isData - if true - text, otherwise - props
-    public static void parseRepresentation(String representation, SVNRevisionNode revNode, boolean isData) throws SVNException{
+    public static void parseRepresentation(String representation, FSRevisionNode revNode, boolean isData) throws SVNException{
         if(revNode == null){
             return;
         }
@@ -573,7 +573,7 @@ public class SVNFSReader {
         if(hexDigest.length() != 2*MD5_DIGESTSIZE ||  SVNFileUtil.fromHexDigest(hexDigest)==null){
             throw new SVNException();
         }
-        SVNRepresentation represnt = new SVNRepresentation(rev, offset, size, expandedSize, hexDigest);
+        FSRepresentation represnt = new FSRepresentation(rev, offset, size, expandedSize, hexDigest);
         
         if(isData){
             revNode.setTextRepresentation(represnt);

@@ -17,22 +17,22 @@ import org.tmatesoft.svn.core.SVNNodeKind;
  * @version 1.0
  * @author  TMate Software Ltd.
  */
-public class SVNRepEntry {
-    private SVNID myId;
+public class FSRepEntry {
+    private FSID myId;
     private SVNNodeKind myType;
     private String myName;
     
-    public SVNRepEntry(){
+    public FSRepEntry(){
         
     }
     
-    public SVNRepEntry(SVNID id, SVNNodeKind type, String name){
+    public FSRepEntry(FSID id, SVNNodeKind type, String name){
         myId = id;
         myType = type;
         myName = name;
     }
     
-    public void setId(SVNID id){
+    public void setId(FSID id){
         myId = id;
     }
 
@@ -44,7 +44,7 @@ public class SVNRepEntry {
         myName = name;
     }
     
-    public SVNID getId(){
+    public FSID getId(){
         return myId;
     }
 

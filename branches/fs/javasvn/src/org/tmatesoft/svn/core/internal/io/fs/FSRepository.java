@@ -173,7 +173,7 @@ public class FSRepository extends SVNRepository {
     private int getFormat(String reposPath, String format) throws SVNException {
         File formatFile = new File(reposPath, format);
         
-        String firstLine = SVNFSReader.readSingleLine(formatFile);
+        String firstLine = FSReader.readSingleLine(formatFile);
 
         if(firstLine == null){
             throw new SVNException("svn: Can't read file '" + formatFile.getAbsolutePath() + "': End of file found");
@@ -356,7 +356,7 @@ public class FSRepository extends SVNRepository {
     private String readReposUUID(String reposRootPath) throws SVNException{
         File uuidFile = new File(new File(reposRootPath, SVN_REPOS_DB_DIR), SVN_REPOS_UUID_FILE);
             
-        String uuidLine = SVNFSReader.readSingleLine(uuidFile);
+        String uuidLine = FSReader.readSingleLine(uuidFile);
 
         if(uuidLine==null){
             throw new SVNException("svn: Can't read file '" + uuidFile.getAbsolutePath() + "': End of file found");
@@ -371,7 +371,7 @@ public class FSRepository extends SVNRepository {
     private void checkFSType(String reposRootPath) throws SVNException{
         File fsTypeFile = new File(new File(reposRootPath, SVN_REPOS_DB_DIR), SVN_FS_TYPE_FILENAME);
 
-        String fsType = SVNFSReader.readSingleLine(fsTypeFile);
+        String fsType = FSReader.readSingleLine(fsTypeFile);
 
         if(fsType==null){
             throw new SVNException("svn: Can't read file '" + fsTypeFile.getAbsolutePath() + "': End of file found");
@@ -409,7 +409,7 @@ public class FSRepository extends SVNRepository {
     private long getYoungestRev(String reposRootPath) throws SVNException{
         File dbCurrentFile = new File(new File(reposRootPath, SVN_REPOS_DB_DIR), SVN_REPOS_DB_CURRENT);
     
-        String firstLine = SVNFSReader.readSingleLine(dbCurrentFile);
+        String firstLine = FSReader.readSingleLine(dbCurrentFile);
 
         if(firstLine==null){
             throw new SVNException("svn: Can't read file '" + dbCurrentFile.getAbsolutePath() + "': End of file found");
@@ -531,8 +531,8 @@ public class FSRepository extends SVNRepository {
     }
     
     //path is relative to this FSRepository's location
-    private Collection getDirEntries(SVNRevisionNode parent, String reposRootPath, Map parentDirProps, boolean includeLogs) throws SVNException {
-        SVNFSReader fsReader = SVNFSReader.getInstance(reposRootPath);
+    private Collection getDirEntries(FSRevisionNode parent, String reposRootPath, Map parentDirProps, boolean includeLogs) throws SVNException {
+        FSReader fsReader = FSReader.getInstance(reposRootPath);
         Map entries = fsReader.getDirEntries(parent);
         Set keys = entries.keySet();
         Iterator iter = keys.iterator();
@@ -541,7 +541,7 @@ public class FSRepository extends SVNRepository {
         
         while(iter.hasNext()){
             String name = (String)iter.next();
-            SVNRepEntry repEntry = (SVNRepEntry)entries.get(name);
+            FSRepEntry repEntry = (FSRepEntry)entries.get(name);
             if(repEntry != null){
                 dirEntries.add(buildDirEntry(repEntry, null, reposRootPath, includeLogs));
             }
@@ -568,13 +568,13 @@ public class FSRepository extends SVNRepository {
         return dirEntries;
     }
     
-    private SVNRevisionNode getParentNode(String reposRootPath, String path, long revision) throws SVNException{
+    private FSRevisionNode getParentNode(String reposRootPath, String path, long revision) throws SVNException{
         String absPath = getRepositoryPath(path);
-        SVNFSReader fsReader = SVNFSReader.getInstance(reposRootPath);
+        FSReader fsReader = FSReader.getInstance(reposRootPath);
         
         String nextPathComponent = null;
-        SVNRevisionNode parent = fsReader.getRootRevNode(revision);
-        SVNRevisionNode child = null;
+        FSRevisionNode parent = fsReader.getRootRevNode(revision);
+        FSRevisionNode child = null;
         if(absPath.indexOf(':') != -1 || absPath.indexOf('|') != -1){
             absPath = (absPath.indexOf('/') != -1) ? absPath.substring(absPath.indexOf('/')) : "";
         }
@@ -601,9 +601,9 @@ public class FSRepository extends SVNRepository {
         return parent;
     }
     
-    private SVNDirEntry buildDirEntry(SVNRepEntry repEntry, SVNRevisionNode revNode, String reposRootPath, boolean includeLogs) throws SVNException {
-        SVNFSReader fsReader = SVNFSReader.getInstance(reposRootPath);
-        SVNRevisionNode entryNode = revNode == null ? fsReader.getRevNode(repEntry.getId()) : revNode;
+    private SVNDirEntry buildDirEntry(FSRepEntry repEntry, FSRevisionNode revNode, String reposRootPath, boolean includeLogs) throws SVNException {
+        FSReader fsReader = FSReader.getInstance(reposRootPath);
+        FSRevisionNode entryNode = revNode == null ? fsReader.getRevNode(repEntry.getId()) : revNode;
 
         //dir size is equated to 0
         long size = 0;
@@ -677,7 +677,7 @@ public class FSRepository extends SVNRepository {
             if(!super.isValidRevision(revision)){
                 revision = getYoungestRev(myReposRootPath);
             }
-            SVNRevisionNode parent = getParentNode(myReposRootPath, path, revision); 
+            FSRevisionNode parent = getParentNode(myReposRootPath, path, revision); 
             Collection entries = getDirEntries(parent, myReposRootPath, properties, false);
             Iterator iterator = entries.iterator();
             while(iterator.hasNext()){
@@ -697,12 +697,12 @@ public class FSRepository extends SVNRepository {
             if(!super.isValidRevision(revision)){
                 revision = getYoungestRev(myReposRootPath);
             }
-            SVNRevisionNode parent = getParentNode(myReposRootPath, path, revision);
+            FSRevisionNode parent = getParentNode(myReposRootPath, path, revision);
             entries.addAll(getDirEntries(parent, myReposRootPath, null, includeCommitMessages));
             SVNDirEntry parentDirEntry = null;
             String parentName = SVNPathUtil.tail(parent.getCreatedPath());
             parentName = parentName.length() > 0 ? parentName : "/"; 
-            parentDirEntry = buildDirEntry(new SVNRepEntry(parent.getRevNodeID(), parent.getType(), parentName), parent, myReposRootPath, includeCommitMessages);
+            parentDirEntry = buildDirEntry(new FSRepEntry(parent.getRevNodeID(), parent.getType(), parentName), parent, myReposRootPath, includeCommitMessages);
             return parentDirEntry;
         }finally{
             closeRepository();

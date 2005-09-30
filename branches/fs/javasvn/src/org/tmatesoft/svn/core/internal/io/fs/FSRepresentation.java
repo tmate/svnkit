@@ -16,14 +16,14 @@ package org.tmatesoft.svn.core.internal.io.fs;
  * @version 1.0
  * @author  TMate Software Ltd.
  */
-public class SVNRepresentation {
+public class FSRepresentation {
     private long myRevision;
     private long myOffset;
     private long mySize;
     private long myExpandedSize;
     private String myHexDigest;
     
-    public SVNRepresentation(long revision, long offset, long size, long expandedSize, String hexDigest){
+    public FSRepresentation(long revision, long offset, long size, long expandedSize, String hexDigest){
         myRevision = revision;
         myOffset = offset;
         mySize = size;
