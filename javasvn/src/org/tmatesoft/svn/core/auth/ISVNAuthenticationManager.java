@@ -22,7 +22,8 @@ public interface ISVNAuthenticationManager {
     
     public static final String PASSWORD = "svn.simple";
     public static final String SSH = "svn.ssh";
-
+    public static final String USERNAME = "svn.username";
+    
     public void setAuthenticationProvider(ISVNAuthenticationProvider provider);
     
     public ISVNProxyManager getProxyManager(SVNURL url) throws SVNException;
