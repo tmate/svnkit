@@ -134,7 +134,21 @@ public class SVNProperty {
     public static boolean isEntryProperty(String name) {
         return name != null && name.startsWith(SVN_ENTRY_PREFIX);
     }
-
+    
+    /*
+     * That this includes some "svn:" props and all user props, i.e. ones 
+     * stored in the repository fs.
+     */
+    public static boolean isRegularProperty(String name){
+        if(name==null){
+            return false;
+        }else if(name.startsWith(SVN_WC_PREFIX) || name.startsWith(SVN_ENTRY_PREFIX)){
+            return false;
+        }else{
+            return true;
+        }
+    }
+    
     public static boolean isSVNProperty(String name) {
         return name != null && name.startsWith(SVN_PREFIX);
     }
