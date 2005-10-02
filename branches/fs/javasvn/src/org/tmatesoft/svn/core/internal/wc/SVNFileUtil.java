@@ -168,7 +168,26 @@ public class SVNFileUtil {
             SVNDebugLog.logInfo(th);
         }
     }
-
+    
+    public static File resolveSymlinkToFile(File file){
+        File targetFile = file;
+        while(isSymlink(targetFile)){
+            String symlinkName = getSymlinkName(targetFile); 
+            if(symlinkName == null){
+                return null;
+            }
+            if(symlinkName.startsWith("/")){
+                targetFile = new File(symlinkName);
+            }else{
+                targetFile = new File(targetFile.getParentFile(), symlinkName);
+            }
+        }
+        if(targetFile == null && !targetFile.isFile()){
+            return null;
+        }
+        return targetFile;
+    }
+    
     public static boolean isSymlink(File file) {
         if (isWindows || file == null) {
             return false;
@@ -304,7 +323,9 @@ public class SVNFileUtil {
         if (ls == null || ls.lastIndexOf(" -> ") < 0) {
             return null;
         }
-        return ls.substring(ls.lastIndexOf(" -> ") + " -> ".length()).trim();
+//        return ls.substring(ls.lastIndexOf(" -> ") + " -> ".length()).trim();
+        String[] attributes = ls.split(" ");
+        return attributes[attributes.length - 1];
     }
 
     public static String computeChecksum(String line) {

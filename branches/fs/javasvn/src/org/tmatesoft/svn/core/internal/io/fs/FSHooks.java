@@ -12,6 +12,7 @@
 package org.tmatesoft.svn.core.internal.io.fs;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -37,7 +38,10 @@ public class FSHooks {
     static String SVN_REPOS_HOOK_WRITE_SENTINEL = "write-sentinels";
     static String SVN_REPOS_HOOK_DESC_EXT = ".tmpl";
     static String SVN_REPOS_HOOKS_DIR = "hooks";
-
+    static String ACTION_DELETE = "D";
+    static String ACTION_ADD = "A";
+    static String ACTION_MODIFY = "M";
+    
     private static String[] winExtensions = {".exe", ".bat", ".cmd"};
     private static String[] nonWinExtensions = {""};
     private static Map myHookers = new HashMap();
@@ -50,7 +54,6 @@ public class FSHooks {
         }else{
             extensions = nonWinExtensions;
         }
-        
         for(int i = 0; i < extensions.length; i++){
             File hookFile = new File(getHooksDir(reposRootPath), hookName + extensions[i]);
             SVNFileType type = SVNFileType.getType(hookFile);
@@ -59,7 +62,11 @@ public class FSHooks {
             }else if(type == SVNFileType.SYMLINK){
                 //should first resolve the symlink and then decide if it's broken and
                 //throw an exception
-                throw new SVNException("svn: Failed to run '" + hookFile.getAbsolutePath() + "' hook; broken symlink");
+                File realFile = SVNFileUtil.resolveSymlinkToFile(hookFile);
+                if(realFile == null){
+                    throw new SVNException("svn: Failed to run '" + hookFile.getAbsolutePath() + "' hook; broken symlink");
+                }
+                return hookFile;
             }
         }
         return null;
@@ -84,11 +91,20 @@ public class FSHooks {
         return hooker;
     }
     
-    public void runPreRevPropChangeHook() throws SVNException {
+    public void runPreRevPropChangeHook(String propName, String propValue, String reposPath, String author, long revision, String wkDir, String action) throws SVNException {
         File hookFile = getHookFile(myReposRootDir, SVN_REPOS_HOOK_PRE_REVPROP_CHANGE);
         if(hookFile == null){
             throw new SVNException("svn: Repository has not been enabled to accept revision propchanges;" + SVNFileUtil.getNativeEOLMarker() + "ask the administrator to create a pre-revprop-change hook");
         }
+        String[] cmd = {hookFile.getAbsolutePath(), reposPath, String.valueOf(revision), author != null ? author : "", action};
+        
+        Process hookProc = null;
+        try{
+            hookProc = Runtime.getRuntime().exec(cmd);
+        }catch(IOException svne){
+            throw new SVNException("svn: Failed to run '" + hookFile.getAbsolutePath() + "' hook");
+        }
+        
         
         
     }
