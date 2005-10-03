@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <projectDescription>
-	<name>org.tmatesoft.javasvn</name>
+	<name>org.tmatesoft.javasvn.fs</name>
 	<comment></comment>
 	<projects>
-		<project>org.tmatesoft.javasvn</project>
+		<project>org.tmatesoft.javasvn.fs</project>
 	</projects>
 	<buildSpec>
 		<buildCommand>
