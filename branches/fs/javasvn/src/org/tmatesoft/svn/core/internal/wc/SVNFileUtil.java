@@ -323,8 +323,7 @@ public class SVNFileUtil {
         if (ls == null || ls.lastIndexOf(" -> ") < 0) {
             return null;
         }
-//        return ls.substring(ls.lastIndexOf(" -> ") + " -> ".length()).trim();
-        String[] attributes = ls.split(" ");
+        String[] attributes = ls.split("\\s+");
         return attributes[attributes.length - 1];
     }
 

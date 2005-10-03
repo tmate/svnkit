@@ -372,12 +372,8 @@ public class FSRepository extends SVNRepository {
         }
     }
 
-    static File getRevPropsFile(String reposRootPath, long revision) throws SVNException {
-        File revPropsFile = new File(getRevPropsDir(reposRootPath), String.valueOf(revision));
-        if (!revPropsFile.exists()) {
-            throw new SVNException("svn: No such revision: " + revision);
-        }
-        return revPropsFile;
+    static File getRevPropsFile(String reposRootPath, long revision) {
+        return new File(getRevPropsDir(reposRootPath), String.valueOf(revision));
     }
 
     static File getRevPropsDir(String reposRootPath) {
@@ -538,14 +534,20 @@ public class FSRepository extends SVNRepository {
             }
             String userName = getUsername(ISVNAuthenticationManager.USERNAME, super.getRepositoryUUID());
             String oldValue = getRevProperty(myReposRootPath, revision, propertyName);
-            
+            String action = null;
             if(propertyValue == null){//delete
-                
+                action = FSHooks.REVPROP_DELETE;
             }else if(oldValue == null){//add
-                
+                action = FSHooks.REVPROP_ADD;
             }else{//modify
-                
+                action = FSHooks.REVPROP_MODIFY;
             }
+            
+            FSHooks hooker = FSHooks.getInstance(myReposRootPath);
+            hooker.runPreRevPropChangeHook(propertyName,propertyValue, super.getLocation().getPath(), userName, revision, action);
+            SVNProperties revProps = new SVNProperties(getRevPropsFile(myReposRootPath, revision), null);
+            revProps.setPropertyValue(propertyName, propertyValue);
+            hooker.runPreRevPropChangeHook(propertyName, oldValue, super.getLocation().getPath(), userName, revision, action);
         } finally {
             closeRepository();
         }
@@ -675,7 +677,6 @@ public class FSRepository extends SVNRepository {
             lastAuthor = (String) revProps.get(SVNRevisionProperty.AUTHOR);
             log = (String) revProps.get(SVNRevisionProperty.LOG);
         }
-        log = log == null || !includeLogs ? "" : log;
 
         Date lastCommitDate = null;
         try {
@@ -684,7 +685,7 @@ public class FSRepository extends SVNRepository {
             //
         }
 
-        return new SVNDirEntry(repEntry.getName(), repEntry.getType(), size, hasProps, repEntry.getId().getRevision(), lastCommitDate, lastAuthor, log);
+        return new SVNDirEntry(repEntry.getName(), repEntry.getType(), size, hasProps, repEntry.getId().getRevision(), lastCommitDate, lastAuthor, includeLogs ? log : null);
     }
 
     private Map getMetaProps(String reposRootPath, long revision) throws SVNException {
@@ -744,10 +745,8 @@ public class FSRepository extends SVNRepository {
             }
             FSRevisionNode parent = getParentNode(myReposRootPath, path, revision);
             entries.addAll(getDirEntries(parent, myReposRootPath, null, includeCommitMessages));
-            SVNDirEntry parentDirEntry = null;
-            String parentName = SVNPathUtil.tail(parent.getCreatedPath());
-            parentName = parentName.length() > 0 ? parentName : "/";
-            parentDirEntry = buildDirEntry(new FSRepEntry(parent.getRevNodeID(), parent.getType(), parentName), parent, myReposRootPath, includeCommitMessages);
+            SVNDirEntry parentDirEntry = buildDirEntry(new FSRepEntry(parent.getRevNodeID(), parent.getType(), ""), parent, myReposRootPath, false);
+            parentDirEntry.setPath(parent.getCreatedPath());
             return parentDirEntry;
         } finally {
             closeRepository();
