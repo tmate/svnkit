@@ -95,7 +95,7 @@ public class FSReader {
     }
 
     public Map getDirEntries(FSRevisionNode revNode) throws SVNException {
-        if(revNode.getType() != SVNNodeKind.DIR){
+        if(revNode == null || revNode.getType() != SVNNodeKind.DIR){
             throw new SVNException("svn: Can't get entries of non-directory");
         }
         
@@ -603,13 +603,8 @@ public class FSReader {
         
         return offsets.getChangesOffset();
     }
-    
-    /**
-     * Build a rev-node given its offset in a rev-file.
-     * 
-     * @param revNode
-     * @param offset
-     */
+
+    //Read in a rev-node given its offset in a rev-file.
     public static Map readRevNodeHeaders(File revFile, long offset) throws SVNException{
         if(offset < 0){
             return null;
