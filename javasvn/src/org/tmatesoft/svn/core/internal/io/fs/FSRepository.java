@@ -85,12 +85,6 @@ public class FSRepository extends SVNRepository {
 
     private FileLock myDBSharedLock;
 
-    /*
-     * svn gets the mutex for buffered i/o (locks a file that can potentially be
-     * changed by another thread of the same process during reading from it)
-     */
-    private static Object myMutex = new Object();
-
     private String myReposRootPath;
     // db.lock file representation for synchronizing
     private RandomAccessFile myDBLockFile;
