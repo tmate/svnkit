@@ -17,16 +17,16 @@ import org.tmatesoft.svn.core.SVNNodeKind;
  * @version 1.0
  * @author  TMate Software Ltd.
  */
-public class FSRepEntry {
+public class FSRepresentationEntry {
     private FSID myId;
     private SVNNodeKind myType;
     private String myName;
     
-    public FSRepEntry(){
+    public FSRepresentationEntry(){
         
     }
     
-    public FSRepEntry(FSID id, SVNNodeKind type, String name){
+    public FSRepresentationEntry(FSID id, SVNNodeKind type, String name){
         myId = id;
         myType = type;
         myName = name;
