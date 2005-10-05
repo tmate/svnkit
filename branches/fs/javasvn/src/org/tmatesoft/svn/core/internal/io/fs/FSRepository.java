@@ -201,7 +201,7 @@ public class FSRepository extends SVNRepository {
             }catch(IOException ioe){
                 rootDir = myReposRootDir.getAbsolutePath();
             }
-            rootDir.replace(File.separatorChar, '/');
+            rootDir = rootDir.replace(File.separatorChar, '/');
             if(!rootDir.startsWith("/")){
                 rootDir = "/" + rootDir;
             }
@@ -356,9 +356,9 @@ public class FSRepository extends SVNRepository {
                 action = FSHooks.REVPROP_MODIFY;
             }
             
-            FSHooks.runPreRevPropChangeHook(myReposRootDir, propertyName, propertyValue, super.getFullPath(getLocation().getPath()), userName, revision, action);
-            FSRepositoryUtil.setRevisionProperty(myReposRootDir, revision, propertyName, propertyValue, oldValue, super.getFullPath(getLocation().getPath()), userName, action);
-            FSHooks.runPostRevPropChangeHook(myReposRootDir, propertyName, oldValue, super.getFullPath(getLocation().getPath()), userName, revision, action);
+            FSHooks.runPreRevPropChangeHook(myReposRootDir, propertyName, propertyValue, super.getRepositoryPath(""), userName, revision, action);
+            FSRepositoryUtil.setRevisionProperty(myReposRootDir, revision, propertyName, propertyValue, oldValue, super.getRepositoryPath(""), userName, action);
+            FSHooks.runPostRevPropChangeHook(myReposRootDir, propertyName, oldValue, super.getRepositoryPath(""), userName, revision, action);
         } finally {
             closeRepository();
         }

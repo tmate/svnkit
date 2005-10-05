@@ -15,6 +15,8 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.HashMap;
 import java.util.Map;
+import java.io.File;
+import java.io.IOException;
 
 import org.tmatesoft.svn.core.internal.util.SVNEncodingUtil;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
@@ -90,68 +92,69 @@ public class SVNURL {
             SVNErrorManager.error("svn: invalid URL '" + url + "': protocol '" + myProtocol + "' is not supported");
         }
 
-        URL tempURL=null;
 
         if("file".equals(myProtocol)){
+            URL testURL = null;
             //file protocol specifics - may be make this common?
             try {
-                tempURL = new URL(myProtocol + url.substring(index));
+                testURL = new URL(myProtocol + url.substring(index));
             } catch (MalformedURLException e) {
                 SVNErrorManager.error("svn: invalid URL '" + url + "': " + e.getMessage());
             }
-            if(tempURL.getPath()==null || "".equals(tempURL.getPath())){
+            if(testURL.getPath()==null || "".equals(testURL.getPath())){
                 //no path, only host - follow subversion behaviour
                 SVNErrorManager.error("svn: Local URL '" + url + "' contains only a hostname, no path");
             }
+
+            myHost = "";
+            if (uriEncoded) {
+                // autoencode it.
+                myEncodedPath = SVNEncodingUtil.autoURIEncode(testURL.getPath());
+                SVNEncodingUtil.assertURISafe(myEncodedPath);
+                try{
+                    myPath = new File(SVNEncodingUtil.uriDecode(myEncodedPath)).getCanonicalPath();
+                }catch(IOException ioe){
+                    myPath = new File(SVNEncodingUtil.uriDecode(myEncodedPath)).getAbsolutePath();
+                }
+            } else {
+                try{
+                    myPath = new File(testURL.getPath()).getCanonicalPath();
+                }catch(IOException ioe){
+                    myPath = new File(testURL.getPath()).getAbsolutePath();
+                }
+                myEncodedPath = SVNEncodingUtil.uriEncode(myPath);
+            }
+            myPath = myPath.replace(File.separatorChar, '/');
+            myUserName = testURL.getUserInfo();
+            myPort = testURL.getPort();
+            
+            myIsDefaultPort = myPort < 0;
         }else{
-            String testURL = "http" + url.substring(index);
+            URL testURL = null;
             try {
-                tempURL = new URL(testURL);
+                testURL = new URL("http" + url.substring(index));
             } catch (MalformedURLException e) {
                 SVNErrorManager.error("svn: invalid URL '" + url + "': " + e.getMessage());
             }
-        }
-
-        myHost = tempURL.getHost();
-        if (uriEncoded) {
-            // autoencode it.
-            myEncodedPath = SVNEncodingUtil.autoURIEncode(tempURL.getPath());
-            SVNEncodingUtil.assertURISafe(myEncodedPath);
-            myPath = SVNEncodingUtil.uriDecode(myEncodedPath);
-        } else {
-            myPath = tempURL.getPath();
-            myEncodedPath = SVNEncodingUtil.uriEncode(myPath);
-        }
-        myUserName = tempURL.getUserInfo();
-        myPort = tempURL.getPort();
         
-        /*        
-        String testURL = "http" + url.substring(index);
-        URL httpURL;
-        try {
-            httpURL = new URL(testURL);
-        } catch (MalformedURLException e) {
-            SVNErrorManager.error("svn: invalid URL '" + url + "': " + e.getMessage());
-            return;
+            myHost = testURL.getHost();
+            if (uriEncoded) {
+                // autoencode it.
+                myEncodedPath = SVNEncodingUtil.autoURIEncode(testURL.getPath());
+                SVNEncodingUtil.assertURISafe(myEncodedPath);
+                myPath = SVNEncodingUtil.uriDecode(myEncodedPath);
+            } else {
+                myPath = testURL.getPath();
+                myEncodedPath = SVNEncodingUtil.uriEncode(myPath);
+            }
+            myUserName = testURL.getUserInfo();
+            myPort = testURL.getPort();
+            myIsDefaultPort = myPort < 0;
+            if (myPort < 0) {
+                Integer defaultPort = (Integer) DEFAULT_PORTS.get(myProtocol);
+                myPort = defaultPort.intValue();
+            } 
         }
-        myHost = httpURL.getHost();
-        if (uriEncoded) {
-            // autoencode it.
-            myEncodedPath = SVNEncodingUtil.autoURIEncode(httpURL.getPath());
-            SVNEncodingUtil.assertURISafe(myEncodedPath);
-            myPath = SVNEncodingUtil.uriDecode(myEncodedPath);
-        } else {
-            myPath = httpURL.getPath();
-            myEncodedPath = SVNEncodingUtil.uriEncode(myPath);
-        }
-        myUserName = httpURL.getUserInfo();
-        myPort = httpURL.getPort();
-*/        
-        myIsDefaultPort = myPort < 0;
-        if (myPort < 0) {
-            Integer defaultPort = (Integer) DEFAULT_PORTS.get(myProtocol);
-            myPort = defaultPort.intValue();
-        } 
     }
     
     public String getProtocol() {
