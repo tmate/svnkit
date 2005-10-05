@@ -92,7 +92,7 @@ public class SVNURL {
 
         URL tempURL=null;
 
-        if("file".equals(myProtocol.toLowerCase())){
+        if("file".equals(myProtocol)){
             //file protocol specifics - may be make this common?
             try {
                 tempURL = new URL(myProtocol + url.substring(index));

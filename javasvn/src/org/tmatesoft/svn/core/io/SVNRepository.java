@@ -1203,6 +1203,7 @@ public abstract class SVNRepository {
         if (relativePath.length() > 0 && relativePath.charAt(0) == '/') {
             return relativePath;
         }
+        
         String fullPath = SVNPathUtil.append(getLocation().getPath(), relativePath);
         String repositoryPath = fullPath.substring(getRepositoryRoot().getPath().length());
         if ("".equals(repositoryPath)) {

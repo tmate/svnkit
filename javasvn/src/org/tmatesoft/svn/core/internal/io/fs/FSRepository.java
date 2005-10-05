@@ -22,7 +22,6 @@ import java.io.File;
 import java.util.Collection;
 import java.util.Date;
 import java.util.Map;
-import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.Iterator;
 import java.util.Set;
@@ -34,7 +33,6 @@ import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNLock;
 import org.tmatesoft.svn.core.SVNNodeKind;
 import org.tmatesoft.svn.core.SVNURL;
-import org.tmatesoft.svn.core.internal.wc.SVNFileType;
 import org.tmatesoft.svn.core.io.ISVNEditor;
 import org.tmatesoft.svn.core.io.ISVNFileRevisionHandler;
 import org.tmatesoft.svn.core.io.ISVNLocationEntryHandler;
@@ -44,48 +42,19 @@ import org.tmatesoft.svn.core.io.ISVNSession;
 import org.tmatesoft.svn.core.io.ISVNWorkspaceMediator;
 import org.tmatesoft.svn.core.io.SVNRepository;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
-import org.tmatesoft.svn.core.internal.util.SVNEncodingUtil;
 import org.tmatesoft.svn.core.internal.util.SVNTimeUtil;
 import org.tmatesoft.svn.core.SVNProperty;
 import org.tmatesoft.svn.core.SVNRevisionProperty;
-import org.tmatesoft.svn.core.internal.wc.SVNProperties;
+import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
-import org.tmatesoft.svn.core.auth.ISVNAuthenticationManager;
 
 /**
  * @version 1.0
  * @author TMate Software Ltd.
  */
 public class FSRepository extends SVNRepository {
-
-    static String SVN_REPOS_README = "README.txt";
-    static String SVN_REPOS_DB_DIR = "db";
-    static String SVN_REPOS_DAV_DIR = "dav";
-    static String SVN_REPOS_LOCKS_DIR = "locks";
-    static String SVN_REPOS_CONF_DIR = "conf";
-    static String SVN_REPOS_DB_LOCKFILE = "db.lock";
-    static String SVN_REPOS_DB_LOGS_LCOKFILE = "db-logs.lock";
-    static String SVN_REPOS_CONF_SVNSERVE_CONF = "svnserve.conf";
-    static String SVN_REPOS_CONF_PASSWD = "passwd";
-    static String SVN_REPOS_FSFS_FORMAT = "fsfs";
-    static String SVN_REPOS_DB_CURRENT = "current";
-    static String SVN_REPOS_FORMAT = "format";
-    private int SVN_REPOS_FORMAT_NUMBER = 3;
-    static String SVN_REPOS_FS_FORMAT = "format";
-    private int SVN_FS_FORMAT_NUMBER = 1;
-    static String SVN_FS_TYPE_FILENAME = "fs-type";
-    static String SVN_REPOS_UUID_FILE = "uuid";
-    static String SVN_REPOS_REVPROPS_DIR = "revprops";
-    static String SVN_REPOS_REVS_DIR = "revs";
-
-    // uuid format - 36 symbols
-    private int SVN_UUID_FILE_LENGTH = 36;
-    // if > max svn 1.2 stops working
-    private int SVN_UUID_FILE_MAX_LENGTH = SVN_UUID_FILE_LENGTH + 1;
-
     private FileLock myDBSharedLock;
-
-    private String myReposRootPath;
+    private File myReposRootDir;
     // db.lock file representation for synchronizing
     private RandomAccessFile myDBLockFile;
 
@@ -103,95 +72,20 @@ public class FSRepository extends SVNRepository {
         }
     }
 
-    private String findRepositoryRoot(String path) throws SVNException {
-        if (path == null) {
-            path = "";
-        }
-        String rootPath = path;
-        while (!isReposRoot(rootPath)) {
-            rootPath = SVNPathUtil.removeTail(rootPath);
-            if (rootPath.equals("") && !isReposRoot(rootPath)) {
-                throw new SVNException();
-            }
-        }
-        return rootPath;
-    }
-
-    private boolean isReposRoot(String candidatePath) {
-        File formatFile = new File(candidatePath, SVN_REPOS_FORMAT);
-        SVNFileType fileType = SVNFileType.getType(formatFile);
-        if (fileType != SVNFileType.FILE) {
-            return false;
-        }
-        File dbFile = new File(candidatePath, SVN_REPOS_DB_DIR);
-        fileType = SVNFileType.getType(dbFile);
-        if (fileType != SVNFileType.DIRECTORY && fileType != SVNFileType.SYMLINK) {
-            return false;
-        }
-        return true;
-    }
-
-    private void checkReposFormat(String reposRootPath) throws SVNException {
-        int formatNumber = getFormat(reposRootPath, SVN_REPOS_FORMAT);
-        if (formatNumber != SVN_REPOS_FORMAT_NUMBER) {
-            throw new SVNException("svn: Expected format '" + SVN_REPOS_FORMAT_NUMBER + "' of repository; found format '" + formatNumber + "'");
-        }
-    }
-
-    private void checkFSFormat(String reposRootPath) throws SVNException {
-        File dbFSFormat = new File(reposRootPath, SVN_REPOS_DB_DIR);
-        int formatNumber = -1;
-        try {
-            formatNumber = getFormat(dbFSFormat.getAbsolutePath(), SVN_REPOS_FS_FORMAT);
-        } catch (SVNException svne) {
-            if (svne.getCause() instanceof FileNotFoundException) {
-                formatNumber = SVN_FS_FORMAT_NUMBER;
-            }
-        }
-
-        if (formatNumber != SVN_FS_FORMAT_NUMBER) {
-            throw new SVNException("svn: Expected FS format '" + SVN_FS_FORMAT_NUMBER + "'; found format '" + formatNumber + "'");
-        }
-    }
-
-    private int getFormat(String reposPath, String format) throws SVNException {
-        File formatFile = new File(reposPath, format);
-
-        String firstLine = FSReader.readSingleLine(formatFile);
-
-        if (firstLine == null) {
-            throw new SVNException("svn: Can't read file '" + formatFile.getAbsolutePath() + "': End of file found");
-        }
-
-        // checking for non-digits
-        for (int i = 0; i < firstLine.length(); i++) {
-            if (!Character.isDigit(firstLine.charAt(i))) {
-                throw new SVNException("First line of '" + formatFile.getAbsolutePath() + "' contains non-digit");
-            }
-        }
-        return Integer.parseInt(firstLine);
-    }
-
-    private void lockDBFile(String reposRootPath) throws SVNException {
+    private void lockDBFile(File reposRootDir) throws SVNException {
         // 1. open db.lock for shared reading (?? just like in the svn code)
-        File dbLockFile = new File(new File(reposRootPath, SVN_REPOS_LOCKS_DIR), SVN_REPOS_DB_LOCKFILE);
+        File dbLockFile = FSRepositoryUtil.getDBLockFile(reposRootDir);
 
         if (!dbLockFile.exists()) {
-            throw new SVNException("svn: Error opening db lockfile" + SVNFileUtil.getNativeEOLMarker() + "svn: Can't open file '" + dbLockFile.getAbsolutePath() + "'");
+            SVNErrorManager.error("svn: Error opening db lockfile" + SVNFileUtil.getNativeEOLMarker() + "svn: Can't open file '" + dbLockFile.getAbsolutePath() + "'");
         }
 
         myDBLockFile = null;
         try {
             myDBLockFile = new RandomAccessFile(dbLockFile, "r");
         } catch (FileNotFoundException fnfe) {
-            if (myDBLockFile != null) {
-                try {
-                    myDBLockFile.close();
-                } catch (IOException ioe) {
-                    //
-                }
-            }
-            throw new SVNException("svn: Error opening db lockfile" + SVNFileUtil.getNativeEOLMarker() + "svn: Can't open file '" + dbLockFile.getAbsolutePath() + "'");
+            SVNFileUtil.closeFile(myDBLockFile);
+            SVNErrorManager.error("svn: Error opening db lockfile" + SVNFileUtil.getNativeEOLMarker() + "svn: Can't open file '" + dbLockFile.getAbsolutePath() + "': " + fnfe.getMessage());
         }
 
         // 2. lock db.lock blocking, not exclusively
@@ -199,13 +93,7 @@ public class FSRepository extends SVNRepository {
         try {
             myDBSharedLock = fch.lock(0, Long.MAX_VALUE, true);
         } catch (IOException ioe) {
-            if (myDBLockFile != null) {
-                try {
-                    myDBLockFile.close();
-                } catch (IOException ioex) {
-                    //
-                }
-            }
+            SVNFileUtil.closeFile(myDBLockFile);
             if (myDBSharedLock != null) {
                 try {
                     myDBSharedLock.release();
@@ -213,7 +101,7 @@ public class FSRepository extends SVNRepository {
                     //
                 }
             }
-            throw new SVNException("svn: Error opening db lockfile" + SVNFileUtil.getNativeEOLMarker() + "svn: Can't get shared lock on file '" + dbLockFile.getAbsolutePath() + "'");
+            SVNErrorManager.error("svn: Error opening db lockfile" + SVNFileUtil.getNativeEOLMarker() + "svn: Can't get shared lock on file '" + dbLockFile.getAbsolutePath() + "': " + ioe.getMessage());
         }
     }
 
@@ -222,29 +110,12 @@ public class FSRepository extends SVNRepository {
         if (myDBSharedLock != null) {
             try {
                 myDBSharedLock.release();
-            } catch (IOException ioex) {
-                File dbLockFile = new File(new File(myReposRootPath, SVN_REPOS_LOCKS_DIR), SVN_REPOS_DB_LOCKFILE);
-                throw new SVNException("svn: Can't unlock file '" + dbLockFile.getAbsoluteFile() + "'");
+            } catch (IOException ioe) {
+                File dbLockFile = FSRepositoryUtil.getDBLockFile(myReposRootDir);
+                SVNErrorManager.error("svn: Can't unlock file '" + dbLockFile.getAbsoluteFile() + "': " + ioe.getMessage());
             } finally {
                 // 2. close 'db.lock' file
-                if (myDBLockFile != null) {
-                    try {
-                        myDBLockFile.close();
-                    } catch (IOException ioex) {
-                        //
-                    }
-                    return;
-                }
-            }
-        }
-
-        // 2. close 'db.lock' file
-        if (myDBLockFile != null) {
-            try {
-                myDBLockFile.close();
-            } catch (IOException ioex) {
-                File dbLockFile = new File(new File(myReposRootPath, SVN_REPOS_LOCKS_DIR), SVN_REPOS_DB_LOCKFILE);
-                throw new SVNException("svn: Can't close file '" + dbLockFile.getAbsoluteFile() + "'");
+                SVNFileUtil.closeFile(myDBLockFile);
             }
         }
     }
@@ -258,50 +129,46 @@ public class FSRepository extends SVNRepository {
 
         // Perform steps similar to svn's ones
         // 1. Find repos root
-        if (myReposRootPath == null) {
+        if (myReposRootDir == null) {
             try {
-                myReposRootPath = findRepositoryRoot(getLocation().getPath());
+                myReposRootDir = FSRepositoryUtil.findRepositoryRoot(new File(getLocation().getPath()).getCanonicalFile());//findRepositoryRoot(getLocation().getPath());
             } catch (SVNException svne) {
-                throw new SVNException(errorMessage);
+                SVNErrorManager.error(errorMessage);
+            }catch(IOException ioe){
+                SVNErrorManager.error(errorMessage + ": " + ioe.getMessage());
             }
         }
 
         // 2. Check repos format (the format file must exist!)
         try {
-            checkReposFormat(myReposRootPath);
+            FSRepositoryUtil.checkRepositoryFormat(myReposRootDir);//checkReposFormat(myReposRootPath);
         } catch (SVNException svne) {
-            throw new SVNException(errorMessage + eol + svne.getMessage());
+            SVNErrorManager.error(errorMessage + eol + svne.getMessage());
         }
 
         // 3. Lock 'db.lock' file non-exclusively, blocking, for reading only
         try {
-            lockDBFile(myReposRootPath);
+            lockDBFile(myReposRootDir);
         } catch (SVNException svne) {
-            throw new SVNException(errorMessage + eol + svne.getMessage());
+            SVNErrorManager.error(errorMessage + eol + svne.getMessage());
         }
 
         // 4. Check FS type for 'fsfs'
         try {
-            checkFSType(myReposRootPath);
+            FSRepositoryUtil.checkFSType(myReposRootDir);
         } catch (SVNException svne) {
-            throw new SVNException(errorMessage + eol + svne.getMessage());
+            SVNErrorManager.error(errorMessage + eol + svne.getMessage());
         }
 
         // 5. Attempt to open the 'current' file of this repository
-        File dbCurrentFile = new File(new File(myReposRootPath, SVN_REPOS_DB_DIR), SVN_REPOS_DB_CURRENT);
+        File dbCurrentFile = FSRepositoryUtil.getFSCurrentFile(myReposRootDir);
         FileInputStream fis = null;
         try {
             fis = new FileInputStream(dbCurrentFile);
         } catch (FileNotFoundException fnfe) {
-            throw new SVNException(errorMessage + eol + "svn: Can't open file '" + dbCurrentFile.getAbsolutePath() + "'");
+            SVNErrorManager.error(errorMessage + eol + "svn: Can't open file '" + dbCurrentFile.getAbsolutePath() + "' " + fnfe.getMessage());
         } finally {
-            if (fis != null) {
-                try {
-                    fis.close();
-                } catch (IOException ioe) {
-                    //
-                }
-            }
+            SVNFileUtil.closeFile(fis);
         }
 
         /*
@@ -314,86 +181,53 @@ public class FSRepository extends SVNRepository {
          * for more.
          */
         try {
-            checkFSFormat(myReposRootPath);
+            FSRepositoryUtil.checkFSFormat(myReposRootDir);
         } catch (SVNException svne) {
-            throw new SVNException(errorMessage + eol + svne.getMessage());
+            SVNErrorManager.error(errorMessage + eol + svne.getMessage());
         }
 
         // 7. Read and cache repository UUID
-        String uuid = null;
-        try {
-            uuid = readReposUUID(myReposRootPath);
-        } catch (SVNException svne) {
-            throw new SVNException(errorMessage + eol + svne.getMessage());
+        if(super.getRepositoryUUID() == null){
+            String uuid = null;
+            try {
+                uuid = FSRepositoryUtil.getRepositoryUUID(myReposRootDir);
+            } catch (SVNException svne) {
+                SVNErrorManager.error(errorMessage + eol + svne.getMessage());
+            }
+    
+            String rootDir = null;
+            try{
+                rootDir = myReposRootDir.getCanonicalPath();
+            }catch(IOException ioe){
+                rootDir = myReposRootDir.getAbsolutePath();
+            }
+            rootDir.replace(File.separatorChar, '/');
+            if(!rootDir.startsWith("/")){
+                rootDir = "/" + rootDir;
+            }
+            setRepositoryCredentials(uuid, SVNURL.parseURIEncoded(getLocation().getProtocol() + "://" + rootDir));
         }
-
-        String decodedURL = SVNEncodingUtil.uriDecode(getLocation().toString());
-        String rootURL = decodedURL.substring(0, decodedURL.indexOf(myReposRootPath) + myReposRootPath.length());
-        setRepositoryCredentials(uuid, SVNURL.parseURIEncoded(rootURL));
     }
 
     private void closeRepository() throws SVNException {
-        unlockDBFile();
-        unlock();
-    }
-
-    private String readReposUUID(String reposRootPath) throws SVNException {
-        File uuidFile = new File(new File(reposRootPath, SVN_REPOS_DB_DIR), SVN_REPOS_UUID_FILE);
-
-        String uuidLine = FSReader.readSingleLine(uuidFile);
-
-        if (uuidLine == null) {
-            throw new SVNException("svn: Can't read file '" + uuidFile.getAbsolutePath() + "': End of file found");
-        }
-
-        if (uuidLine.length() > SVN_UUID_FILE_MAX_LENGTH) {
-            throw new SVNException("svn: Can't read length line in file '" + uuidFile.getAbsolutePath() + "'");
-        }
-        return uuidLine;
-    }
-
-    private void checkFSType(String reposRootPath) throws SVNException {
-        File fsTypeFile = new File(new File(reposRootPath, SVN_REPOS_DB_DIR), SVN_FS_TYPE_FILENAME);
-
-        String fsType = FSReader.readSingleLine(fsTypeFile);
-
-        if (fsType == null) {
-            throw new SVNException("svn: Can't read file '" + fsTypeFile.getAbsolutePath() + "': End of file found");
-        }
-
-        if (!fsType.equals(SVN_REPOS_FSFS_FORMAT)) {
-            throw new SVNException("svn: Unknown FS type '" + fsType + "'");
+        try{
+            unlockDBFile();
+        }finally{
+            unlock();
         }
     }
 
-    static File getRevPropsFile(String reposRootPath, long revision) {
-        return new File(getRevPropsDir(reposRootPath), String.valueOf(revision));
+    public File getRepositoryRootDir(){
+        return myReposRootDir;
     }
-
-    static File getRevPropsDir(String reposRootPath) {
-        return new File(new File(reposRootPath, SVN_REPOS_DB_DIR), SVN_REPOS_REVPROPS_DIR);
-    }
-
     
-    static File getRevsDir(String reposRootPath) {
-        return new File(new File(reposRootPath, SVN_REPOS_DB_DIR), SVN_REPOS_REVS_DIR);
-    }
-
-    static File getRevFile(String reposRootPath, long revision) throws SVNException {
-        File revFile = new File(getRevsDir(reposRootPath), String.valueOf(revision));
-        if (!revFile.exists()) {
-            throw new SVNException("svn: No such revision " + revision);
-        }
-        return revFile;
-    }
-
-    private long getYoungestRev(String reposRootPath) throws SVNException {
-        File dbCurrentFile = new File(new File(reposRootPath, SVN_REPOS_DB_DIR), SVN_REPOS_DB_CURRENT);
+    private long getYoungestRev(File reposRootDir) throws SVNException {
+        File dbCurrentFile = FSRepositoryUtil.getFSCurrentFile(reposRootDir);//new File(new File(reposRootPath, SVN_REPOS_DB_DIR), SVN_REPOS_DB_CURRENT);
 
         String firstLine = FSReader.readSingleLine(dbCurrentFile);
 
         if (firstLine == null) {
-            throw new SVNException("svn: Can't read file '" + dbCurrentFile.getAbsolutePath() + "': End of file found");
+            SVNErrorManager.error("svn: Can't read file '" + dbCurrentFile.getAbsolutePath() + "': End of file found");
         }
 
         String splittedLine[] = firstLine.split(" ");
@@ -403,7 +237,7 @@ public class FSRepository extends SVNRepository {
         } catch (NumberFormatException nfe) {
             // svn 1.2 will not report an error if there are no any digit bytes
             // but we decided to introduce this restriction
-            throw new SVNException("svn: Can't parse revision number in file '" + dbCurrentFile.getAbsolutePath() + "'");
+            SVNErrorManager.error("svn: Can't parse revision number in file '" + dbCurrentFile.getAbsolutePath() + "'");
         }
 
         return latestRev;
@@ -412,37 +246,31 @@ public class FSRepository extends SVNRepository {
     public long getLatestRevision() throws SVNException {
         try {
             openRepository();
-            return getYoungestRev(myReposRootPath);
+            return getYoungestRev(myReposRootDir);
         } finally {
             closeRepository();
         }
     }
 
-    private Date getTime(String reposRootPath, long revision) throws SVNException {
+    private Date getTime(File reposRootDir, long revision) throws SVNException {
         String timeString = null;
 
-        timeString = getRevProperty(reposRootPath, revision, SVNRevisionProperty.DATE);
+        timeString = FSRepositoryUtil.getRevisionProperty(reposRootDir, revision, SVNRevisionProperty.DATE);//getRevProperty(reposRootPath, revision, SVNRevisionProperty.DATE);
 
         if (timeString == null) {
-            throw new SVNException("svn: Failed to find time on revision " + revision);
+            SVNErrorManager.error("svn: Failed to find time on revision " + revision);
         }
 
         Date date = null;
         date = SVNTimeUtil.parseDate(timeString);
         if (date == null) {
-            throw new SVNException("svn: Can't parse date on revision " + revision);
+            SVNErrorManager.error("svn: Can't parse date on revision " + revision);
         }
         return date;
     }
 
-    private String getRevProperty(String reposRootPath, long revision, String revPropName) throws SVNException {
-        File revPropFile = getRevPropsFile(reposRootPath, revision);
-        SVNProperties revProps = new SVNProperties(revPropFile, null);
-        return revProps.getPropertyValue(revPropName);
-    }
-
-    private long getDatedRev(String reposRootPath, Date date) throws SVNException {
-        long latestRev = getYoungestRev(reposRootPath);
+    private long getDatedRev(File reposRootDir, Date date) throws SVNException {
+        long latestRev = getYoungestRev(reposRootDir);
         long topRev = latestRev;
         long botRev = 0;
         long midRev;
@@ -450,13 +278,13 @@ public class FSRepository extends SVNRepository {
 
         while (botRev <= topRev) {
             midRev = (topRev + botRev) / 2;
-            curTime = getTime(reposRootPath, midRev);
+            curTime = getTime(reposRootDir, midRev);
 
             if (curTime.compareTo(date) > 0) {// overshot
                 if ((midRev - 1) < 0) {
                     return 0;
                 }
-                Date prevTime = getTime(reposRootPath, midRev - 1);
+                Date prevTime = getTime(reposRootDir, midRev - 1);
                 // see if time falls between midRev and midRev-1:
                 if (prevTime.compareTo(date) < 0) {
                     return midRev - 1;
@@ -466,7 +294,7 @@ public class FSRepository extends SVNRepository {
                 if ((midRev + 1) > latestRev) {
                     return latestRev;
                 }
-                Date nextTime = getTime(reposRootPath, midRev + 1);
+                Date nextTime = getTime(reposRootDir, midRev + 1);
                 // see if time falls between midRev and midRev+1:
                 if (nextTime.compareTo(date) > 0) {
                     return midRev + 1;
@@ -479,15 +307,6 @@ public class FSRepository extends SVNRepository {
         return 0;
     }
 
-    private String getUsername(String kind, String realm) throws SVNException {
-        ISVNAuthenticationManager authManager = super.getAuthenticationManager();
-        if (authManager == null) {
-            return "";
-        }
-
-        String username = authManager.getFirstAuthentication(kind, realm, super.getLocation()).getUserName();
-        return username != null ? username : "";
-    }
     
     
     public long getDatedRevision(Date date) throws SVNException {
@@ -497,7 +316,7 @@ public class FSRepository extends SVNRepository {
 
         try {
             openRepository();
-            return getDatedRev(myReposRootPath, date);
+            return getDatedRev(myReposRootDir, date);
         } finally {
             closeRepository();
         }
@@ -508,7 +327,7 @@ public class FSRepository extends SVNRepository {
 
         try {
             openRepository();
-            Map revProps = getAllRevProps(myReposRootPath, revision);
+            Map revProps = FSRepositoryUtil.getRevisionProperties(myReposRootDir, revision);
             if (properties == null) {
                 properties = revProps;
             }
@@ -524,10 +343,10 @@ public class FSRepository extends SVNRepository {
             openRepository();
 
             if (!SVNProperty.isRegularProperty(propertyName)) {
-                throw new SVNException("svn: Storage of non-regular property '" + propertyName + "' is disallowed through the repository interface, and could indicate a bug in your client");
+                SVNErrorManager.error("svn: Storage of non-regular property '" + propertyName + "' is disallowed through the repository interface, and could indicate a bug in your client");
             }
-            String userName = getUsername(ISVNAuthenticationManager.USERNAME, super.getRepositoryUUID());
-            String oldValue = getRevProperty(myReposRootPath, revision, propertyName);
+            String userName = System.getProperty("user.name");
+            String oldValue = FSRepositoryUtil.getRevisionProperty(myReposRootDir, revision, propertyName);
             String action = null;
             if(propertyValue == null){//delete
                 action = FSHooks.REVPROP_DELETE;
@@ -537,11 +356,9 @@ public class FSRepository extends SVNRepository {
                 action = FSHooks.REVPROP_MODIFY;
             }
             
-            FSHooks hooker = FSHooks.getInstance(myReposRootPath);
-            hooker.runPreRevPropChangeHook(propertyName,propertyValue, super.getLocation().getPath(), userName, revision, action);
-            SVNProperties revProps = new SVNProperties(getRevPropsFile(myReposRootPath, revision), null);
-            revProps.setPropertyValue(propertyName, propertyValue);
-            hooker.runPreRevPropChangeHook(propertyName, oldValue, super.getLocation().getPath(), userName, revision, action);
+            FSHooks.runPreRevPropChangeHook(myReposRootDir, propertyName, propertyValue, super.getFullPath(getLocation().getPath()), userName, revision, action);
+            FSRepositoryUtil.setRevisionProperty(myReposRootDir, revision, propertyName, propertyValue, oldValue, super.getFullPath(getLocation().getPath()), userName, action);
+            FSHooks.runPostRevPropChangeHook(myReposRootDir, propertyName, oldValue, super.getFullPath(getLocation().getPath()), userName, revision, action);
         } finally {
             closeRepository();
         }
@@ -554,9 +371,7 @@ public class FSRepository extends SVNRepository {
         }
         try {
             openRepository();
-
-            String value = getRevProperty(myReposRootPath, revision, propertyName);
-            return value;
+            return FSRepositoryUtil.getRevisionProperty(myReposRootDir, revision, propertyName);
         } finally {
             closeRepository();
         }
@@ -571,31 +386,30 @@ public class FSRepository extends SVNRepository {
     }
 
     // path is relative to this FSRepository's location
-    private Collection getDirEntries(FSRevisionNode parent, String reposRootPath, Map parentDirProps, boolean includeLogs) throws SVNException {
-        FSReader fsReader = FSReader.getInstance(reposRootPath);
-        Map entries = fsReader.getDirEntries(parent);
+    private Collection getDirEntries(FSRevisionNode parent, File reposRootDir, Map parentDirProps, boolean includeLogs) throws SVNException {
+        Map entries = FSReader.getDirEntries(parent, reposRootDir);
         Set keys = entries.keySet();
         Iterator iter = keys.iterator();
         Collection dirEntries = new LinkedList();
 
         while (iter.hasNext()) {
             String name = (String) iter.next();
-            FSRepEntry repEntry = (FSRepEntry) entries.get(name);
+            FSRepresentationEntry repEntry = (FSRepresentationEntry) entries.get(name);
             if (repEntry != null) {
-                dirEntries.add(buildDirEntry(repEntry, null, reposRootPath, includeLogs));
+                dirEntries.add(buildDirEntry(repEntry, null, reposRootDir, includeLogs));
             }
         }
 
         if (parentDirProps != null) {
             // first fetch out user props
-            Map dirProps = fsReader.getProperties(parent);
+            Map dirProps = FSReader.getProperties(parent, reposRootDir);
             if (dirProps != null && dirProps.size() > 0) {
                 parentDirProps.putAll(dirProps);
             }
             // now add special non-tweakable metadata props
             Map metaprops = null;
             try {
-                metaprops = getMetaProps(reposRootPath, parent.getRevNodeID().getRevision());
+                metaprops = FSRepositoryUtil.getMetaProps(reposRootDir, parent.getRevNodeID().getRevision(), this);
             } catch (SVNException svne) {
                 //
             }
@@ -607,12 +421,11 @@ public class FSRepository extends SVNRepository {
         return dirEntries;
     }
 
-    private FSRevisionNode getParentNode(String reposRootPath, String path, long revision) throws SVNException {
-        String absPath = getRepositoryPath(path);
-        FSReader fsReader = FSReader.getInstance(reposRootPath);
+    private FSRevisionNode getParentNode(File reposRootDir, String path, long revision) throws SVNException {
+        String absPath = super.getRepositoryPath(path);
 
         String nextPathComponent = null;
-        FSRevisionNode parent = fsReader.getRootRevNode(revision);
+        FSRevisionNode parent = FSReader.getRootRevNode(reposRootDir, revision);
         FSRevisionNode child = null;
         if (absPath.indexOf(':') != -1 || absPath.indexOf('|') != -1) {
             absPath = (absPath.indexOf('/') != -1) ? absPath.substring(absPath.indexOf('/')) : "";
@@ -625,9 +438,9 @@ public class FSRepository extends SVNRepository {
             if (nextPathComponent.length() == 0) {
                 child = parent;
             } else {
-                child = fsReader.getChildDirNode(nextPathComponent, parent);
+                child = FSReader.getChildDirNode(nextPathComponent, parent, reposRootDir);
                 if (child == null) {
-                    throw new SVNException("svn: Attempted to open non-existent child node '" + nextPathComponent + "'" + SVNFileUtil.getNativeEOLMarker() + "svn: File not found: revision "
+                    SVNErrorManager.error("svn: Attempted to open non-existent child node '" + nextPathComponent + "'" + SVNFileUtil.getNativeEOLMarker() + "svn: File not found: revision "
                             + revision + ", path '" + getRepositoryPath(path) + "'");
                 }
 
@@ -641,9 +454,8 @@ public class FSRepository extends SVNRepository {
         return parent;
     }
 
-    private SVNDirEntry buildDirEntry(FSRepEntry repEntry, FSRevisionNode revNode, String reposRootPath, boolean includeLogs) throws SVNException {
-        FSReader fsReader = FSReader.getInstance(reposRootPath);
-        FSRevisionNode entryNode = revNode == null ? fsReader.getRevNode(repEntry.getId()) : revNode;
+    private SVNDirEntry buildDirEntry(FSRepresentationEntry repEntry, FSRevisionNode revNode, File reposRootDir, boolean includeLogs) throws SVNException {
+        FSRevisionNode entryNode = revNode == null ? FSReader.getRevNode(reposRootDir, repEntry.getId()) : revNode;
 
         // dir size is equated to 0
         long size = 0;
@@ -653,14 +465,14 @@ public class FSRepository extends SVNRepository {
         }
 
         Map props = null;
-        props = fsReader.getProperties(entryNode);
+        props = FSReader.getProperties(entryNode, reposRootDir);
         boolean hasProps = (props == null || props.size() == 0) ? false : true;
 
         // should it be an exception if getting a rev property is impossible,
         // hmmm?
         Map revProps = null;
         try {
-            revProps = getAllRevProps(reposRootPath, repEntry.getId().getRevision());
+            revProps = FSRepositoryUtil.getRevisionProperties(reposRootDir, repEntry.getId().getRevision());
         } catch (SVNException svne) {
             //
         }
@@ -674,7 +486,7 @@ public class FSRepository extends SVNRepository {
 
         Date lastCommitDate = null;
         try {
-            lastCommitDate = getTime(reposRootPath, repEntry.getId().getRevision());
+            lastCommitDate = getTime(reposRootDir, repEntry.getId().getRevision());
         } catch (SVNException svne) {
             //
         }
@@ -682,46 +494,17 @@ public class FSRepository extends SVNRepository {
         return new SVNDirEntry(repEntry.getName(), repEntry.getType(), size, hasProps, repEntry.getId().getRevision(), lastCommitDate, lastAuthor, includeLogs ? log : null);
     }
 
-    private Map getMetaProps(String reposRootPath, long revision) throws SVNException {
-        Map metaProps = new HashMap();
-        Map revProps = null;
-        revProps = getAllRevProps(reposRootPath, revision);
-        String author = (String) revProps.get(SVNRevisionProperty.AUTHOR);
-        String date = (String) revProps.get(SVNRevisionProperty.DATE);
-        String uuid = super.getRepositoryUUID();
-        String rev = String.valueOf(revision);
-
-        metaProps.put(SVNProperty.LAST_AUTHOR, author != null ? author : "");
-        metaProps.put(SVNProperty.COMMITTED_DATE, date != null ? date : "");
-        metaProps.put(SVNProperty.COMMITTED_REVISION, rev);
-        metaProps.put(SVNProperty.UUID, uuid != null ? uuid : "");
-        return metaProps;
-    }
-
-    private Map getAllRevProps(String reposRootPath, long revision) throws SVNException {
-        Map allProps = new HashMap();
-        String author = getRevProperty(reposRootPath, revision, SVNRevisionProperty.AUTHOR);
-        String date = getRevProperty(reposRootPath, revision, SVNRevisionProperty.DATE);
-        String log = getRevProperty(reposRootPath, revision, SVNRevisionProperty.LOG);
-
-        allProps.put(SVNRevisionProperty.AUTHOR, author);
-        allProps.put(SVNRevisionProperty.DATE, date);
-        allProps.put(SVNRevisionProperty.LOG, log);
-
-        return allProps;
-    }
-
     public long getDir(String path, long revision, Map properties, ISVNDirEntryHandler handler) throws SVNException {
         try {
             openRepository();
-            if (!super.isValidRevision(revision)) {
-                revision = getYoungestRev(myReposRootPath);
+            if (!SVNRepository.isValidRevision(revision)) {
+                revision = getYoungestRev(myReposRootDir);
             }
-            FSRevisionNode parent = getParentNode(myReposRootPath, path, revision);
-            Collection entries = getDirEntries(parent, myReposRootPath, properties, false);
-            Iterator iterator = entries.iterator();
-            while (iterator.hasNext()) {
-                SVNDirEntry entry = (SVNDirEntry) iterator.next();
+            FSRevisionNode parent = getParentNode(myReposRootDir, path, revision);
+            Collection entriesCollection = getDirEntries(parent, myReposRootDir, properties, false);
+            Iterator entries = entriesCollection.iterator();
+            while (entries.hasNext()) {
+                SVNDirEntry entry = (SVNDirEntry) entries.next();
                 handler.handleDirEntry(entry);
             }
 
@@ -734,12 +517,12 @@ public class FSRepository extends SVNRepository {
     public SVNDirEntry getDir(String path, long revision, boolean includeCommitMessages, Collection entries) throws SVNException {
         try {
             openRepository();
-            if (!super.isValidRevision(revision)) {
-                revision = getYoungestRev(myReposRootPath);
+            if (!SVNRepository.isValidRevision(revision)) {
+                revision = getYoungestRev(myReposRootDir);
             }
-            FSRevisionNode parent = getParentNode(myReposRootPath, path, revision);
-            entries.addAll(getDirEntries(parent, myReposRootPath, null, includeCommitMessages));
-            SVNDirEntry parentDirEntry = buildDirEntry(new FSRepEntry(parent.getRevNodeID(), parent.getType(), ""), parent, myReposRootPath, false);
+            FSRevisionNode parent = getParentNode(myReposRootDir, path, revision);
+            entries.addAll(getDirEntries(parent, myReposRootDir, null, includeCommitMessages));
+            SVNDirEntry parentDirEntry = buildDirEntry(new FSRepresentationEntry(parent.getRevNodeID(), parent.getType(), ""), parent, myReposRootDir, false);
             parentDirEntry.setPath(parent.getCreatedPath());
             return parentDirEntry;
         } finally {

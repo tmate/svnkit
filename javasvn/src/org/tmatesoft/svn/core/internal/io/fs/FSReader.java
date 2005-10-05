@@ -12,20 +12,18 @@
 package org.tmatesoft.svn.core.internal.io.fs;
 
 import org.tmatesoft.svn.core.SVNException;
-import org.tmatesoft.svn.core.SVNProperty;
 import org.tmatesoft.svn.core.SVNNodeKind;
-import org.tmatesoft.svn.core.internal.wc.SVNTranslator;
+import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.FileReader;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.io.Reader;
 import java.io.RandomAccessFile;
 import java.io.ByteArrayInputStream;
 import java.io.BufferedReader;
+import java.io.InputStreamReader;
 import java.io.FileNotFoundException;
 import java.io.File;
 import java.util.Map;
@@ -34,125 +32,93 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 
 public class FSReader {
-    private static Map myReaders = new HashMap();
-    
-    private File myReposRootDir;
-    private Map myOffsets = new HashMap();
-
-    static BufferedReader myCurReader;
     //to mean the end of a file 
-    static long FILE_END_POS = -1;
+    public static final long FILE_END_POS = -1;
     
-    static String HEADER_ID = "id";
-    static String HEADER_TYPE = "type";
-    static String HEADER_COUNT = "count";
-    static String HEADER_PROPS = "props";
-    static String HEADER_TEXT = "text";
-    static String HEADER_CPATH = "cpath";
-    static String HEADER_PRED = "pred";
-    static String HEADER_COPYFROM = "copyfrom";
-    static String HEADER_COPYROOT = "copyroot";
-    static String REP_DELTA = "DELTA";
-    static String REP_PLAIN = "PLAIN";
+    public static final String HEADER_ID = "id";
+    public static final String HEADER_TYPE = "type";
+    public static final String HEADER_COUNT = "count";
+    public static final String HEADER_PROPS = "props";
+    public static final String HEADER_TEXT = "text";
+    public static final String HEADER_CPATH = "cpath";
+    public static final String HEADER_PRED = "pred";
+    public static final String HEADER_COPYFROM = "copyfrom";
+    public static final String HEADER_COPYROOT = "copyroot";
+    public static final String REP_DELTA = "DELTA";
+    public static final String REP_PLAIN = "PLAIN";
     
-    static int MD5_DIGESTSIZE = 16;
+    public static final int MD5_DIGESTSIZE = 16;
     
-    private FSReader(String reposRootPath){
-        myReposRootDir = new File(reposRootPath);
-    }
+    public static FSRevisionNode getChildDirNode(String child, FSRevisionNode parent, File reposRootDir) throws SVNException{
+        checkPathComponent(child);
 
-    private File getRevFile(long revision) throws SVNException{
-        return FSRepository.getRevFile(myReposRootDir.getAbsolutePath(), revision);
-    }
-
-    public static FSReader getInstance(String reposRootPath){
-        FSReader reader = (FSReader)myReaders.get(reposRootPath);
-        if(reader != null){
-            return reader;
-        }
-        
-        reader = new FSReader(reposRootPath);
-        myReaders.put(reposRootPath, reader);
-        return reader;
-    }
-    
-    public FSRevisionNode getChildDirNode(String child, FSRevisionNode parent) throws SVNException{
-        Map entries = getDirEntries(parent);
-        FSRepEntry entry = entries != null ? (FSRepEntry)entries.get(child) : null;
+        Map entries = getDirEntries(parent, reposRootDir);
+        FSRepresentationEntry entry = entries != null ? (FSRepresentationEntry)entries.get(child) : null;
         if(entry == null){
             return null;
             //throw new SVNException("svn: Attempted to open non-existent child node '" + child + "'");
         }
 
-        checkPathComponent(child);
         
-        return getRevNode(entry.getId()); 
+        return getRevNode(reposRootDir, entry.getId()); 
     }
-    private void checkPathComponent(String name) throws SVNException{
+    
+    private static void checkPathComponent(String name) throws SVNException{
         if(name == null || name.length() == 0 || "..".equals(name) || name.indexOf('/') != -1){
-            throw new SVNException("svn: Attempted to open node with an illegal name '" + name + "'");
+            SVNErrorManager.error("svn: Attempted to open node with an illegal name '" + name + "'");
         }
     }
 
-    public Map getDirEntries(FSRevisionNode revNode) throws SVNException {
+    public static Map getDirEntries(FSRevisionNode revNode, File reposRootDir) throws SVNException {
         if(revNode == null || revNode.getType() != SVNNodeKind.DIR){
-            throw new SVNException("svn: Can't get entries of non-directory");
+            SVNErrorManager.error("svn: Can't get entries of non-directory");
         }
         
-        return getDirContents(revNode.getTextRepresentation());
+        return getDirContents(revNode.getTextRepresentation(), reposRootDir);
     }
     
-    public Map getProperties(FSRevisionNode revNode) throws SVNException{
-        return getProplist(revNode.getPropsRepresentation());
+    public static Map getProperties(FSRevisionNode revNode, File reposRootDir) throws SVNException{
+        return getProplist(revNode.getPropsRepresentation(), reposRootDir);
     }
     
-    private Map getDirContents(FSRepresentation represnt) throws SVNException {
+    private static Map getDirContents(FSRepresentation represnt, File reposRootDir) throws SVNException {
         if(represnt == null){
             return null;
         }
-
-        InputStream is = readRepresentation(represnt, REP_PLAIN);
+        InputStream is = null;
         try{
+            is = readRepresentation(represnt, REP_PLAIN, reposRootDir);
             return parsePlainRepresentation(is, false);
         }catch(IOException ioe){
-            throw new SVNException("svn: Can't read representation in revision file '" + getRevFile(represnt.getRevision()).getAbsolutePath() + "': " + ioe.getMessage());
+            SVNErrorManager.error("svn: Can't read representation in revision file '" + FSRepositoryUtil.getRevisionFile(reposRootDir, represnt.getRevision()).getAbsolutePath() + "': " + ioe.getMessage());
         }catch(SVNException svne){
-            throw new SVNException("svn: Revision file '" + getRevFile(represnt.getRevision()).getAbsolutePath() + "' corrupt" + SVNFileUtil.getNativeEOLMarker() + svne.getMessage());
+            SVNErrorManager.error("svn: Revision file '" + FSRepositoryUtil.getRevisionFile(reposRootDir, represnt.getRevision()).getAbsolutePath() + "' corrupt" + SVNFileUtil.getNativeEOLMarker() + svne.getMessage());
         }finally{
-            if(is != null){
-                try{
-                    is.close();
-                }catch(IOException ioe){
-                    //
-                }
-            }
+            SVNFileUtil.closeFile(is);
         }
+        return null;
     }
     
-    private Map getProplist(FSRepresentation represnt) throws SVNException {
+    private static Map getProplist(FSRepresentation represnt, File reposRootDir) throws SVNException {
         if(represnt == null){
             return null;
         }
-        
-        InputStream is = readRepresentation(represnt, REP_PLAIN);
+        InputStream is = null;
         try{
+            is = readRepresentation(represnt, REP_PLAIN, reposRootDir);
             return parsePlainRepresentation(is, true);
         }catch(IOException ioe){
-            throw new SVNException("svn: Can't read representation in revision file '" + getRevFile(represnt.getRevision()).getAbsolutePath() + "': " + ioe.getMessage());
+            SVNErrorManager.error("svn: Can't read representation in revision file '" + FSRepositoryUtil.getRevisionFile(reposRootDir, represnt.getRevision()).getAbsolutePath() + "': " + ioe.getMessage());
         }catch(SVNException svne){
-            throw new SVNException("svn: Revision file '" + getRevFile(represnt.getRevision()).getAbsolutePath() + "' corrupt" + SVNFileUtil.getNativeEOLMarker() + svne.getMessage());
+            SVNErrorManager.error("svn: Revision file '" + FSRepositoryUtil.getRevisionFile(reposRootDir, represnt.getRevision()).getAbsolutePath() + "' corrupt" + SVNFileUtil.getNativeEOLMarker() + svne.getMessage());
         }finally{
-            if(is != null){
-                try{
-                    is.close();
-                }catch(IOException ioe){
-                    //
-                }
-            }
+            SVNFileUtil.closeFile(is);
         }
+        return null;
     }
-    private InputStream readRepresentation(FSRepresentation represnt, String repHeader) throws SVNException {
-        File revFile = getRevFile(represnt.getRevision());
+    
+    private static InputStream readRepresentation(FSRepresentation represnt, String repHeader, File reposRootDir) throws SVNException {
+        File revFile = FSRepositoryUtil.getRevisionFile(reposRootDir, represnt.getRevision());
         InputStream is = null;
         try{
             is = SVNFileUtil.openFileForReading(revFile);
@@ -160,26 +126,26 @@ public class FSReader {
             try{
                 readBytesFromStream(new Long(represnt.getOffset()).intValue(), is, null);
             }catch(IOException ioe){
-                throw new SVNException("svn: Can't set position pointer in file '" + revFile + "'");
+                SVNErrorManager.error("svn: Can't set position pointer in file '" + revFile + "': " + ioe.getMessage());
             }
             String header = null;
             try{
                 header = readSingleLine(is);
             }catch(FileNotFoundException fnfe){
-                throw new SVNException("svn: Can't open file '" + revFile.getAbsolutePath() + "'", fnfe);
+                SVNErrorManager.error("svn: Can't open file '" + revFile.getAbsolutePath() + "': " + fnfe.getMessage());
             } catch(IOException ioe){
-                throw new SVNException("svn: Can't read file '" + revFile.getAbsolutePath() + "'", ioe);
+                SVNErrorManager.error("svn: Can't read file '" + revFile.getAbsolutePath() + "': " + ioe.getMessage());
             }
             
             if(!repHeader.equals(header)){
-                throw new SVNException("svn: Malformed representation header in revision file '" + revFile.getAbsolutePath() + "'");
+                SVNErrorManager.error("svn: Malformed representation header in revision file '" + revFile.getAbsolutePath() + "'");
             }
             
             MessageDigest digest = null;
             try{
                 digest = MessageDigest.getInstance("MD5");
             }catch(NoSuchAlgorithmException nsae){
-                throw new SVNException("svn: Can't check the digest in revision file '" + revFile.getAbsolutePath() + "': "+nsae.getMessage());
+                SVNErrorManager.error("svn: Can't check the digest in revision file '" + revFile.getAbsolutePath() + "': " + nsae.getMessage());
             }
     
             ByteArrayOutputStream os = new ByteArrayOutputStream();
@@ -188,7 +154,7 @@ public class FSReader {
                 try{
                     readBytes += readBytesFromStream(1, is, os);
                 }catch(IOException ioe){
-                    throw new SVNException("svn: Can't read representation in revision file '" + revFile.getAbsolutePath() + "': " + ioe.getMessage());            
+                    SVNErrorManager.error("svn: Can't read representation in revision file '" + revFile.getAbsolutePath() + "': " + ioe.getMessage());            
                 }
             }
             byte[] bytes = os.toByteArray();
@@ -196,20 +162,14 @@ public class FSReader {
             
             // Compare read and expected checksums 
             if(!MessageDigest.isEqual(SVNFileUtil.fromHexDigest(represnt.getHexDigest()), digest.digest())){
-                throw new SVNException("svn: Checksum mismatch while reading representation:" + SVNFileUtil.getNativeEOLMarker() + 
+                SVNErrorManager.error("svn: Checksum mismatch while reading representation:" + SVNFileUtil.getNativeEOLMarker() + 
                         "   expected:  " + represnt.getHexDigest() + SVNFileUtil.getNativeEOLMarker() + 
                         "     actual:  " + SVNFileUtil.toHexDigest(digest));
             }
             
             return new ByteArrayInputStream(bytes);
         }finally{
-            if(is != null){
-                try{
-                    is.close();
-                }catch(IOException ioe){
-                    //
-                }
-            }
+            SVNFileUtil.closeFile(is);
         }
     }
     
@@ -218,7 +178,7 @@ public class FSReader {
      * for props representation - so, isProps is needed to differentiate
      * between text and props repreentation
      */
-    private Map parsePlainRepresentation(InputStream is, boolean isProps) throws IOException, SVNException{
+    private static Map parsePlainRepresentation(InputStream is, boolean isProps) throws IOException, SVNException{
         Map representationMap = new HashMap();
         ByteArrayOutputStream os = new ByteArrayOutputStream();
         while(readEntry('K', is, os)){
@@ -230,11 +190,11 @@ public class FSReader {
             String value = new String(os.toByteArray(), "UTF-8");
             os.reset();
             if(!isProps){
-                FSRepEntry nextRepEntry = null;
+                FSRepresentationEntry nextRepEntry = null;
                 try{
                     nextRepEntry = parseRepEntryValue(key, value);
                 }catch(SVNException svne){
-                    throw new SVNException("svn: Directory entry '" + key + "' corrupt");
+                    SVNErrorManager.error("svn: Directory entry '" + key + "' corrupt");
                 }
                 representationMap.put(key, nextRepEntry);
             }else{
@@ -245,7 +205,7 @@ public class FSReader {
         return representationMap;
     }
     
-    private FSRepEntry parseRepEntryValue(String name, String value) throws SVNException{
+    private static FSRepresentationEntry parseRepEntryValue(String name, String value) throws SVNException{
         String[] values = value.split(" ");
         if(values == null || values.length < 2){
             throw new SVNException();
@@ -257,7 +217,7 @@ public class FSReader {
         }
         
         FSID id = parseID(values[1], null);
-        return new FSRepEntry(id, type, name);
+        return new FSRepresentationEntry(id, type, name);
     }
 
     private static boolean readEntry(char type, InputStream is, OutputStream os) throws IOException {
@@ -315,14 +275,14 @@ public class FSReader {
         throw new IOException("malformed file format");
     }
     
-    public FSRevisionNode getRootRevNode(long revision) throws SVNException{
-        FSID id = new FSID(FSID.ID_INAPPLICABLE, FSID.ID_INAPPLICABLE, FSID.ID_INAPPLICABLE, revision, getRootOffset(revision));
-        return getRevNode(id);
+    public static FSRevisionNode getRootRevNode(File reposRootDir, long revision) throws SVNException{
+        FSID id = new FSID(FSID.ID_INAPPLICABLE, FSID.ID_INAPPLICABLE, FSID.ID_INAPPLICABLE, revision, getRootOffset(reposRootDir, revision));
+        return getRevNode(reposRootDir, id);
     }
     
     
-    public FSRevisionNode getRevNode(FSID id) throws SVNException{
-        File revFile = getRevFile(id.getRevision());
+    public static FSRevisionNode getRevNode(File reposRootDir, FSID id) throws SVNException{
+        File revFile = FSRepositoryUtil.getRevisionFile(reposRootDir, id.getRevision());//getRevFile(id.getRevision());
         
         FSRevisionNode revNode = new FSRevisionNode();
         long offset = id.getOffset();
@@ -332,19 +292,19 @@ public class FSReader {
         // Read the rev-node id.
         String revNodeId = (String)headers.get(HEADER_ID);
         if(revNodeId == null){
-            throw new SVNException("svn: Missing node-id in node-rev in revision file '" + revFile.getAbsolutePath() + "'");
+            SVNErrorManager.error("svn: Missing node-id in node-rev in revision file '" + revFile.getAbsolutePath() + "'");
         }
         
         try{
             revNode.setRevNodeID(parseID(revNodeId, null));
         }catch(SVNException svne){
-            throw new SVNException("svn: Corrupt node-id in node-rev in revision file '" + revFile.getAbsolutePath() + "'");
+            SVNErrorManager.error("svn: Corrupt node-id in node-rev in revision file '" + revFile.getAbsolutePath() + "'");
         }
 
         // Read the type. 
         SVNNodeKind nodeKind = SVNNodeKind.parseKind((String)headers.get(HEADER_TYPE));
         if(nodeKind == SVNNodeKind.NONE || nodeKind == SVNNodeKind.UNKNOWN){
-            throw new SVNException("svn: Missing kind field in node-rev in revision file '" + revFile.getAbsolutePath() + "'");
+            SVNErrorManager.error("svn: Missing kind field in node-rev in revision file '" + revFile.getAbsolutePath() + "'");
         }
         revNode.setType(nodeKind);
         
@@ -360,7 +320,7 @@ public class FSReader {
                     throw new NumberFormatException();
                 }
             }catch(NumberFormatException nfe){
-                throw new SVNException("svn: Corrupt count in node-rev in revision file '" + revFile.getAbsolutePath() + "'");
+                SVNErrorManager.error("svn: Corrupt count in node-rev in revision file '" + revFile.getAbsolutePath() + "'");
             }
             revNode.setCount(cnt);
         }
@@ -582,25 +542,13 @@ public class FSReader {
         }
     }
 
-    public long getRootOffset(long revision) throws SVNException{
-        Long rev = new Long(revision);
-        RootAndChangesOffsets offsets = (RootAndChangesOffsets)myOffsets.get(rev);
-
-        if(offsets == null){
-            offsets = readRootAndChangesOffset(revision);
-        }
-        
+    public static long getRootOffset(File reposRootDir, long revision) throws SVNException{
+        RootAndChangesOffsets offsets = readRootAndChangesOffset(reposRootDir, revision);
         return offsets.getRootOffset();
     }
     
-    public long getChangesOffset(long revision) throws SVNException{
-        Long rev = new Long(revision);
-        RootAndChangesOffsets offsets = (RootAndChangesOffsets)myOffsets.get(rev);
-        
-        if(offsets == null){
-            offsets = readRootAndChangesOffset(revision);
-        }
-        
+    public static long getChangesOffset(File reposRootDir, long revision) throws SVNException{
+        RootAndChangesOffsets offsets = readRootAndChangesOffset(reposRootDir, revision);
         return offsets.getChangesOffset();
     }
 
@@ -610,7 +558,11 @@ public class FSReader {
             return null;
         }
         
-        BufferedReader reader = openFileForReading(revFile);
+        InputStream is = SVNFileUtil.openFileForReading(revFile);
+        if (is == null) {
+            SVNErrorManager.error("svn: Can't open file '" + revFile.getAbsolutePath() + "'");
+        }
+        BufferedReader reader = new BufferedReader(new InputStreamReader(is));
         
         boolean isFirstLine = true;
         Map map = new HashMap();
@@ -634,7 +586,7 @@ public class FSReader {
                 map.put(localName, localValue.trim());
             }
         }finally{
-            closeFile(reader);
+            SVNFileUtil.closeFile(reader);
         }
         return map;
     }
@@ -645,21 +597,21 @@ public class FSReader {
         }
         
         if(!file.canRead() || !file.isFile()){
-            throw new SVNException("svn: Cannot read from '" + file + "': path refers to a directory or read access denied");
+            SVNErrorManager.error("svn: Cannot read from '" + file + "': path refers to a directory or read access denied");
         }
         
         RandomAccessFile revRAF = null;
         try{
             revRAF = new RandomAccessFile(file, "r");
         }catch(FileNotFoundException fnfe){
-            throw new SVNException("svn: Can't open file '" + file.getAbsolutePath() + "': " + fnfe.getMessage());
+            SVNErrorManager.error("svn: Can't open file '" + file.getAbsolutePath() + "': " + fnfe.getMessage());
         }
         
         long fileLength = -1;
         try{
             fileLength = revRAF.length();
         }catch(IOException ioe){
-            throw new SVNException("svn: Can't open file '" + file.getAbsolutePath() + "': " + ioe.getMessage());
+            SVNErrorManager.error("svn: Can't open file '" + file.getAbsolutePath() + "': " + ioe.getMessage());
         }
         
         if(pos == FILE_END_POS){
@@ -678,15 +630,9 @@ public class FSReader {
                 throw new IOException("eof unexpectedly found");
             }
         } catch (IOException ioe) {
-            throw new SVNException("svn: Can't read length line in file '" + file.getAbsolutePath() + "'", ioe);
+            SVNErrorManager.error("svn: Can't read length line in file '" + file.getAbsolutePath() + "': " + ioe.getMessage());
         } finally {
-            if(revRAF!=null){
-                try {
-                    revRAF.close();
-                } catch (IOException e) {
-                    //
-                }
-            }
+            SVNFileUtil.closeFile(revRAF);
         }
         
         ByteArrayOutputStream os = new ByteArrayOutputStream();
@@ -706,21 +652,20 @@ public class FSReader {
             os.write(buffer, 0, r);
             return r;
         } 
-        
         return (int)is.skip(bytesToRead);
     }
     
-    static String readNextLine(File file, BufferedReader reader, long skipBytes) throws SVNException{
+    public static String readNextLine(File file, BufferedReader reader, long skipBytes) throws SVNException{
         skipBytes = (skipBytes < 0) ? 0 : skipBytes;
         long skipped = -1;
         try{
             skipped = reader.skip(skipBytes);
         }catch(IOException ioe){
-            throw new SVNException("svn: Can't set position pointer in file '" + file.getAbsolutePath() + "'");
+            SVNErrorManager.error("svn: Can't set position pointer in file '" + file.getAbsolutePath() + "'");
         }
         
         if(skipped < skipBytes){
-            throw new SVNException("svn: Can't set position pointer in file '" + file.getAbsolutePath() + "'");
+            SVNErrorManager.error("svn: Can't set position pointer in file '" + file.getAbsolutePath() + "'");
         }
         
         String line = null;
@@ -728,28 +673,26 @@ public class FSReader {
         try{
             line = reader.readLine();
         }catch(IOException ioe){
-            throw new SVNException("svn: Can't read file ");
+            SVNErrorManager.error("svn: Can't read file ");
         }
         return line;
     }
     
     public static String readSingleLine(File file) throws SVNException {
-        if (!file.isFile() || !file.canRead()) {
-            throw new SVNException("svn: Can't open file '" + file.getAbsolutePath() + "'");
+        InputStream is = SVNFileUtil.openFileForReading(file);
+        if (is == null) {
+            SVNErrorManager.error("svn: Can't open file '" + file.getAbsolutePath() + "'");
         }
 
         BufferedReader reader = null;
         String line = null;
-        try {
-            reader = new BufferedReader(new FileReader(file));
+        try{
+            reader = new BufferedReader(new InputStreamReader(is));
             line = reader.readLine();
-        }catch(FileNotFoundException fnfe){
-            throw new SVNException("svn: Can't open file '" + file.getAbsolutePath() + "'", fnfe);
-        } catch(IOException ioe){
-            throw new SVNException("svn: Can't read file '" + file.getAbsolutePath() + "'", ioe);
-        }
-        finally {
-            closeFile(reader);
+        }catch(IOException ioe){
+            SVNErrorManager.error("svn: Can't read from file '" + file.getAbsolutePath() + "': " + ioe.getMessage());
+        }finally {
+            SVNFileUtil.closeFile(reader);
         }
         return line;
     }
@@ -764,43 +707,12 @@ public class FSReader {
             }
             os.write(b);
         }
-        
         return new String(os.toByteArray());
     }
 
-    static void closeFile(Reader is) {
-        if (is != null) {
-            try {
-                is.close();
-            } catch (IOException e) {
-                //
-            }
-        }
-    }
-    
-    static BufferedReader openFileForReading(File file) throws SVNException{
-        if (file == null || !file.isFile() || !file.canRead()) {
-            throw new SVNException("svn: Can't open file '" + file.getAbsolutePath() + "'");
-        }
-        BufferedReader reader = null;
-        try {
-            reader = new BufferedReader(new FileReader(file));
-        }catch(FileNotFoundException fnfe){
-            if(reader!=null){
-                try{
-                    reader.close();
-                }catch(IOException ioe){
-                    //
-                }
-            }
-            throw new SVNException("svn: Can't open file '" + file.getAbsolutePath() + "'");
-        }
-        return reader;
-    }
-    
-    private RootAndChangesOffsets readRootAndChangesOffset(long revision) throws SVNException{
-        File revFile = getRevFile(revision);
-        String eolBytes = new String(SVNTranslator.getEOL(SVNProperty.EOL_STYLE_NATIVE));
+    private static RootAndChangesOffsets readRootAndChangesOffset(File reposRootDir, long revision) throws SVNException{
+        File revFile =FSRepositoryUtil.getRevisionFile(reposRootDir, revision); //getRevFile(revision);
+        String eol = SVNFileUtil.getNativeEOLMarker();
         
         int size = 64;
         byte[] buffer = null;
@@ -812,44 +724,43 @@ public class FSReader {
              */
             buffer = readBytesFromFile(FILE_END_POS, -size, size, revFile);
         }catch(SVNException svne){
-            throw new SVNException(svne.getMessage() + eolBytes + "svn: No such revision " + revision);
+            SVNErrorManager.error(svne.getMessage() + eol + "svn: No such revision " + revision);
         }
         
         // The last byte should be a newline.
         if(buffer[buffer.length - 1] != '\n'){
-            throw new SVNException("svn: Revision file '" + revFile.getAbsolutePath() + "' lacks trailing newline");
+            SVNErrorManager.error("svn: Revision file '" + revFile.getAbsolutePath() + "' lacks trailing newline");
         }
         String bytesAsString = new String(buffer);
-        if(bytesAsString.indexOf('\n')==bytesAsString.lastIndexOf('\n')){
-            throw new SVNException("svn: Final line in revision file '" + revFile.getAbsolutePath() + "' is longer than 64 characters");
+        if(bytesAsString.indexOf('\n') == bytesAsString.lastIndexOf('\n')){
+            SVNErrorManager.error("svn: Final line in revision file '" + revFile.getAbsolutePath() + "' is longer than 64 characters");
         }
         String[] lines = bytesAsString.split("\n");
         String lastLine = lines[lines.length - 1];
         String[] offsetsValues = lastLine.split(" ");
         if(offsetsValues.length < 2){
-            throw new SVNException("svn: Final line in revision file '" + revFile.getAbsolutePath() + "' missing space");
+            SVNErrorManager.error("svn: Final line in revision file '" + revFile.getAbsolutePath() + "' missing space");
         }
         
         long rootOffset = -1;
         try{
             rootOffset = Long.parseLong(offsetsValues[0]);
         }catch(NumberFormatException nfe){
-            throw new SVNException("svn: Unparsable root offset number in revision file '" + revFile.getAbsolutePath() + "'");
+            SVNErrorManager.error("svn: Unparsable root offset number in revision file '" + revFile.getAbsolutePath() + "'");
         }
         
         long changesOffset = -1;
         try{
             changesOffset = Long.parseLong(offsetsValues[1]);
         }catch(NumberFormatException nfe){
-            throw new SVNException("svn: Unparsable changes offset number in revision file '" + revFile.getAbsolutePath() + "'");
+            SVNErrorManager.error("svn: Unparsable changes offset number in revision file '" + revFile.getAbsolutePath() + "'");
         }
         
         RootAndChangesOffsets offs = new RootAndChangesOffsets(rootOffset, changesOffset, revision);
-        myOffsets.put(offs.getRevObject(), offs);
         return offs;
     }
 
-    private class RootAndChangesOffsets{
+    private static class RootAndChangesOffsets{
         long changesOffset;
         long rootOffset;
         Long revision;

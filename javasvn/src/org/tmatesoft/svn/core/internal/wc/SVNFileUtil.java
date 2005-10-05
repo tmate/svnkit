@@ -23,6 +23,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.Reader;
 import java.io.Writer;
+import java.io.RandomAccessFile;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.nio.channels.FileChannel;
@@ -759,7 +760,18 @@ public class SVNFileUtil {
             //
         }
     }
-    
+
+    public static void closeFile(RandomAccessFile raf) {
+        if (raf == null) {
+            return;
+        }
+        try {
+            raf.close();
+        } catch (IOException e) {
+            //
+        }
+    }
+
     private static String execCommand(String[] commandLine) {
         return execCommand(commandLine, false);
     }
