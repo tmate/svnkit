@@ -65,15 +65,8 @@ public class SVNBasicClient implements ISVNEventHandler {
     private boolean myIsLeaveConflictsUnresolved;
 
     protected SVNBasicClient(final ISVNAuthenticationManager authManager, ISVNOptions options) {
-        this(new ISVNRepositoryFactory() {
-            public SVNRepository createRepository(SVNURL url) throws SVNException {
-                SVNRepository repository = SVNRepositoryFactory.create(url, null);
-                repository.setAuthenticationManager(authManager == null ? 
-                        SVNWCUtil.createDefaultAuthenticationManager() : authManager);
-                return repository;
-            }
-            
-        }, options);
+        this(new DefaultSVNRepositoryFactory(authManager == null ? SVNWCUtil.createDefaultAuthenticationManager() : authManager, 
+                true, DefaultSVNRepositoryFactory.RUNTIME_POOL), options);
     }
 
     protected SVNBasicClient(ISVNRepositoryFactory repositoryFactory, ISVNOptions options) {
@@ -199,16 +192,11 @@ public class SVNBasicClient implements ISVNEventHandler {
         return myIsDoNotSleepForTimeStamp;
     }
 
-    protected SVNRepository createRepository(String url) throws SVNException {
-        SVNURL svnURL = SVNURL.parseURIEncoded(url);
-        return createRepository(svnURL);
-    }
-
-    protected SVNRepository createRepository(SVNURL url) throws SVNException {
+    protected SVNRepository createRepository(SVNURL url, boolean mayReuse) throws SVNException {
         if (myRepositoryFactory == null) {
             return SVNRepositoryFactory.create(url, null);
         }
-        return myRepositoryFactory.createRepository(url);
+        return myRepositoryFactory.createRepository(url, mayReuse);
     }
     
     protected ISVNRepositoryFactory getRepositoryFactory() {
@@ -328,8 +316,12 @@ public class SVNBasicClient implements ISVNEventHandler {
         }
         return -1;
     }
-    
+
     protected SVNRepository createRepository(SVNURL url, File path, SVNRevision pegRevision, SVNRevision revision) throws SVNException {
+        return createRepository(url, path, pegRevision, revision, null);
+    }
+    
+    protected SVNRepository createRepository(SVNURL url, File path, SVNRevision pegRevision, SVNRevision revision, long[] pegRev) throws SVNException {
         if (url == null) {
             SVNURL pathURL = getURL(path);
             if (pathURL == null) {
@@ -339,31 +331,38 @@ public class SVNBasicClient implements ISVNEventHandler {
         if (!revision.isValid() && pegRevision.isValid()) {
             revision = pegRevision;
         }
+        SVNRevision startRevision = SVNRevision.UNDEFINED;
         if (path == null) {
             if (!revision.isValid()) {
-                revision = SVNRevision.HEAD;
-            } 
+                startRevision = SVNRevision.HEAD;
+            } else {
+                startRevision = revision;
+            }
             if (!pegRevision.isValid()) {
                 pegRevision = SVNRevision.HEAD;
             } 
         } else {
             if (!revision.isValid()) {
-                revision = SVNRevision.BASE;
-            } 
+                startRevision = SVNRevision.BASE;
+            }  else {
+                startRevision = revision;
+            }
             if (!pegRevision.isValid()) {
                 pegRevision = SVNRevision.WORKING;
             } 
         }
         
-        SVNRepositoryLocation[] locations = getLocations(url, path, pegRevision, revision, SVNRevision.UNDEFINED);
+        SVNRepositoryLocation[] locations = getLocations(url, path, pegRevision, startRevision, SVNRevision.UNDEFINED);
         url = locations[0].getURL();
         long actualRevision = locations[0].getRevisionNumber();
-        SVNRepository repository = createRepository(url);
+        SVNRepository repository = createRepository(url, true);
         actualRevision = getRevisionNumber(SVNRevision.create(actualRevision), repository, path);
         if (actualRevision < 0) {
             actualRevision = repository.getLatestRevision();
         }
-        repository.setPegRevision(actualRevision);
+        if (pegRev != null && pegRev.length > 0) {
+            pegRev[0] = actualRevision;
+        }
         return repository;
     }
     
@@ -390,9 +389,8 @@ public class SVNBasicClient implements ISVNEventHandler {
             } else {
                 SVNErrorManager.error("svn: '" + path + "' has no URL");
             }
-            SVNDebugLog.logInfo("fetched: " + url);
         }
-        SVNRepository repository = createRepository(url);
+        SVNRepository repository = createRepository(url, true);
         if (pegRevisionNumber < 0) {
             pegRevisionNumber = getRevisionNumber(revision, repository, path);
         }
@@ -401,6 +399,12 @@ public class SVNBasicClient implements ISVNEventHandler {
             endRevisionNumber = startRevisionNumber;
         } else {
             endRevisionNumber = getRevisionNumber(end, repository, path);
+        }
+        if (endRevisionNumber == pegRevisionNumber && startRevisionNumber == pegRevisionNumber) {
+            SVNRepositoryLocation[] result = new SVNRepositoryLocation[2];
+            result[0] = new SVNRepositoryLocation(url, startRevisionNumber);
+            result[1] = new SVNRepositoryLocation(url, endRevisionNumber);
+            return result;
         }
         SVNURL rootURL = repository.getRepositoryRoot(true);
         long[] revisionsRange = startRevisionNumber == endRevisionNumber ? 

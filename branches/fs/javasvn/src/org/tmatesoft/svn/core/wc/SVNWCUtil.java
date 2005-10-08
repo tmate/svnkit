@@ -11,6 +11,8 @@
 package org.tmatesoft.svn.core.wc;
 
 import java.io.File;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
 
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNProperty;
@@ -21,6 +23,7 @@ import org.tmatesoft.svn.core.internal.wc.SVNExternalInfo;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNProperties;
 import org.tmatesoft.svn.core.internal.wc.SVNWCAccess;
+import org.tmatesoft.svn.util.SVNDebugLog;
 
 /**
  * The <b>SVNWCUtil</b> is a utility class providing some common methods 
@@ -35,6 +38,8 @@ import org.tmatesoft.svn.core.internal.wc.SVNWCAccess;
  */
 public class SVNWCUtil {
     
+    private static final String ECLIPSE_AUTH_MANAGER_CLASSNAME = "org.tmatesoft.svn.core.internal.wc.EclipseSVNAuthenticationManager";
+
     /**
      * Gets the location of the default SVN's run-time configuration area
      * on the current machine. The result path depends on the platform
@@ -139,6 +144,21 @@ public class SVNWCUtil {
      *                    and servers configuration driver interface
      */
     public static ISVNAuthenticationManager createDefaultAuthenticationManager(File configDir, String userName, String password, boolean storeAuth) {
+        // check whether we are running inside Eclipse.
+        if (isEclipse()) {
+            // use reflection to allow compilation when there is no Eclipse.
+            try {
+                Class managerClass = SVNWCUtil.class.getClassLoader().loadClass(ECLIPSE_AUTH_MANAGER_CLASSNAME);
+                if (managerClass != null) {
+                    Constructor method = managerClass.getConstructor(new Class[] {File.class, Boolean.TYPE, String.class, String.class});
+                    if (method != null) {
+                        return (ISVNAuthenticationManager) method.newInstance(new Object[] {configDir, storeAuth ? Boolean.TRUE : Boolean.FALSE, userName, password});
+                    }
+                }
+            } catch (Throwable e) {
+                SVNDebugLog.logInfo(e);
+            } 
+        }
         return new DefaultSVNAuthenticationManager(configDir, storeAuth, userName, password);
     }
     
@@ -317,5 +337,18 @@ public class SVNWCUtil {
             return getWorkingCopyRoot(versionedDir.getParentFile(), stopOnExtenrals);
         }
         return versionedDir;
+    }
+    
+    private static boolean isEclipse() {
+        try {
+            Class platform = SVNWCUtil.class.getClassLoader().loadClass("org.eclipse.core.runtime.Platform");
+            Method isRunning = platform.getMethod("isRunning", new Class[0]);
+            Object result = isRunning.invoke(null, new Object[0]);
+            if (result != null && Boolean.TRUE.equals(result)) {
+                return true;
+            }
+        } catch (Throwable th) {
+        }
+        return false;
     }
 }

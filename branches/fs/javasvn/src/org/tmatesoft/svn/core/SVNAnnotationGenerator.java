@@ -119,7 +119,7 @@ public class SVNAnnotationGenerator implements ISVNFileRevisionHandler {
     }
 
     public void handleDiffWindowClosed(String token) throws SVNException {
-        if (!myDeltaProcessor.textDeltaEnd(myPreviousFile, myCurrentFile)) {
+        if (!myDeltaProcessor.textDeltaEnd(myPreviousFile, myCurrentFile, false)) {
             return;
         }
         if (myCurrentRevision >= myStartRevision) {
@@ -133,7 +133,7 @@ public class SVNAnnotationGenerator implements ISVNFileRevisionHandler {
                 ArrayList newLines = new ArrayList();
                 int lastStart = 0;
 
-                final QSequenceLineResult result = QSequenceLineMedia.createBlocks(new QSequenceLineRAFileData(left), new QSequenceLineRAFileData(right), new byte[0]);
+                final QSequenceLineResult result = QSequenceLineMedia.createBlocks(new QSequenceLineRAFileData(left), new QSequenceLineRAFileData(right), null);
                 try {
                     List blocksList = result.getBlocks();
                     for(int i = 0; i < blocksList.size(); i++) {

@@ -81,18 +81,18 @@ public class FSReader {
         return getProplist(revNode.getPropsRepresentation(), reposRootDir);
     }
     
-    private static Map getDirContents(FSRepresentation represnt, File reposRootDir) throws SVNException {
-        if(represnt == null){
+    private static Map getDirContents(FSRepresentation representation, File reposRootDir) throws SVNException {
+        if(representation == null){
             return null;
         }
         InputStream is = null;
         try{
-            is = readRepresentation(represnt, REP_PLAIN, reposRootDir);
+            is = readRepresentation(representation, REP_PLAIN, reposRootDir);
             return parsePlainRepresentation(is, false);
         }catch(IOException ioe){
-            SVNErrorManager.error("svn: Can't read representation in revision file '" + FSRepositoryUtil.getRevisionFile(reposRootDir, represnt.getRevision()).getAbsolutePath() + "': " + ioe.getMessage());
+            SVNErrorManager.error("svn: Can't read representation in revision file '" + FSRepositoryUtil.getRevisionFile(reposRootDir, representation.getRevision()).getAbsolutePath() + "': " + ioe.getMessage());
         }catch(SVNException svne){
-            SVNErrorManager.error("svn: Revision file '" + FSRepositoryUtil.getRevisionFile(reposRootDir, represnt.getRevision()).getAbsolutePath() + "' corrupt" + SVNFileUtil.getNativeEOLMarker() + svne.getMessage());
+            SVNErrorManager.error("svn: Revision file '" + FSRepositoryUtil.getRevisionFile(reposRootDir, representation.getRevision()).getAbsolutePath() + "' corrupt" + SVNFileUtil.getNativeEOLMarker() + svne.getMessage());
         }finally{
             SVNFileUtil.closeFile(is);
         }
@@ -117,14 +117,14 @@ public class FSReader {
         return null;
     }
     
-    private static InputStream readRepresentation(FSRepresentation represnt, String repHeader, File reposRootDir) throws SVNException {
-        File revFile = FSRepositoryUtil.getRevisionFile(reposRootDir, represnt.getRevision());
+    public static InputStream readRepresentation(FSRepresentation representation, String repHeader, File reposRootDir) throws SVNException {
+        File revFile = FSRepositoryUtil.getRevisionFile(reposRootDir, representation.getRevision());
         InputStream is = null;
         try{
             is = SVNFileUtil.openFileForReading(revFile);
             
             try{
-                readBytesFromStream(new Long(represnt.getOffset()).intValue(), is, null);
+                readBytesFromStream(new Long(representation.getOffset()).intValue(), is, null);
             }catch(IOException ioe){
                 SVNErrorManager.error("svn: Can't set position pointer in file '" + revFile + "': " + ioe.getMessage());
             }
@@ -150,7 +150,7 @@ public class FSReader {
     
             ByteArrayOutputStream os = new ByteArrayOutputStream();
             long readBytes = 0;
-            for(long i = 0; i < represnt.getSize(); i++){
+            for(long i = 0; i < representation.getSize(); i++){
                 try{
                     readBytes += readBytesFromStream(1, is, os);
                 }catch(IOException ioe){
@@ -161,9 +161,9 @@ public class FSReader {
             digest.update(bytes);
             
             // Compare read and expected checksums 
-            if(!MessageDigest.isEqual(SVNFileUtil.fromHexDigest(represnt.getHexDigest()), digest.digest())){
+            if(!MessageDigest.isEqual(SVNFileUtil.fromHexDigest(representation.getHexDigest()), digest.digest())){
                 SVNErrorManager.error("svn: Checksum mismatch while reading representation:" + SVNFileUtil.getNativeEOLMarker() + 
-                        "   expected:  " + represnt.getHexDigest() + SVNFileUtil.getNativeEOLMarker() + 
+                        "   expected:  " + representation.getHexDigest() + SVNFileUtil.getNativeEOLMarker() + 
                         "     actual:  " + SVNFileUtil.toHexDigest(digest));
             }
             
@@ -329,7 +329,7 @@ public class FSReader {
         String propsRepr = (String)headers.get(HEADER_PROPS);
         if(propsRepr != null){
             try{
-            parseRepresentation(propsRepr, revNode, false);
+            parseRepresentationHeader(propsRepr, revNode, false);
             }catch(SVNException svne){
                 throw new SVNException("svn: Malformed props rep offset line in node-rev '" + revFile.getAbsolutePath() + "'");
             }
@@ -339,7 +339,7 @@ public class FSReader {
         String textRepr = (String)headers.get(HEADER_TEXT);
         if(textRepr != null){
             try{
-                parseRepresentation(textRepr, revNode, true);
+                parseRepresentationHeader(textRepr, revNode, true);
             }catch(SVNException svne){
                 throw new SVNException("svn: Malformed text rep offset line in node-rev '" + revFile.getAbsolutePath() + "'");
             }
@@ -480,7 +480,7 @@ public class FSReader {
     }
 
     //isData - if true - text, otherwise - props
-    public static void parseRepresentation(String representation, FSRevisionNode revNode, boolean isData) throws SVNException{
+    public static void parseRepresentationHeader(String representation, FSRevisionNode revNode, boolean isData) throws SVNException{
         if(revNode == null){
             return;
         }

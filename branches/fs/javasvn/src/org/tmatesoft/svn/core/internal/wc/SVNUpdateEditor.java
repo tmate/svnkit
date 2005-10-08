@@ -26,6 +26,7 @@ import org.tmatesoft.svn.core.io.ISVNEditor;
 import org.tmatesoft.svn.core.io.diff.SVNDiffWindow;
 import org.tmatesoft.svn.core.wc.SVNEventAction;
 import org.tmatesoft.svn.core.wc.SVNStatusType;
+import org.tmatesoft.svn.util.SVNDebugLog;
 
 /**
  * @version 1.0
@@ -136,7 +137,7 @@ public class SVNUpdateEditor implements ISVNEditor {
         File file = parentDir.getFile(name);
         if (file.exists()) {
             SVNErrorManager.error("svn: Failed to add directory '" + path + "': object of the same name already exists");
-        } else if (".svn".equals(name)) {
+        } else if (SVNFileUtil.getAdminDirectoryName().equals(name)) {
             SVNErrorManager.error("svn: Failed to add directory '" + path + "': object of the same name as the administrative directory");
         }
         SVNEntry entry = parentDir.getEntries().getEntry(name, true);
@@ -156,6 +157,8 @@ public class SVNUpdateEditor implements ISVNEditor {
         if (dir == null) {
             SVNErrorManager.error("svn: Failed to add directory '" + path + "': directory is missing or not locked");
         } else {
+            dir.getEntries().getEntry("", false).setIncomplete(true);
+            dir.getEntries().save(true);
             dir.lock();
         }
         myWCAccess.handleEvent(SVNEventFactory.createUpdateAddEvent(myWCAccess, parentDir, SVNNodeKind.DIR, entry));
@@ -323,7 +326,8 @@ public class SVNUpdateEditor implements ISVNEditor {
     public void textDeltaEnd(String commitPath) throws SVNException {
         File baseTmpFile = myCurrentFile.getDirectory().getBaseFile(myCurrentFile.Name, true);
         File targetFile = myCurrentFile.getDirectory().getBaseFile(myCurrentFile.Name + ".tmp", true);
-        if (myDeltaProcessor.textDeltaEnd(baseTmpFile, targetFile)) {
+        if (myDeltaProcessor.textDeltaEnd(baseTmpFile, targetFile, true)) {
+            myCurrentFile.Checksum = myDeltaProcessor.getChecksum();
             SVNFileUtil.rename(targetFile, baseTmpFile);
         }
     }
@@ -334,7 +338,7 @@ public class SVNUpdateEditor implements ISVNEditor {
         String checksum = null;
         if (textChecksum != null && myCurrentFile.TextUpdated) {            
             File baseTmpFile = myCurrentFile.getDirectory().getBaseFile(myCurrentFile.Name, true);
-            checksum = SVNFileUtil.computeChecksum(baseTmpFile);            
+            checksum = myCurrentFile.Checksum != null ? myCurrentFile.Checksum : SVNFileUtil.computeChecksum(baseTmpFile);            
             if (!textChecksum.equals(checksum)) {
                 SVNErrorManager.error("svn: Checksum differs, expected '" + textChecksum + "'; actual: '" + checksum + "'");
             }
@@ -372,8 +376,10 @@ public class SVNUpdateEditor implements ISVNEditor {
 
         // merge contents.
         File textTmpBase = dir.getBaseFile(name, true);
-        String tmpPath = ".svn/tmp/text-base/" + name + ".svn-base";
-        String basePath = ".svn/text-base/" + name + ".svn-base";
+        String adminDir = SVNFileUtil.getAdminDirectoryName();
+
+        String tmpPath = adminDir + "/tmp/text-base/" + name + ".svn-base";
+        String basePath = adminDir + "/text-base/" + name + ".svn-base";
         File workingFile = dir.getFile(name);
 
         if (!myCurrentFile.TextUpdated && magicPropsChanged && workingFile.exists()) {
@@ -544,7 +550,11 @@ public class SVNUpdateEditor implements ISVNEditor {
         for (Iterator children = childDirectories.keySet().iterator(); children.hasNext();) {
             SVNDirectory child = (SVNDirectory) children.next();
             String childURL = (String) childDirectories.get(child);
-            bumpDirectory(child, childURL);
+            if (child != null) {
+                bumpDirectory(child, childURL);
+            } else {
+                SVNDebugLog.logInfo("svn: Directory object is null in bump directories method");
+            }
         }
     }
 
@@ -721,6 +731,7 @@ public class SVNUpdateEditor implements ISVNEditor {
         public String Name;
         public String CommitTime;
         public boolean TextUpdated;
+        public String Checksum;
 
         public SVNFileInfo(SVNDirectoryInfo parent, String path) {
             super(path);

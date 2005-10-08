@@ -12,7 +12,6 @@ package org.tmatesoft.svn.core.internal.wc;
 
 import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
@@ -78,6 +77,10 @@ public class SVNEntries {
                     continue;
                 }
                 if (entry != null) {
+                    if (line.indexOf('=') <= 0 || line.indexOf('\"') <= 0 || 
+                            line.indexOf('\"') == line.lastIndexOf('\"')) {
+                        continue;
+                    }
                     String name = line.substring(0, line.indexOf('='));
                     String value = line.substring(line.indexOf('\"') + 1, 
                             line.lastIndexOf('\"'));
@@ -130,7 +133,7 @@ public class SVNEntries {
         File tmpFile = new File(myFile.getParentFile(), "tmp/entries");
         Map rootEntry = (Map) myData.get("");
         try {
-            os = new OutputStreamWriter(new FileOutputStream(tmpFile), "UTF-8");
+            os = new OutputStreamWriter(SVNFileUtil.openFileForWriting(tmpFile), "UTF-8");
             os.write("<?xml version=\"1.0\" encoding=\"utf-8\"?>\n");
             os.write("<wc-entries\n");
             os.write("   xmlns=\"svn:\">\n");
@@ -191,14 +194,9 @@ public class SVNEntries {
             tmpFile.delete();
             SVNErrorManager.error("svn: Cannot save entries file '" + myFile + "'");
         } finally {
-            if (os != null) {
-                try {
-                    os.close();
-                } catch (IOException e) {
-                    //
-                }
-            }
+            SVNFileUtil.closeFile(os);
         }
+        
         SVNFileUtil.rename(tmpFile, myFile);
         SVNFileUtil.setReadonly(myFile, true);
         if (close) {

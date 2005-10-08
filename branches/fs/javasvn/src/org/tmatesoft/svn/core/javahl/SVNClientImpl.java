@@ -18,6 +18,7 @@ import org.tigris.subversion.javahl.CommitMessage;
 import org.tigris.subversion.javahl.DirEntry;
 import org.tigris.subversion.javahl.Info;
 import org.tigris.subversion.javahl.Info2;
+import org.tigris.subversion.javahl.JavaHLObjectFactory;
 import org.tigris.subversion.javahl.LogMessage;
 import org.tigris.subversion.javahl.Notify;
 import org.tigris.subversion.javahl.Notify2;
@@ -28,11 +29,11 @@ import org.tigris.subversion.javahl.Revision;
 import org.tigris.subversion.javahl.SVNClient;
 import org.tigris.subversion.javahl.SVNClientInterface;
 import org.tigris.subversion.javahl.SVNClientLogLevel;
-import org.tigris.subversion.javahl.JavaHLObjectFactory;
 import org.tigris.subversion.javahl.Status;
 import org.tmatesoft.svn.core.ISVNDirEntryHandler;
 import org.tmatesoft.svn.core.ISVNLogEntryHandler;
 import org.tmatesoft.svn.core.SVNCancelException;
+import org.tmatesoft.svn.core.SVNCommitInfo;
 import org.tmatesoft.svn.core.SVNDirEntry;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNLogEntry;
@@ -44,6 +45,7 @@ import org.tmatesoft.svn.core.internal.io.svn.SVNJSchSession;
 import org.tmatesoft.svn.core.internal.io.svn.SVNRepositoryFactoryImpl;
 import org.tmatesoft.svn.core.internal.util.SVNFormatUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
+import org.tmatesoft.svn.core.wc.DefaultSVNRepositoryFactory;
 import org.tmatesoft.svn.core.wc.ISVNAnnotateHandler;
 import org.tmatesoft.svn.core.wc.ISVNCommitHandler;
 import org.tmatesoft.svn.core.wc.ISVNEventHandler;
@@ -54,6 +56,7 @@ import org.tmatesoft.svn.core.wc.ISVNStatusHandler;
 import org.tmatesoft.svn.core.wc.SVNClientManager;
 import org.tmatesoft.svn.core.wc.SVNCommitClient;
 import org.tmatesoft.svn.core.wc.SVNCommitItem;
+import org.tmatesoft.svn.core.wc.SVNCommitPacket;
 import org.tmatesoft.svn.core.wc.SVNCopyClient;
 import org.tmatesoft.svn.core.wc.SVNDiffClient;
 import org.tmatesoft.svn.core.wc.SVNEvent;
@@ -83,7 +86,7 @@ public class SVNClientImpl implements SVNClientInterface {
     private ISVNOptions myOptions;
     private boolean myCancelOperation = false;
     private SVNClientManager myClientManager;
-    private SVNClient myOwner;
+    private SVNClientInterface myOwner;
     
     private ISVNAuthenticationManager myAuthenticationManager;
     private static final ISVNAuthenticationStorage ourAuthStorage = new JavaHLAuthenticationStorage();
@@ -104,7 +107,7 @@ public class SVNClientImpl implements SVNClientInterface {
         DAVRepositoryFactory.setup();
         SVNRepositoryFactoryImpl.setup();
         myConfigDir = SVNWCUtil.getDefaultConfigurationDirectory().getAbsolutePath();
-        myOwner = owner;
+        myOwner = owner == null ? (SVNClientInterface) this : (SVNClientInterface) owner;
     }
 
     public String getLastPath() {
@@ -383,6 +386,43 @@ public class SVNClientImpl implements SVNClientInterface {
             throwException(e);
         }
         return -1;
+    }
+
+    public long[] commit(String[] path, String message, boolean recurse, boolean noUnlock, boolean atomicCommit) throws ClientException {
+        if(path == null || path.length == 0){
+            return new long[0];
+        }
+        SVNCommitClient client = getSVNCommitClient();
+        File[] files = new File[path.length];
+        for (int i = 0; i < path.length; i++) {
+            files[i] = new File(path[i]).getAbsoluteFile();
+        }
+        SVNCommitPacket[] packets = null;
+        SVNCommitInfo[] commitResults = null;
+        try {
+            if(myMessageHandler != null){
+                client.setCommitHander(new ISVNCommitHandler(){
+                    public String getCommitMessage(String cmessage, SVNCommitItem[] commitables) {
+                        CommitItem[] items = JavaHLObjectFactory.getCommitItems(commitables);
+                        return myMessageHandler.getLogMessage(items);
+                    }
+                });
+            }
+            packets = client.doCollectCommitItems(files, noUnlock, !recurse, recurse, atomicCommit);
+            commitResults = client.doCommit(packets, noUnlock, message);
+        } catch (SVNException e) {
+            throwException(e);
+        }
+        if (commitResults != null && commitResults.length > 0) {
+            long[] revisions = new long[commitResults.length];
+            for (int i = 0; i < commitResults.length; i++) {
+                SVNCommitInfo result = commitResults[i];
+                revisions[i] = result.getNewRevision();
+            }
+            return revisions;
+            
+        }
+        return new long[0];
     }
 
     public void copy(String srcPath, String destPath, String message, Revision revision) throws ClientException {
@@ -877,6 +917,7 @@ public class SVNClientImpl implements SVNClientInterface {
 
     public void dispose() {
         SVNJSchSession.shutdown();
+        new DefaultSVNRepositoryFactory(null).shutdownConnections(true);
     }
 
     public void setConfigDirectory(String configDir) throws ClientException {
@@ -1021,7 +1062,7 @@ public class SVNClientImpl implements SVNClientInterface {
                     if (path != null) {
                         path = path.replace(File.separatorChar, '/');
                     }
-                    if(myNotify != null){
+                    if(myNotify != null && event.getErrorMessage() == null){
                         myNotify.onNotify(
                                 path,
                                 JavaHLObjectFactory.getNotifyActionValue(event.getAction()),
@@ -1052,7 +1093,7 @@ public class SVNClientImpl implements SVNClientInterface {
     protected SVNClientManager getClientManager() {
         if (myClientManager == null) {
             updateClientManager();
-            myClientManager = SVNClientManager.newInstance(myOptions, myAuthenticationManager);
+            myClientManager = SVNClientManager.newInstance(myOptions, new DefaultSVNRepositoryFactory(myAuthenticationManager));
             myClientManager.setEventHandler(getEventListener());
         }
         return myClientManager;

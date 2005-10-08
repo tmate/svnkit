@@ -128,12 +128,12 @@ public class Commit {
         /*
          * Default values:
          */
-        String url = "svn://localhost/rep";
+        String url = "svn://localhost/testRep";
         String name = "userName";
         String password = "userPassword";
-        String dirPath = "/test";
-        String filePath = "/test/myTemp.txt";
-        String copyPath = "/testCopy";
+        String dirPath = "test";
+        String filePath = "test/myTemp.txt";
+        String copyPath = "testCopy";
         String commitMessage = "adding a new directory with a file!";
         /*
          * This is the text of the file to be created in the repository.
@@ -570,10 +570,12 @@ public class Commit {
         /*
          * Creating  a  new  diff  window  (provided  the  size  of the delta  - 
          * deltaLength) that will contain instructions of applying the delta  to
-         * the file in the repository.
+         * the file in  the  repository.  This  diff  window  will  replace  the 
+         * original text by a new one.
          */
         SVNDiffWindow diffWindow = SVNDiffWindowBuilder
                 .createReplacementDiffWindow(deltaLength);
+
         /*
          * Gets an OutputStream where the delta will be written to.
          */

@@ -208,7 +208,7 @@ public class SVNCopyClient extends SVNBasicClient {
         if ("".equals(srcPath) && isMove) {
             SVNErrorManager.error("svn: Cannot move URL '" + srcURL + "' into itself");
         }
-        SVNRepository repository = createRepository(topURL);
+        SVNRepository repository = createRepository(topURL, true);
         long srcRevNumber = getRevisionNumber(srcRevision, repository, null);
         long latestRevision = repository.getLatestRevision();
         
@@ -257,6 +257,9 @@ public class SVNCopyClient extends SVNBasicClient {
             SVNDebugLog.logInfo(e);
             SVNErrorManager.error("svn: " + e.getMessage());
         }
+        if (result != null && result.getNewRevision() >= 0) { 
+            dispatchEvent(SVNEventFactory.createCommitCompletedEvent(null, result.getNewRevision()), ISVNEventHandler.UNKNOWN);
+        }
         return result != null ? result : SVNCommitInfo.NULL;
     }
     
@@ -303,7 +306,7 @@ public class SVNCopyClient extends SVNBasicClient {
         String dstTarget = SVNPathUtil.tail(dstURL.toString());
         dstTarget = SVNEncodingUtil.uriDecode(dstTarget);
         
-        SVNRepository repository = createRepository(dstAnchorURL);
+        SVNRepository repository = createRepository(dstAnchorURL, true);
         SVNNodeKind dstKind = repository.checkPath(dstTarget, -1);
         if (dstKind == SVNNodeKind.DIR) {
             dstURL = dstURL.appendPath(srcPath.getName(), false);
@@ -335,16 +338,19 @@ public class SVNCopyClient extends SVNBasicClient {
             SVNCommitUtil.harvestCommitables(commitables, wcAccess.getTarget(), srcPath, null, entry, dstURL.toString(), entry.getURL(), 
                     true, false, false, null, true);
             items = (SVNCommitItem[]) commitables.values().toArray(new SVNCommitItem[commitables.values().size()]);
+            for (int i = 0; i < items.length; i++) {
+                items[i].setWCAccess(wcAccess);
+            }
             
             commitables = new TreeMap();
             dstURL = SVNURL.parseURIEncoded(SVNCommitUtil.translateCommitables(items, commitables));
 
-            repository = createRepository(dstURL);
-            SVNCommitMediator mediator = new SVNCommitMediator(wcAccess, commitables);
+            repository = createRepository(dstURL, true);
+            SVNCommitMediator mediator = new SVNCommitMediator(commitables);
             tmpFiles = mediator.getTmpFiles();
 
             commitEditor = repository.getCommitEditor(commitMessage, null, false, mediator);
-            info = SVNCommitter.commit(wcAccess, tmpFiles, commitables, repository.getRepositoryRoot(true).getPath(), commitEditor);
+            info = SVNCommitter.commit(tmpFiles, commitables, repository.getRepositoryRoot(true).getPath(), commitEditor);
             commitEditor = null;
         } finally {
             if (tmpFiles != null) {
@@ -359,6 +365,9 @@ public class SVNCopyClient extends SVNBasicClient {
             if (wcAccess != null) {
                 wcAccess.close(false);
             }
+        }
+        if (info != null && info.getNewRevision() >= 0) { 
+            dispatchEvent(SVNEventFactory.createCommitCompletedEvent(null, info.getNewRevision()), ISVNEventHandler.UNKNOWN);
         }
         return info != null ? info : SVNCommitInfo.NULL;
     }
@@ -384,7 +393,7 @@ public class SVNCopyClient extends SVNBasicClient {
      *                        </ul>
      */
     public long doCopy(SVNURL srcURL, SVNRevision srcRevision, File dstPath) throws SVNException {
-        SVNRepository repository = createRepository(srcURL);
+        SVNRepository repository = createRepository(srcURL, true);
         if (!srcRevision.isValid()) {
             srcRevision = SVNRevision.HEAD;
         }

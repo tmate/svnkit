@@ -12,10 +12,12 @@
          <export name="*"/>
       </library>
       <library name="contrib/jsch/jsch.jar"/>
+      <library name="contrib/jsch/ganymed.jar"/>
       <library name="contrib/junit/junit.jar"/>
    </runtime>
    <requires>
       <import plugin="org.eclipse.core.runtime"/>
+      <import plugin="org.eclipse.swt"/>
    </requires>
 
 </plugin>

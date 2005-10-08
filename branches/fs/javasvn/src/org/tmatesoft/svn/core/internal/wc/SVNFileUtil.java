@@ -20,15 +20,16 @@ import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.Reader;
 import java.io.Writer;
 import java.io.RandomAccessFile;
-import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.nio.channels.FileChannel;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.Properties;
 import java.util.StringTokenizer;
 
 import org.tmatesoft.svn.core.SVNException;
@@ -58,6 +59,7 @@ public class SVNFileUtil {
     private static String ourGroupID;
     private static String ourUserID;
     private static File ourAppDataPath;
+    private static String ourAdminDirectoryName;
     private static final String BINARY_MIME_TYPE = "application/octet-stream";
 
     static {
@@ -70,7 +72,7 @@ public class SVNFileUtil {
         File base = file.getParentFile();
         while (base != null) {
             if (base.isDirectory()) {
-                File adminDir = new File(base, ".svn");
+                File adminDir = new File(base, getAdminDirectoryName());
                 if (adminDir.exists() && adminDir.isDirectory()) {
                     break;
                 }
@@ -113,38 +115,49 @@ public class SVNFileUtil {
     }
 
     public static void rename(File src, File dst) throws SVNException {
-        boolean renamed = src.renameTo(dst);
-        if (renamed) {
-            return;
-        }
         if (!src.exists() && !isSymlink(src)) {
-            SVNErrorManager.error("svn: Cannot rename file '"
-                    + src.getAbsolutePath() + "' : file doesn't exist");
+            SVNErrorManager.error("svn: Cannot rename file '" + src.getAbsolutePath() + "' : file does not exist");
         }
         if (dst.isDirectory()) {
-            SVNErrorManager.error("svn: Cannot overwrite file '"
-                    + dst.getAbsolutePath() + "' : it is a directory");
+            SVNErrorManager.error("svn: Cannot overwrite file '" + dst.getAbsolutePath() + "' : it is a directory");
+        }
+        boolean renamed = false;
+        if (!isWindows) {
+            renamed = src.renameTo(dst);
+        } else {
+            boolean wasRO = dst.exists() && !dst.canWrite();
+            setReadonly(src, false);
+            setReadonly(dst, false);
+            // use special loop on windows.
+            int retries = 100;
+            long delay = 1;
+            while(retries > 0) {
+                dst.delete();
+                if (src.renameTo(dst)) {
+                    if (wasRO) {
+                        dst.setReadOnly();
+                    }
+                    return;
+                }
+                SVNDebugLog.logInfo("file: retrying to rename file " + src + " to " + dst);
+                try {
+                    Thread.sleep(delay*100);
+                } catch (InterruptedException e) {
+                }
+                if (delay < 128) {
+                    delay = delay * 2;
+                }
+                retries--;            
+            }
         }
         if (!renamed) {
-            if (dst.exists()) {
-                boolean deleted = dst.delete();
-                if (!deleted && dst.exists()) {
-                    SVNErrorManager.error("svn: Cannot overwrite file '"
-                            + dst.getAbsolutePath() + "'");
-                }
-            }
-            if (!src.renameTo(dst)) {
-                SVNErrorManager.error("svn: Cannot rename file '"
-                        + src.getAbsolutePath() + "'");
-            }
+            SVNErrorManager.error("svn: Cannot rename file '" + src.getAbsolutePath() + "'");
         }
     }
 
-    public static boolean setReadonly(File file, boolean readonly)
-            throws SVNException {
+    public static boolean setReadonly(File file, boolean readonly) {
         if (!file.exists()) {
-            SVNErrorManager.error("svn: Cannot change file RO state '"
-                    + file.getAbsolutePath() + "' : file doesn't exist");
+            return false;
         }
         if (readonly) {
             return file.setReadOnly();
@@ -152,9 +165,25 @@ public class SVNFileUtil {
         if (file.canWrite()) {
             return true;
         }
-        File tmpFile = createUniqueFile(file.getParentFile(), file.getName(), ".tmp");
-        copyFile(file, tmpFile, false);
-        rename(tmpFile, file);
+        try {
+            if (file.length() < 1024*100) {
+                // faster way for small files.
+                File tmp = createUniqueFile(file.getParentFile(), file.getName(), ".ro");
+                copyFile(file, tmp, false);
+                copyFile(tmp, file, false);
+                deleteFile(tmp);
+            } else {
+                if (isWindows) {
+                    Process p = Runtime.getRuntime().exec("attrib -R \"" + file.getAbsolutePath() + "\"");
+                    p.waitFor();
+                } else {
+                    execCommand(new String[] { "chmod", "ugo+w", file.getAbsolutePath() });
+                }
+            }
+        } catch (Throwable th) {
+            SVNDebugLog.logInfo(th);
+            return false;
+        }
         return true;
     }
 
@@ -163,8 +192,7 @@ public class SVNFileUtil {
             return;
         }
         try {
-            execCommand(new String[] { "chmod", executable ? "ugo+x" : "ugo-x",
-                    file.getAbsolutePath() });
+            execCommand(new String[] { "chmod", executable ? "ugo+x" : "ugo-x", file.getAbsolutePath() });
         } catch (Throwable th) {
             SVNDebugLog.logInfo(th);
         }
@@ -240,8 +268,7 @@ public class SVNFileUtil {
             dstChannel = new FileOutputStream(tmpDst).getChannel();
             long count = srcChannel.size();
             while (count > 0) {
-                count -= dstChannel.transferFrom(srcChannel, 0, srcChannel
-                        .size());
+                count -= dstChannel.transferFrom(srcChannel, 0, srcChannel.size());
             }
         } catch (IOException e) {
             SVNErrorManager.error("svn: Cannot copy file '" + src + "' to '" + dst + "'");
@@ -444,7 +471,6 @@ public class SVNFileUtil {
       catch (SVNException e) {
         // should never happen as cancell handler is null.
       }
-
     }
 
     public static void deleteAll(File dir, boolean deleteDirs, ISVNEventHandler cancelBaton) throws SVNException {
@@ -467,13 +493,39 @@ public class SVNFileUtil {
         if (dir.isDirectory() && !deleteDirs) {
             return;
         }
-        dir.delete();
+        deleteFile(dir);
+    }
+    
+    public static void deleteFile(File file) {
+        if (!isWindows || file.isDirectory() || !file.exists()) {
+            file.delete();
+            return;
+        }
+        // use special loop on windows.
+        int retries = 100;
+        long delay = 1;
+        while(retries > 0) {
+            if (file.delete()) {
+                return;
+            }
+            if (!file.exists()) {
+                return;
+            }
+            setReadonly(file, false);
+            try {
+                Thread.sleep(delay*100);
+            } catch (InterruptedException e) {
+            }
+            if (delay < 128) {
+                delay = delay * 2;
+            }
+            retries--;            
+        }
     }
 
     private static String readSingleLine(File file) throws IOException {
         if (!file.isFile() || !file.canRead()) {
-            throw new IOException("can't open file '" + file.getAbsolutePath()
-                    + "'");
+            throw new IOException("can't open file '" + file.getAbsolutePath() + "'");
         }
         BufferedReader reader = null;
         String line = null;
@@ -670,7 +722,7 @@ public class SVNFileUtil {
             if (cancel != null) {
                 cancel.checkCancelled();
             }
-            if (!copyAdminDir && file.getName().equals(".svn")) {
+            if (!copyAdminDir && file.getName().equals(getAdminDirectoryName())) {
                 continue;
             }
             SVNFileType fileType = SVNFileType.getType(file);
@@ -684,7 +736,7 @@ public class SVNFileUtil {
                 }
             } else if (fileType == SVNFileType.DIRECTORY) {
                 copyDirectory(file, dst, copyAdminDir, cancel);
-                if (file.isHidden() || ".svn".equals(file.getName())) {
+                if (file.isHidden() || getAdminDirectoryName().equals(file.getName())) {
                     setHidden(dst, true);
                 }
             } else if (fileType == SVNFileType.SYMLINK) {
@@ -855,41 +907,82 @@ public class SVNFileUtil {
         }
     }
     
+    public static String getAdminDirectoryName() {
+        if (ourAdminDirectoryName == null) {
+            String defaultAdminDir = ".svn";
+            if (getEnvironmentVariable("SVN_ASP_DOT_NET_HACK") != null){
+                defaultAdminDir = "_svn";
+            }
+            ourAdminDirectoryName = System.getProperty("javasvn.admindir", defaultAdminDir);
+            if (ourAdminDirectoryName == null || "".equals(ourAdminDirectoryName.trim())) {
+                ourAdminDirectoryName = defaultAdminDir;
+            }
+        }
+        return ourAdminDirectoryName;
+    }
+    
+    public static void setAdminDirectoryName(String name) {
+        ourAdminDirectoryName = name;
+    }
+    
     public static File getApplicationDataPath() {
         if (ourAppDataPath != null) {
             return ourAppDataPath;
         }
-        Method getEnvMethod = null;
-        try {
-            getEnvMethod = System.class.getMethod("getenv", new Class[] {String.class});
-        } catch (SecurityException e) {
-        } catch (NoSuchMethodException e) {
-        }
-        if (getEnvMethod != null) {
-            try {
-                String path = (String) getEnvMethod.invoke(null, new Object[] {"APPDATA"});
-                if (path != null) {
-                    ourAppDataPath = new File(path);
-                    return new File(path);
-                }
-            } catch (IllegalArgumentException e) {
-            } catch (IllegalAccessException e) {
-            } catch (InvocationTargetException e) {
-            }
-        }
-        if (ourAppDataPath == null) {
-            String[] cmd = new String[] {"cmd.exe", "/D", "/C", "set", "APPDATA"};
-            String result = execCommand(cmd, true);
-            if (result != null && result.startsWith("APPDATA=")) {
-                result = result.substring("APPDATA=".length());
-                if (result.indexOf("\r") >= 0) {
-                    result = result.substring(0, result.indexOf("\r"));
-                }
-                ourAppDataPath = new File(result.trim());
-            } else {
-                ourAppDataPath = new File(new File(System.getProperty("user.home")), "Application Data");
-            }
+        String envAppData = getEnvironmentVariable("APPDATA");
+        if (envAppData == null) {
+            ourAppDataPath = new File(new File(System.getProperty("user.home")), "Application Data");
+        } else {
+            ourAppDataPath = new File(envAppData);
         }
         return ourAppDataPath;
+    }
+    
+    public static String getEnvironmentVariable(String name) {
+        try {
+            // pre-Java 1.5 this throws an Error.  On Java 1.5 it
+            // returns the environment variable
+            Method getenv = System.class.getMethod("getenv", new Class[] {String.class});
+            if (getenv != null) {
+                Object value = getenv.invoke(null, new Object[] {name});
+                if (value instanceof String) {
+                    return (String) value;
+                }
+            }            
+        } catch(Throwable e) {
+            try {
+                // This means we are on 1.4.  Get all variables into
+                // a Properties object and get the variable from that
+                return getEnvironment().getProperty(name);
+            } catch (Throwable e1) {
+                return null;
+            }
+        }
+        return null;
+    }
+
+    public static Properties getEnvironment() throws Throwable {
+        Process p = null;
+        Properties envVars = new Properties();
+        Runtime r = Runtime.getRuntime();
+        if (isWindows) {
+            if (System.getProperty("os.name").toLowerCase().indexOf("windows 9") >= 0) 
+                p = r.exec( "command.com /c set" );
+            else
+                p = r.exec( "cmd.exe /c set" );
+        } else {
+            p = r.exec( "env" );
+        }
+        if (p != null) {
+            BufferedReader br = new BufferedReader(new InputStreamReader(p.getInputStream()));
+            String line;
+            while( (line = br.readLine()) != null ) {
+                int idx = line.indexOf( '=' );
+                String key = line.substring( 0, idx );
+                String value = line.substring( idx+1 );
+                envVars.setProperty( key, value );
+            }
+        }
+        return envVars;
     }
 }
