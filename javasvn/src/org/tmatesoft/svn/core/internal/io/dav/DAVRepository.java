@@ -417,17 +417,17 @@ class DAVRepository extends SVNRepository {
     
     private void openConnection() throws SVNException {
         lock();
-        if (getOptions().keepConnection() && myConnection != null) {
+        if (getOptions().keepConnection(this) && myConnection != null) {
             return;
         }
         if (myConnection == null) {
-            myConnection = new DAVConnection(myConnectionFactory, getLocation());
+            myConnection = new DAVConnection(myConnectionFactory, this);
         }
         myConnection.open(this);
     }
 
     private void closeConnection() {
-        if (getOptions().keepConnection()) {
+        if (getOptions().keepConnection(this)) {
             unlock();
             return;
         }
@@ -513,7 +513,7 @@ class DAVRepository extends SVNRepository {
     }
 
     public void diff(SVNURL url, long revision, String target, boolean ignoreAncestry, boolean recursive, ISVNReporterBaton reporter, ISVNEditor editor) throws SVNException {
-        diff(url, revision, getPegRevision(), target, ignoreAncestry, recursive, reporter, editor);
+        diff(url, revision, revision, target, ignoreAncestry, recursive, reporter, editor);
     }
     
     public void diff(SVNURL url, long targetRevision, long revision, String target, boolean ignoreAncestry, boolean recursive, ISVNReporterBaton reporter, ISVNEditor editor) throws SVNException {

@@ -19,11 +19,13 @@ import java.util.Stack;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNNodeKind;
 import org.tmatesoft.svn.core.SVNProperty;
+import org.tmatesoft.svn.core.SVNURL;
 import org.tmatesoft.svn.core.auth.ISVNAuthenticationManager;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNCancellableEditor;
 import org.tmatesoft.svn.core.internal.wc.SVNEventFactory;
 import org.tmatesoft.svn.core.internal.wc.SVNExternalInfo;
+import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNProperties;
 import org.tmatesoft.svn.core.internal.wc.SVNReporter;
 import org.tmatesoft.svn.core.internal.wc.SVNStatusEditor;
@@ -181,9 +183,9 @@ public class SVNStatusClient extends SVNBasicClient {
         }
         SVNStatusEditor statusEditor = new SVNStatusEditor(getOptions(), wcAccess, handler, parentExternals, includeIgnored, reportAll, recursive);
         if (remote) {
-            String url = wcAccess.getAnchor().getEntries().getEntry("", true).getURL();
-            SVNRepository repos = createRepository(url);
-            SVNRepository locksRepos = createRepository(url);
+            SVNURL url = wcAccess.getAnchor().getEntries().getEntry("", true).getSVNURL();
+            SVNRepository repos = createRepository(url, true);
+            SVNRepository locksRepos = createRepository(url, false);
 
             SVNReporter reporter = new SVNReporter(wcAccess, false, recursive);
             SVNStatusReporter statusReporter = new SVNStatusReporter(locksRepos, reporter, statusEditor);
@@ -307,14 +309,14 @@ public class SVNStatusClient extends SVNBasicClient {
           return externals;
         }
         wcRoot = wcRoot.getParentFile().getAbsoluteFile();
-        if (wcRoot == null || !new File(wcRoot, ".svn").isDirectory()) {
+        if (wcRoot == null || !new File(wcRoot, SVNFileUtil.getAdminDirectoryName()).isDirectory()) {
           // parent is not versioned.
           return externals;
         }
         Stack dirs = new Stack();
         String currentPath = path.getName();
         String baseName = path.getName();
-        while(wcRoot.getParentFile() != null && new File(wcRoot.getParentFile(), ".svn").isDirectory()) {
+        while(wcRoot.getParentFile() != null && new File(wcRoot.getParentFile(), SVNFileUtil.getAdminDirectoryName()).isDirectory()) {
           dirs.push(currentPath);
           currentPath = SVNPathUtil.append(wcRoot.getName(), currentPath);
           wcRoot = wcRoot.getParentFile();
@@ -324,7 +326,7 @@ public class SVNStatusClient extends SVNBasicClient {
         // now go back.
         while(!dirs.isEmpty()) {
           currentPath = (String) dirs.pop();
-          SVNProperties props = new SVNProperties(new File(wcRoot, ".svn/dir-props"), "");
+          SVNProperties props = new SVNProperties(new File(wcRoot, SVNFileUtil.getAdminDirectoryName() + "/dir-props"), "");
 
           String externalsProperty = props.getPropertyValue(SVNProperty.EXTERNALS);
           if (externalsProperty != null) {

@@ -38,10 +38,10 @@ public class SVNDiffWindowBuilder {
 		return new SVNDiffWindowBuilder();
 	}
 	
-	private static final int HEADER = 0;
-	private static final int OFFSET = 1;
-	private static final int INSTRUCTIONS = 2;
-	private static final int DONE = 3;
+	public static final int HEADER = 0;
+	public static final int OFFSET = 1;
+	public static final int INSTRUCTIONS = 2;
+	public static final int DONE = 3;
     
     private static final byte[] HEADER_BYTES = {'S', 'V', 'N', 0};
 	
@@ -84,6 +84,10 @@ public class SVNDiffWindowBuilder {
 	public SVNDiffWindow getDiffWindow() {
 		return myDiffWindow;
 	}
+    
+    public byte[] getInstructionsData() {
+        return myInstructions;
+    }
 	
     public int accept(byte[] bytes, int offset) {       
         switch (myState) {
@@ -187,7 +191,7 @@ public class SVNDiffWindowBuilder {
             case INSTRUCTIONS:
                 if (myOffsets[3] > 0) {
                     if (myInstructions == null) {
-                        myInstructions = new byte[myOffsets[3]];                        
+                        myInstructions = new byte[myOffsets[3]];
                     }
                     // min of number of available and required.
                     int length =  myOffsets[3];
@@ -209,6 +213,11 @@ public class SVNDiffWindowBuilder {
                             myNewDataStream = consumer.textDeltaChunk(path, myDiffWindow);
                             if (myNewDataStream == null) {
                                 myNewDataStream = SVNFileUtil.DUMMY_OUT;
+                            }
+                            try {
+                                myNewDataStream.write(myInstructions);
+                            } catch (IOException e) {
+                                SVNErrorManager.error(e.getMessage());
                             }
                         }
                     }
@@ -238,7 +247,7 @@ public class SVNDiffWindowBuilder {
                     SVNErrorManager.error(e.getMessage());
                 }
                 SVNFileUtil.closeFile(myNewDataStream);
-                reset(1);
+                reset(SVNDiffWindowBuilder.OFFSET);
                 break;
             default:
                 SVNDebugLog.logInfo("invalid diff window builder state: " + myState);
@@ -247,8 +256,10 @@ public class SVNDiffWindowBuilder {
         return true;
     }
     
-    public static void save(SVNDiffWindow window, OutputStream os) throws IOException {
-        os.write(HEADER_BYTES);
+    public static void save(SVNDiffWindow window, boolean saveHeader, OutputStream os) throws IOException {
+        if (saveHeader) {
+            os.write(HEADER_BYTES);
+        } 
         if (window.getInstructionsCount() == 0) {
             return;
         }
@@ -298,9 +309,28 @@ public class SVNDiffWindowBuilder {
         if (dataLength > 0) {
             instructionsList.add(new SVNDiffInstruction(SVNDiffInstruction.COPY_FROM_NEW_DATA, dataLength, offset));
         }
-//        SVNDiffInstruction[] instructions = {new SVNDiffInstruction(SVNDiffInstruction.COPY_FROM_NEW_DATA, dataLength, 0)};
         SVNDiffInstruction[] instructions = (SVNDiffInstruction[]) instructionsList.toArray(new SVNDiffInstruction[instructionsList.size()]);
         return new SVNDiffWindow(0, 0, totalLength, instructions, totalLength);
+    }
+
+    public static SVNDiffWindow[] createReplacementDiffWindows(long dataLength, int maxWindowLength) {
+        if (dataLength == 0) {
+            return new SVNDiffWindow[] {new SVNDiffWindow(0, 0, dataLength, new SVNDiffInstruction[0], dataLength)};
+        }
+        int instructionsCount = (int) ((dataLength / (maxWindowLength)) + 1);
+        Collection windows = new ArrayList(instructionsCount);
+        while(dataLength > maxWindowLength) {
+            SVNDiffInstruction instruction = new SVNDiffInstruction(SVNDiffInstruction.COPY_FROM_NEW_DATA, maxWindowLength, 0); 
+            SVNDiffWindow window = new SVNDiffWindow(0, 0, maxWindowLength, new SVNDiffInstruction[] { instruction}, maxWindowLength);
+            windows.add(window);
+            dataLength -= maxWindowLength; 
+        }
+        if (dataLength > 0) {
+            SVNDiffInstruction instruction = new SVNDiffInstruction(SVNDiffInstruction.COPY_FROM_NEW_DATA, dataLength, 0);
+            SVNDiffWindow window = new SVNDiffWindow(0, 0, dataLength, new SVNDiffInstruction[] {instruction}, dataLength);
+            windows.add(window);
+        }
+        return (SVNDiffWindow[]) windows.toArray(new SVNDiffWindow[windows.size()]);
     }
     
     private static void writeInt(OutputStream os, long i) throws IOException {
@@ -366,12 +396,12 @@ public class SVNDiffWindowBuilder {
 
 	private static SVNDiffWindow createDiffWindow(int[] offsets, byte[] instructions) {
 		SVNDiffWindow window = new SVNDiffWindow(offsets[0], offsets[1], offsets[2], 
-				createInstructions(instructions),
+				instructions.length,
 				offsets[4]);
 		return window;
 	}
 
-	private static SVNDiffInstruction[] createInstructions(byte[] bytes) {
+	public static SVNDiffInstruction[] createInstructions(byte[] bytes) {
         Collection instructions = new ArrayList();
         int[] instr = new int[2];
         for(int i = 0; i < bytes.length;) {            

@@ -116,7 +116,6 @@ public abstract class SVNRepository {
     private int myLockCount;
     private Thread myLocker;
     private ISVNAuthenticationManager myAuthManager;
-    private long myPegRevision;
     private ISVNSession myOptions;
 
     /**
@@ -133,7 +132,6 @@ public abstract class SVNRepository {
      */
     protected SVNRepository(SVNURL location, ISVNSession options) {
         myLocation = location;
-        myPegRevision = -1;
         myOptions = options;
     }
 	
@@ -148,6 +146,38 @@ public abstract class SVNRepository {
 	 */    
     public SVNURL getLocation() {
         return myLocation;
+    }
+    
+    public void setLocation(SVNURL url, boolean forceReconnect) throws SVNException {
+        lock();
+        try {
+            if (url == null) {
+                return;
+            } else if (!url.getProtocol().equals(myLocation.getProtocol())) {
+                SVNErrorManager.error("svn: SVNRepository.setLocation could not change connection protocol '" + myLocation.getProtocol() + "' to '" + url.getProtocol() + "';\n" +
+                        "svn: Create another SVNRepository instance instead");
+            }
+            
+            if (forceReconnect || myRepositoryRoot == null) {
+                closeSession();
+                myRepositoryRoot = null;
+                myRepositoryUUID = null;
+            } else if (url.toString().startsWith(myRepositoryRoot.toString() + "/") || myRepositoryRoot.equals(url)) {
+                // just do nothing
+            } else if (url.getProtocol().equals(myRepositoryRoot.getProtocol()) && 
+                    url.getHost().equals(myRepositoryRoot.getHost()) &&
+                    url.getPort() == myRepositoryRoot.getPort()) {
+                myRepositoryRoot = null;
+                myRepositoryUUID = null;
+            } else {
+                closeSession();
+                myRepositoryRoot = null;
+                myRepositoryUUID = null;
+            }
+            myLocation = url;
+        } finally {
+            unlock();
+        }
     }
 
     /**
@@ -207,15 +237,17 @@ public abstract class SVNRepository {
     public ISVNAuthenticationManager getAuthenticationManager() {
         return myAuthManager;
     }
-    
-    public void setPegRevision(long revision) {
-        myPegRevision = revision;
-    }
-    
-    public long getPegRevision() {
-        return myPegRevision;
-    }
-    
+
+    /**
+     * Stores the identification parameters for the repository.
+     * 
+     * @param uuid 		the repository's Universal Unique IDentifier 
+     * 					(UUID) used to differentiate between one
+     * 					repository and another. 
+     * @param rootURL	the repository's root URL.
+     * @see 			#getRepositoryRoot()
+     * @see 			#getRepositoryUUID()
+     */
     protected void setRepositoryCredentials(String uuid, SVNURL rootURL) {
         if (uuid != null && rootURL != null) {
             myRepositoryUUID = uuid;
@@ -743,9 +775,12 @@ public abstract class SVNRepository {
      * @see 					ISVNReporter
      * @see 					ISVNEditor
 	 */
-    public abstract void diff(SVNURL url, long revision, String target, boolean ignoreAncestry, boolean recursive, ISVNReporterBaton reporter, ISVNEditor editor) throws SVNException;
-    
     public abstract void diff(SVNURL url, long targetRevision, long revision, String target, boolean ignoreAncestry, boolean recursive, ISVNReporterBaton reporter, ISVNEditor editor) throws SVNException;
+    
+    /**
+     * @deprecated use diff with 'targetRevision' parameter instead
+     */
+    public abstract void diff(SVNURL url, long revision, String target, boolean ignoreAncestry, boolean recursive, ISVNReporterBaton reporter, ISVNEditor editor) throws SVNException;
     
     /**
      * Asks the Repository Access (RA) Layer to update a working copy.

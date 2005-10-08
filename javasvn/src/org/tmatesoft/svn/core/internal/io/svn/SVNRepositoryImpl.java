@@ -31,6 +31,7 @@ import org.tmatesoft.svn.core.SVNProperty;
 import org.tmatesoft.svn.core.SVNRevisionProperty;
 import org.tmatesoft.svn.core.SVNURL;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
+import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.io.ISVNEditor;
 import org.tmatesoft.svn.core.io.ISVNFileRevisionHandler;
 import org.tmatesoft.svn.core.io.ISVNLocationEntryHandler;
@@ -66,6 +67,15 @@ public class SVNRepositoryImpl extends SVNRepository implements ISVNReporter {
         } finally {
             closeConnection();
         }
+    }
+    
+    public void setLocation(SVNURL url, boolean forceReconnect) throws SVNException {
+        if (!url.equals(myConnection)) {
+            super.setLocation(url, true);
+        } else {
+            super.setLocation(url, forceReconnect);
+        }
+        myRealm = null;
     }
 
     public long getLatestRevision() throws SVNException {
@@ -229,11 +239,12 @@ public class SVNRepositoryImpl extends SVNRepository implements ISVNReporter {
 
             buffer[1] = properties;
             buffer = read("[(N(*P)", buffer);
-            revision = buffer[0] != null ? SVNReader.getLong(buffer, 0)
-                    : revision;
+            revision = buffer[0] != null ? SVNReader.getLong(buffer, 0) : revision;
             if (handler != null) {
                 buffer[0] = handler;
                 read("(*D)))", buffer);
+            } else {
+                read("()))", null);
             }
         } finally {
             closeConnection();
@@ -271,6 +282,8 @@ public class SVNRepositoryImpl extends SVNRepository implements ISVNReporter {
             if (handler != null) {
                 buffer[0] = handler;
                 read("(*D)))", buffer);
+            } else {
+                read("()))", null);
             }
             // get comments.
             if (includeComment) {
@@ -359,13 +372,18 @@ public class SVNRepositoryImpl extends SVNRepository implements ISVNReporter {
                     builder.accept(line, 0);
                     SVNDiffWindow window = builder.getDiffWindow();
                     if (window != null) {
-                        builder.reset(1);
-                        OutputStream os = handler.handleDiffWindow(
-                                name == null ? path : name, window);
+                        OutputStream os = handler.handleDiffWindow(name == null ? path : name, window);
+                        if (os != null) {
+                            try {
+                                os.write(builder.getInstructionsData());
+                            } catch (IOException e) {
+                                SVNErrorManager.error(e.getMessage());
+                            }
+                        }
+                        builder.reset(SVNDiffWindowBuilder.OFFSET);
                         long length = window.getNewDataLength();
                         while (length > 0) {
-                            byte[] contents = (byte[]) myConnection.read("B",
-                                    null)[0];
+                            byte[] contents = (byte[]) myConnection.read("B", null)[0];
                             length -= contents.length;
                             try {
                                 if (os != null) {
@@ -573,7 +591,7 @@ public class SVNRepositoryImpl extends SVNRepository implements ISVNReporter {
             }
             authenticate();
             read("[()]", null);
-            return new SVNCommitEditor(this, myConnection, mediator,
+            return new SVNCommitEditor(this, myConnection,
                     new Runnable() {
                         public void run() {
                             closeConnection();
@@ -707,11 +725,11 @@ public class SVNRepositoryImpl extends SVNRepository implements ISVNReporter {
 
     private void openConnection() throws SVNException {
         lock();
-        if (getOptions().keepConnection() && myConnection != null) {
+        if (getOptions().keepConnection(this) && myConnection != null) {
             return;
         }
         ISVNConnector connector = SVNRepositoryFactoryImpl.getConnectorFactory().createConnector(this);
-        myConnection = new SVNConnection(connector, getLocation(), getAuthenticationManager());
+        myConnection = new SVNConnection(connector, this);
         try {
             myConnection.open(this);
             authenticate();
@@ -731,7 +749,7 @@ public class SVNRepositoryImpl extends SVNRepository implements ISVNReporter {
     }
 
     private void closeConnection() {
-        if (getOptions().keepConnection()) {
+        if (getOptions().keepConnection(this)) {
             unlock();
             return;
         }

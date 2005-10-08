@@ -86,6 +86,11 @@ public class SVNEditModeReader {
                     if (myDiffStream == null) {
                         myDiffStream = SVNFileUtil.DUMMY_OUT;
                     }
+                    try {
+                        myDiffStream.write(myBuilder.getInstructionsData());
+                    } catch (IOException e) {
+                        SVNErrorManager.error(e.getMessage());
+                    }
                     if (myLenght == 0) {
                         closeDiffStream();
                     }
@@ -160,7 +165,7 @@ public class SVNEditModeReader {
         } catch (IOException e) {
             throw new SVNException(e);
         }
-        myBuilder.reset(1);
+        myBuilder.reset(SVNDiffWindowBuilder.OFFSET);
         myDiffStream = null;
         myLenght = -1;
     }
