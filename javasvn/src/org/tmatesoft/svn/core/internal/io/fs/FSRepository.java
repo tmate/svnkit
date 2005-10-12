@@ -22,6 +22,7 @@ import java.io.File;
 import java.util.Collection;
 import java.util.Date;
 import java.util.Map;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.Iterator;
 import java.util.Set;
@@ -382,43 +383,65 @@ public class FSRepository extends SVNRepository {
     }
 
     public long getFile(String path, long revision, Map properties, OutputStream contents) throws SVNException {
-        return 0;
+        try {
+            openRepository();
+            if (!SVNRepository.isValidRevision(revision)) {
+                revision = getYoungestRev(myReposRootDir);
+            }
+            String parentPath = SVNPathUtil.removeTail(path);
+            FSRevisionNode parent = getParentNode(myReposRootDir, parentPath, revision);
+            String childPath = SVNPathUtil.tail(path);
+            FSRevisionNode childNode = FSReader.getChildDirNode(childPath, parent, myReposRootDir);
+            FSReader.readDeltaRepresentation(childNode.getTextRepresentation(), contents, myReposRootDir);
+            if(properties != null){
+                properties.putAll(collectProperties(childNode, myReposRootDir));
+            }
+            return revision;
+        } finally {
+            closeRepository();
+        }
     }
 
     // path is relative to this FSRepository's location
     private Collection getDirEntries(FSRevisionNode parent, File reposRootDir, Map parentDirProps, boolean includeLogs) throws SVNException {
         Map entries = FSReader.getDirEntries(parent, reposRootDir);
         Set keys = entries.keySet();
-        Iterator iter = keys.iterator();
-        Collection dirEntries = new LinkedList();
+        Iterator dirEntries = keys.iterator();
+        Collection dirEntriesList = new LinkedList();
 
-        while (iter.hasNext()) {
-            String name = (String) iter.next();
+        while (dirEntries.hasNext()) {
+            String name = (String) dirEntries.next();
             FSRepresentationEntry repEntry = (FSRepresentationEntry) entries.get(name);
             if (repEntry != null) {
-                dirEntries.add(buildDirEntry(repEntry, null, reposRootDir, includeLogs));
+                dirEntriesList.add(buildDirEntry(repEntry, null, reposRootDir, includeLogs));
             }
         }
 
         if (parentDirProps != null) {
-            // first fetch out user props
-            Map dirProps = FSReader.getProperties(parent, reposRootDir);
-            if (dirProps != null && dirProps.size() > 0) {
-                parentDirProps.putAll(dirProps);
-            }
-            // now add special non-tweakable metadata props
-            Map metaprops = null;
-            try {
-                metaprops = FSRepositoryUtil.getMetaProps(reposRootDir, parent.getRevNodeID().getRevision(), this);
-            } catch (SVNException svne) {
-                //
-            }
-            if (metaprops != null && metaprops.size() > 0) {
-                parentDirProps.putAll(metaprops);
-            }
+            parentDirProps.putAll(collectProperties(parent, reposRootDir));
         }
 
-        return dirEntries;
+        return dirEntriesList;
+    }
+    
+    private Map collectProperties(FSRevisionNode revNode, File reposRootDir) throws SVNException {
+        Map properties = new HashMap();
+        // first fetch out user props
+        Map versionedProps = FSReader.getProperties(revNode, reposRootDir);
+        if (versionedProps != null && versionedProps.size() > 0) {
+            properties.putAll(versionedProps);
+        }
+        // now add special non-tweakable metadata props
+        Map metaprops = null;
+        try {
+            metaprops = FSRepositoryUtil.getMetaProps(reposRootDir, revNode.getRevNodeID().getRevision(), this);
+        } catch (SVNException svne) {
+            //
+        }
+        if (metaprops != null && metaprops.size() > 0) {
+            properties.putAll(metaprops);
+        }
+        return properties;
     }
 
     private FSRevisionNode getParentNode(File reposRootDir, String path, long revision) throws SVNException {
