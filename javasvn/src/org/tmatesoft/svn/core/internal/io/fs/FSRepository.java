@@ -390,8 +390,13 @@ public class FSRepository extends SVNRepository {
             }
             String parentPath = SVNPathUtil.removeTail(path);
             FSRevisionNode parent = getParentNode(myReposRootDir, parentPath, revision);
-            String childPath = SVNPathUtil.tail(path);
-            FSRevisionNode childNode = FSReader.getChildDirNode(childPath, parent, myReposRootDir);
+            String childName = SVNPathUtil.tail(path);
+            FSRevisionNode childNode = FSReader.getChildDirNode(childName, parent, myReposRootDir);
+            if(childNode == null){
+                SVNErrorManager.error("svn: Attempted to open non-existent child node '" + childName + "'");
+            }else if(childNode.getType() != SVNNodeKind.FILE){
+                SVNErrorManager.error("svn: Path at '" + path + "' is not a file, but " + childNode.getType());
+            }
             FSReader.readDeltaRepresentation(childNode.getTextRepresentation(), contents, myReposRootDir);
             if(properties != null){
                 properties.putAll(collectProperties(childNode, myReposRootDir));

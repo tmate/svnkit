@@ -56,7 +56,9 @@ public class FSReader {
     public static final int MD5_DIGESTSIZE = 16;
     
     public static FSRevisionNode getChildDirNode(String child, FSRevisionNode parent, File reposRootDir) throws SVNException{
-        checkPathComponent(child);
+        if(child == null || child.length() == 0 || "..".equals(child) || child.indexOf('/') != -1){
+            SVNErrorManager.error("svn: Attempted to open node with an illegal name '" + child + "'");
+        }
 
         Map entries = getDirEntries(parent, reposRootDir);
         FSRepresentationEntry entry = entries != null ? (FSRepresentationEntry)entries.get(child) : null;
@@ -64,15 +66,8 @@ public class FSReader {
             return null;
             //throw new SVNException("svn: Attempted to open non-existent child node '" + child + "'");
         }
-
         
         return getRevNode(reposRootDir, entry.getId()); 
-    }
-    
-    private static void checkPathComponent(String name) throws SVNException{
-        if(name == null || name.length() == 0 || "..".equals(name) || name.indexOf('/') != -1){
-            SVNErrorManager.error("svn: Attempted to open node with an illegal name '" + name + "'");
-        }
     }
 
     public static Map getDirEntries(FSRevisionNode revNode, File reposRootDir) throws SVNException {
