@@ -15,6 +15,11 @@ import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNNodeKind;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
+import org.tmatesoft.svn.core.io.diff.SVNDiffWindow;
+import org.tmatesoft.svn.core.io.diff.SVNDiffWindowApplyBaton;
+import org.tmatesoft.svn.core.io.diff.SVNDiffWindowBuilder;
+import org.tmatesoft.svn.core.io.diff.SVNDiffInstruction;
+
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -26,6 +31,7 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.io.FileNotFoundException;
 import java.io.File;
+import java.util.LinkedList;
 import java.util.Map;
 import java.util.HashMap;
 import java.security.MessageDigest;
@@ -87,7 +93,7 @@ public class FSReader {
         }
         InputStream is = null;
         try{
-            is = readRepresentation(representation, REP_PLAIN, reposRootDir);
+            is = readPlainRepresentation(representation, reposRootDir);
             return parsePlainRepresentation(is, false);
         }catch(IOException ioe){
             SVNErrorManager.error("svn: Can't read representation in revision file '" + FSRepositoryUtil.getRevisionFile(reposRootDir, representation.getRevision()).getAbsolutePath() + "': " + ioe.getMessage());
@@ -99,25 +105,25 @@ public class FSReader {
         return null;
     }
     
-    private static Map getProplist(FSRepresentation represnt, File reposRootDir) throws SVNException {
-        if(represnt == null){
+    private static Map getProplist(FSRepresentation representation, File reposRootDir) throws SVNException {
+        if(representation == null){
             return null;
         }
         InputStream is = null;
         try{
-            is = readRepresentation(represnt, REP_PLAIN, reposRootDir);
+            is = readPlainRepresentation(representation, reposRootDir);
             return parsePlainRepresentation(is, true);
         }catch(IOException ioe){
-            SVNErrorManager.error("svn: Can't read representation in revision file '" + FSRepositoryUtil.getRevisionFile(reposRootDir, represnt.getRevision()).getAbsolutePath() + "': " + ioe.getMessage());
+            SVNErrorManager.error("svn: Can't read representation in revision file '" + FSRepositoryUtil.getRevisionFile(reposRootDir, representation.getRevision()).getAbsolutePath() + "': " + ioe.getMessage());
         }catch(SVNException svne){
-            SVNErrorManager.error("svn: Revision file '" + FSRepositoryUtil.getRevisionFile(reposRootDir, represnt.getRevision()).getAbsolutePath() + "' corrupt" + SVNFileUtil.getNativeEOLMarker() + svne.getMessage());
+            SVNErrorManager.error("svn: Revision file '" + FSRepositoryUtil.getRevisionFile(reposRootDir, representation.getRevision()).getAbsolutePath() + "' corrupt" + SVNFileUtil.getNativeEOLMarker() + svne.getMessage());
         }finally{
             SVNFileUtil.closeFile(is);
         }
         return null;
     }
     
-    public static InputStream readRepresentation(FSRepresentation representation, String repHeader, File reposRootDir) throws SVNException {
+    public static InputStream readPlainRepresentation(FSRepresentation representation, File reposRootDir) throws SVNException {
         File revFile = FSRepositoryUtil.getRevisionFile(reposRootDir, representation.getRevision());
         InputStream is = null;
         try{
@@ -137,10 +143,10 @@ public class FSReader {
                 SVNErrorManager.error("svn: Can't read file '" + revFile.getAbsolutePath() + "': " + ioe.getMessage());
             }
             
-            if(!repHeader.equals(header)){
+            if(!REP_PLAIN.equals(header)){
                 SVNErrorManager.error("svn: Malformed representation header in revision file '" + revFile.getAbsolutePath() + "'");
             }
-            
+                
             MessageDigest digest = null;
             try{
                 digest = MessageDigest.getInstance("MD5");
@@ -149,14 +155,12 @@ public class FSReader {
             }
     
             ByteArrayOutputStream os = new ByteArrayOutputStream();
-            long readBytes = 0;
-            for(long i = 0; i < representation.getSize(); i++){
-                try{
-                    readBytes += readBytesFromStream(1, is, os);
-                }catch(IOException ioe){
-                    SVNErrorManager.error("svn: Can't read representation in revision file '" + revFile.getAbsolutePath() + "': " + ioe.getMessage());            
-                }
+            try{
+                readBytesFromStream(representation.getSize(), is, os);
+            }catch(IOException ioe){
+                SVNErrorManager.error("svn: Can't read representation in revision file '" + revFile.getAbsolutePath() + "': " + ioe.getMessage());            
             }
+
             byte[] bytes = os.toByteArray();
             digest.update(bytes);
             
@@ -168,6 +172,182 @@ public class FSReader {
             }
             
             return new ByteArrayInputStream(bytes);
+        }finally{
+            SVNFileUtil.closeFile(is);
+        }
+    }
+    
+    public static void readDeltaRepresentation(FSRepresentation representation, OutputStream targetOS, File reposRootDir) throws SVNException {
+        File revFile = FSRepositoryUtil.getRevisionFile(reposRootDir, representation.getRevision());
+        DefaultFSDeltaCollector collector = new DefaultFSDeltaCollector(); 
+        getDiffWindow(collector, representation.getRevision(), representation.getOffset(), representation.getSize(), reposRootDir);
+
+        MessageDigest digest = null;
+        try{
+            digest = MessageDigest.getInstance("MD5");
+        }catch(NoSuchAlgorithmException nsae){
+            SVNErrorManager.error("svn: Can't check the digest in revision file '" + revFile.getAbsolutePath() + "': " + nsae.getMessage());
+        }
+    
+        DiffWindowsIOStream windowsStreams = new DiffWindowsIOStream();
+        SVNDiffWindowApplyBaton diffWindowApplyBaton = null;
+        String finalChecksum = null;
+        try{
+            while(collector.getWindowsCount() > 0){
+                SVNDiffWindow diffWindow = collector.getLastWindow();
+                diffWindowApplyBaton = windowsStreams.getDiffWindowApplyBaton(digest); 
+                diffWindow.apply(diffWindowApplyBaton, collector.getDeltaDataStorage(diffWindow));
+                finalChecksum = diffWindowApplyBaton.close();
+                collector.removeWindow(diffWindow);
+            }
+
+            // Compare read and expected checksums 
+            if(!MessageDigest.isEqual(SVNFileUtil.fromHexDigest(representation.getHexDigest()), SVNFileUtil.fromHexDigest(finalChecksum))){
+                SVNErrorManager.error("svn: Checksum mismatch while reading representation:" + SVNFileUtil.getNativeEOLMarker() + 
+                        "   expected:  " + representation.getHexDigest() + SVNFileUtil.getNativeEOLMarker() + 
+                        "     actual:  " + SVNFileUtil.toHexDigest(digest));
+            }
+
+            InputStream sourceStream = windowsStreams.getTemporarySourceInputStream();
+            int b = -1;
+            while(true){
+                b = sourceStream.read();
+                if(b == -1){
+                    break;
+                }
+                targetOS.write(b);
+                targetOS.flush();
+            }
+
+        }catch(IOException ioe){
+            ioe.printStackTrace();
+            //????
+        }finally{
+            windowsStreams.closeSourceStream();
+            windowsStreams.closeTargetStream();
+        }
+    }
+    
+    //returns the amount of bytes read from a revision file
+    public static void getDiffWindow(IFSDeltaCollector collector, long revision, long offset, long length, File reposRootDir) throws SVNException {
+        if(collector == null){
+            return;
+        }
+        
+        File revFile = FSRepositoryUtil.getRevisionFile(reposRootDir, revision);
+        InputStream is = null;
+        try{
+            is = SVNFileUtil.openFileForReading(revFile);
+            
+            try{
+                readBytesFromStream(new Long(offset).intValue(), is, null);
+            }catch(IOException ioe){
+                SVNErrorManager.error("svn: Can't set position pointer in file '" + revFile + "': " + ioe.getMessage());
+            }
+            String header = null;
+            try{
+                header = readSingleLine(is);
+            }catch(FileNotFoundException fnfe){
+                SVNErrorManager.error("svn: Can't open file '" + revFile.getAbsolutePath() + "': " + fnfe.getMessage());
+            } catch(IOException ioe){
+                SVNErrorManager.error("svn: Can't read file '" + revFile.getAbsolutePath() + "': " + ioe.getMessage());
+            }
+            
+            if(header != null && header.startsWith(REP_DELTA) ){
+                ByteArrayOutputStream os = new ByteArrayOutputStream();
+                try{
+                    readBytesFromStream(length, is, os);
+                }catch(IOException ioe){
+                    SVNErrorManager.error("svn: Can't read representation in revision file '" + revFile.getAbsolutePath() + "': " + ioe.getMessage());            
+                }
+                byte[] bytes = os.toByteArray();
+                SVNDiffWindowBuilder diffWindowBuilder = SVNDiffWindowBuilder.newInstance();
+                
+                int bufferOffset = 0;
+                int numOfCopyFromSourceInstructions = 0;
+                LinkedList windowsPerRevision = new LinkedList();
+                HashMap windowsData = new HashMap();
+                
+                while(bufferOffset < bytes.length){
+                    int metaDataLength = diffWindowBuilder.accept(bytes, bufferOffset);
+                    SVNDiffWindow window = diffWindowBuilder.getDiffWindow();
+                    if (window != null) {
+                        for(int i = 0; i < diffWindowBuilder.getInstructionsData().length; i++){
+                            int type = (diffWindowBuilder.getInstructionsData()[i] & 0xC0) >> 6;
+                            if(type == SVNDiffInstruction.COPY_FROM_SOURCE){
+                                    numOfCopyFromSourceInstructions++;
+                            }
+                        }
+                        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                        try {
+                            baos.write(diffWindowBuilder.getInstructionsData());
+                        } catch (IOException ioe) {
+                            SVNErrorManager.error("svn: Can't construct a diff window due to errors: " + ioe.getMessage());
+                        }
+                        long newDataLength = window.getNewDataLength();
+                        newDataLength = (newDataLength + metaDataLength > bytes.length) ? bytes.length - metaDataLength : newDataLength; 
+                        
+                        for(int i = 0; i < newDataLength; i++){
+                            baos.write(bytes[metaDataLength + i]);
+                        }
+                        SVNFileUtil.closeFile(baos);
+
+                        windowsPerRevision.addLast(window);
+                        windowsData.put(window, baos);
+                        
+                        bufferOffset = metaDataLength + (int)newDataLength;
+                        if(bufferOffset < bytes.length){
+                            diffWindowBuilder.reset(SVNDiffWindowBuilder.OFFSET);
+                        }else{
+                            break;
+                        }
+                    }else{
+                        break;
+                    }
+                }
+                
+                
+                while(windowsPerRevision.size() > 0){
+                    SVNDiffWindow nextWindow = (SVNDiffWindow)windowsPerRevision.getLast();
+                    ByteArrayOutputStream deltaDataBytes = (ByteArrayOutputStream)windowsData.get(nextWindow);
+                    OutputStream deltaDataStorage = collector.insertWindow(nextWindow);
+                    try{
+                        deltaDataStorage.write(deltaDataBytes.toByteArray());
+                        deltaDataStorage.flush();
+                    }catch(IOException ioe){
+                        SVNErrorManager.error("svn: Can't construct a diff window due to errors: " + ioe.getMessage());                    
+                    }
+                    SVNFileUtil.closeFile(deltaDataStorage);
+                    windowsData.remove(nextWindow);
+                    windowsPerRevision.removeLast();
+                }
+                if(!REP_DELTA.equals(header)){
+                    String[] baseLocation = header.split(" ");
+                    if(baseLocation.length != 4){
+                        SVNErrorManager.error("svn: Malformed representation header in revision file '" + revFile.getAbsolutePath() + "'");
+                    }
+                    
+                    //check up if there are any source instructions
+                    if(numOfCopyFromSourceInstructions == 0){
+                        return;
+                    }
+
+                    try{
+                        revision = Long.parseLong(baseLocation[1]);
+                        offset = Long.parseLong(baseLocation[2]);
+                        length = Long.parseLong(baseLocation[3]);
+                        if(revision < 0 || offset < 0 || length < 0){
+                            throw new NumberFormatException();
+                        }
+                    }catch(NumberFormatException nfe){
+                        SVNErrorManager.error("svn: Malformed representation header in revision file '" + revFile.getAbsolutePath() + "'");
+                    }
+                    
+                    getDiffWindow(collector, revision, offset, length, reposRootDir);
+                }
+            }else{
+                SVNErrorManager.error("svn: Malformed representation header in revision file '" + revFile.getAbsolutePath() + "'");
+            }
         }finally{
             SVNFileUtil.closeFile(is);
         }
@@ -641,16 +821,22 @@ public class FSReader {
         return os.toByteArray();
     }
     
-    public static int readBytesFromStream(int bytesToRead, InputStream is, OutputStream os) throws IOException{
+    public static long readBytesFromStream(long bytesToRead, InputStream is, OutputStream os) throws IOException{
         if(is == null){
             return -1;
         }
 
         if(os != null){
-            byte[] buffer = new byte[bytesToRead];
-            int r = is.read(buffer);
-            os.write(buffer, 0, r);
-            return r;
+            long bytesRead = 0;
+            while(bytesRead != bytesToRead){
+                int b = is.read();
+                if(b == -1){
+                    break;
+                }
+                os.write(b);
+                bytesRead++;
+            }
+            return bytesRead;
         } 
         return (int)is.skip(bytesToRead);
     }
@@ -759,7 +945,8 @@ public class FSReader {
         RootAndChangesOffsets offs = new RootAndChangesOffsets(rootOffset, changesOffset, revision);
         return offs;
     }
-
+    
+    
     private static class RootAndChangesOffsets{
         long changesOffset;
         long rootOffset;
