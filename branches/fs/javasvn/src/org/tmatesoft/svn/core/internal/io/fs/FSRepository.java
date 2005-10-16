@@ -379,7 +379,40 @@ public class FSRepository extends SVNRepository {
     }
 
     public SVNNodeKind checkPath(String path, long revision) throws SVNException {
-        return null;
+        try {
+            openRepository();
+            if (!SVNRepository.isValidRevision(revision)) 
+            {
+                revision = getYoungestRev(myReposRootDir);
+            }
+            String[] partsOfPath = path.split("/");
+            //Suppose that path of type "//////////" is resolved like dir
+            if(partsOfPath.length == 0)
+            {
+            	return SVNNodeKind.DIR;
+            }
+            String parent = partsOfPath[0];        
+            String child = null;
+            for(int count = 1; count < partsOfPath.length - 1; count++)
+            {
+            	parent += "/" + partsOfPath[count];
+            }            
+            FSRevisionNode rootRevNode = getParentNode(myReposRootDir, parent, revision);           
+            if(rootRevNode == null)
+            {
+            	return SVNNodeKind.NONE;
+            }           
+            if(partsOfPath.length > 1)
+            {
+            	child = partsOfPath[partsOfPath.length - 1];
+                FSRevisionNode childRevNode = FSReader.getChildDirNode( child, rootRevNode, myReposRootDir);
+                return childRevNode == null ? SVNNodeKind.NONE : childRevNode.getType();                
+            }
+            else                       	
+                return rootRevNode == null ? SVNNodeKind.NONE : rootRevNode.getType();            
+        } finally {
+            closeRepository();
+        }    	
     }
 
     public long getFile(String path, long revision, Map properties, OutputStream contents) throws SVNException {
