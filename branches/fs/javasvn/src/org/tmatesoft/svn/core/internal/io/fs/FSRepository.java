@@ -390,6 +390,10 @@ public class FSRepository extends SVNRepository {
             }
             String parentPath = SVNPathUtil.removeTail(path);
             FSRevisionNode parent = getParentNode(myReposRootDir, parentPath, revision);
+            if(parent == null){
+                SVNErrorManager.error("svn: Attempted to open non-existent child node '" + path + "'" + SVNFileUtil.getNativeEOLMarker() + "svn: File not found: revision "
+                        + revision + ", path '" + getRepositoryPath(path) + "'");
+            }
             String childName = SVNPathUtil.tail(path);
             FSRevisionNode childNode = FSReader.getChildDirNode(childName, parent, myReposRootDir);
             if(childNode == null){
@@ -468,8 +472,7 @@ public class FSRepository extends SVNRepository {
             } else {
                 child = FSReader.getChildDirNode(nextPathComponent, parent, reposRootDir);
                 if (child == null) {
-                    SVNErrorManager.error("svn: Attempted to open non-existent child node '" + nextPathComponent + "'" + SVNFileUtil.getNativeEOLMarker() + "svn: File not found: revision "
-                            + revision + ", path '" + getRepositoryPath(path) + "'");
+                    return null;
                 }
 
             }
@@ -529,6 +532,10 @@ public class FSRepository extends SVNRepository {
                 revision = getYoungestRev(myReposRootDir);
             }
             FSRevisionNode parent = getParentNode(myReposRootDir, path, revision);
+            if(parent == null){
+                SVNErrorManager.error("svn: Attempted to open non-existent child node '" + path + "'" + SVNFileUtil.getNativeEOLMarker() + "svn: File not found: revision "
+                        + revision + ", path '" + getRepositoryPath(path) + "'");
+            }
             Collection entriesCollection = getDirEntries(parent, myReposRootDir, properties, false);
             Iterator entries = entriesCollection.iterator();
             while (entries.hasNext()) {
@@ -549,6 +556,10 @@ public class FSRepository extends SVNRepository {
                 revision = getYoungestRev(myReposRootDir);
             }
             FSRevisionNode parent = getParentNode(myReposRootDir, path, revision);
+            if(parent == null){
+                SVNErrorManager.error("svn: Attempted to open non-existent child node '" + path + "'" + SVNFileUtil.getNativeEOLMarker() + "svn: File not found: revision "
+                        + revision + ", path '" + getRepositoryPath(path) + "'");
+            }
             entries.addAll(getDirEntries(parent, myReposRootDir, null, includeCommitMessages));
             SVNDirEntry parentDirEntry = buildDirEntry(new FSRepresentationEntry(parent.getRevNodeID(), parent.getType(), ""), parent, myReposRootDir, false);
             parentDirEntry.setPath(parent.getCreatedPath());
