@@ -600,10 +600,8 @@ public class SVNFileUtil {
     }
     
     private static boolean isHex(char ch){
-        if(Character.isDigit(ch) || (ch - 'a' >= 0 && ch - 'a' < 6)){
-            return true;
-        }
-        return false;
+        return Character.isDigit(ch) || 
+              (Character.toUpperCase(ch) >= 'A' && Character.toUpperCase(ch) <= 'F');
     }
     
     public static String getNativeEOLMarker(){

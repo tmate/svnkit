@@ -136,7 +136,7 @@ public class SVNProperty {
     }
     
     /*
-     * That this includes some "svn:" props and all user props, i.e. ones 
+     * Regular are some "svn:" props and all user props, i.e. ones 
      * stored in the repository fs.
      */
     public static boolean isRegularProperty(String name){
