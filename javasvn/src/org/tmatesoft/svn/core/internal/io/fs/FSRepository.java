@@ -381,35 +381,26 @@ public class FSRepository extends SVNRepository {
     public SVNNodeKind checkPath(String path, long revision) throws SVNException {
         try {
             openRepository();
-            if (!SVNRepository.isValidRevision(revision)) 
-            {
+            if (!SVNRepository.isValidRevision(revision)){
                 revision = getYoungestRev(myReposRootDir);
             }
-            String[] partsOfPath = path.split("/");
-            //Suppose that path of type "//////////" is resolved like dir
-            if(partsOfPath.length == 0)
-            {
-            	return SVNNodeKind.DIR;
+            path = path == null ? "" : path;
+            String repositoryPath = super.getRepositoryPath(path);
+            String parent = SVNPathUtil.removeTail(repositoryPath);
+            String child = SVNPathUtil.tail(repositoryPath);
+            child = child.startsWith("/") ? child.substring(child.indexOf("/")+1): child;
+            
+            FSRevisionNode rootRevNode = getParentRevisionNode(myReposRootDir, parent, revision);           
+            if(rootRevNode == null){
+                return SVNNodeKind.NONE;
             }
-            String parent = partsOfPath[0];        
-            String child = null;
-            for(int count = 1; count < partsOfPath.length - 1; count++)
-            {
-            	parent += "/" + partsOfPath[count];
-            }            
-            FSRevisionNode rootRevNode = getParentNode(myReposRootDir, parent, revision);           
-            if(rootRevNode == null)
-            {
-            	return SVNNodeKind.NONE;
-            }           
-            if(partsOfPath.length > 1)
-            {
-            	child = partsOfPath[partsOfPath.length - 1];
-                FSRevisionNode childRevNode = FSReader.getChildDirNode( child, rootRevNode, myReposRootDir);
-                return childRevNode == null ? SVNNodeKind.NONE : childRevNode.getType();                
+            if("".equals(child)){
+                return rootRevNode.getType();
             }
-            else                       	
-                return rootRevNode == null ? SVNNodeKind.NONE : rootRevNode.getType();            
+            
+            FSRevisionNode childRevNode = FSReader.getChildDirNode( child, rootRevNode, myReposRootDir);
+            return childRevNode == null ? SVNNodeKind.NONE : childRevNode.getType();                
+            
         } finally {
             closeRepository();
         }    	
@@ -421,14 +412,18 @@ public class FSRepository extends SVNRepository {
             if (!SVNRepository.isValidRevision(revision)) {
                 revision = getYoungestRev(myReposRootDir);
             }
-            String parentPath = SVNPathUtil.removeTail(path);
-            FSRevisionNode parent = getParentNode(myReposRootDir, parentPath, revision);
+            path = path == null ? "" : path;
+            String repositoryPath = super.getRepositoryPath(path);
+            String parentPath = SVNPathUtil.removeTail(repositoryPath);
+
+            FSRevisionNode parent = getParentRevisionNode(myReposRootDir, parentPath, revision);
             if(parent == null){
                 SVNErrorManager.error("svn: Attempted to open non-existent child node '" + path + "'" + SVNFileUtil.getNativeEOLMarker() + "svn: File not found: revision "
                         + revision + ", path '" + getRepositoryPath(path) + "'");
             }
-            String childName = SVNPathUtil.tail(path);
+            String childName = SVNPathUtil.tail(repositoryPath);
             FSRevisionNode childNode = FSReader.getChildDirNode(childName, parent, myReposRootDir);
+
             if(childNode == null){
                 SVNErrorManager.error("svn: Attempted to open non-existent child node '" + childName + "'");
             }else if(childNode.getType() != SVNNodeKind.FILE){
@@ -486,8 +481,8 @@ public class FSRepository extends SVNRepository {
         return properties;
     }
 
-    private FSRevisionNode getParentNode(File reposRootDir, String path, long revision) throws SVNException {
-        String absPath = super.getRepositoryPath(path);
+    private FSRevisionNode getParentRevisionNode(File reposRootDir, String repositoryPath, long revision) throws SVNException {
+        String absPath = repositoryPath;//super.getRepositoryPath(path);
 
         String nextPathComponent = null;
         FSRevisionNode parent = FSReader.getRootRevNode(reposRootDir, revision);
@@ -564,7 +559,9 @@ public class FSRepository extends SVNRepository {
             if (!SVNRepository.isValidRevision(revision)) {
                 revision = getYoungestRev(myReposRootDir);
             }
-            FSRevisionNode parent = getParentNode(myReposRootDir, path, revision);
+            path = path == null ? "" : path;
+            String repositoryPath = super.getRepositoryPath(path);
+            FSRevisionNode parent = getParentRevisionNode(myReposRootDir, repositoryPath, revision);
             if(parent == null){
                 SVNErrorManager.error("svn: Attempted to open non-existent child node '" + path + "'" + SVNFileUtil.getNativeEOLMarker() + "svn: File not found: revision "
                         + revision + ", path '" + getRepositoryPath(path) + "'");
@@ -588,7 +585,10 @@ public class FSRepository extends SVNRepository {
             if (!SVNRepository.isValidRevision(revision)) {
                 revision = getYoungestRev(myReposRootDir);
             }
-            FSRevisionNode parent = getParentNode(myReposRootDir, path, revision);
+            path = path == null ? "" : path;
+            String repositoryPath = super.getRepositoryPath(path);
+
+            FSRevisionNode parent = getParentRevisionNode(myReposRootDir, repositoryPath, revision);
             if(parent == null){
                 SVNErrorManager.error("svn: Attempted to open non-existent child node '" + path + "'" + SVNFileUtil.getNativeEOLMarker() + "svn: File not found: revision "
                         + revision + ", path '" + getRepositoryPath(path) + "'");
