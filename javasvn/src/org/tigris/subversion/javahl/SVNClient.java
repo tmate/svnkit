@@ -1,7 +1,5 @@
 package org.tigris.subversion.javahl;
 
-import java.io.OutputStream;
-
 import org.tmatesoft.svn.core.javahl.SVNClientImpl;
 
 public class SVNClient implements SVNClientInterface {
@@ -267,10 +265,6 @@ public class SVNClient implements SVNClientInterface {
         return myDelegate.fileContent(path, revision, pegRevision);
     }
 
-    public void streamFileContent(String path, Revision revision, Revision pegRevision, int bufferSize, OutputStream stream) throws ClientException {
-        myDelegate.streamFileContent(path, revision, pegRevision, bufferSize, stream);
-    }
-
     public void relocate(String from, String to, String path, boolean recurse) throws ClientException {
         myDelegate.relocate(from, to, path, recurse);
     }
@@ -321,14 +315,6 @@ public class SVNClient implements SVNClientInterface {
 
     public String getVersionInfo(String path, String trailUrl, boolean lastChanged) throws ClientException {
         return myDelegate.getVersionInfo(path, trailUrl, lastChanged);
-    }
-
-    public String getAdminDirectoryName() {
-        return myDelegate.getAdminDirectoryName();
-    }
-
-    public boolean isAdminDirectory(String name) {
-        return myDelegate.isAdminDirectory(name);
     }
 
     public static String version() {

@@ -145,8 +145,9 @@ public class SVNMergeEditor implements ISVNEditor {
     public void closeDir() throws SVNException {
         SVNStatusType propStatus = SVNStatusType.UNCHANGED;
         if (myCurrentDirectory.myPropertyDiff != null) {
-            SVNDirectory dir = myWCAccess.getDirectory(myCurrentDirectory.myWCPath);
-            if (dir == null && !myMerger.isDryRun()) {
+            SVNDirectory dir = myWCAccess
+                    .getDirectory(myCurrentDirectory.myWCPath);
+            if (dir == null) {
                 SVNEvent event = SVNEventFactory.createMergeEvent(myWCAccess,
                         myCurrentDirectory.myWCPath, SVNEventAction.SKIP, null,
                         null, SVNNodeKind.DIR);
@@ -154,14 +155,12 @@ public class SVNMergeEditor implements ISVNEditor {
                 myCurrentDirectory = myCurrentDirectory.myParent;
                 return;
             }
-            if (!myMerger.isDryRun() || dir != null) {
-                propStatus = myMerger.directoryPropertiesChanged(
-                        myCurrentDirectory.myWCPath,
-                        myCurrentDirectory.myBaseProperties,
-                        myCurrentDirectory.myPropertyDiff);
-            }
+            // no need to do this if it is dry run?
+            propStatus = myMerger.directoryPropertiesChanged(
+                    myCurrentDirectory.myWCPath,
+                    myCurrentDirectory.myPropertyDiff);
         }
-        if (!myCurrentDirectory.myIsAdded && propStatus != SVNStatusType.UNCHANGED) {
+        if (propStatus != SVNStatusType.UNCHANGED) {
             SVNEvent event = SVNEventFactory.createMergeEvent(myWCAccess,
                     myCurrentDirectory.myWCPath, SVNEventAction.UPDATE_UPDATE,
                     null, propStatus, SVNNodeKind.DIR);
@@ -210,20 +209,22 @@ public class SVNMergeEditor implements ISVNEditor {
                     myRevision1);
         }
         myCurrentFile.myFile = myMerger.getFile(myCurrentFile.myWCPath, false);
-        myDeltaProcessor.applyTextDelta(myCurrentFile.myBaseFile, myCurrentFile.myFile, false);
+        SVNFileUtil.createEmptyFile(myCurrentFile.myFile);
     }
 
     public OutputStream textDeltaChunk(String commitPath, SVNDiffWindow diffWindow) throws SVNException {
-        return myDeltaProcessor.textDeltaChunk(diffWindow);
+        File chunkFile = SVNFileUtil.createUniqueFile(myCurrentFile.myBaseFile.getParentFile(), SVNPathUtil.tail(myCurrentFile.myPath), ".chunk");
+        return myDeltaProcessor.textDeltaChunk(chunkFile, diffWindow);
     }
 
     public void textDeltaEnd(String commitPath) throws SVNException {
-        myDeltaProcessor.textDeltaEnd();
+        File baseTmpFile = myCurrentFile.myBaseFile;
+        File targetFile = myCurrentFile.myFile;
+        myDeltaProcessor.textDeltaEnd(baseTmpFile, targetFile, false);
     }
 
     public void closeFile(String commitPath, String textChecksum)
             throws SVNException {
-        myDeltaProcessor.close();
         SVNDirectory dir = myWCAccess.getDirectory(myCurrentDirectory.myWCPath);
         if (dir == null && !myMerger.isDryRun()) {
             // not for dry run?
@@ -255,7 +256,6 @@ public class SVNMergeEditor implements ISVNEditor {
                                         myCurrentFile.myFile != null ? myCurrentFile.myBaseFile
                                                 : null, myCurrentFile.myFile,
                                         myRevision2, 0, mimeType1, mimeType2,
-                                        myCurrentFile.myBaseProperties,
                                         myCurrentFile.myPropertyDiff,
                                         myCurrentFile.myEntryProps);
                     } catch (Throwable th) {
@@ -266,7 +266,6 @@ public class SVNMergeEditor implements ISVNEditor {
                         result = myMerger.fileChanged(myCurrentFile.myWCPath,
                                 myCurrentFile.myBaseFile, myCurrentFile.myFile,
                                 myRevision1, myRevision2, mimeType1, mimeType2,
-                                myCurrentFile.myBaseProperties,
                                 myCurrentFile.myPropertyDiff);
                     } catch (Throwable th) {
                         SVNDebugLog.logInfo(th);

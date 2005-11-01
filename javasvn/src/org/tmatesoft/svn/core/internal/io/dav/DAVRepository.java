@@ -692,7 +692,6 @@ class DAVRepository extends SVNRepository {
             openConnection();
             for (Iterator paths = pathToTokens.keySet().iterator(); paths.hasNext();) {
                 String path = (String) paths.next();
-                String shortPath = path;
                 String id = (String) pathToTokens.get(path);
                 String repositoryPath = getRepositoryPath(path);
                 path = getFullPath(path);
@@ -702,11 +701,7 @@ class DAVRepository extends SVNRepository {
                     myConnection.doUnlock(path, id, force);
                     error = null;
                 } catch (SVNException e) {
-                    if (e.getMessage().indexOf("not locked") >= 0) {
-                        error = new SVNException("svn: Repository path '" + shortPath + "' is not locked");
-                    } else {
-                        throw e;
-                    }
+                    error = e;
                 }
                 if (handler != null) {
                     handler.handleUnlock(repositoryPath, new SVNLock(path, id, null, null, null, null), error);

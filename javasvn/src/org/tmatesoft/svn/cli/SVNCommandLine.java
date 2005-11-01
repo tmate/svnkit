@@ -20,7 +20,6 @@ import java.util.Map;
 import java.util.Set;
 
 import org.tmatesoft.svn.core.SVNException;
-import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.wc.SVNRevision;
 
 /**
@@ -128,8 +127,7 @@ public class SVNCommandLine {
 
         SVNArgument previousArgument = null;
         String previousArgumentName = null;
-        boolean hasPegRevisions = false;
-        
+
         for (int i = 0; i < arguments.length; i++) {
             String argument = arguments[i];
             if (previousArgument != null) {
@@ -182,25 +180,13 @@ public class SVNCommandLine {
                     }
                 }
             } else {
-                
                 if (myCommandName == null) {
                     myCommandName = argument;
-                    hasPegRevisions = SVNCommand.hasPegRevision(myCommandName);
                 } else {
                     String pegRevision = SVNRevision.UNDEFINED.toString();
-                    if (hasPegRevisions) {
-                        int atIndex = argument.lastIndexOf('@');
-                        if (atIndex > 0 && atIndex != argument.length() - 1) {
-                            pegRevision = argument.substring(argument.lastIndexOf('@') + 1);
-                            argument = argument.substring(0, argument.lastIndexOf('@'));
-                            try {
-                                Long.parseLong(pegRevision);
-                            } catch (NumberFormatException e) {                            
-                                SVNErrorManager.error("svn: Syntax error parsing revision '" + pegRevision + "'");
-                            }
-                        } else if (atIndex > 0 && atIndex == argument.length() - 1) {
-                            argument = argument.substring(0, argument.length() - 1);
-                        }
+                    if (argument.indexOf('@') > 0) {
+                        pegRevision = argument.substring(argument.lastIndexOf('@') + 1);
+                        argument = argument.substring(0, argument.lastIndexOf('@'));
                     }
                     myPathURLs.add(argument);
                     if (argument.indexOf("://") >= 0) {

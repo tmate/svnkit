@@ -23,7 +23,6 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
-import java.util.StringTokenizer;
 
 import org.tmatesoft.svn.core.SVNCommitInfo;
 import org.tmatesoft.svn.core.SVNException;
@@ -174,71 +173,67 @@ public class SVNDirectory {
         return new SVNProperties(propertiesFile, getAdminDirectory().getName() + "/" + path);
     }
 
-    public SVNStatusType mergeProperties(String name, Map serverBaseProps, Map propDiff, boolean baseMerge, SVNLog log) throws SVNException {
-        serverBaseProps = serverBaseProps == null ? Collections.EMPTY_MAP : serverBaseProps;
-        propDiff = propDiff == null ? Collections.EMPTY_MAP : propDiff;
-        
+    public SVNStatusType mergeProperties(String name, Map changedProperties,
+            Map locallyChanged, boolean updateBaseProps, SVNLog log)
+            throws SVNException {
+        changedProperties = changedProperties == null ? Collections.EMPTY_MAP
+                : changedProperties;
+        locallyChanged = locallyChanged == null ? Collections.EMPTY_MAP
+                : locallyChanged;
+
         SVNProperties working = getProperties(name, false);
-        Map workingProps = working.asMap();
         SVNProperties workingTmp = getProperties(name, true);
         SVNProperties base = getBaseProperties(name, false);
         SVNProperties baseTmp = getBaseProperties(name, true);
 
         working.copyTo(workingTmp);
-        if (baseMerge) {
+        if (updateBaseProps) {
             base.copyTo(baseTmp);
         }
 
         Collection conflicts = new ArrayList();
-        SVNStatusType result = propDiff.isEmpty() ? SVNStatusType.UNCHANGED : SVNStatusType.CHANGED;
-        
-        for (Iterator propEntries = propDiff.entrySet().iterator(); propEntries.hasNext();) {
-            Map.Entry incomingEntry = (Map.Entry) propEntries.next();
-            String propName = (String) incomingEntry.getKey();
-            String toValue = (String) incomingEntry.getValue();
-            String fromValue = (String) serverBaseProps.get(propName);
-            String workingValue = (String) workingProps.get(propName);
-            if (baseMerge) {
-                baseTmp.setPropertyValue(propName, toValue);
+        SVNStatusType result = changedProperties.isEmpty() ? SVNStatusType.UNCHANGED
+                : SVNStatusType.CHANGED;
+        for (Iterator propNames = changedProperties.keySet().iterator(); propNames
+                .hasNext();) {
+            String propName = (String) propNames.next();
+            String propValue = (String) changedProperties.get(propName);
+            if (updateBaseProps) {
+                baseTmp.setPropertyValue(propName, propValue);
             }
-            if (fromValue == null) {
-                if (workingValue != null) {
-                    if (workingValue.equals(toValue)) {
-                        result = result != SVNStatusType.CONFLICTED ? SVNStatusType.MERGED : result;
-                    } else {
-                        conflicts.add(MessageFormat.format("Trying to add new property ''{0}'' with value ''{1}'',\n" +
-                                "but property already exists with value ''{2}''.", new Object[] { propName, toValue, workingValue }));
-                        result = SVNStatusType.CONFLICTED;                            
-                    }
-                } else {
-                    workingTmp.setPropertyValue(propName, toValue);
+
+            if (locallyChanged.containsKey(propName)) {
+                String workingValue = (String) locallyChanged.get(propName);
+                String conflict = null;
+                // if (workingValue != null) {
+                if (workingValue == null && propValue != null) {
+                    conflict = MessageFormat
+                            .format(
+                                    "Property ''{0}'' locally deleted, but update sets it to ''{1}''\n",
+                                    new Object[] { propName, propValue });
+                } else if (workingValue != null && propValue == null) {
+                    conflict = MessageFormat
+                            .format(
+                                    "Property ''{0}'' locally changed to ''{1}'', but update deletes it\n",
+                                    new Object[] { propName, workingValue });
+                } else if (workingValue != null
+                        && !workingValue.equals(propValue)) {
+                    conflict = MessageFormat
+                            .format(
+                                    "Property ''{0}'' locally changed to ''{1}'', but update sets it to ''{2}''\n",
+                                    new Object[] { propName, workingValue,
+                                            propValue });
                 }
-            } else {
-                if (workingValue == null) {
-                    if (toValue != null) {
-                        result = SVNStatusType.CONFLICTED;
-                        conflicts.add(MessageFormat.format("Trying to change property ''{0}'' from ''{1}'' to ''{2}'',\n" +
-                                "but the property does not exist.", new Object[] { propName, fromValue, toValue }));
-                    } else {
-                        result = result != SVNStatusType.CONFLICTED ? SVNStatusType.MERGED : result;
-                    }
-                } else {
-                    if (workingValue.equals(fromValue)) {
-                        workingTmp.setPropertyValue(propName, toValue);
-                    } else if (toValue == null && !workingValue.equals(fromValue)) {
-                        result = SVNStatusType.CONFLICTED;
-                        conflicts.add(MessageFormat.format("Trying to delete property ''{0}'' but value has been modified from ''{1}'' to ''{2}''.",
-                                 new Object[] { propName, fromValue, workingValue }));
-                    } else if (workingValue.equals(toValue)) {
-                        result = result != SVNStatusType.CONFLICTED ? SVNStatusType.MERGED : result;
-                    } else {
-                        result = SVNStatusType.CONFLICTED;
-                        conflicts.add(MessageFormat.format("Trying to change property ''{0}'' from ''{1}'' to ''{2}'',\n" +
-                                "but property already exists with value ''{3}''.", new Object[] { propName, fromValue, toValue, workingValue }));
-                    }
+                if (conflict != null) {
+                    conflicts.add(conflict);
+                    continue;
                 }
+                result = SVNStatusType.MERGED;
+                // }
             }
+            workingTmp.setPropertyValue(propName, propValue);
         }
+        // now log all.
         Map command = new HashMap();
         if (log != null) {
             command.put(SVNLog.NAME_ATTR, workingTmp.getPath());
@@ -247,7 +242,8 @@ public class SVNDirectory {
             command.clear();
             command.put(SVNLog.NAME_ATTR, working.getPath());
             log.addCommand(SVNLog.READONLY, command, false);
-            if (baseMerge) {
+
+            if (updateBaseProps) {
                 command.put(SVNLog.NAME_ATTR, baseTmp.getPath());
                 command.put(SVNLog.DEST_ATTR, base.getPath());
                 log.addCommand(SVNLog.MOVE, command, false);
@@ -306,6 +302,7 @@ public class SVNDirectory {
             workingTmp.delete();
             baseTmp.delete();
         }
+
         return result;
     }
 
@@ -796,7 +793,7 @@ public class SVNDirectory {
         }
     }
 
-    public SVNDirectory createChildDirectory(String name, String url, String reposURL, long revision) throws SVNException {
+    public SVNDirectory createChildDirectory(String name, String url,  long revision) throws SVNException {
         File dir = new File(myDirectory, name);
         createVersionedDirectory(dir);
 
@@ -810,7 +807,6 @@ public class SVNDirectory {
         if (url != null) {
             rootEntry.setURL(url);
         }
-        rootEntry.setRepositoryRoot(reposURL);
         rootEntry.setRevision(revision);
         rootEntry.setKind(SVNNodeKind.DIR);
         child.getEntries().save(true);
@@ -1033,7 +1029,6 @@ public class SVNDirectory {
         if (fileKind == SVNNodeKind.DIR) {
             // compose new url
             String parentURL = getEntries().getEntry("", true).getURL();
-            String reposURL = getEntries().getEntry("", true).getRepositoryRoot();
             String childURL = SVNPathUtil.append(parentURL, SVNEncodingUtil.uriEncode(name));
             // if child dir exists (deleted) -> check that url is the same and
             // revision is the same
@@ -1045,7 +1040,7 @@ public class SVNDirectory {
                     SVNErrorManager.error("svn: URL doesn't match");
                 }
             } else {
-                childDir = createChildDirectory(name, childURL, reposURL, 0);
+                childDir = createChildDirectory(name, childURL, 0);
             }
             if (!replace) {
                 childDir.getEntries().getEntry("", true).scheduleForAddition();
@@ -1279,23 +1274,5 @@ public class SVNDirectory {
                 }
             }
         }
-    }
-    
-    public boolean isIgnored(String fileName) throws SVNException {
-        String ignoredProperty = getProperties("", false).getPropertyValue(SVNProperty.IGNORE);
-        if (ignoredProperty == null) {
-            return false;
-        }
-        for (StringTokenizer tokens = new StringTokenizer(ignoredProperty, "\r\n"); tokens.hasMoreTokens();) {
-            String token = tokens.nextToken();
-            if (token.trim().length() == 0) {
-                continue;
-            }
-            if (DefaultSVNOptions.matches(token, fileName)) {
-                return true;
-            }
-        }
-        return false;
-
     }
 }

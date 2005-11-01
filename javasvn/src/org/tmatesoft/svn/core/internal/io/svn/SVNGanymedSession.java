@@ -63,7 +63,7 @@ public class SVNGanymedSession {
             String password = credentials.getPassword();
             String userName = credentials.getUserName();
             
-            password = "".equals(password) && privateKey != null ? null : password;
+            password = "".equals(password) ? null : password;
             passphrase = "".equals(passphrase) ? null : passphrase;
             
             if (privateKey != null && !isValidPrivateKey(privateKey, passphrase)) {
@@ -82,17 +82,15 @@ public class SVNGanymedSession {
                 boolean authenticated;
                 if (privateKey != null) {
                     authenticated = connection.authenticateWithPublicKey(userName, privateKey, passphrase);
-                } else if (password != null) {
-                    authenticated = connection.authenticateWithPassword(userName, password);
                 } else {
-                    throw new SVNAuthenticationException("svn: Either password or OpenSSH private key file required for svn+ssh connection");
+                    authenticated = connection.authenticateWithPassword(userName, password);
                 }
                 if (authenticated) {
                     if (isUsePersistentConnection()) {
                         ourConnectionsPool.put(key, connection);
                     }
                 } else {
-                    throw new SVNAuthenticationException("svn: SSH server rejects provided credentials (" + (privateKey != null ? "private key" : "password") + ")");
+                    throw new SVNAuthenticationException("svn: Authentication failed");
                 }
             } catch (IOException e) {
                 if (connection != null) {

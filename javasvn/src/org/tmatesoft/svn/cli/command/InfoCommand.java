@@ -45,7 +45,7 @@ public class InfoCommand extends SVNCommand implements ISVNInfoHandler {
         final boolean recursive = getCommandLine().hasArgument(SVNArgument.RECURSIVE);
         SVNRevision revision = SVNRevision.UNDEFINED;
 
-        if (getCommandLine().hasArgument(SVNArgument.REVISION)) {
+        if (getCommandLine().hasArgument(SVNArgument.RECURSIVE)) {
             revision = SVNRevision.parse((String) getCommandLine().getArgumentValue(SVNArgument.REVISION));
         }
         SVNWCClient wcClient = getClientManager().getWCClient();
@@ -53,8 +53,7 @@ public class InfoCommand extends SVNCommand implements ISVNInfoHandler {
 
         for (int i = 0; i < getCommandLine().getPathCount(); i++) {
             myBaseFile = new File(getCommandLine().getPathAt(i));
-            SVNRevision peg = getCommandLine().getPathPegRevision(i);
-            wcClient.doInfo(myBaseFile, peg, revision, recursive, this);
+            wcClient.doInfo(myBaseFile, revision, recursive, this);
         }
         myBaseFile = null;
         for (int i = 0; i < getCommandLine().getURLCount(); i++) {

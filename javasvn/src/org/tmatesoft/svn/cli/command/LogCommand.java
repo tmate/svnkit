@@ -72,14 +72,13 @@ public class LogCommand extends SVNCommand implements ISVNLogEntryHandler {
         boolean stopOnCopy = getCommandLine().hasArgument(SVNArgument.STOP_ON_COPY);
         myReportPaths = getCommandLine().hasArgument(SVNArgument.VERBOSE);
         myIsQuiet = getCommandLine().hasArgument(SVNArgument.QUIET);
-        String limitStr = (String) getCommandLine().getArgumentValue(SVNArgument.LIMIT);
-        myPrintStream = out;
-        long limit = 0;
-        if (limitStr != null) {
-            try {
-                limit = Long.parseLong(limitStr);
-            } catch (NumberFormatException nfe) {}
-        }
+        final StringBuffer buffer = new StringBuffer();
+        myPrintStream = new PrintStream(System.out, true) {
+            public void print(String s) {
+                super.print(s);
+                buffer.append(s);
+            }
+        };
         SVNLogClient logClient = getClientManager().getLogClient();
         if (getCommandLine().hasURLs()) {
             String url = getCommandLine().getURL(0);
@@ -88,18 +87,17 @@ public class LogCommand extends SVNCommand implements ISVNLogEntryHandler {
                 targets.add(getCommandLine().getPathAt(i));
             }
             String[] paths = (String[]) targets.toArray(new String[targets.size()]);
-            logClient.doLog(SVNURL.parseURIEncoded(url), paths, SVNRevision.UNDEFINED, startRevision ,endRevision, stopOnCopy, myReportPaths, limit, this);
+            logClient.doLog(SVNURL.parseURIEncoded(url), paths, SVNRevision.UNDEFINED, startRevision ,endRevision, stopOnCopy, myReportPaths, 0, this);
         } else if (getCommandLine().hasPaths()) {
             Collection targets = new ArrayList();
             for(int i = 0; i < getCommandLine().getPathCount(); i++) {
                 targets.add(new File(getCommandLine().getPathAt(i)).getAbsoluteFile());
             }
             File[] paths = (File[]) targets.toArray(new File[targets.size()]);
-            logClient.doLog(paths, startRevision ,endRevision, stopOnCopy, myReportPaths, limit, this);
+            logClient.doLog(paths, startRevision ,endRevision, stopOnCopy, myReportPaths, 0, this);
         }
         if (myHasLogEntries) {
             myPrintStream.print(SEPARATOR);
-            myPrintStream.flush();
         }
     }
 
@@ -108,37 +106,35 @@ public class LogCommand extends SVNCommand implements ISVNLogEntryHandler {
             return;
         }
         myHasLogEntries = true;
-        StringBuffer result = new StringBuffer();
         String author = logEntry.getAuthor() == null ? "(no author)" : logEntry.getAuthor();
         String date = logEntry.getDate() == null ? "(no date)" : DATE_FORMAT.format(logEntry.getDate());
         String message = logEntry.getMessage();
         if (!myIsQuiet && message == null) {
             message = "";
         }
-        result.append(SEPARATOR);
-        result.append("r" + Long.toString(logEntry.getRevision()) + " | " + author + " | " + date);
+        myPrintStream.print(SEPARATOR);
+        myPrintStream.print("r" + Long.toString(logEntry.getRevision()) + " | " + author + " | " + date);
         if (!myIsQuiet) {
             int count = getLinesCount(message);
-            result.append(" | " + count + (count == 1 ? " line" : " lines"));
+            myPrintStream.print(" | " + count + (count == 1 ? " line" : " lines"));
         }
-        result.append("\n");
+        myPrintStream.print("\n");
         if (myReportPaths && logEntry.getChangedPaths() != null) {
             Map sortedPaths = new TreeMap(logEntry.getChangedPaths());
-            result.append("Changed paths:\n");
+            myPrintStream.print("Changed paths:\n");
             for (Iterator paths = sortedPaths.keySet().iterator(); paths.hasNext();) {
                 String path = (String) paths.next();
                 SVNLogEntryPath lPath = (SVNLogEntryPath) sortedPaths.get(path);
-                result.append("   " + lPath.getType() + " " + path);
+                myPrintStream.print("   " + lPath.getType() + " " + path);
                 if (lPath.getCopyPath() != null) {
-                    result.append(" (from " + lPath.getCopyPath() + ":" + lPath.getCopyRevision() + ")");
+                    myPrintStream.print(" (from " + lPath.getCopyPath() + ":" + lPath.getCopyRevision() + ")");
                 }
-                result.append("\n");
+                myPrintStream.print("\n");
             }
         }
         if (!myIsQuiet) {
-            result.append("\n" + message + "\n");
+            myPrintStream.print("\n" + message + "\n");
         }
-        myPrintStream.print(result.toString());
         myPrintStream.flush();
     }
 }

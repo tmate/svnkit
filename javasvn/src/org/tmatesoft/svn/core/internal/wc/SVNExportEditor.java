@@ -118,19 +118,25 @@ public class SVNExportEditor implements ISVNEditor {
 
     public void applyTextDelta(String commitPath, String baseChecksum)
             throws SVNException {
-        myCurrentTmpFile = SVNFileUtil.createUniqueFile(myCurrentDirectory, myCurrentFile.getName(), ".tmp");
-        myDeltaProcessor.applyTextDelta(null, myCurrentTmpFile, true);
     }
 
     public OutputStream textDeltaChunk(String commitPath, SVNDiffWindow diffWindow) throws SVNException {
-        return myDeltaProcessor.textDeltaChunk(diffWindow);
+        File tmpFile = SVNFileUtil.createUniqueFile(myCurrentDirectory,  myCurrentFile.getName(), ".tmp");
+        return myDeltaProcessor.textDeltaChunk(tmpFile, diffWindow);
     }
     
     private String myChecksum;
 
     public void textDeltaEnd(String commitPath) throws SVNException {
-        myDeltaProcessor.textDeltaEnd();
-        myChecksum = myDeltaProcessor.getChecksum();
+        // apply all deltas
+        myCurrentTmpFile = SVNFileUtil.createUniqueFile(myCurrentDirectory, myCurrentFile.getName(), ".tmp");
+        SVNFileUtil.createEmptyFile(myCurrentTmpFile);
+        File fakeBase = SVNFileUtil.createUniqueFile(myCurrentDirectory, myCurrentFile.getName(), ".tmp");
+        try {
+            myChecksum = myDeltaProcessor.textDeltaEnd(fakeBase, myCurrentTmpFile, true);
+        } finally {
+            fakeBase.delete();
+        }
     }
 
     public void closeFile(String commitPath, String textChecksum) throws SVNException {
@@ -164,12 +170,9 @@ public class SVNExportEditor implements ISVNEditor {
                 keywordsMap = SVNTranslator.computeKeywords(keywords, url,
                         author, date, revStr);
             }
-            byte[] eolBytes = null;
-            if (SVNProperty.EOL_STYLE_NATIVE.equals(myFileProperties.get(SVNProperty.EOL_STYLE))) {
-                eolBytes = SVNTranslator.getWorkingEOL(myEOLStyle != null ? myEOLStyle : (String) myFileProperties.get(SVNProperty.EOL_STYLE));
-            } else if (myFileProperties.containsKey(SVNProperty.EOL_STYLE)) {
-                eolBytes = SVNTranslator.getWorkingEOL((String) myFileProperties.get(SVNProperty.EOL_STYLE));
-            }
+            String eolStyle = myEOLStyle != null ? myEOLStyle
+                    : (String) myFileProperties.get(SVNProperty.EOL_STYLE);
+            byte[] eolBytes = SVNTranslator.getWorkingEOL(eolStyle);
             boolean special = myFileProperties.get(SVNProperty.SPECIAL) != null;
             boolean executable = myFileProperties.get(SVNProperty.EXECUTABLE) != null;
 

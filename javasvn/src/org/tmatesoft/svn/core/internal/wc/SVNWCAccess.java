@@ -235,7 +235,9 @@ public class SVNWCAccess implements ISVNEventHandler {
                 myDirectories.put(myName, myTarget);
             }
             if (recursive) {
-                if (myTarget == myAnchor && (myName != null && !"".equals(myName))) {
+                // target may be the same as anchor in case "name" does not exist.
+                // in that case anchor should be locked, but not recursively.
+                if (myName != null && !"".equals(myName) && myTarget == myAnchor) {
                     return;
                 }
                 visitDirectories(myTarget == myAnchor ? "" : myName, myTarget,

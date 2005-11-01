@@ -51,7 +51,7 @@ class JavaHLAuthenticationProvider implements ISVNAuthenticationProvider {
                 boolean save = prompt4.userAllowedSave();
                 if (keyPath != null && !"".equals(keyPath)) {
                     return new SVNSSHAuthentication(userName, new File(keyPath), passphrase, port, save);
-                } else if (password != null){
+                } else if (password != null && !"".equals(password)){
                     return new SVNSSHAuthentication(userName, password, port, save);
                 }
             }

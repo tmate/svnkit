@@ -114,9 +114,7 @@ public class SVNFileUtil {
 
     public static void rename(File src, File dst) throws SVNException {
         if (!src.exists() && !isSymlink(src)) {
-            deleteFile(dst);
-            return;
-//            SVNErrorManager.error("svn: Cannot rename file '" + src.getAbsolutePath() + "' : file does not exist");
+            SVNErrorManager.error("svn: Cannot rename file '" + src.getAbsolutePath() + "' : file does not exist");
         }
         if (dst.isDirectory()) {
             SVNErrorManager.error("svn: Cannot overwrite file '" + dst.getAbsolutePath() + "' : it is a directory");
