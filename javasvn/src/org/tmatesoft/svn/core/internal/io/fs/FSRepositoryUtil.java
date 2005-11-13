@@ -13,6 +13,8 @@ package org.tmatesoft.svn.core.internal.io.fs;
 
 import java.io.File;
 import java.io.IOException;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -21,6 +23,7 @@ import org.tmatesoft.svn.core.SVNProperty;
 import org.tmatesoft.svn.core.SVNRevisionProperty;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.internal.wc.SVNFileType;
+import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNProperties;
 
 
@@ -29,6 +32,26 @@ import org.tmatesoft.svn.core.internal.wc.SVNProperties;
  * @author  TMate Software Ltd.
  */
 public class FSRepositoryUtil {
+    
+    public static File getDigestFileFromRepositoryPath(String repositoryPath, File reposRootDir) throws SVNException {
+        String digestPath = getDigestFromRepositoryPath(repositoryPath);
+        return new File(getLockDigestSubdirectory(digestPath, reposRootDir), digestPath);
+    }
+    
+    public static File getLockDigestSubdirectory(String digestPath, File reposRootDir){
+        return new File(FSRepositoryUtil.getDBLocksDir(reposRootDir), digestPath.substring(0, FSConstants.DIGEST_SUBDIR_LEN -1));
+    }
+    
+    public static String getDigestFromRepositoryPath(String repositoryPath) throws SVNException {
+        MessageDigest digestFromPath = null;
+        try {
+            digestFromPath = MessageDigest.getInstance("MD5");
+        } catch (NoSuchAlgorithmException nsae) {
+            SVNErrorManager.error("svn: Can't get digest: " + nsae.getMessage());
+        }
+        digestFromPath.update(repositoryPath.getBytes());
+        return SVNFileUtil.toHexDigest(digestFromPath); 
+    }
     
     public static void setRevisionProperty(File reposRootDir, long revision, String propertyName, String propertyNewValue, String propertyOldValue, String reposPath, String userName, String action) throws SVNException {
         FSHooks.runPreRevPropChangeHook(reposRootDir, propertyName, propertyNewValue, reposPath, userName, revision, action);
@@ -174,6 +197,10 @@ public class FSRepositoryUtil {
 
     public static File getLocksDir(File reposRootDir) {
         return new File(reposRootDir, FSConstants.SVN_REPOS_LOCKS_DIR);
+    }
+
+    public static File getDBLocksDir(File reposRootDir) {
+        return new File(getRepositoryDBDir(reposRootDir), FSConstants.SVN_REPOS_LOCKS_DIR);
     }
 
     public static File getRepositoryUUIDFile(File reposRootDir) {

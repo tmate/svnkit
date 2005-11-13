@@ -37,9 +37,23 @@ public class FSConstants {
     public static final String SVN_REPOS_REVPROPS_DIR = "revprops";
     public static final String SVN_REPOS_REVS_DIR = "revs";
 
+    //the following are keys that appear in digest lock file
+    public static final String PATH_LOCK_KEY = "path";
+    public static final String CHILDREN_LOCK_KEY = "children";
+    public static final String TOKEN_LOCK_KEY = "token";
+    public static final String OWNER_LOCK_KEY = "owner";
+    public static final String IS_DAV_COMMENT_LOCK_KEY = "is_dav_comment";
+    public static final String CREATION_DATE_LOCK_KEY = "creation_date";
+    public static final String EXPIRATION_DATE_LOCK_KEY = "expiration_date";
+    public static final String COMMENT_LOCK_KEY = "comment";
+    
     // uuid format - 36 symbols
     public static final int SVN_UUID_FILE_LENGTH = 36;
     // if > max svn 1.2 stops working
     public static final int SVN_UUID_FILE_MAX_LENGTH = SVN_UUID_FILE_LENGTH + 1;
-
+    
+    /* Number of characters from the head of a digest file name used to
+     * calculate a subdirectory in which to drop that file. 
+     */
+    public static final int DIGEST_SUBDIR_LEN = 3;
 }
