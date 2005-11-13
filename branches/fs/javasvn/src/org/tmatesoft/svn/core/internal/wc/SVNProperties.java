@@ -23,6 +23,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.TreeSet;
+import java.util.Set;
 
 import org.tmatesoft.svn.core.SVNException;
 
@@ -346,6 +347,33 @@ public class SVNProperties {
         myFile.delete();
     }
 
+    public static void setProperties(Map namesToValues, File target) throws SVNException {
+        OutputStream dst = null;
+        File tmpFile = null;
+        try {
+            tmpFile = SVNFileUtil.createUniqueFile(target.getParentFile(),
+                    target.getName(), ".tmp");
+            dst = SVNFileUtil.openFileForWriting(tmpFile);
+            
+            Object[] keys = namesToValues.keySet().toArray();
+            for(int i = 0; i < keys.length; i++){
+                String propertyName = (String)keys[i];
+                writeProperty(dst, 'K', propertyName.getBytes());
+                String propertyValue = (String)namesToValues.get(propertyName);
+                writeProperty(dst, 'V', propertyValue.getBytes());
+            }
+            dst.write(new byte[] { 'E', 'N', 'D', '\n' });
+        }catch(IOException ioe){    
+            SVNErrorManager.error(ioe.getMessage());
+        } finally {
+            SVNFileUtil.closeFile(dst);
+        }
+        if (tmpFile != null) {
+            SVNFileUtil.rename(tmpFile, target);
+            SVNFileUtil.setReadonly(target, true);
+        }
+    }
+    
     /** @noinspection ResultOfMethodCallIgnored */
     private static void copyProperties(InputStream is, OutputStream os,
             String name, InputStream value, int length) throws SVNException {

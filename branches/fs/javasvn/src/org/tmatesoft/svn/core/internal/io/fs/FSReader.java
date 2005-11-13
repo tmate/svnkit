@@ -12,8 +12,12 @@
 package org.tmatesoft.svn.core.internal.io.fs;
 
 import org.tmatesoft.svn.core.SVNException;
+import org.tmatesoft.svn.core.SVNLock;
 import org.tmatesoft.svn.core.SVNNodeKind;
+import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
+import org.tmatesoft.svn.core.internal.util.SVNTimeUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
+import org.tmatesoft.svn.core.internal.wc.SVNProperties;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 import org.tmatesoft.svn.core.io.diff.SVNDiffWindow;
 import org.tmatesoft.svn.core.io.diff.SVNDiffWindowApplyBaton;
@@ -30,8 +34,10 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.io.FileNotFoundException;
 import java.io.File;
+import java.util.Date;
 import java.util.LinkedList;
 import java.util.Map;
+import java.util.Collection;
 import java.util.HashMap;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -55,22 +61,136 @@ public class FSReader {
 
     public static final int MD5_DIGESTSIZE = 16;
 
+    
+    public static SVNLock getLock(String repositoryPath, boolean haveWriteLock, Collection children, File reposRootDir) throws SVNException {
+        SVNLock lock = fetchLock(repositoryPath, children, reposRootDir);
+        if(lock == null){
+            return null;//SVNErrorManager.error("svn: No lock on path '" + fsAbsPath + "' in filesystem '" + FSRepositoryUtil.getRepositoryDBDir(reposRootDir).getAbsolutePath() + "'");
+        }
+        
+        Date current = new Date(System.currentTimeMillis());
+        /* Don't return an expired lock. */
+        if(lock.getExpirationDate() != null && current.compareTo(lock.getExpirationDate()) > 0){
+            /* Only remove the lock if we have the write lock.
+             * Read operations shouldn't change the filesystem. 
+             */
+            if(haveWriteLock){
+                FSWriter.deleteLock(lock, reposRootDir);
+            }
+            return null;//yet recently it has been an error
+        }
+        return lock;
+    }
+    
+    
+    
+    public static SVNLock fetchLock(String repositoryPath, Collection children, File reposRootDir) throws SVNException {
+        File digestLockFile = FSRepositoryUtil.getDigestFileFromRepositoryPath(repositoryPath, reposRootDir);
+        SVNProperties props = new SVNProperties(digestLockFile, null);
+        Map lockProps = null;
+        try{
+            lockProps = props.asMap();
+        } catch(SVNException svne){
+            SVNErrorManager.error("svn: Can't parse lock/entries hashfile '" + digestLockFile.getAbsolutePath() + "'");
+        }
+        
+        SVNLock lock = null;
+        String lockPath = (String)lockProps.get(FSConstants.PATH_LOCK_KEY);
+        if(lockPath != null){
+            String lockToken = (String)lockProps.get(FSConstants.TOKEN_LOCK_KEY);
+            if(lockToken == null){
+                SVNErrorManager.error("svn: Corrupt lockfile for path '" + lockPath + "' in filesystem '" + FSRepositoryUtil.getRepositoryDBDir(reposRootDir).getAbsolutePath() + "'");
+            }
+            String lockOwner = (String)lockProps.get(FSConstants.OWNER_LOCK_KEY);
+            if(lockOwner == null){
+                SVNErrorManager.error("svn: Corrupt lockfile for path '" + lockPath + "' in filesystem '" + FSRepositoryUtil.getRepositoryDBDir(reposRootDir).getAbsolutePath() + "'");
+            }
+            String davComment = (String)lockProps.get(FSConstants.IS_DAV_COMMENT_LOCK_KEY);
+            //? how about it? what is to do with this flag? add it to SVNLock?
+            if(davComment == null){
+                SVNErrorManager.error("svn: Corrupt lockfile for path '" + lockPath + "' in filesystem '" + FSRepositoryUtil.getRepositoryDBDir(reposRootDir).getAbsolutePath() + "'");
+            }
+            
+            String creationTime = (String)lockProps.get(FSConstants.CREATION_DATE_LOCK_KEY);
+            if(creationTime == null){
+                SVNErrorManager.error("svn: Corrupt lockfile for path '" + lockPath + "' in filesystem '" + FSRepositoryUtil.getRepositoryDBDir(reposRootDir).getAbsolutePath() + "'");
+            }
+            Date creationDate = SVNTimeUtil.parseDate(creationTime);
+            if (creationDate == null) {
+                SVNErrorManager.error("svn: Corrupt lockfile for path '" + lockPath + "' in filesystem '" + FSRepositoryUtil.getRepositoryDBDir(reposRootDir).getAbsolutePath() + "'" + SVNFileUtil.getNativeEOLMarker() + "svn: Can't parse creation time");
+            }
+            String expirationTime = (String)lockProps.get(FSConstants.EXPIRATION_DATE_LOCK_KEY);
+            Date expirationDate = null;
+            if(expirationTime != null){
+                expirationDate = SVNTimeUtil.parseDate(expirationTime);
+                if (expirationDate == null) {
+                    SVNErrorManager.error("svn: Corrupt lockfile for path '" + lockPath + "' in filesystem '" + FSRepositoryUtil.getRepositoryDBDir(reposRootDir).getAbsolutePath() + "'" + SVNFileUtil.getNativeEOLMarker() + "svn: Can't parse expiration time");
+                }
+            }
+            
+            String comment = (String)lockProps.get(FSConstants.COMMENT_LOCK_KEY);
+            lock = new SVNLock(lockPath, lockToken, lockOwner, comment, creationDate, expirationDate);
+        }
+        
+        String childEntries = (String)lockProps.get(FSConstants.CHILDREN_LOCK_KEY);
+        if(children != null && childEntries != null){
+            String[] digests = childEntries.split("\n");
+            for(int i = 0; i < digests.length; i++){
+                children.add(digests[i]);
+            }
+        }
+        
+        return lock;
+    }
+    
+    
+    
+    public static FSRevisionNode getRevisionNode(File reposRootDir, String repositoryPath, long revision) throws SVNException {
+        String absPath = repositoryPath;
+
+        String nextPathComponent = null;
+        FSRevisionNode parent = FSReader.getRootRevNode(reposRootDir, revision);
+        FSRevisionNode child = null;
+
+        while (true) {
+            nextPathComponent = SVNPathUtil.head(absPath);
+            absPath = SVNPathUtil.removeHead(absPath);
+
+            if (nextPathComponent.length() == 0) {
+                child = parent;
+            } else {
+                child = FSReader.getChildDirNode(nextPathComponent, parent, reposRootDir);
+                if (child == null) {
+                    return null;
+                }
+            }
+            parent = child;
+
+            if ("".equals(absPath)) {
+                break;
+            }
+        }
+        return parent;
+    }
+    
     public static FSRevisionNode getChildDirNode(String child, FSRevisionNode parent, File reposRootDir) throws SVNException {
         if (child == null || child.length() == 0 || "..".equals(child) || child.indexOf('/') != -1) {
             SVNErrorManager.error("svn: Attempted to open node with an illegal name '" + child + "'");
         }
-
         Map entries = getDirEntries(parent, reposRootDir);
         FSRepresentationEntry entry = entries != null ? (FSRepresentationEntry) entries.get(child) : null;
-        if (entry == null) {
-            return null;
-            // throw new SVNException("svn: Attempted to open non-existent child
-            // node '" + child + "'");
-        }
-
-        return getRevNode(reposRootDir, entry.getId());
+        return entry == null ? null : getRevNodeFromID(reposRootDir, entry.getId());
     }
 
+    public static FSRepresentationEntry getChildEntry(String child, FSRevisionNode parent, File reposRootDir) throws SVNException {
+        if (child == null || child.length() == 0 || "..".equals(child) || child.indexOf('/') != -1) {
+            SVNErrorManager.error("svn: Attempted to open node with an illegal name '" + child + "'");
+        }
+        Map entries = getDirEntries(parent, reposRootDir);
+        FSRepresentationEntry entry = entries != null ? (FSRepresentationEntry) entries.get(child) : null;
+        return entry;
+    }
+    
     public static Map getDirEntries(FSRevisionNode revNode, File reposRootDir) throws SVNException {
         if (revNode == null || revNode.getType() != SVNNodeKind.DIR) {
             SVNErrorManager.error("svn: Can't get entries of non-directory");
@@ -453,11 +573,11 @@ public class FSReader {
 
     public static FSRevisionNode getRootRevNode(File reposRootDir, long revision) throws SVNException {
         FSID id = new FSID(FSID.ID_INAPPLICABLE, FSID.ID_INAPPLICABLE, FSID.ID_INAPPLICABLE, revision, getRootOffset(reposRootDir, revision));
-        return getRevNode(reposRootDir, id);
+        return getRevNodeFromID(reposRootDir, id);
     }
 
-    public static FSRevisionNode getRevNode(File reposRootDir, FSID id) throws SVNException {
-        File revFile = FSRepositoryUtil.getRevisionFile(reposRootDir, id.getRevision());// getRevFile(id.getRevision());
+    public static FSRevisionNode getRevNodeFromID(File reposRootDir, FSID id) throws SVNException {
+        File revFile = FSRepositoryUtil.getRevisionFile(reposRootDir, id.getRevision());
 
         FSRevisionNode revNode = new FSRevisionNode();
         long offset = id.getOffset();
