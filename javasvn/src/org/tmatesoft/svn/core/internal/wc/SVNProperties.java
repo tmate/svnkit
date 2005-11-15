@@ -23,7 +23,6 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.TreeSet;
-import java.util.Set;
 
 import org.tmatesoft.svn.core.SVNException;
 

@@ -225,7 +225,7 @@ public class FSReader {
 
     private static Map getProplist(FSRepresentation representation, File reposRootDir) throws SVNException {
         if (representation == null) {
-            return null;
+            return new HashMap();
         }
         InputStream is = null;
         try {
