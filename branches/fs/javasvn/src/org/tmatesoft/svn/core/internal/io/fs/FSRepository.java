@@ -487,7 +487,7 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
         }
         return properties;
     }
-
+/*
     private FSRevisionNode getRevisionNode(File reposRootDir, String repositoryPath, long revision) throws SVNException {
         String absPath = repositoryPath;// super.getRepositoryPath(path);
 
@@ -519,7 +519,7 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
         }
         return parent;
     }
-
+*/
     private SVNDirEntry buildDirEntry(FSRepresentationEntry repEntry, FSRevisionNode revNode, File reposRootDir, boolean includeLogs) throws SVNException {
         FSRevisionNode entryNode = revNode == null ? FSReader.getRevNodeFromID(reposRootDir, repEntry.getId()) : revNode;
 
@@ -806,31 +806,41 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
     }
 
     private void diffDirs(long sourceRevision, String sourcePath, String targetPath, String editPath, boolean startEmpty) throws SVNException {
-        
+        /* Compare the property lists.  If we're starting empty, pass a null
+         * source path so that we add all the properties. When we support 
+         * directory locks, we must pass the lock token here. */
+        diffProplists(sourceRevision, startEmpty == true ? null : sourcePath, editPath, targetPath, null, true);
+        /* Get the list of entries in each of source and target. */
+        if(sourcePath != null && !startEmpty){
+            
+        }
     }
     
     private void diffProplists(long sourceRevision, String sourcePath, String editPath, String targetPath, String lockToken, boolean isDir) throws SVNException {
         FSRevisionNode targetNode = FSReader.getRevisionNode(myReposRootDir, targetPath, myReporterContext.getTargetRevision());
-        
+        if(targetNode == null){
+            SVNErrorManager.error("svn: File not found: revision " + myReporterContext.getTargetRevision() + ", path '" + targetPath + "'");
+        }
         long createdRevision = targetNode != null ? targetNode.getRevNodeID().getRevision() : -1;  
-        //hmmmmmm, big-big doubt - not clear in the source code, we have to find out this
+        //why are we checking the created revision fetched from the rev-file? may the file be malformed - is this the reason...
         if(isValidRevision(createdRevision)){
+            Map entryProps = FSRepositoryUtil.getMetaProps(myReposRootDir, createdRevision, this);
             /* Transmit the committed-rev. */
-            changeProperty(editPath, SVNProperty.COMMITTED_REVISION, String.valueOf(createdRevision), isDir);
-            Map revisionProperties = FSRepositoryUtil.getRevisionProperties(myReposRootDir, targetNode.getRevNodeID().getRevision());
+            changeProperty(editPath, SVNProperty.COMMITTED_REVISION, (String)entryProps.get(SVNProperty.COMMITTED_REVISION), isDir);
             /* Transmit the committed-date. */
-            String committedDate = (String)revisionProperties.get(SVNRevisionProperty.DATE);
+            String committedDate = (String)entryProps.get(SVNProperty.COMMITTED_DATE);
             if(committedDate != null || sourcePath != null){
                 changeProperty(editPath, SVNProperty.COMMITTED_DATE, committedDate, isDir);
             }
             /* Transmit the last-author. */
-            String lastAuthor = (String)revisionProperties.get(SVNRevisionProperty.AUTHOR);
+            String lastAuthor = (String)entryProps.get(SVNProperty.LAST_AUTHOR);
             if(lastAuthor != null || sourcePath != null){
                 changeProperty(editPath, SVNProperty.LAST_AUTHOR, lastAuthor, isDir);
             }
             /* Transmit the UUID. */
-            if(getRepositoryUUID() != null || sourcePath != null){
-                changeProperty(editPath, SVNProperty.UUID, getRepositoryUUID(), isDir);
+            String uuid = (String)entryProps.get(SVNProperty.UUID);
+            if(uuid != null || sourcePath != null){
+                changeProperty(editPath, SVNProperty.UUID, uuid, isDir);
             }
         }
         /* Update lock properties. */
@@ -841,7 +851,29 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
                 changeProperty(editPath, SVNProperty.LOCK_TOKEN, null, isDir);
             }
         }
+        Map sourceProps = null;
+        if(sourcePath != null){
+            boolean propsChanged = FSRepositoryUtil.arePropsChanged(sourcePath, sourceRevision, targetPath, myReporterContext.getTargetRevision(), myReposRootDir);
+            if(!propsChanged){
+                return;
+            }
+            /* If so, go ahead and get the source path's properties. */
+            FSRevisionNode sourceNode = FSReader.getRevisionNode(myReposRootDir, sourcePath, sourceRevision);
+            sourceProps = FSReader.getProperties(sourceNode, myReposRootDir);
+        }else{
+            sourceProps = new HashMap();
+        }
+        /* Get the target path's properties */
+        Map targetProps = FSReader.getProperties(targetNode, myReposRootDir);
+        /* Now transmit the differences. */
+        Map propsDiffs = FSRepositoryUtil.getPropsDiffs(sourceProps, targetProps);
+        Object[] names = propsDiffs.keySet().toArray();
+        for(int i = 0; i < names.length; i++){
+            String propName = (String)names[i];
+            changeProperty(editPath, propName, (String)propsDiffs.get(propName), isDir);
+        }
     }
+    
     
     private void changeProperty(String path, String name, String value, boolean isDir) throws SVNException{
         if(isDir){
@@ -857,6 +889,7 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
             myReporterContext = null;
         }
     }
+    
     
     private class ReporterContext {
 

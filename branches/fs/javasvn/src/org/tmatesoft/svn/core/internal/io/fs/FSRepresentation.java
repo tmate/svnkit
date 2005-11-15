@@ -70,4 +70,12 @@ public class FSRepresentation {
     public String getHexDigest(){
         return myHexDigest;
     }
+    
+    public boolean equals(Object obj){
+        if (obj == null || obj.getClass() != FSRepresentation.class) {
+            return false;
+        }
+        FSRepresentation rep = (FSRepresentation)obj;
+        return myRevision == rep.getRevision() && myOffset == rep.getOffset();
+    }
 }

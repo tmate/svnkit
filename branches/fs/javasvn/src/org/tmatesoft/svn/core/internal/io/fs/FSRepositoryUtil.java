@@ -33,6 +33,66 @@ import org.tmatesoft.svn.core.internal.wc.SVNProperties;
  */
 public class FSRepositoryUtil {
     
+    public static Map getPropsDiffs(Map sourceProps, Map targetProps){
+        Map result = new HashMap();
+        /* Loop over sourceProps and examine each key.  This will allow 
+         * us to detect any `deletion' events or `set-modification' 
+         * events.  
+         */
+        Object[] names = sourceProps.keySet().toArray();
+        for(int i = 0; i < names.length; i++){
+            String propName = (String)names[i];
+            String srcPropVal = (String)sourceProps.get(propName);
+            /* Does property name exist in targetProps? */
+            String targetPropVal = (String)targetProps.get(propName);
+            if(targetPropVal == null){
+                /* Add a delete event to the result */
+                result.put(propName, null);
+            }else if(!targetPropVal.equals(srcPropVal)){
+                /* Add a set (modification) event to the result */
+                result.put(propName, targetPropVal);
+            }
+        }
+        /* Loop over targetProps and examine each key.  This allows us 
+         * to detect `set-creation' events 
+         */
+        names = targetProps.keySet().toArray();
+        for(int i = 0; i < names.length; i++){
+            String propName = (String)names[i];
+            String targetPropVal = (String)targetProps.get(propName);
+            /* Does property name exist in sourceProps? */
+            if(sourceProps.get(propName) == null){
+                /* Add a set (creation) event to the result */
+                result.put(propName, targetPropVal);
+            }
+        }        
+        return result;
+    }
+    
+    public static boolean arePropsChanged(String sourcePath, long sourceRevision, String targetPath, long targetRevision, File reposRootDir) throws SVNException {
+        FSRevisionNode sourceNode = FSReader.getRevisionNode(reposRootDir, sourcePath, sourceRevision);
+        FSRevisionNode targetNode = FSReader.getRevisionNode(reposRootDir, targetPath, targetRevision);
+        if(sourceNode == null){
+            SVNErrorManager.error("svn: File not found: revision " + sourceRevision + ", path '"
+                    + sourcePath + "'");
+        }
+        if(targetNode == null){
+            SVNErrorManager.error("svn: File not found: revision " + targetRevision + ", path '"
+                    + targetPath + "'");
+        }
+        /* Compare property keys. */
+        return compareRepresentations(sourceNode.getPropsRepresentation(), targetNode.getPropsRepresentation());
+    }
+    
+    private static boolean compareRepresentations(FSRepresentation r1, FSRepresentation r2){
+        if(r1 == null && r2 == null){
+            return true;
+        }else if(r1 == null || r2 == null){
+            return false;
+        }
+        return r1.equals(r2);
+    }
+    
     public static File getDigestFileFromRepositoryPath(String repositoryPath, File reposRootDir) throws SVNException {
         String digestPath = getDigestFromRepositoryPath(repositoryPath);
         return new File(getLockDigestSubdirectory(digestPath, reposRootDir), digestPath);
@@ -69,24 +129,30 @@ public class FSRepositoryUtil {
         String uuid = repository.getRepositoryUUID();
         String rev = String.valueOf(revision);
 
-        metaProps.put(SVNProperty.LAST_AUTHOR, author != null ? author : "");
-        metaProps.put(SVNProperty.COMMITTED_DATE, date != null ? date : "");
+        metaProps.put(SVNProperty.LAST_AUTHOR, author);
+        metaProps.put(SVNProperty.COMMITTED_DATE, date);
         metaProps.put(SVNProperty.COMMITTED_REVISION, rev);
-        metaProps.put(SVNProperty.UUID, uuid != null ? uuid : "");
+        metaProps.put(SVNProperty.UUID, uuid);
         return metaProps;
     }
     
     public static Map getRevisionProperties(File reposRootDir, long revision) throws SVNException {
+        /*
         Map allProps = new HashMap();
         String author = getRevisionProperty(reposRootDir, revision, SVNRevisionProperty.AUTHOR);
         String date = getRevisionProperty(reposRootDir, revision, SVNRevisionProperty.DATE);
         String log = getRevisionProperty(reposRootDir, revision, SVNRevisionProperty.LOG);
-
+        */
+        File revPropFile = getRevisionPropertiesFile(reposRootDir, revision);
+        SVNProperties revProps = new SVNProperties(revPropFile, null);
+        return revProps.asMap();
+        /*
         allProps.put(SVNRevisionProperty.AUTHOR, author);
         allProps.put(SVNRevisionProperty.DATE, date);
         allProps.put(SVNRevisionProperty.LOG, log);
 
         return allProps;
+        */
     }
 
     public static String getRevisionProperty(File reposRootDir, long revision, String revPropName) throws SVNException {
