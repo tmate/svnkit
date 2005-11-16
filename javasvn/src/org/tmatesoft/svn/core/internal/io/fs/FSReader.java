@@ -205,7 +205,7 @@ public class FSReader {
 
     private static Map getDirContents(FSRepresentation representation, File reposRootDir) throws SVNException {
         if (representation == null) {
-            return null;
+            return new HashMap();
         }
         InputStream is = null;
         try {
@@ -220,7 +220,7 @@ public class FSReader {
         } finally {
             SVNFileUtil.closeFile(is);
         }
-        return null;
+        return new HashMap();
     }
 
     private static Map getProplist(FSRepresentation representation, File reposRootDir) throws SVNException {

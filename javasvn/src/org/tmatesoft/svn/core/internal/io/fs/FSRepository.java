@@ -805,15 +805,156 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
         tmpFileOS.write(fullRepresentation.getBytes());
     }
 
+    /* Emit edits within directory (with corresponding path editPath) with 
+     * the changes from the directory sourceRevision/sourcePath to the
+     * directory myReporterContext.getTargetRevision()/targetPath.  
+     * sourcePath may be null if the entry does not exist in the source. 
+     */
     private void diffDirs(long sourceRevision, String sourcePath, String targetPath, String editPath, boolean startEmpty) throws SVNException {
         /* Compare the property lists.  If we're starting empty, pass a null
          * source path so that we add all the properties. When we support 
          * directory locks, we must pass the lock token here. */
         diffProplists(sourceRevision, startEmpty == true ? null : sourcePath, editPath, targetPath, null, true);
         /* Get the list of entries in each of source and target. */
+        Map sourceEntries = null;
         if(sourcePath != null && !startEmpty){
-            
+            sourceEntries = FSReader.getDirEntries(FSReader.getRevisionNode(myReposRootDir, sourcePath, sourceRevision), myReposRootDir);
         }
+        Map targetEntries = FSReader.getDirEntries(FSReader.getRevisionNode(myReposRootDir, targetPath, myReporterContext.getTargetRevision()), myReposRootDir);
+        /* Iterate over the report information for this directory. */
+        while(true){
+            Object[] nextInfo = fetchPathInfo(editPath);
+            String entryName = (String)nextInfo[0];
+            if(entryName == null){
+                break;
+            }
+            PathInfo pathInfo = (PathInfo)nextInfo[1];
+            if(pathInfo != null && isInvalidRevision(pathInfo.getRevision())){
+                /* We want to perform deletes before non-replacement adds,
+                 * for graceful handling of case-only renames on
+                 * case-insensitive client filesystems.  So, if the report
+                 * item is a delete, remove the entry from the source hash,
+                 * but don't update the entry yet. 
+                 */
+                if(sourceEntries != null){
+                    sourceEntries.put(entryName, null);
+                }
+                continue;
+            }
+            
+            String entryEditPath = SVNPathUtil.append(editPath, entryName);
+            String entryTargetPath = SVNPathUtil.append(targetPath, entryName);
+            FSRepresentationEntry targetEntry = (FSRepresentationEntry)targetEntries.get(entryName);
+            String entrySourcePath = sourcePath != null ? SVNPathUtil.append(sourcePath, entryName) : null;
+            FSRepresentationEntry sourceEntry = sourceEntries != null ? (FSRepresentationEntry)sourceEntries.get(entryName) : null;
+            updateEntry(sourceRevision, entrySourcePath, sourceEntry, entryTargetPath, targetEntry, entryEditPath, pathInfo, myReporterContext.isRecursive());
+            /* Don't revisit this entryName in the target or source entries. */
+            targetEntries.put(entryName, null);
+            if(sourceEntries != null){
+                sourceEntries.put(entryName, null);
+            }
+        }
+        
+        /* Remove any deleted entries. Do this before processing the
+         * target, for graceful handling of case-only renames. 
+         */
+        if(sourceEntries != null){
+            Object[] names = sourceEntries.keySet().toArray();
+            for(int i = 0; i < names.length; i++){
+                FSRepresentationEntry srcEntry = (FSRepresentationEntry)sourceEntries.get(names[i]);
+                if(targetEntries.get(srcEntry.getName()) == null){
+                    /* There is no corresponding target entry, so delete. */
+                    String entryEditPath = SVNPathUtil.append(editPath, srcEntry.getName());
+                    if(myReporterContext.isRecursive() || srcEntry.getType() != SVNNodeKind.DIR){
+                        myReporterContext.getEditor().deleteEntry(entryEditPath, -1);
+                    }
+                }
+            }
+        }
+        /* Loop over the dirents in the target. */
+
+        
+    }
+
+    /* Emits a series of editing operations to transform a source entry to
+     * a target entry.
+     * 
+     * sourceRevision and sourcePath specify the source entry.  sourceEntry 
+     * contains the already-looked-up information about the node-revision 
+     * existing at that location. sourcePath and sourceEntry may be null if 
+     * the entry does not exist in the source.  spurcePath may be non-null 
+     * and sourceEntry may be null if the caller expects pathInfo to modify 
+     * the source to an existing location.
+     *
+     * targetPath specify the target entry.  targetEntry contains
+     * the already-looked-up information about the node-revision existing
+     * at that location. targetPath and targetEntry may be null if the entry 
+     * does not exist in the target.
+     *
+     * editPath should be passed to the editor calls as the pathname. 
+     * editPath is the anchor-relative working copy pathname, which may 
+     * differ from the source and target pathnames if the report contains a 
+     * link_path.
+     *
+     * pathInfo contains the report information for this working copy path, 
+     * or null if there is none.  This method will internally modify the
+     * source and target entries as appropriate based on the report
+     * information.
+     * 
+     * If recursive is false, avoids operating on directories.  (Normally
+     * recursive is simply taken from myReporterContext.isRecursive(), but 
+     * finishReport() needs to force us to recurse into the target even if 
+     * that flag is not set.) 
+     */
+    private void updateEntry(long sourceRevision, String sourcePath, FSRepresentationEntry sourceEntry, String targetPath, FSRepresentationEntry targetEntry, String editPath, PathInfo pathInfo, boolean recursive) throws SVNException {
+        
+    }
+    
+    /* Fetch the next pathinfo from the report file for a descendent of
+     * prefix.  If the next pathinfo is for an immediate child of prefix,
+     * sets Object[0] to the path component of the report information and
+     * Object[1] to the path information for that entry.  If the next pathinfo
+     * is for a grandchild or other more remote descendent of prefix, sets
+     * Object[0] to the immediate child corresponding to that descendent and
+     * sets Object[1] to null.  If the next pathinfo is not for a descendent of
+     * prefix, or if we reach the end of the report, sets both Object[0] and 
+     * Object[1] to null.
+     *
+     * At all times, myReporterContext.getCurrentPathInfo() is presumed to be 
+     * the next pathinfo not yet returned as an immediate child, or null if we 
+     * have reached the end of the report. 
+     */
+    private Object[] fetchPathInfo(String prefix) throws SVNException{
+        Object[] result = new Object[2];
+        PathInfo pathInfo = myReporterContext.getCurrentPathInfo(); 
+        if(!areRelevant(pathInfo, prefix)){
+            /* No more entries relevant to prefix. */
+            result[0] = null;
+            result[1] = null;
+        }else{
+            /* Take a look at the prefix-relative part of the path. */
+            String relPath = "".equals(prefix) ? pathInfo.getPath() : pathInfo.getPath().substring(prefix.length() + 1);
+            if(relPath.indexOf('/') != -1){
+                /* Return the immediate child part; do not advance. */
+                result[0] = relPath.substring(0, relPath.indexOf('/'));
+                result[1] = null;
+            }else{
+                /* This is an immediate child; return it and advance. */
+                result[0] = relPath;
+                result[1] = pathInfo;
+                try{
+                    myReporterContext.getNextPathInfo();
+                }catch(IOException ioe){
+                    SVNErrorManager.error("svn: Can't read report file: " + ioe.getMessage());
+                }
+            }
+        }
+        return result;
+    }
+    
+    private boolean areRelevant(PathInfo pathInfo, String prefix){
+        /* Return true if pathInfo's path is a child of prefix. */
+        return pathInfo != null && ("".equals(prefix) || pathInfo.getPath().charAt(prefix.length()) == '/') && pathInfo.getPath().startsWith(prefix);
     }
     
     private void diffProplists(long sourceRevision, String sourcePath, String editPath, String targetPath, String lockToken, boolean isDir) throws SVNException {
