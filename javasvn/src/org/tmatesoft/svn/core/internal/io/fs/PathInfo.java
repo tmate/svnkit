@@ -50,4 +50,10 @@ public class PathInfo {
     public boolean isStartEmpty() {
         return startEmpty;
     }
+    
+    public static boolean isRelevant(PathInfo pathInfo, String prefix){
+        /* Return true if pathInfo's path is a child of prefix. */
+        return pathInfo != null && ("".equals(prefix) || pathInfo.getPath().charAt(prefix.length()) == '/') && pathInfo.getPath().startsWith(prefix);
+    }
+
 }
