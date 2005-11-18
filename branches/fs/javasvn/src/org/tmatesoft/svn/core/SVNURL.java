@@ -252,6 +252,14 @@ public class SVNURL {
         StringBuffer url = new StringBuffer();
         url.append(protocol);
         url.append("://");
+        if("file".equals(protocol)){
+            if(!path.startsWith("/")){
+                url.append("/");
+            }
+            url.append(path);
+            return url.toString();
+        }
+
         if (userInfo != null) {
             url.append(userInfo);
             url.append("@");

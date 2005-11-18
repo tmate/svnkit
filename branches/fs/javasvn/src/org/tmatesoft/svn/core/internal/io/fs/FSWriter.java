@@ -15,6 +15,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.FileOutputStream;
 import java.io.FileNotFoundException;
+import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Map;
@@ -35,6 +36,16 @@ import org.tmatesoft.svn.core.internal.util.SVNTimeUtil;
 public class FSWriter {
     private static File ourTmpDir;
 
+    public static void writePathInfo(OutputStream tmpFileOS, String target, String path, String linkPath, String lockToken, long revision, boolean startEmpty) throws IOException {
+        String anchorRelativePath = SVNPathUtil.append(target, path);
+        String linkPathRep = linkPath != null ? "+" + linkPath.length() + ":" + linkPath : "-";
+        String revisionRep = FSRepository.isValidRevision(revision) ? "+" + revision + ":" : "-";
+        String lockTokenRep = lockToken != null ? "+" + lockToken.length() + ":" + lockToken : "-";
+        String startEmptyRep = startEmpty ? "+" : "-";
+        String fullRepresentation = "+" + anchorRelativePath.length() + ":" + anchorRelativePath + linkPathRep + revisionRep + startEmptyRep + lockTokenRep;
+        tmpFileOS.write(fullRepresentation.getBytes());
+    }
+    
     /* Delete LOCK from FS in the actual OS filesystem. */
     public static void deleteLock(SVNLock lock, File reposRootDir) throws SVNException {
         String reposPath = lock.getPath();
