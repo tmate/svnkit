@@ -143,13 +143,16 @@ public class FSReader {
         return lock;
     }
     
-    
-    
-    public static FSRevisionNode getRevisionNode(File reposRootDir, String repositoryPath, long revision) throws SVNException {
+    /*
+     * If root is not null, tries to find the rev-node for repositoryPath 
+     * in the provided root, oherwise if root is null, uses the provided 
+     * revision to get the root first. 
+     */
+    public static FSRevisionNode getRevisionNode(File reposRootDir, String repositoryPath, FSRevisionNode root, long revision) throws SVNException {
         String absPath = repositoryPath;
 
         String nextPathComponent = null;
-        FSRevisionNode parent = FSReader.getRootRevNode(reposRootDir, revision);
+        FSRevisionNode parent = root != null ? root : FSReader.getRootRevNode(reposRootDir, revision);
         FSRevisionNode child = null;
 
         while (true) {

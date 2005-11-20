@@ -1,0 +1,18 @@
+Remarks to the file:/// protocol implementation (FSRepository):
+
+1) Pool for rev-nodes will surely optimize the methods run time
+
+2) For now in update operations (when ignoring ancestry) when there's a need 
+   to compare bytes of two files, I use ByteArrayOutputStream to fetch the file 
+   contents first, i.e. the contents of files file1 and file2 are loaded into 
+   the memory, what is not actually safe for huge files. But as I can guess 
+   looking at the Subversion sources, they do the same (maybe I'm wrong?) when 
+   applying a combined window and saving the result in a buffer, after what 
+   they read portions of SVN_STREAM_CHUNK_SIZE (102400 bytes) from that 
+   buffer. What I mean - they also store the full contents in the memory.
+   I'm in a great doubt.
+3) If it's true that in an FSFS repository a file may be represented with
+   more than one diff window in a particular revision, it may cause a 
+   trouble in getFile()? That is we'll have to keep the same source view 
+   during applying those windows - now every next applying delta is 
+   followed by replacing a previous source view with a previous target.
