@@ -69,25 +69,30 @@ public class FSRepositoryUtil {
         return result;
     }
     
-    public static boolean arePropsChanged(String sourcePath, long sourceRevision, String targetPath, long targetRevision, File reposRootDir) throws SVNException {
-        FSRevisionNode sourceNode = FSReader.getRevisionNode(reposRootDir, sourcePath, sourceRevision);
-        FSRevisionNode targetNode = FSReader.getRevisionNode(reposRootDir, targetPath, targetRevision);
-        if(sourceNode == null){
-            SVNErrorManager.error("svn: File not found: revision " + sourceRevision + ", path '"
-                    + sourcePath + "'");
+    public static boolean areContentsEqual(FSRevisionNode revNode1, FSRevisionNode revNode2) {
+        return areRepresentationsEqual(revNode1, revNode2, false);
+    }
+
+    public static boolean arePropertiesEqual(FSRevisionNode revNode1, FSRevisionNode revNode2) {
+        return areRepresentationsEqual(revNode1, revNode2, true);
+    }
+
+    private static boolean areRepresentationsEqual(FSRevisionNode revNode1, FSRevisionNode revNode2, boolean forProperties) {
+        if(revNode1 == revNode2){
+            return true;
+        }else if(revNode1 == null || revNode2 == null){
+            return false;
         }
-        if(targetNode == null){
-            SVNErrorManager.error("svn: File not found: revision " + targetRevision + ", path '"
-                    + targetPath + "'");
-        }
-        /* Compare property keys. */
-        return compareRepresentations(sourceNode.getPropsRepresentation(), targetNode.getPropsRepresentation());
+        /* If forProperties is true - compares property keys.
+         * Otherwise compares contents keys. 
+         */
+        return compareRepresentations(forProperties ? revNode1.getPropsRepresentation() : revNode1.getTextRepresentation(), forProperties ? revNode2.getPropsRepresentation() : revNode2.getTextRepresentation());
     }
     
     private static boolean compareRepresentations(FSRepresentation r1, FSRepresentation r2){
-        if(r1 == null && r2 == null){
+        if(r1 == r2){
             return true;
-        }else if(r1 == null || r2 == null){
+        }else if(r1 == null){
             return false;
         }
         return r1.equals(r2);

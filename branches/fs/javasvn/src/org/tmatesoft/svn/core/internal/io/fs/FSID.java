@@ -111,7 +111,13 @@ public class FSID {
         }
         return true;
     }
-
+    
+    /*
+     * Return values:
+     *  0 - id1 equals to id2
+     *  1 - id1 is related to id2 (id2 is a result of user's modifications)
+     * -1 - id1 is not related to id2 (absolutely different items)  
+     */
     public static int compareIds(FSID id1, FSID id2){
         if(areEqualIds(id1, id2)){
             return 0;
