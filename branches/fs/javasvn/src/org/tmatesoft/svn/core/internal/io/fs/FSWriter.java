@@ -36,7 +36,7 @@ import org.tmatesoft.svn.core.internal.util.SVNTimeUtil;
 public class FSWriter {
     private static File ourTmpDir;
 
-    public static void writePathInfo(OutputStream tmpFileOS, String target, String path, String linkPath, String lockToken, long revision, boolean startEmpty) throws IOException {
+    public static void writePathInfoToReportFile(OutputStream tmpFileOS, String target, String path, String linkPath, String lockToken, long revision, boolean startEmpty) throws IOException {
         String anchorRelativePath = SVNPathUtil.append(target, path);
         String linkPathRep = linkPath != null ? "+" + linkPath.length() + ":" + linkPath : "-";
         String revisionRep = FSRepository.isValidRevision(revision) ? "+" + revision + ":" : "-";
