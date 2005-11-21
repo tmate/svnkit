@@ -1065,7 +1065,8 @@ public class FSReader {
     }
 
     public static PathInfo readPathInfoFromReportFile(InputStream reportFile) throws IOException {
-        if (reportFile.read() == '-') {
+        int firstByte = reportFile.read();
+        if (firstByte == -1 || firstByte == '-') {
             return null;
         }
         String path = readStringFromReportFile(reportFile);
@@ -1091,7 +1092,7 @@ public class FSReader {
         int b;
         StringBuffer result = new StringBuffer();
         while ((b = reportFile.read()) != ':') {
-            result.append(b);
+            result.append((char)b);
         }
         return Integer.parseInt(result.toString(), 10);
     }
