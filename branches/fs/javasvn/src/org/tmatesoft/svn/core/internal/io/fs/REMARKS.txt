@@ -11,8 +11,15 @@ Remarks to the file:/// protocol implementation (FSRepository):
    they read portions of SVN_STREAM_CHUNK_SIZE (102400 bytes) from that 
    buffer. What I mean - they also store the full contents in the memory.
    I'm in a great doubt.
+   
+   - Now I'm writing all the contents to files - is it better, guess 
+     not the ideal solution
 3) If it's true that in an FSFS repository a file may be represented with
    more than one diff window in a particular revision, it may cause a 
    trouble in getFile()? That is we'll have to keep the same source view 
    during applying those windows - now every next applying delta is 
    followed by replacing a previous source view with a previous target.
+4) I've noticed a problem with invoking a pre-revprop-change hook - 
+   svn sucessfully manages to try an empty hook file, but in Java 
+   Runtime.getRuntime().exec(cmd) failed to run an empty file - what's
+   the problem?
