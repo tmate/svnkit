@@ -478,40 +478,8 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
         }
         return properties;
     }
-
-    private FSRevisionNode getRevisionNode(File reposRootDir, String repositoryPath, long revision) throws SVNException {
-        String absPath = repositoryPath;// super.getRepositoryPath(path);
-
-        String nextPathComponent = null;
-        FSRevisionNode parent = FSReader.getRootRevNode(reposRootDir, revision);
-        FSRevisionNode child = null;
-        if (absPath.indexOf(':') != -1 || absPath.indexOf('|') != -1) {
-            absPath = (absPath.indexOf('/') != -1) ? absPath.substring(absPath.indexOf('/')) : "";
-        }
-
-        while (true) {
-            nextPathComponent = SVNPathUtil.head(absPath);
-            absPath = SVNPathUtil.removeHead(absPath);
-
-            if (nextPathComponent.length() == 0) {
-                child = parent;
-            } else {
-            	//commented because of svn update made conflict
-           //     child = FSReader.getChildDirNode(nextPathComponent, parent, reposRootDir);
-                if (child == null) {
-                    return null;
-                }
-
-            }
-            parent = child;
-
-            if ("".equals(absPath)) {
-                break;
-            }
-        }
-        return parent;
-    }
-	private SVNDirEntry buildDirEntry(FSRepresentationEntry repEntry, FSRevisionNode revNode, File reposRootDir, boolean includeLogs) throws SVNException {
+	
+    private SVNDirEntry buildDirEntry(FSRepresentationEntry repEntry, FSRevisionNode revNode, File reposRootDir, boolean includeLogs) throws SVNException {
         FSRevisionNode entryNode = revNode == null ? FSReader.getRevNodeFromID(reposRootDir, repEntry.getId()) : revNode;
 
         // dir size is equated to 0
@@ -1401,13 +1369,6 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
             return myReportOS;
         }
 
-/*        public InputStream getReportFileForReading() throws SVNException {
-            if (myReportIS == null) {
-                myReportIS = SVNFileUtil.openFileForReading(myReportFile);
-            }
-            return myReportIS;
-        }
-*/
         public boolean isIgnoreAncestry(){
             return ignoreAncestry;
         }

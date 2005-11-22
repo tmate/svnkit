@@ -120,13 +120,12 @@ public class FSWriter {
             }
             props.put(FSConstants.CHILDREN_LOCK_KEY, value.toString());
         }
-        //Need to update *.core to be on right way )
-/*        try{
+
+        try{
             SVNProperties.setProperties(props, digestLockFile);
         }catch(SVNException svne){
             SVNErrorManager.error("svn: Cannot write lock/entries hashfile '" + digestLockFile.getAbsolutePath() + "': " + svne.getMessage());
         }
-*/        
     }
     
     public static boolean ensureDirExists(File dir, boolean create){

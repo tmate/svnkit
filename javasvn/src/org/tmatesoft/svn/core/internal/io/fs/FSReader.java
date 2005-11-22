@@ -201,6 +201,7 @@ public class FSReader {
 
     	return locations;
     }
+    
     public static SVNLock getLock(String repositoryPath, boolean haveWriteLock, Collection children, File reposRootDir) throws SVNException {
         SVNLock lock = fetchLock(repositoryPath, children, reposRootDir);
         if(lock == null){
