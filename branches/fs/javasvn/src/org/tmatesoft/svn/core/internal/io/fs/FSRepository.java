@@ -479,7 +479,39 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
         return properties;
     }
 
-    private SVNDirEntry buildDirEntry(FSRepresentationEntry repEntry, FSRevisionNode revNode, File reposRootDir, boolean includeLogs) throws SVNException {
+    private FSRevisionNode getRevisionNode(File reposRootDir, String repositoryPath, long revision) throws SVNException {
+        String absPath = repositoryPath;// super.getRepositoryPath(path);
+
+        String nextPathComponent = null;
+        FSRevisionNode parent = FSReader.getRootRevNode(reposRootDir, revision);
+        FSRevisionNode child = null;
+        if (absPath.indexOf(':') != -1 || absPath.indexOf('|') != -1) {
+            absPath = (absPath.indexOf('/') != -1) ? absPath.substring(absPath.indexOf('/')) : "";
+        }
+
+        while (true) {
+            nextPathComponent = SVNPathUtil.head(absPath);
+            absPath = SVNPathUtil.removeHead(absPath);
+
+            if (nextPathComponent.length() == 0) {
+                child = parent;
+            } else {
+            	//commented because of svn update made conflict
+           //     child = FSReader.getChildDirNode(nextPathComponent, parent, reposRootDir);
+                if (child == null) {
+                    return null;
+                }
+
+            }
+            parent = child;
+
+            if ("".equals(absPath)) {
+                break;
+            }
+        }
+        return parent;
+    }
+	private SVNDirEntry buildDirEntry(FSRepresentationEntry repEntry, FSRevisionNode revNode, File reposRootDir, boolean includeLogs) throws SVNException {
         FSRevisionNode entryNode = revNode == null ? FSReader.getRevNodeFromID(reposRootDir, repEntry.getId()) : revNode;
 
         // dir size is equated to 0
@@ -577,6 +609,20 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
     }
 
     public int getLocations(String path, long pegRevision, long[] revisions, ISVNLocationEntryHandler handler) throws SVNException {
+    	try{
+    		openRepository();
+    		if (!SVNRepository.isValidRevision(pegRevision)){
+    			//Bad situation: how to react at bad revisoin????????
+    			return -1;    		
+    		}
+    		//Get absolute path of file
+    		path = path == null ? "" : path;
+    		String repositoryPath = super.getRepositoryPath(path);
+            String parentPath = SVNPathUtil.removeTail(repositoryPath);
+            
+    	}finally{
+    		closeRepository();
+    	}
         return 0;
     }
 
@@ -616,8 +662,14 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
     public void status(long revision, String target, boolean recursive, ISVNReporterBaton reporter, ISVNEditor editor) throws SVNException {
         try {
             openRepository();
+
+          //!!!!commented because of bad situation
+          //  File tmpFile = FSWriter.createUniqueTemporaryFile("report", ".tmp");
+          //  myReporterContext = new ReporterContext(revision, tmpFile, target, recursive, editor);
+
             File tmpFile = FSWriter.createUniqueTemporaryFile("report", ".tmp");
             makeReporterContext(revision, tmpFile, target, null, recursive, false, false, editor);
+
             reporter.report(this);
         } finally {
             closeRepository();
@@ -714,7 +766,7 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
             SVNErrorManager.error("svn: Can't write path info: " + ioe.getMessage());
         }
     }
-
+   
     public void finishReport() throws SVNException {
         OutputStream tmpFile = myReporterContext.getReportFileForWriting();
         try {
@@ -727,6 +779,7 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
          * Read the first pathinfo from the report and verify that it is a
          * top-level set_path entry.
          */
+
         PathInfo info = null;
         try {
             info = myReporterContext.getFirstPathInfo();
@@ -771,7 +824,7 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
         String fullSourcePath = "/".equals(anchor) ? anchor + myReporterContext.getReportTarget(): SVNPathUtil.append(getRepositoryPath(""), myReporterContext.getReportTarget());
         FSRepresentationEntry targetEntry = fakeDirEntry(fullTargetPath, myReporterContext.getTargetRoot(myReposRootDir), myReporterContext.getTargetRevision());
         FSRepresentationEntry sourceEntry = fakeDirEntry(fullSourcePath, null, sourceRevision);
-
+        
         /* 
          * If the operand is a locally added file or directory, it won't
          * exist in the source, so accept that. 
@@ -803,6 +856,7 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
         myReporterContext.getEditor().closeEdit();
         
         disposeReporterContext();
+        
     }
 
     public void abortReport() throws SVNException {

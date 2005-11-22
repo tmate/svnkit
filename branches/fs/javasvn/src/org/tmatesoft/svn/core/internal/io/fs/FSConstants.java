@@ -56,4 +56,7 @@ public class FSConstants {
      * calculate a subdirectory in which to drop that file. 
      */
     public static final int DIGEST_SUBDIR_LEN = 3;
+    
+    //invalid revision number, suppose it to be -1
+    public static final int SVN_INVALID_REVNUM = -1;
 }
