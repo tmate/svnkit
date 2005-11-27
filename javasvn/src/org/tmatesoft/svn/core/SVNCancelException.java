@@ -29,7 +29,7 @@ public class SVNCancelException extends SVNException {
      * @param message  an error message describing why the operation 
      *                 was cancelled
      */
-    public SVNCancelException(String message) {
-        super(message);
+    public SVNCancelException() {
+        super(SVNErrorMessage.create(SVNErrorCode.CANCELLED), null);
     }
 }

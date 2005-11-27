@@ -11,14 +11,16 @@
  */
 package org.tmatesoft.svn.core.internal.io.dav;
 
-import org.tmatesoft.svn.core.SVNAuthenticationException;
-import org.tmatesoft.svn.core.auth.SVNPasswordAuthentication;
-
 import java.io.UnsupportedEncodingException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Map;
 import java.util.StringTokenizer;
+
+import org.tmatesoft.svn.core.SVNErrorCode;
+import org.tmatesoft.svn.core.SVNErrorMessage;
+import org.tmatesoft.svn.core.SVNException;
+import org.tmatesoft.svn.core.auth.SVNPasswordAuthentication;
 
 /**
  * @version 1.0
@@ -38,7 +40,7 @@ public class HttpDigestAuth {
 
     private SVNPasswordAuthentication myCredentials;
 
-    public HttpDigestAuth(SVNPasswordAuthentication credentials, Map challenge) throws SVNAuthenticationException {
+    public HttpDigestAuth(SVNPasswordAuthentication credentials, Map challenge) throws SVNException {
         myChallenge = challenge;
         String qop = (String) challenge.get("qop");
         String selectedQop = null;
@@ -52,14 +54,14 @@ public class HttpDigestAuth {
             }
         }
         if (selectedQop != null && !"auth".equals(selectedQop)) {
-            throw new SVNAuthenticationException("Digest HTTP auth: '" + selectedQop + "' is not supported");
+            SVNException.throwException(SVNErrorMessage.create(SVNErrorCode.RA_NOT_AUTHORIZED, "Digest HTTP auth: ''{0}'' is not supported", selectedQop));
         }
         myQop = selectedQop;
         myCnonce = createCnonce();
         myCredentials = credentials;
     }
 
-    public String authenticate() throws SVNAuthenticationException {
+    public String authenticate() throws SVNException {
         String uname = myCredentials.getUserName();
 
         String digest = createDigest(uname, myCredentials.getPassword(), "US-ASCII");
@@ -92,7 +94,7 @@ public class HttpDigestAuth {
         return sb.toString();
     }
 
-    private String createDigest(String uname, String pwd, String charset) throws SVNAuthenticationException {
+    private String createDigest(String uname, String pwd, String charset) throws SVNException {
         final String digAlg = "MD5";
 
         String uri = getParameter("uri");
@@ -106,9 +108,8 @@ public class HttpDigestAuth {
         try {
             md5Helper = MessageDigest.getInstance(digAlg);
         } catch (Exception e) {
-            throw new SVNAuthenticationException(
-              "Unsupported algorithm in HTTP Digest authentication: "
-               + digAlg);
+            SVNException.throwException(SVNErrorMessage.create(SVNErrorCode.RA_NOT_AUTHORIZED, "Unsupported algorithm in HTTP Digest authentication: ''{0}''", digAlg));
+            return null;
         }
         StringBuffer tmp = new StringBuffer(uname.length() + realm.length() + pwd.length() + 2);
         tmp.append(uname);

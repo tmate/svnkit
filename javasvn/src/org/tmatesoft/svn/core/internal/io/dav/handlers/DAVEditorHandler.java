@@ -14,6 +14,8 @@ package org.tmatesoft.svn.core.internal.io.dav.handlers;
 
 import java.io.UnsupportedEncodingException;
 
+import org.tmatesoft.svn.core.SVNErrorCode;
+import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNProperty;
 import org.tmatesoft.svn.core.SVNURL;
@@ -127,7 +129,7 @@ public class DAVEditorHandler extends BasicDAVDeltaHandler {
             public void finishReport() {
             }
             public void abortReport() throws SVNException {
-                throw new SVNException();
+                SVNException.throwCancelException();
             }
         });
         buffer.append("</S:update-report>");
@@ -174,7 +176,7 @@ public class DAVEditorHandler extends BasicDAVDeltaHandler {
         if (element == UPDATE_REPORT) {
             String receiveAll = attrs.getValue(SEND_ALL_ATTR);
             if (receiveAll == null || !Boolean.valueOf(receiveAll).booleanValue()) {
-                throw new SVNException("update-report format used by server is not supported");
+                SVNException.throwException(SVNErrorMessage.create(SVNErrorCode.RA_NOT_IMPLEMENTED, "update-report format used by server is not supported"));
             }
         } else if (element == TARGET_REVISION) {
             long revision = Long.parseLong(attrs.getValue(REVISION_ATTR));
@@ -236,7 +238,7 @@ public class DAVEditorHandler extends BasicDAVDeltaHandler {
                 myEditor.changeFileProperty(myPath, name, null);
             }            
         } else if (element == RESOURCE || element == FETCH_FILE || element == FETCH_PROPS) {
-            throw new SVNException(element + " element is not supported in update-report");
+            SVNException.throwException(SVNErrorMessage.create(SVNErrorCode.RA_DAV_MALFORMED_DATA, "Unexpected element received in update report"));
         } else if (element == TX_DELTA) {
             if (myIsFetchContent) {
                 setDeltaProcessing(true);

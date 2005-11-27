@@ -11,10 +11,7 @@
  */
 package org.tmatesoft.svn.core.internal.io.dav;
 
-import org.tmatesoft.svn.core.internal.io.dav.commons.CommonsHTTPConnection;
 import org.tmatesoft.svn.core.io.SVNRepository;
-
-
 /**
  * @version 1.0
  * @author  TMate Software Ltd.
@@ -28,13 +25,6 @@ public interface IHTTPConnectionFactory {
     public IHTTPConnectionFactory DEFAULT = new IHTTPConnectionFactory() {
 
         public IHTTPConnection createHTTPConnection(SVNRepository repository) {
-            try {
-                Class httpClientClass = getClass().getClassLoader().loadClass(HTTP_CLIENT_CLASS_NAME);
-                if (httpClientClass != null && HTTP_CLIENT_JAKARTA.equalsIgnoreCase(System.getProperty(HTTP_CLIENT_PROPERTY))) {
-                    return new CommonsHTTPConnection(repository);
-                }
-            } catch (ClassNotFoundException e) {
-            }
             return new DefaultHTTPConnection(repository);
         }
         

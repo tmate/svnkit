@@ -10,6 +10,8 @@
  */
 package org.tmatesoft.svn.core.internal.wc;
 
+import org.tmatesoft.svn.core.SVNErrorCode;
+import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.util.SVNDebugLog;
 
@@ -26,6 +28,6 @@ public class SVNErrorManager {
             message = "svn: " + message;
         }
         SVNDebugLog.logInfo(message);
-        throw new SVNException(message);
+        SVNException.throwException(SVNErrorMessage.create(SVNErrorCode.UNKNOWN, message));
     }
 }

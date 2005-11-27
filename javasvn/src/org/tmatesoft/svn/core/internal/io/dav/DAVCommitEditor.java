@@ -119,8 +119,8 @@ class DAVCommitEditor implements ISVNEditor {
         DAVResource parentResource = (DAVResource) myDirsStack.peek();
         if (parentResource.getWorkingURL() == null) {
         	String filePath = SVNPathUtil.append(parentResource.getURL(), SVNPathUtil.tail(path));
-    		DAVResponse responce = DAVUtil.getResourceProperties(myConnection, filePath, null, DAVElement.STARTING_PROPERTIES, true);
-    		if (responce != null) {
+    		DAVResponse response = DAVUtil.getResourceProperties(myConnection, filePath, null, DAVElement.STARTING_PROPERTIES, true);
+    		if (response != null) {
     			throw new SVNException("Directory '"  + filePath + "' already exists");
     		}
         }

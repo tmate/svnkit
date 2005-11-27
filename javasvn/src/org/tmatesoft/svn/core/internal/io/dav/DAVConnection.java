@@ -16,11 +16,15 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InterruptedIOException;
 import java.io.OutputStream;
+import java.net.SocketException;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.tmatesoft.svn.core.SVNErrorCode;
+import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNLock;
 import org.tmatesoft.svn.core.SVNURL;
@@ -200,7 +204,7 @@ public class DAVConnection {
                 id = lock.getID();
             } 
             if (id == null) {
-                throw new SVNException("repository path '" + path + "' is not locked.");
+                SVNException.throwException(SVNErrorMessage.create(SVNErrorCode.RA_NOT_LOCKED, "''{0}'' is not locked in the repository"));
             }
         }
         Map header = new HashMap();
@@ -287,7 +291,7 @@ public class DAVConnection {
                     bos.write(b);
                 }
             } catch (IOException e) {
-                throw new SVNException(e);
+                SVNException.throwException(getErrorMessage("Unlock request failed", myRepository.getLocation(), e));
             } finally {
                 try {
                     data.close();
@@ -394,5 +398,19 @@ public class DAVConnection {
         if (myHttpConnection != null) {
             myHttpConnection.clearAuthenticationCache();
         }
+    }
+    
+    private static SVNErrorMessage getErrorMessage(String context, SVNURL url, IOException e) {
+        SVNErrorCode code = SVNErrorCode.RA_DAV_REQUEST_FAILED;
+        String message;
+        if (e instanceof SocketException) {
+            message = "could not connect to server";
+        } else if (e instanceof InterruptedIOException) {
+            message = "timed out waiting for server";
+        } else {
+            message = e.getMessage();
+        }
+        message = context + ": " + message + "(" + url.getProtocol() + "://" + url.getHost() + ":" + url.getPort() + ")";
+        return SVNErrorMessage.create(code, message);
     }
 }

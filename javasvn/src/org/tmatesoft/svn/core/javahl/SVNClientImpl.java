@@ -35,6 +35,8 @@ import org.tmatesoft.svn.core.ISVNLogEntryHandler;
 import org.tmatesoft.svn.core.SVNCancelException;
 import org.tmatesoft.svn.core.SVNCommitInfo;
 import org.tmatesoft.svn.core.SVNDirEntry;
+import org.tmatesoft.svn.core.SVNErrorCode;
+import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNLogEntry;
 import org.tmatesoft.svn.core.SVNURL;
@@ -1105,7 +1107,7 @@ public class SVNClientImpl implements SVNClientInterface {
                 public void checkCancelled() throws SVNCancelException {
                     if(myCancelOperation){
                         myCancelOperation = false;
-                        throw new SVNCancelException("operation cancelled");
+                        SVNException.throwCancelException();
                     }
                 }
             };

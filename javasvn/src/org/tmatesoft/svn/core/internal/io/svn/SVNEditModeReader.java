@@ -17,6 +17,8 @@ import java.io.OutputStream;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.tmatesoft.svn.core.SVNErrorCode;
+import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
@@ -68,7 +70,7 @@ public class SVNEditModeReader {
     public boolean processCommand(String commandName, InputStream parameters) throws SVNException {
         String pattern = (String) COMMANDS_MAP.get(commandName);
         if (pattern == null) {
-            throw new SVNException("unknown command name: " + commandName);
+            SVNException.throwException(SVNErrorMessage.create(SVNErrorCode.RA_SVN_UNKNOWN_CMD));
         }
         if ("textdelta-chunk".equals(commandName)) {
             if (myBuilder.getDiffWindow() == null) {
@@ -103,7 +105,7 @@ public class SVNEditModeReader {
                     try {
                         myDiffStream.write(line);
                     } catch (IOException e) {
-                        throw new SVNException(e);
+                        SVNException.throwException(SVNErrorMessage.create(SVNErrorCode.RA_SVN_IO_ERROR, e.getMessage()), e);
                     }
                 }
                 if (myLenght == 0) {
@@ -163,7 +165,7 @@ public class SVNEditModeReader {
         try {
             myDiffStream.close();
         } catch (IOException e) {
-            throw new SVNException(e);
+            SVNException.throwException(SVNErrorMessage.create(SVNErrorCode.RA_SVN_IO_ERROR, e.getMessage()), e);
         }
         myBuilder.reset(SVNDiffWindowBuilder.OFFSET);
         myDiffStream = null;

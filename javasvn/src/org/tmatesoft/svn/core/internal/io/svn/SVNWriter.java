@@ -18,9 +18,10 @@ import java.util.Date;
 import java.util.Iterator;
 import java.util.Map;
 
+import org.tmatesoft.svn.core.SVNErrorCode;
+import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.internal.util.SVNTimeUtil;
-import org.tmatesoft.svn.util.SVNDebugLog;
 
 /**
  * @version 1.0
@@ -141,8 +142,7 @@ public class SVNWriter {
                 os.write(' ');
             }
         } catch (IOException e) {
-            SVNDebugLog.logInfo(e);
-            throw new SVNException("error while sending data", e);
+            SVNException.throwException(SVNErrorMessage.create(SVNErrorCode.RA_SVN_IO_ERROR, e.getMessage()), e);
         } 
     }
 }

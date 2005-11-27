@@ -16,6 +16,8 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.Socket;
 
+import org.tmatesoft.svn.core.SVNErrorCode;
+import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNURL;
 import org.tmatesoft.svn.core.internal.util.SVNSocketFactory;
@@ -43,7 +45,7 @@ public class SVNPlainConnector implements ISVNConnector {
             try {
                 mySocket.close();
             } catch (IOException ex) {
-                throw new SVNException(ex);
+                SVNException.throwException(SVNErrorMessage.create(SVNErrorCode.RA_SVN_IO_ERROR, ex.getMessage(), ex));
             } finally {
                 mySocket = null;
                 myInputStream = null;
