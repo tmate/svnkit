@@ -125,7 +125,7 @@ public class FSID {
         return checkIdsRelated(id1, id2) ? 1 : -1;
     }
     
-    private static boolean checkIdsRelated(FSID id1, FSID id2){
+    public static boolean checkIdsRelated(FSID id1, FSID id2){
         if(id1 == id2){
             return true;
         }
@@ -144,7 +144,7 @@ public class FSID {
         if(id1 == id2){
             return true;
         }else if(id1 != null){
-            id1.equals(id2);
+            return id1.equals(id2);
         }else if(id2 != null){
             return id2.equals(id1);
         }
