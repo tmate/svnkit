@@ -27,6 +27,8 @@ import org.tmatesoft.svn.core.ISVNLogEntryHandler;
 import org.tmatesoft.svn.core.SVNAuthenticationException;
 import org.tmatesoft.svn.core.SVNCancelException;
 import org.tmatesoft.svn.core.SVNDirEntry;
+import org.tmatesoft.svn.core.SVNErrorCode;
+import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNLock;
 import org.tmatesoft.svn.core.SVNLogEntry;
@@ -528,7 +530,7 @@ class DAVRepository extends SVNRepository {
 
     public void update(SVNURL url, long revision, String target, boolean recursive, ISVNReporterBaton reporter, ISVNEditor editor) throws SVNException {
         if (url == null) {
-            throw new SVNException(url + ": not valid URL");
+            SVNException.throwException(SVNErrorMessage.create(SVNErrorCode.BAD_URL, "URL can not be NULL"));
         }
         try {
             openConnection();
@@ -550,7 +552,7 @@ class DAVRepository extends SVNRepository {
     
     public void diff(SVNURL url, long targetRevision, long revision, String target, boolean ignoreAncestry, boolean recursive, ISVNReporterBaton reporter, ISVNEditor editor) throws SVNException {
         if (url == null) {
-            throw new SVNException(url + ": not valid URL");
+            SVNException.throwException(SVNErrorMessage.create(SVNErrorCode.BAD_URL, "URL can not be NULL"));
         }
         if (revision < 0) {
             revision = targetRevision;
@@ -606,7 +608,8 @@ class DAVRepository extends SVNRepository {
                 }   
             });
             if (blPath[0] == null) {
-                throw new SVNException("repository auto-versioning is enabled, can't put unversioned property");
+                SVNException.throwException(SVNErrorMessage.create(SVNErrorCode.RA_DAV_REQUEST_FAILED, "DAV request failed; it's possible that the repository's " +
+                        "pre-revprop-change hook either failed or is non-existent"));
             }
             myConnection.doProppatch(null, blPath[0], request, null);
         } finally {
@@ -683,12 +686,12 @@ class DAVRepository extends SVNRepository {
                 path = getFullPath(path);
                 path = SVNEncodingUtil.uriEncode(path);
                 SVNLock lock = null;
-                SVNException error = null;
+                SVNErrorMessage error = null;
                 long revisionNumber = revision != null ? revision.longValue() : -1;
                 try {
                      lock = myConnection.doLock(path, comment, force, revisionNumber);
                 } catch (SVNException e) {
-                    error = e;
+                    error = e.getErrorMessage();
                     throw e;
                 }
                 if (handler != null) {
@@ -705,18 +708,17 @@ class DAVRepository extends SVNRepository {
             openConnection();
             for (Iterator paths = pathToTokens.keySet().iterator(); paths.hasNext();) {
                 String path = (String) paths.next();
-                String shortPath = path;
                 String id = (String) pathToTokens.get(path);
                 String repositoryPath = getRepositoryPath(path);
                 path = getFullPath(path);
                 path = SVNEncodingUtil.uriEncode(path);
-                SVNException error = null;
+                SVNErrorMessage error = null;
                 try {
                     myConnection.doUnlock(path, id, force);
                     error = null;
                 } catch (SVNException e) {
-                    if (e.getMessage().indexOf("not locked") >= 0) {
-                        error = new SVNException("svn: Repository path '" + shortPath + "' is not locked");
+                    if (e.getErrorMessage().getErrorCode() == SVNErrorCode.RA_NOT_LOCKED) {
+                        error = e.getErrorMessage();
                     } else {
                         throw e;
                     }

@@ -15,7 +15,8 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.tmatesoft.svn.core.SVNAuthenticationException;
+import org.tmatesoft.svn.core.SVNErrorCode;
+import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNURL;
 
@@ -132,7 +133,8 @@ public class BasicAuthenticationManager implements ISVNAuthenticationManager, IS
             myPasswordIndex = 0; 
             return (SVNAuthentication) myPasswordAuthentications.get(0);
         }
-        throw new SVNAuthenticationException("svn: Authentication required for '" + realm + "'");
+        SVNException.throwException(SVNErrorMessage.create(SVNErrorCode.RA_NOT_AUTHORIZED, "Authentication required for ''{0}''", realm));
+        return null;
     } 
 
     public SVNAuthentication getNextAuthentication(String kind, String realm, SVNURL url) throws SVNException {
@@ -143,7 +145,8 @@ public class BasicAuthenticationManager implements ISVNAuthenticationManager, IS
             myPasswordIndex++; 
             return (SVNAuthentication) myPasswordAuthentications.get(myPasswordIndex);
         }
-        throw new SVNAuthenticationException("svn: Authentication failed for '" + realm + "'");
+        SVNException.throwException(SVNErrorMessage.create(SVNErrorCode.RA_NOT_AUTHORIZED, "Authentication required for ''{0}''", realm));
+        return null;
     }
     
     /**
@@ -186,7 +189,7 @@ public class BasicAuthenticationManager implements ISVNAuthenticationManager, IS
      * @param errorMessage
      * @param authentication
      */
-    public void acknowledgeAuthentication(boolean accepted, String kind, String realm, String errorMessage, SVNAuthentication authentication) {
+    public void acknowledgeAuthentication(boolean accepted, String kind, String realm, SVNErrorMessage errorMessage, SVNAuthentication authentication) {
     }
     
     /**

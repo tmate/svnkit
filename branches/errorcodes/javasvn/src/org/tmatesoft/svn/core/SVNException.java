@@ -12,6 +12,10 @@
 
 package org.tmatesoft.svn.core;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
 
 /**
  * A main exception class that is used in the JavaSVN library. All other
@@ -22,59 +26,76 @@ package org.tmatesoft.svn.core;
  */
 public class SVNException extends Exception {
 
-    /**
-     * A default constructor.
-     *
-     */
-    public SVNException() {
+    private static final SVNErrorMessage UNKNOWN_ERROR = SVNErrorMessage.create(SVNErrorCode.UNKNOWN, "Unknown error");
+    
+    public static void throwException(SVNErrorMessage message) throws SVNException {
+        throwException(message, null);
     }
     
-    /**
-     * Constructs an <b>SVNException</b> provided an error 
-     * description message.
-     * 
-     * @param message	an informational message
-     */
-    public SVNException(String message) {
-        super(message);
+    public static void throwException(SVNErrorMessage message, Throwable cause) throws SVNException {
+        if (message == null) {
+            message = UNKNOWN_ERROR;
+        }
+        if (cause instanceof SVNException) {
+            List messagesList = new ArrayList();
+            messagesList.add(message);
+            messagesList.addAll(((SVNException) cause).myMessages);
+            throw new SVNException(messagesList, cause);
+        } 
+        throwException(Collections.singletonList(message), cause);
+    }
+
+    public static void throwException(List messages, Throwable cause) throws SVNException {
+        if (messages == null || messages.isEmpty()) {
+            throwException(UNKNOWN_ERROR, cause);
+        }
+        SVNErrorMessage message = (SVNErrorMessage) messages.get(0);
+        if (message.getErrorCode() == SVNErrorCode.CANCELLED) {
+            throw new SVNCancelException();
+        } else if (message.getErrorCode().isAuthentication()) {
+            throw new SVNAuthenticationException(message);
+        }
+        throw new SVNException(messages, cause);
     }
     
-    /**
-     * Constructs an <b>SVNException</b> provided an error description 
-     * message and an original exception - the cause of this exception.
-     * 
-     * @param message	an informational message
-     * @param cause		an initial cause of this exception 
-     */
-    public SVNException(String message, Throwable cause) {
-        super(message, cause);
+    public static void throwCancelException() throws SVNCancelException {
+        throw new SVNCancelException();
     }
+
+    private List myMessages;
     
-    /**
-     * Constructs an <code>SVNException</code> provided an original 
-     * <code>Throwable</code> - as a real cause of the exception.
-     * 
-     * @param cause		an initial cause of this exception 
-     */
-    public SVNException(Throwable cause) {
+    protected SVNException(List messages, Throwable cause) {
         super(cause);
+        myMessages = messages == null || messages.isEmpty() ? 
+                Collections.singletonList(SVNErrorMessage.UNKNOWN_ERROR_MESSAGE) : messages ;
+    }
+
+    protected SVNException(SVNErrorMessage message, Throwable cause) {
+        super(cause);
+        myMessages = Collections.singletonList(message == null ? SVNErrorMessage.UNKNOWN_ERROR_MESSAGE : message);
     }
     
-    /**
-     * Returns the informational message describing the cause
-     * of this exception.
-     * 
-     * @return an informational message
-     */
+    public String getLocalizedMessage() {
+        return getMessage();
+    }
+    
     public String getMessage() {
-        StringBuffer message = new StringBuffer();
-        if (super.getMessage() != null && !"".equals(super.getMessage().trim())) {
-            message.append(super.getMessage());
+        return getErrorMessage().toString();
+    }
+
+    public SVNErrorMessage getErrorMessage() {
+        return (SVNErrorMessage) myMessages.get(0);
+    }
+    
+    public String toString() {
+        StringBuffer result = new StringBuffer();
+        for (int i = 0; i < myMessages.size(); i++) {
+            SVNErrorMessage message = (SVNErrorMessage) myMessages.get(i);
+            result.append(message.toString());
+            if (i + 1 < myMessages.size()) {
+                result.append("\n");
+            }
         }
-        if (getCause() instanceof SVNException) {
-            message.append("\n");
-            message.append(((SVNException) getCause()).getMessage());
-        }
-        return message.toString();
+        return result.toString();
     }
 }
