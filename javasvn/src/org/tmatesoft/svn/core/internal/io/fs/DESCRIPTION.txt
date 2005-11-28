@@ -133,5 +133,8 @@ windows and new data for them. Further, when all deltas are collected,
 I retrieve a window by window and retieve them all in series to get 
 full file contents in a definite revision.
     
+12)FSRevisionNodePool & DefaultFSRevisionNodePool - used for retrieving & caching
+root rev nodes as well as other rev nodes. Used to optimize the run-time 
+characteristics.
 
 
