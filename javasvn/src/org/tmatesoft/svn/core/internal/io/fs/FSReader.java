@@ -483,8 +483,7 @@ public class FSReader {
             }
 
         } catch (IOException ioe) {
-            ioe.printStackTrace();
-            // ????
+            SVNErrorManager.error("Can't write to target stream: " + ioe.getMessage());
         } finally {
             windowsStreams.closeSourceStream();
             windowsStreams.closeTargetStream();
