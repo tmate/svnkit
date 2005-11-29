@@ -117,7 +117,7 @@ on.
       reports
     - writing lock data to /db/locks/xxx/lockdigestfile
     - creating unique tmp files
-and so on... I guess write func will grow as we move further (commit)
+and so on... I guess write func will grow as we move further (with commit)
 
 8)PathInfo - represents path info that was reported by metods of 
 ISVNReporter

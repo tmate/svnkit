@@ -30,6 +30,7 @@ import java.util.Set;
 
 import org.tmatesoft.svn.core.ISVNDirEntryHandler;
 import org.tmatesoft.svn.core.ISVNLogEntryHandler;
+import org.tmatesoft.svn.core.SVNCommitInfo;
 import org.tmatesoft.svn.core.SVNDirEntry;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNLock;
@@ -44,6 +45,7 @@ import org.tmatesoft.svn.core.io.ISVNReporterBaton;
 import org.tmatesoft.svn.core.io.ISVNSession;
 import org.tmatesoft.svn.core.io.ISVNWorkspaceMediator;
 import org.tmatesoft.svn.core.io.SVNRepository;
+import org.tmatesoft.svn.core.io.diff.SVNDiffWindow;
 import org.tmatesoft.svn.core.io.diff.SVNRAFileData;
 import org.tmatesoft.svn.core.io.diff.SVNSequenceDeltaGenerator;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
@@ -661,6 +663,15 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
     }
 
     public ISVNEditor getCommitEditor(String logMessage, Map locks, boolean keepLocks, ISVNWorkspaceMediator mediator) throws SVNException {
+        try {
+            openRepository();
+            //TODO: create and return an FSCommitEditor instance
+        } finally {
+            closeRepository();
+        }
+        
+        
+        //TODO: to delete when finished!
         return null;
     }
 
@@ -807,7 +818,6 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
     public void abortReport() throws SVNException {
         disposeReporterContext();
     }
-
 
     /* Emit edits within directory (with corresponding path editPath) with 
      * the changes from the directory sourceRevision/sourcePath to the
@@ -1060,7 +1070,7 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
      * editPath should be passed to the editor calls as the pathname. 
      * editPath is the anchor-relative working copy pathname, which may 
      * differ from the source and target pathnames if the report contains a 
-     * link_path.
+     * linkPath.
      *
      * pathInfo contains the report information for this working copy path, 
      * or null if there is none.  This method will internally modify the
@@ -1391,6 +1401,93 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
                 myTargetRoot = myRevNodesPool.getRootRevisionNode(myTargetRevision, myReposRootDir); 
             }
             return myTargetRoot; 
+        }
+    }
+
+    private class FSCommitEditor implements ISVNEditor {
+        private ISVNWorkspaceMediator myMediator;
+        private Map myLockTokens;
+        private String myUserName;
+        private FSTransaction myTxn;
+        private boolean isTxnOwner;
+        
+        public FSCommitEditor(FSTransaction txn, String userName, Map lockTokens, ISVNWorkspaceMediator mediator){
+            myMediator = mediator;
+            myLockTokens = lockTokens;
+            myUserName = userName;
+            myTxn = txn;
+            isTxnOwner = txn == null ? true : false;
+        }
+        
+        public void targetRevision(long revision) throws SVNException {
+            //does nothing
+        }
+
+        public void openRoot(long revision) throws SVNException {
+            /* Ignore revision.  We always build our transaction against
+             * HEAD. However, we will keep it for out of dateness checks.  
+             */
+            long youngestRev = getYoungestRev(myReposRootDir);
+            
+            /* Unless we've been instructed to use a specific transaction, 
+             * we'll make our own. 
+             */
+            if(isTxnOwner){
+                
+            }else{
+                
+            }
+            
+        }
+
+        public void deleteEntry(String path, long revision) throws SVNException {
+        }
+
+        public void absentDir(String path) throws SVNException {
+        }
+
+        public void absentFile(String path) throws SVNException {
+        }
+
+        public void addDir(String path, String copyFromPath, long copyFromRevision) throws SVNException {
+        }
+
+        public void openDir(String path, long revision) throws SVNException {
+        }
+
+        public void changeDirProperty(String name, String value) throws SVNException {
+        }
+
+        public void closeDir() throws SVNException {
+        }
+
+        public void addFile(String path, String copyFromPath, long copyFromRevision) throws SVNException {
+        }
+
+        public void openFile(String path, long revision) throws SVNException {
+        }
+
+        public void applyTextDelta(String path, String baseChecksum) throws SVNException {
+        }
+
+        public OutputStream textDeltaChunk(String path, SVNDiffWindow diffWindow) throws SVNException {
+            return null;
+        }
+
+        public void textDeltaEnd(String path) throws SVNException {
+        }
+
+        public void changeFileProperty(String path, String name, String value) throws SVNException {
+        }
+
+        public void closeFile(String path, String textChecksum) throws SVNException {
+        }
+
+        public SVNCommitInfo closeEdit() throws SVNException {
+            return null;
+        }
+
+        public void abortEdit() throws SVNException {
         }
     }
 }
