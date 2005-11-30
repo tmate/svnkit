@@ -290,6 +290,9 @@ public class FSRepositoryUtil {
         return new File(getRepositoryDBDir(reposRootDir), FSConstants.SVN_REPOS_REVPROPS_DIR);
     }
 
+    public static File getTransactionsDir(File reposRootDir) {
+        return new File(getRepositoryDBDir(reposRootDir), FSConstants.SVN_REPOS_TXNS_DIR);
+    }
     
     public static File getRevisionsDir(File reposRootDir) {
         return new File(getRepositoryDBDir(reposRootDir), FSConstants.SVN_REPOS_REVS_DIR);

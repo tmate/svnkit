@@ -44,19 +44,20 @@ public class FSHooks {
     public static final String REVPROP_DELETE = "D";
     public static final String REVPROP_ADD = "A";
     public static final String REVPROP_MODIFY = "M";
-    
-    private static String[] winExtensions = {".exe", ".bat", ".cmd"};
-    private static String[] nonWinExtensions = {""};
+    private static final String[] winExtensions = {".exe", ".bat", ".cmd"};
     
     public static File getHookFile(File reposRootDir, String hookName) throws SVNException {
-        String[] extensions = null;
+        File hookFile = null;
         if(SVNFileUtil.isWindows){
-            extensions = winExtensions;
+            for(int i = 0; i < winExtensions.length; i++){
+                hookFile = new File(getHooksDir(reposRootDir), hookName + winExtensions[i]);
+                SVNFileType type = SVNFileType.getType(hookFile);
+                if(type == SVNFileType.FILE){
+                    return hookFile;
+                }
+            } 
         }else{
-            extensions = nonWinExtensions;
-        }
-        for(int i = 0; i < extensions.length; i++){
-            File hookFile = new File(getHooksDir(reposRootDir), hookName + extensions[i]);
+            hookFile = new File(getHooksDir(reposRootDir), hookName);
             SVNFileType type = SVNFileType.getType(hookFile);
             if(type == SVNFileType.FILE){
                 return hookFile; 
@@ -78,14 +79,51 @@ public class FSHooks {
     }
 
     public static void runPreRevPropChangeHook(File reposRootDir, String propName, String propNewValue, String reposPath, String author, long revision, String action) throws SVNException {
-        changeRevPropHook(reposRootDir, SVN_REPOS_HOOK_PRE_REVPROP_CHANGE, propName, propNewValue, reposPath, author, revision, action, true);
+        invokeChangeRevPropHook(reposRootDir, SVN_REPOS_HOOK_PRE_REVPROP_CHANGE, propName, propNewValue, reposPath, author, revision, action, true);
     }
     
     public static void runPostRevPropChangeHook(File reposRootDir, String propName, String propOldValue, String reposPath, String author, long revision, String action) throws SVNException {
-        changeRevPropHook(reposRootDir, SVN_REPOS_HOOK_POST_REVPROP_CHANGE, propName, propOldValue, reposPath, author, revision, action, false);
+        invokeChangeRevPropHook(reposRootDir, SVN_REPOS_HOOK_POST_REVPROP_CHANGE, propName, propOldValue, reposPath, author, revision, action, false);
+    }
+
+    public static void runStartCommitHook(File reposRootDir, String reposPath, String author) throws SVNException {
+        author = author == null ? "" : author;
+        runCommitHook(reposRootDir, SVN_REPOS_HOOK_START_COMMIT, reposPath, author, true);
+    }
+
+    public static void runPreCommitHook(File reposRootDir, String reposPath, String txnName) throws SVNException {
+        runCommitHook(reposRootDir, SVN_REPOS_HOOK_PRE_COMMIT, reposPath, txnName, true);
+    }
+
+    public static void runPostCommitHook(File reposRootDir, String reposPath, long committedRevision) throws SVNException {
+        runCommitHook(reposRootDir, SVN_REPOS_HOOK_POST_COMMIT, reposPath, String.valueOf(committedRevision), false);
     }
     
-    public static void changeRevPropHook(File reposRootDir, String hookName, String propName, String propValue, String reposPath, String author, long revision, String action, boolean isPre) throws SVNException {
+    private static void runCommitHook(File reposRootDir, String hookName, String reposPath, String secondArg, boolean readErrorStream) throws SVNException {
+        File hookFile = getHookFile(reposRootDir, hookName);
+        if(hookFile == null){
+            return;
+        }
+        Process hookProc = null;
+        try{
+            String executableName = hookFile.getName().toLowerCase();
+            if(executableName.endsWith(".bat") || executableName.endsWith(".cmd")){
+                String cmd = "cmd /C \"" +  
+                             "\"" + hookFile.getAbsolutePath() + "\" " +
+                             "\"" + reposPath + "\" " + 
+                             "\"" + secondArg + "\"";
+                hookProc = Runtime.getRuntime().exec(cmd);
+            }else{
+                String[] cmd = {hookFile.getAbsolutePath(), reposPath, secondArg != null && !"".equals(secondArg) ? secondArg : "\"\""};
+                hookProc = Runtime.getRuntime().exec(cmd);
+            }
+        }catch(IOException ioe){
+            SVNErrorManager.error("svn: Failed to run '" + hookFile.getAbsolutePath() + "' hook: " + ioe.getMessage());
+        }
+        runHook(hookFile, hookProc, null, readErrorStream);
+    }
+    
+    private static void invokeChangeRevPropHook(File reposRootDir, String hookName, String propName, String propValue, String reposPath, String author, long revision, String action, boolean isPre) throws SVNException {
         File hookFile = getHookFile(reposRootDir, hookName);
         if(hookFile == null && isPre){
             SVNErrorManager.error("svn: Repository has not been enabled to accept revision propchanges;" + SVNFileUtil.getNativeEOLMarker() + 
@@ -93,41 +131,54 @@ public class FSHooks {
         }else if(hookFile == null){
             return;
         }
-        
-        String[] cmd = {hookFile.getAbsolutePath(), reposPath, String.valueOf(revision), author != null ? author : "", propName, action};
-        
+        author = author == null ? "" : author;
         Process hookProc = null;
         try{
-            hookProc = Runtime.getRuntime().exec(cmd);
+            String executableName = hookFile.getName().toLowerCase();
+            if(executableName.endsWith(".bat") || executableName.endsWith(".cmd")){
+                String cmd = "cmd /C \"" +  
+                             "\"" + hookFile.getAbsolutePath() + "\" " +
+                             "\"" + reposPath + "\" " + 
+                             String.valueOf(revision) + " " + 
+                             "\"" + author + "\" " + 
+                             "\"" + propName + "\" " + 
+                             action + "\"";
+                hookProc = Runtime.getRuntime().exec(cmd);
+            }else{
+                String[] cmd = {hookFile.getAbsolutePath(), reposPath, String.valueOf(revision), !"".equals(author) ? author : "\"\"", propName, action};
+                hookProc = Runtime.getRuntime().exec(cmd);
+            }
         }catch(IOException ioe){
             SVNErrorManager.error("svn: Failed to run '" + hookFile.getAbsolutePath() + "' hook: " + ioe.getMessage());
         }
-        
-        // Pass the new value as stdin to hook
-        if(propValue != null){
-            OutputStream os = hookProc.getOutputStream();
+        runHook(hookFile, hookProc, propValue, isPre);
+    }
+    
+    private static void runHook(File hook, Process hookProcess, String stdInValue, boolean readErrorStream) throws SVNException {
+        if(hookProcess == null){
+            SVNErrorManager.error("svn: Can't run '" + hook.getAbsolutePath() + "' hook process");
+        }
+        if(stdInValue != null){
+            OutputStream os = hookProcess.getOutputStream();
             try{
-                os.write(propValue.getBytes());
+                os.write(stdInValue.getBytes());
             }catch(IOException ioe){
-                SVNErrorManager.error("svn: Failed to run '" + hookFile.getAbsolutePath() + "' hook" + SVNFileUtil.getNativeEOLMarker() + 
-                                       "svn: Can't set process '" + hookFile.getAbsolutePath() + "' child input: " + ioe.getMessage());
+                SVNErrorManager.error("svn: Failed to run '" + hook.getAbsolutePath() + "' hook" + SVNFileUtil.getNativeEOLMarker() + 
+                                       "svn: Can't set process '" + hook.getAbsolutePath() + "' child input: " + ioe.getMessage());
             }
         }
-        
         int rc = -1;
         try{
-            rc = hookProc.waitFor();
+            rc = hookProcess.waitFor();
         }catch(InterruptedException ie){
-            SVNErrorManager.error("svn: Failed to run '" + hookFile.getAbsolutePath() + "' hook" + SVNFileUtil.getNativeEOLMarker() +
-                                   "svn: Error waiting for process '" + hookFile.getAbsolutePath() + "' " + ie.getMessage());
+            SVNErrorManager.error("svn: Failed to run '" + hook.getAbsolutePath() + "' hook" + SVNFileUtil.getNativeEOLMarker() +
+                                   "svn: Error waiting for process '" + hook.getAbsolutePath() + "' " + ie.getMessage());
         }
-
-        InputStream is = null;
-        StringBuffer result = null;
         String errString = null;
-
-        if(isPre){
-            is = hookProc.getInputStream();
+        if(readErrorStream){
+            InputStream is = null;
+            StringBuffer result = null;
+            is = hookProcess.getErrorStream();
             result = new StringBuffer();
             int r;            
             try{
@@ -141,11 +192,10 @@ public class FSHooks {
             }
             errString = result.toString();
         }
-        
         if (rc != 0) {
-            SVNErrorManager.error((errString == null || !isPre ? "svn: '" + hookName + "' hook failed; no error output available" : 
-                                    "svn: '" + hookName + "' hook failed with error output:" + SVNFileUtil.getNativeEOLMarker() + 
-                                    errString));
+            SVNErrorManager.error((!readErrorStream ? "svn: '" + hook.getName() + "' hook failed; no error output available" : 
+                                    "svn: '" + hook.getName() + "' hook failed with error output:" + SVNFileUtil.getNativeEOLMarker() + 
+                                    errString != null ? errString : ""));
         }
     }
 }

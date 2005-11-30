@@ -35,7 +35,22 @@ import org.tmatesoft.svn.core.internal.util.SVNTimeUtil;
  */
 public class FSWriter {
     private static File ourTmpDir;
-
+    /* Create a unique directory for a transaction in FS based on the 
+     * provided revision. Return the ID for this transaction. 
+     */
+    public static File createTxnDir(long revision, File reposRootDir) throws SVNException {
+        File parent = FSRepositoryUtil.getTransactionsDir(reposRootDir);
+        File uniquePath = null;
+        for (int i = 1; i < 99999; i++) {
+            uniquePath = new File(parent, revision + "-" + i + FSConstants.TXN_PATH_EXT);
+            if (!uniquePath.exists() && uniquePath.mkdirs()) {
+                return uniquePath;
+            }
+        }
+        SVNErrorManager.error("svn: Unable to create transaction directory in '" + parent.getAbsolutePath() + "' for revision " + revision);
+        return null;
+    }
+    
     public static void writePathInfoToReportFile(OutputStream tmpFileOS, String target, String path, String linkPath, String lockToken, long revision, boolean startEmpty) throws IOException {
         String anchorRelativePath = SVNPathUtil.append(target, path);
         String linkPathRep = linkPath != null ? "+" + linkPath.length() + ":" + linkPath : "-";
