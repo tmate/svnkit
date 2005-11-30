@@ -22,6 +22,8 @@ public class FSConstants {
     public static final String SVN_REPOS_DAV_DIR = "dav";
     public static final String SVN_REPOS_LOCKS_DIR = "locks";
     public static final String SVN_REPOS_CONF_DIR = "conf";
+    public static final String SVN_REPOS_TXNS_DIR = "transactions";
+    public static final String TXN_PATH_EXT = ".txn";
     public static final String SVN_REPOS_DB_LOCKFILE = "db.lock";
     public static final String SVN_REPOS_DB_LOGS_LOCKFILE = "db-logs.lock";
     public static final String SVN_REPOS_CONF_SVNSERVE_CONF_FILE = "svnserve.conf";
