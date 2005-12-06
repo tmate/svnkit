@@ -118,13 +118,6 @@ public class FSRepositoryUtil {
         return SVNFileUtil.toHexDigest(digestFromPath); 
     }
     
-    public static void setRevisionProperty(File reposRootDir, long revision, String propertyName, String propertyNewValue, String propertyOldValue, String reposPath, String userName, String action) throws SVNException {
-        FSHooks.runPreRevPropChangeHook(reposRootDir, propertyName, propertyNewValue, reposPath, userName, revision, action);
-        SVNProperties revProps = new SVNProperties(getRevisionPropertiesFile(reposRootDir, revision), null);
-        revProps.setPropertyValue(propertyName, propertyNewValue);
-        FSHooks.runPostRevPropChangeHook(reposRootDir, propertyName, propertyOldValue, reposPath, userName, revision, action);
-    }
-    
     public static Map getMetaProps(File reposRootDir, long revision, FSRepository repository) throws SVNException {
         Map metaProps = new HashMap();
         Map revProps = null;
@@ -296,6 +289,26 @@ public class FSRepositoryUtil {
     
     public static File getRevisionsDir(File reposRootDir) {
         return new File(getRepositoryDBDir(reposRootDir), FSConstants.SVN_REPOS_REVS_DIR);
+    }
+
+    public static File getTxnRevNodeFile(FSID id, File reposRootDir) {
+        return new File(getTxnDir(id.getTxnID(), reposRootDir), FSConstants.PATH_PREFIX_NODE + id.getNodeID() + "." + id.getCopyID());
+    }
+
+    public static File getTxnRevFile(String id, File reposRootDir) {
+        return new File(getTxnDir(id, reposRootDir), FSConstants.TXN_PATH_REV);
+    }
+
+    public static File getTxnChangesFile(String id, File reposRootDir) {
+        return new File(getTxnDir(id, reposRootDir), FSConstants.TXN_PATH_CHANGES);
+    }
+
+    public static File getTxnNextIdsFile(String id, File reposRootDir) {
+        return new File(getTxnDir(id, reposRootDir), FSConstants.TXN_PATH_NEXT_IDS);
+    }
+
+    public static File getTxnDir(String txnId, File reposRootDir) {
+        return new File(getTransactionsDir(reposRootDir), txnId + FSConstants.TXN_PATH_EXT);
     }
 
     public static File getRevisionFile(File reposRootDir, long revision) throws SVNException {

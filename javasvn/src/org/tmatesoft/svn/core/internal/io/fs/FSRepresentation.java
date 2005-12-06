@@ -78,4 +78,8 @@ public class FSRepresentation {
         FSRepresentation rep = (FSRepresentation)obj;
         return myRevision == rep.getRevision() && myOffset == rep.getOffset();
     }
+    
+    public String toString(){
+        return myRevision + " " + myOffset + " " + mySize + " " + myExpandedSize + " " + myHexDigest;
+    }
 }

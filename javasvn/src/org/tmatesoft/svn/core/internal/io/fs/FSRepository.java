@@ -349,10 +349,7 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
             } else {// modify
                 action = FSHooks.REVPROP_MODIFY;
             }
-
-            FSHooks.runPreRevPropChangeHook(myReposRootDir, propertyName, propertyValue, super.getRepositoryPath(""), userName, revision, action);
-            FSRepositoryUtil.setRevisionProperty(myReposRootDir, revision, propertyName, propertyValue, oldValue, super.getRepositoryPath(""), userName, action);
-            FSHooks.runPostRevPropChangeHook(myReposRootDir, propertyName, oldValue, super.getRepositoryPath(""), userName, revision, action);
+            FSWriter.setRevisionProperty(myReposRootDir, revision, propertyName, propertyValue, oldValue, getRepositoryPath(""), userName, action);
         } finally {
             closeRepository();
         }
@@ -454,7 +451,7 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
         // now add special non-tweakable metadata props
         Map metaprops = null;
         try {
-            metaprops = FSRepositoryUtil.getMetaProps(reposRootDir, revNode.getRevNodeID().getRevision(), this);
+            metaprops = FSRepositoryUtil.getMetaProps(reposRootDir, revNode.getId().getRevision(), this);
         } catch (SVNException svne) {
             //
         }
@@ -544,7 +541,7 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
                         + getRepositoryPath(path) + "'");
             }
             entries.addAll(getDirEntries(parent, myReposRootDir, null, includeCommitMessages));
-            SVNDirEntry parentDirEntry = buildDirEntry(new FSRepresentationEntry(parent.getRevNodeID(), parent.getType(), ""), parent, myReposRootDir, false);
+            SVNDirEntry parentDirEntry = buildDirEntry(new FSRepresentationEntry(parent.getId(), parent.getType(), ""), parent, myReposRootDir, false);
             parentDirEntry.setPath(parent.getCreatedPath());
             return parentDirEntry;
         } finally {
@@ -949,7 +946,11 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
             SVNRAFileData srcRAFile = new SVNRAFileData(srcFile, true);
             SVNRAFileData tgtRAFile = new SVNRAFileData(tgtFile, true);
             SVNSequenceDeltaGenerator generator = new SVNSequenceDeltaGenerator(FSWriter.getTmpDir());
+            //TODO: replace this single window generation code with code that
+            //generates windows of a fixed length
             generator.generateDiffWindow(editPath, myReporterContext.getEditor(), tgtRAFile, srcRAFile);
+            srcFile.delete();
+            tgtFile.delete();
         }else{
             myReporterContext.getEditor().textDeltaEnd(editPath);
         }
@@ -1156,7 +1157,7 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
         FSRevisionNode node = root != null ? myRevNodesPool.getRevisionNode(root, reposPath, myReposRootDir) : myRevNodesPool.getRevisionNode(revision, reposPath, myReposRootDir);
         FSRepresentationEntry dirEntry = null;
         if(node != null){
-            dirEntry = new FSRepresentationEntry(node.getRevNodeID(), node.getType(), SVNPathUtil.tail(node.getCreatedPath()));
+            dirEntry = new FSRepresentationEntry(node.getId(), node.getType(), SVNPathUtil.tail(node.getCreatedPath()));
         }
         return dirEntry;
     }
@@ -1228,7 +1229,7 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
         if(targetNode == null){
             SVNErrorManager.error("svn: File not found: revision " + myReporterContext.getTargetRevision() + ", path '" + targetPath + "'");
         }
-        long createdRevision = targetNode != null ? targetNode.getRevNodeID().getRevision() : -1;  
+        long createdRevision = targetNode != null ? targetNode.getId().getRevision() : -1;  
         //why are we checking the created revision fetched from the rev-file? may the file be malformed - is this the reason...
         if(isValidRevision(createdRevision)){
             Map entryProps = FSRepositoryUtil.getMetaProps(myReposRootDir, createdRevision, this);
@@ -1438,6 +1439,34 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
                 
             }
             
+        }
+
+        private FSTransaction createTxn(long baseRevision, File reposRootDir) throws SVNException {
+            /* Get the txn id. */
+            String txnId = FSWriter.createTxnDir(baseRevision, reposRootDir); 
+            //TODO: add to FSTransaction an equivalent of txn_vtable
+            FSTransaction txn = new FSTransaction(baseRevision, txnId);
+            FSRevisionNode root = myRevNodesPool.getRootRevisionNode(baseRevision, reposRootDir);// FSReader.getRootRevNode(reposRootDir, baseRevision)
+            if(root == null){
+                SVNErrorManager.error("svn: No such revision " + baseRevision);
+            }
+            /* Create a new root node for this transaction. */
+            FSWriter.createNewTxnNodeRevisionFromRevision(txn.getTxnId(), root, reposRootDir);
+            /* Create an empty rev file. */
+            SVNFileUtil.createEmptyFile(FSRepositoryUtil.getTxnRevFile(txn.getTxnId(), reposRootDir));
+            /* Create an empty changes file. */
+            SVNFileUtil.createEmptyFile(FSRepositoryUtil.getTxnChangesFile(txn.getTxnId(), reposRootDir));
+            /* Write the next-ids file. */
+            OutputStream nextIdsFile = null;
+            try{
+                nextIdsFile = SVNFileUtil.openFileForWriting(FSRepositoryUtil.getTxnNextIdsFile(txn.getTxnId(), reposRootDir));
+                nextIdsFile.write("0 0\n".getBytes());
+            }catch(IOException ioe){
+                SVNErrorManager.error("svn: Can't write to '" + FSRepositoryUtil.getTxnNextIdsFile(txn.getTxnId(), reposRootDir).getAbsolutePath() + "': " + ioe.getMessage());  
+            }finally{
+                SVNFileUtil.closeFile(nextIdsFile);
+            }
+            return null;
         }
 
         public void deleteEntry(String path, long revision) throws SVNException {

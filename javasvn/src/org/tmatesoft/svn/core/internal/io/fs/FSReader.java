@@ -25,7 +25,6 @@ import org.tmatesoft.svn.core.io.diff.SVNDiffWindow;
 import org.tmatesoft.svn.core.io.diff.SVNDiffWindowApplyBaton;
 import org.tmatesoft.svn.core.io.diff.SVNDiffWindowBuilder;
 import org.tmatesoft.svn.core.io.diff.SVNDiffInstruction;
-import org.tmatesoft.svn.core.io.SVNLocationEntry;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -50,19 +49,6 @@ public class FSReader {
     // to mean the end of a file
     public static final long FILE_END_POS = -1;
 
-    public static final String HEADER_ID = "id";
-    public static final String HEADER_TYPE = "type";
-    public static final String HEADER_COUNT = "count";
-    public static final String HEADER_PROPS = "props";
-    public static final String HEADER_TEXT = "text";
-    public static final String HEADER_CPATH = "cpath";
-    public static final String HEADER_PRED = "pred";
-    public static final String HEADER_COPYFROM = "copyfrom";
-    public static final String HEADER_COPYROOT = "copyroot";
-    public static final String REP_DELTA = "DELTA";
-    public static final String REP_PLAIN = "PLAIN";
-
-    public static final int MD5_DIGESTSIZE = 16;
 
     public static boolean checkRelated(FSID idOne, FSID idTwo){
     	return false;
@@ -71,7 +57,7 @@ public class FSReader {
     public static FSID getRevNodeID(FSRevisionNode root, String path){
     	return null;
     }
-    
+
     public static String pathIsChild(String path, String pathChild){
     	return null;
     }
@@ -134,7 +120,7 @@ public class FSReader {
     	  //Assign the current path to all younger revisions until we reach
   	      //the copy target rev
     		//!!!here must be INVALID_REVISION_NUMBER, but not -1!!!
-    		crev = croot.getRevNodeID().isTxn() ? -1 : croot.getRevNodeID().getRevision();
+    		crev = croot.getId().isTxn() ? -1 : croot.getId().getRevision();
     		while((count < revisions.length) && (locationRevs[count] >= crev)){
     			//!!!Possible bad usage new Long(locationRevs[count]) as a key
     			//!!!Need good key for locations hash table
@@ -408,7 +394,7 @@ public class FSReader {
                 SVNErrorManager.error("svn: Can't read file '" + revFile.getAbsolutePath() + "': " + ioe.getMessage());
             }
 
-            if (!REP_PLAIN.equals(header)) {
+            if (!FSConstants.REP_PLAIN.equals(header)) {
                 SVNErrorManager.error("svn: Malformed representation header in revision file '" + revFile.getAbsolutePath() + "'");
             }
 
@@ -515,7 +501,7 @@ public class FSReader {
                 SVNErrorManager.error("svn: Can't read file '" + revFile.getAbsolutePath() + "': " + ioe.getMessage());
             }
 
-            if (header != null && header.startsWith(REP_DELTA)) {
+            if (header != null && header.startsWith(FSConstants.REP_DELTA)) {
                 ByteArrayOutputStream os = new ByteArrayOutputStream();
                 try {
                     readBytesFromStream(length, is, os);
@@ -582,7 +568,7 @@ public class FSReader {
                     windowsData.remove(nextWindow);
                     windowsPerRevision.removeLast();
                 }
-                if (!REP_DELTA.equals(header)) {
+                if (!FSConstants.REP_DELTA.equals(header)) {
                     String[] baseLocation = header.split(" ");
                     if (baseLocation.length != 4) {
                         SVNErrorManager.error("svn: Malformed representation header in revision file '" + revFile.getAbsolutePath() + "'");
@@ -729,26 +715,26 @@ public class FSReader {
         Map headers = readRevNodeHeaders(revFile, offset);
 
         // Read the rev-node id.
-        String revNodeId = (String) headers.get(HEADER_ID);
+        String revNodeId = (String) headers.get(FSConstants.HEADER_ID);
         if (revNodeId == null) {
             SVNErrorManager.error("svn: Missing node-id in node-rev in revision file '" + revFile.getAbsolutePath() + "'");
         }
 
         try {
-            revNode.setRevNodeID(parseID(revNodeId, null));
+            revNode.setId(parseID(revNodeId, null));
         } catch (SVNException svne) {
             SVNErrorManager.error("svn: Corrupt node-id in node-rev in revision file '" + revFile.getAbsolutePath() + "'");
         }
 
         // Read the type.
-        SVNNodeKind nodeKind = SVNNodeKind.parseKind((String) headers.get(HEADER_TYPE));
+        SVNNodeKind nodeKind = SVNNodeKind.parseKind((String) headers.get(FSConstants.HEADER_TYPE));
         if (nodeKind == SVNNodeKind.NONE || nodeKind == SVNNodeKind.UNKNOWN) {
             SVNErrorManager.error("svn: Missing kind field in node-rev in revision file '" + revFile.getAbsolutePath() + "'");
         }
         revNode.setType(nodeKind);
 
         // Read the 'count' field.
-        String countString = (String) headers.get(HEADER_COUNT);
+        String countString = (String) headers.get(FSConstants.HEADER_COUNT);
         if (countString == null) {
             revNode.setCount(0);
         } else {
@@ -765,7 +751,7 @@ public class FSReader {
         }
 
         // Get the properties location (if any).
-        String propsRepr = (String) headers.get(HEADER_PROPS);
+        String propsRepr = (String) headers.get(FSConstants.HEADER_PROPS);
         if (propsRepr != null) {
             try {
                 parseRepresentationHeader(propsRepr, revNode, false);
@@ -775,7 +761,7 @@ public class FSReader {
         }
 
         // Get the data location (if any).
-        String textRepr = (String) headers.get(HEADER_TEXT);
+        String textRepr = (String) headers.get(FSConstants.HEADER_TEXT);
         if (textRepr != null) {
             try {
                 parseRepresentationHeader(textRepr, revNode, true);
@@ -785,27 +771,27 @@ public class FSReader {
         }
 
         // Get the created path.
-        String cpath = (String) headers.get(HEADER_CPATH);
+        String cpath = (String) headers.get(FSConstants.HEADER_CPATH);
         if (cpath == null) {
             throw new SVNException("svn: Missing cpath in node-rev in revision file '" + revFile.getAbsolutePath() + "'");
         }
         revNode.setCreatedPath(cpath);
 
         // Get the predecessor rev-node id (if any).
-        String predId = (String) headers.get(HEADER_PRED);
+        String predId = (String) headers.get(FSConstants.HEADER_PRED);
         if (predId != null) {
             try {
-                revNode.setPredecessorRevNodeID(parseID(predId, null));
+                revNode.setPredecessorId(parseID(predId, null));
             } catch (SVNException svne) {
                 throw new SVNException("svn: Corrupt node-id in node-rev in revision file '" + revFile.getAbsolutePath() + "'");
             }
         }
 
         // Get the copyroot.
-        String copyroot = (String) headers.get(HEADER_COPYROOT);
+        String copyroot = (String) headers.get(FSConstants.HEADER_COPYROOT);
         if (copyroot == null) {
             revNode.setCopyRootPath(revNode.getCreatedPath());
-            revNode.setCopyRootRevision(revNode.getRevNodeID().getRevision());
+            revNode.setCopyRootRevision(revNode.getId().getRevision());
         } else {
             try {
                 parseCopyRoot(copyroot, revNode);
@@ -815,7 +801,7 @@ public class FSReader {
         }
 
         // Get the copyfrom.
-        String copyfrom = (String) headers.get(HEADER_COPYFROM);
+        String copyfrom = (String) headers.get(FSConstants.HEADER_COPYFROM);
         if (copyfrom == null) {
             revNode.setCopyFromPath(null);
             revNode.setCopyFromRevision(-1);// maybe this should be replaced
@@ -968,7 +954,7 @@ public class FSReader {
         }
 
         String hexDigest = offsets[4];
-        if (hexDigest.length() != 2 * MD5_DIGESTSIZE || SVNFileUtil.fromHexDigest(hexDigest) == null) {
+        if (hexDigest.length() != 2 * FSConstants.MD5_DIGESTSIZE || SVNFileUtil.fromHexDigest(hexDigest) == null) {
             throw new SVNException();
         }
         FSRepresentation represnt = new FSRepresentation(rev, offset, size, expandedSize, hexDigest);
@@ -981,13 +967,13 @@ public class FSReader {
     }
 
     public static long getRootOffset(File reposRootDir, long revision) throws SVNException {
-        RootAndChangesOffsets offsets = readRootAndChangesOffset(reposRootDir, revision);
-        return offsets.getRootOffset();
+        Long[] offsets = readRootAndChangesOffset(reposRootDir, revision);
+        return offsets[0].longValue();
     }
 
     public static long getChangesOffset(File reposRootDir, long revision) throws SVNException {
-        RootAndChangesOffsets offsets = readRootAndChangesOffset(reposRootDir, revision);
-        return offsets.getChangesOffset();
+        Long[] offsets = readRootAndChangesOffset(reposRootDir, revision);
+        return offsets[1].longValue();
     }
 
     // Read in a rev-node given its offset in a rev-file.
@@ -1154,7 +1140,7 @@ public class FSReader {
         return new String(os.toByteArray());
     }
 
-    private static RootAndChangesOffsets readRootAndChangesOffset(File reposRootDir, long revision) throws SVNException {
+    private static Long[] readRootAndChangesOffset(File reposRootDir, long revision) throws SVNException {
         File revFile = FSRepositoryUtil.getRevisionFile(reposRootDir, revision); // getRevFile(revision);
         String eol = SVNFileUtil.getNativeEOLMarker();
 
@@ -1200,9 +1186,10 @@ public class FSReader {
         } catch (NumberFormatException nfe) {
             SVNErrorManager.error("svn: Unparsable changes offset number in revision file '" + revFile.getAbsolutePath() + "'");
         }
-
-        RootAndChangesOffsets offs = new RootAndChangesOffsets(rootOffset, changesOffset, revision);
-        return offs;
+        Long[] offsets = new Long[2];
+        offsets[0] = new Long(rootOffset);
+        offsets[1] = new Long(changesOffset);
+        return offsets;
     }
 
     public static PathInfo readPathInfoFromReportFile(InputStream reportFile) throws IOException {
@@ -1244,34 +1231,5 @@ public class FSReader {
         }
 
         return -1;
-    }
-
-    private static class RootAndChangesOffsets {
-
-        long changesOffset;
-        long rootOffset;
-        Long revision;
-
-        public RootAndChangesOffsets(long root, long changes, long rev) {
-            changesOffset = changes;
-            rootOffset = root;
-            revision = new Long(rev);
-        }
-
-        public long getRootOffset() {
-            return rootOffset;
-        }
-
-        public long getChangesOffset() {
-            return changesOffset;
-        }
-
-        public long getRevision() {
-            return revision.longValue();
-        }
-
-        public Long getRevObject() {
-            return revision;
-        }
     }
 }

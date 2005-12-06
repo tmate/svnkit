@@ -24,6 +24,10 @@ public class FSConstants {
     public static final String SVN_REPOS_CONF_DIR = "conf";
     public static final String SVN_REPOS_TXNS_DIR = "transactions";
     public static final String TXN_PATH_EXT = ".txn";
+    public static final String PATH_PREFIX_NODE = "node.";
+    public static final String TXN_PATH_REV = "rev";
+    public static final String TXN_PATH_CHANGES = "changes";
+    public static final String TXN_PATH_NEXT_IDS = "next-ids";
     public static final String SVN_REPOS_DB_LOCKFILE = "db.lock";
     public static final String SVN_REPOS_DB_LOGS_LOCKFILE = "db-logs.lock";
     public static final String SVN_REPOS_CONF_SVNSERVE_CONF_FILE = "svnserve.conf";
@@ -48,6 +52,19 @@ public class FSConstants {
     public static final String CREATION_DATE_LOCK_KEY = "creation_date";
     public static final String EXPIRATION_DATE_LOCK_KEY = "expiration_date";
     public static final String COMMENT_LOCK_KEY = "comment";
+    //rev-node files keywords
+    public static final String HEADER_ID = "id";
+    public static final String HEADER_TYPE = "type";
+    public static final String HEADER_COUNT = "count";
+    public static final String HEADER_PROPS = "props";
+    public static final String HEADER_TEXT = "text";
+    public static final String HEADER_CPATH = "cpath";
+    public static final String HEADER_PRED = "pred";
+    public static final String HEADER_COPYFROM = "copyfrom";
+    public static final String HEADER_COPYROOT = "copyroot";
+    public static final String REP_DELTA = "DELTA";
+    public static final String REP_PLAIN = "PLAIN";
+    public static final int MD5_DIGESTSIZE = 16;
     
     // uuid format - 36 symbols
     public static final int SVN_UUID_FILE_LENGTH = 36;

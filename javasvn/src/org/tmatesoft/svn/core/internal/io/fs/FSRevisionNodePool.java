@@ -100,12 +100,12 @@ public abstract class FSRevisionNodePool {
             clearRootsCache();
             clearRevisionsCache();
         }else {
-            revNode = fetchRevisionNode(root.getRevNodeID().getRevision(), path);
+            revNode = fetchRevisionNode(root.getId().getRevision(), path);
         }        
         if(revNode == null){
             revNode = FSReader.getRevisionNode(myReposRootDir, path, root, FSConstants.SVN_INVALID_REVNUM);
             if(revNode != null){
-                cacheRevisionNode(root.getRevNodeID().getRevision(), path, revNode);
+                cacheRevisionNode(root.getId().getRevision(), path, revNode);
             }
         }
         return revNode;

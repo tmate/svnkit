@@ -16,7 +16,7 @@ import org.tmatesoft.svn.core.SVNNodeKind;
 
 public class FSRevisionNode {
     //id: a.b.r<revID>/offset
-    private FSID myRevNodeId;
+    private FSID myId;
     
     //type: 'dir' or 'file' 
     private SVNNodeKind myType;
@@ -25,10 +25,9 @@ public class FSRevisionNode {
     private long myCount;
     
     //(_)a.(_)b.tx-y
-    private String myTxnID;
 
     //pred: a.b.r<revID>/offset
-    private FSID myPredRevNodeId;
+    private FSID myPredecessorId;
     
     //text: <rev> <offset> <length> <size> <digest>
     private FSRepresentation myTextRepresentation;
@@ -50,8 +49,8 @@ public class FSRevisionNode {
     public FSRevisionNode(){
     }
     
-    public void setRevNodeID(FSID revNodeID){
-        myRevNodeId = revNodeID;
+    public void setId(FSID revNodeID){
+        myId = revNodeID;
     }
 
     public void setType(SVNNodeKind nodeKind){
@@ -62,12 +61,8 @@ public class FSRevisionNode {
         myCount = count;
     }
 
-    public void setTxnID(String txnID){
-        myTxnID = txnID;
-    }
-
-    public void setPredecessorRevNodeID(FSID predRevNodeId){
-        myPredRevNodeId = predRevNodeId;
+    public void setPredecessorId(FSID predRevNodeId){
+        myPredecessorId = predRevNodeId;
     }
 
     public void setTextRepresentation(FSRepresentation textRepr){
@@ -98,8 +93,8 @@ public class FSRevisionNode {
         myCopyRootPath = copyRootPath;
     }
 
-    public FSID getRevNodeID(){
-        return myRevNodeId;
+    public FSID getId(){
+        return myId;
     }
 
     public SVNNodeKind getType(){
@@ -110,13 +105,8 @@ public class FSRevisionNode {
         return myCount;
     }
 
-    //?
-    public String getTxnID(){
-        return myTxnID;
-    }
-
-    public FSID getPredecessorRevNodeId(){
-        return myPredRevNodeId;
+    public FSID getPredecessorId(){
+        return myPredecessorId;
     }
 
     //text
@@ -149,4 +139,19 @@ public class FSRevisionNode {
         return myCopyRootPath;
     }
     
+    public FSRevisionNode cloneRevisionNode(){
+        FSRevisionNode clone = new FSRevisionNode();
+        clone.setId(myId);
+        clone.setPredecessorId(myPredecessorId);
+        clone.setType(myType);
+        clone.setCopyFromPath(myCopyFromPath);
+        clone.setCopyFromRevision(myCopyFromRevision);
+        clone.setCopyRootPath(myCopyRootPath);
+        clone.setCopyRootRevision(myCopyRootRevision);
+        clone.setCount(myCount);
+        clone.setCreatedPath(myCreatedPath);
+        clone.setPropsRepresentation(myPropsRepresentation);
+        clone.setTextRepresentation(myTextRepresentation);
+        return clone;
+    }
 }

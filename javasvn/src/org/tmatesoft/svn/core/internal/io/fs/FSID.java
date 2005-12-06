@@ -151,4 +151,7 @@ public class FSID {
         return true;
     }
     
+    public String toString(){
+        return myNodeID + "." + myCopyID + "." + (isTxn() ? "t" + myTxnID : "r" + myRevision + "/" + myOffset);
+    }
 }
