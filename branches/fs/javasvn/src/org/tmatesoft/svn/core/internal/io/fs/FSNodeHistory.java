@@ -133,7 +133,7 @@ public class FSNodeHistory
     	//!!!Need to use FSRepository's checkPath() 
     	//kind = checkPath(root, path);
     	    	
-    	return new FSNodeHistory(new SVNLocationEntry(root.getRevNodeID().getRevision(), path), 
+    	return new FSNodeHistory(new SVNLocationEntry(root.getId().getRevision(), path), 
     			false, new SVNLocationEntry(FSConstants.SVN_INVALID_REVNUM, null));
     }
     
@@ -183,7 +183,7 @@ public class FSNodeHistory
     	dagNode = parentPath.getDAGNode();
     	nodeId = dagNode.getID();
     	commitPath = dagNode.getCreatedPath();
-    	commitRev = dagNode.getRevNode().getRevNodeID().getRevision();
+    	commitRev = dagNode.getRevNode().getId().getRevision();
     	
     	//The Subversion filesystem is written in such a way that a given
         //line of history may have at most one interesting history point
@@ -201,7 +201,7 @@ public class FSNodeHistory
     	        //... or we *have* reported on this revision, and must now
                 //progress toward this node's predecessor (unless there is
                 //no predecessor, in which case we're all done!)
-    			FSID predId = dagNode.getRevNode().getPredecessorRevNodeId();
+    			FSID predId = dagNode.getRevNode().getPredecessorId();
     			if(predId == null || predId.getRevision() < 0 ){
     				return prevHist;
     			}

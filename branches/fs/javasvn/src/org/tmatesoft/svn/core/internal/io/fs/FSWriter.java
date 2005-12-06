@@ -23,6 +23,7 @@ import java.util.HashMap;
 
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNLock;
+import org.tmatesoft.svn.core.SVNNodeKind;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNProperties;
@@ -34,17 +35,80 @@ import org.tmatesoft.svn.core.internal.util.SVNTimeUtil;
  * @author  TMate Software Ltd.
  */
 public class FSWriter {
-    private static File ourTmpDir;
+    /* Copy a source revision node  into the current transaction txnId. */
+    public static void createNewTxnNodeRevisionFromRevision(String txnId, FSRevisionNode sourceNode, File reposRootDir) throws SVNException {
+        if(sourceNode.getId().isTxn()){
+            SVNErrorManager.error("svn: Copying from transactions not allowed");
+        }
+        FSRevisionNode revNode = sourceNode.cloneRevisionNode(); 
+        revNode.setPredecessorId(sourceNode.getId());
+        revNode.setCount(revNode.getCount() + 1);
+        revNode.setCopyFromPath(null);
+        revNode.setCopyFromRevision(FSConstants.SVN_INVALID_REVNUM);
+        /* For the transaction root, the copyroot never changes. */
+        revNode.setId(new FSID(sourceNode.getId().getNodeID(), txnId, sourceNode.getId().getCopyID(), FSConstants.SVN_INVALID_REVNUM, -1));
+        putTxnNodeRevision(revNode.getId(), revNode, reposRootDir);
+    }
+
+    private static void putTxnNodeRevision(FSID id, FSRevisionNode revNode, File reposRootDir) throws SVNException{
+        if(!id.isTxn()){
+            SVNErrorManager.error("svn: Attempted to write to non-transaction");
+        }
+        OutputStream revNodeFile = SVNFileUtil.openFileForWriting(FSRepositoryUtil.getTxnRevNodeFile(id, reposRootDir));
+        try{
+            writeTxnNodeRevision(revNodeFile, revNode);
+        }catch(IOException ioe){
+            SVNErrorManager.error("svn: Can't write to txn file");
+        }finally{
+            SVNFileUtil.closeFile(revNodeFile);
+        }
+    }
+
+    /* Write the revision node revNode into the file. */
+    private static void writeTxnNodeRevision(OutputStream revNodeFile, FSRevisionNode revNode) throws IOException{
+        String id = FSConstants.HEADER_ID + ": " + revNode.getId() + "\n";
+        revNodeFile.write(id.getBytes());
+        String type = FSConstants.HEADER_TYPE + ": " + revNode.getType() + "\n";
+        revNodeFile.write(type.getBytes());
+        if(revNode.getPredecessorId() != null){
+            String predId = FSConstants.HEADER_PRED + ": " + revNode.getPredecessorId() + "\n";
+            revNodeFile.write(predId.getBytes());
+        }
+        String count = FSConstants.HEADER_COUNT + ": " + revNode.getCount() + "\n";
+        revNodeFile.write(count.getBytes());
+        if(revNode.getTextRepresentation() != null){
+            String textRepresentation = FSConstants.HEADER_TEXT + ": " + (revNode.getId().isTxn() && revNode.getType() == SVNNodeKind.DIR ? "-1" : revNode.getTextRepresentation().toString()) + "\n";
+            revNodeFile.write(textRepresentation.getBytes());
+        }
+        if(revNode.getPropsRepresentation() != null){
+            String propsRepresentation = FSConstants.HEADER_PROPS + ": " + (revNode.getId().isTxn() ? "-1" : revNode.getPropsRepresentation().toString()) + "\n";
+            revNodeFile.write(propsRepresentation.getBytes());
+        }
+        String cpath = FSConstants.HEADER_COUNT + ": " + revNode.getCount() + "\n";
+        revNodeFile.write(cpath.getBytes());
+        if(revNode.getCopyFromPath() != null){
+            String copyFromPath = FSConstants.HEADER_COPYFROM + ": " + revNode.getCopyFromRevision() + " " + revNode.getCopyFromPath() + "\n";
+            revNodeFile.write(copyFromPath.getBytes());
+        }
+        if(revNode.getCopyRootRevision() != revNode.getId().getRevision() || !revNode.getCopyRootPath().equals(revNode.getCreatedPath())){
+            String copyroot = FSConstants.HEADER_COPYROOT + ": " + revNode.getCopyRootRevision() + " " + revNode.getCopyRootPath() + "\n";
+            revNodeFile.write(copyroot.getBytes());
+        }
+        revNodeFile.write("\n".getBytes());
+    }
+    
     /* Create a unique directory for a transaction in FS based on the 
      * provided revision. Return the ID for this transaction. 
      */
-    public static File createTxnDir(long revision, File reposRootDir) throws SVNException {
+    public static String createTxnDir(long revision, File reposRootDir) throws SVNException {
         File parent = FSRepositoryUtil.getTransactionsDir(reposRootDir);
         File uniquePath = null;
+        /* Try to create directories named "<txndir>/<rev>-<uniquifier>.txn". */
         for (int i = 1; i < 99999; i++) {
             uniquePath = new File(parent, revision + "-" + i + FSConstants.TXN_PATH_EXT);
             if (!uniquePath.exists() && uniquePath.mkdirs()) {
-                return uniquePath;
+                /* We succeeded.  Return the basename minus the ".txn" extension. */
+                return revision + "-" + i;
             }
         }
         SVNErrorManager.error("svn: Unable to create transaction directory in '" + parent.getAbsolutePath() + "' for revision " + revision);
@@ -142,7 +206,14 @@ public class FSWriter {
             SVNErrorManager.error("svn: Cannot write lock/entries hashfile '" + digestLockFile.getAbsolutePath() + "': " + svne.getMessage());
         }
     }
-    
+
+    public static void setRevisionProperty(File reposRootDir, long revision, String propertyName, String propertyNewValue, String propertyOldValue, String reposPath, String userName, String action) throws SVNException {
+        FSHooks.runPreRevPropChangeHook(reposRootDir, propertyName, propertyNewValue, reposPath, userName, revision, action);
+        SVNProperties revProps = new SVNProperties(FSRepositoryUtil.getRevisionPropertiesFile(reposRootDir, revision), null);
+        revProps.setPropertyValue(propertyName, propertyNewValue);
+        FSHooks.runPostRevPropChangeHook(reposRootDir, propertyName, propertyOldValue, reposPath, userName, revision, action);
+    }
+
     public static boolean ensureDirExists(File dir, boolean create){
         if(!dir.exists() && create == true){
             return dir.mkdirs();
@@ -169,10 +240,7 @@ public class FSWriter {
     }
 
     public static File getTmpDir() {
-        if (ourTmpDir == null) {
-            ourTmpDir = FSWriter.testTempDir(new File(""));
-        }
-        return ourTmpDir;
+        return FSWriter.testTempDir(new File("")); 
     }
 
     public static File testTempDir(File tmpDir){
