@@ -227,7 +227,7 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
         return myReposRootDir;
     }
 
-    private long getYoungestRev(File reposRootDir) throws SVNException {
+    long getYoungestRev(File reposRootDir) throws SVNException {
         File dbCurrentFile = FSRepositoryUtil.getFSCurrentFile(reposRootDir);
         String firstLine = FSReader.readSingleLine(dbCurrentFile);
         if (firstLine == null) {
@@ -244,7 +244,15 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
         }
         return latestRev;
     }
-
+    
+    File getReposRootDir(){
+        return myReposRootDir;
+    }
+    
+    FSRevisionNodePool getRevisionNodePool(){
+        return myRevNodesPool;
+    }
+    
     public long getLatestRevision() throws SVNException {
         try {
             openRepository();
@@ -349,7 +357,7 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
             } else {// modify
                 action = FSHooks.REVPROP_MODIFY;
             }
-            FSWriter.setRevisionProperty(myReposRootDir, revision, propertyName, propertyValue, oldValue, getRepositoryPath(""), userName, action);
+            FSWriter.setRevisionProperty(myReposRootDir, revision, propertyName, propertyValue, oldValue, userName, action);
         } finally {
             closeRepository();
         }
@@ -854,8 +862,10 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
             }
             
             String entryEditPath = SVNPathUtil.append(editPath, entryName);
+            //TODO: fix it in SVNPathUtil.append
             String entryTargetPath = "/".equals(targetPath) ? targetPath + entryName : SVNPathUtil.append(targetPath, entryName);
             FSRepresentationEntry targetEntry = (FSRepresentationEntry)targetEntries.get(entryName);
+            //TODO: fix it in SVNPathUtil.append
             String entrySourcePath = sourcePath != null ? ("/".equals(sourcePath) ? sourcePath + entryName : SVNPathUtil.append(sourcePath, entryName)) : null;
             FSRepresentationEntry sourceEntry = sourceEntries != null ? (FSRepresentationEntry)sourceEntries.get(entryName) : null;
             updateEntry(sourceRevision, entrySourcePath, sourceEntry, entryTargetPath, targetEntry, entryEditPath, pathInfo, myReporterContext.isRecursive());
@@ -1310,7 +1320,6 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
     }
     
     private class FSReporterContext {
-
         private File myReportFile;
         private String myTarget;
         private OutputStream myReportOS;
@@ -1402,121 +1411,6 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
                 myTargetRoot = myRevNodesPool.getRootRevisionNode(myTargetRevision, myReposRootDir); 
             }
             return myTargetRoot; 
-        }
-    }
-
-    private class FSCommitEditor implements ISVNEditor {
-        private ISVNWorkspaceMediator myMediator;
-        private Map myLockTokens;
-        private String myUserName;
-        private FSTransaction myTxn;
-        private boolean isTxnOwner;
-        
-        public FSCommitEditor(FSTransaction txn, String userName, Map lockTokens, ISVNWorkspaceMediator mediator){
-            myMediator = mediator;
-            myLockTokens = lockTokens;
-            myUserName = userName;
-            myTxn = txn;
-            isTxnOwner = txn == null ? true : false;
-        }
-        
-        public void targetRevision(long revision) throws SVNException {
-            //does nothing
-        }
-
-        public void openRoot(long revision) throws SVNException {
-            /* Ignore revision.  We always build our transaction against
-             * HEAD. However, we will keep it for out of dateness checks.  
-             */
-            long youngestRev = getYoungestRev(myReposRootDir);
-            
-            /* Unless we've been instructed to use a specific transaction, 
-             * we'll make our own. 
-             */
-            if(isTxnOwner){
-                
-            }else{
-                
-            }
-            
-        }
-
-        private FSTransaction createTxn(long baseRevision, File reposRootDir) throws SVNException {
-            /* Get the txn id. */
-            String txnId = FSWriter.createTxnDir(baseRevision, reposRootDir); 
-            //TODO: add to FSTransaction an equivalent of txn_vtable
-            FSTransaction txn = new FSTransaction(baseRevision, txnId);
-            FSRevisionNode root = myRevNodesPool.getRootRevisionNode(baseRevision, reposRootDir);// FSReader.getRootRevNode(reposRootDir, baseRevision)
-            if(root == null){
-                SVNErrorManager.error("svn: No such revision " + baseRevision);
-            }
-            /* Create a new root node for this transaction. */
-            FSWriter.createNewTxnNodeRevisionFromRevision(txn.getTxnId(), root, reposRootDir);
-            /* Create an empty rev file. */
-            SVNFileUtil.createEmptyFile(FSRepositoryUtil.getTxnRevFile(txn.getTxnId(), reposRootDir));
-            /* Create an empty changes file. */
-            SVNFileUtil.createEmptyFile(FSRepositoryUtil.getTxnChangesFile(txn.getTxnId(), reposRootDir));
-            /* Write the next-ids file. */
-            OutputStream nextIdsFile = null;
-            try{
-                nextIdsFile = SVNFileUtil.openFileForWriting(FSRepositoryUtil.getTxnNextIdsFile(txn.getTxnId(), reposRootDir));
-                nextIdsFile.write("0 0\n".getBytes());
-            }catch(IOException ioe){
-                SVNErrorManager.error("svn: Can't write to '" + FSRepositoryUtil.getTxnNextIdsFile(txn.getTxnId(), reposRootDir).getAbsolutePath() + "': " + ioe.getMessage());  
-            }finally{
-                SVNFileUtil.closeFile(nextIdsFile);
-            }
-            return null;
-        }
-
-        public void deleteEntry(String path, long revision) throws SVNException {
-        }
-
-        public void absentDir(String path) throws SVNException {
-        }
-
-        public void absentFile(String path) throws SVNException {
-        }
-
-        public void addDir(String path, String copyFromPath, long copyFromRevision) throws SVNException {
-        }
-
-        public void openDir(String path, long revision) throws SVNException {
-        }
-
-        public void changeDirProperty(String name, String value) throws SVNException {
-        }
-
-        public void closeDir() throws SVNException {
-        }
-
-        public void addFile(String path, String copyFromPath, long copyFromRevision) throws SVNException {
-        }
-
-        public void openFile(String path, long revision) throws SVNException {
-        }
-
-        public void applyTextDelta(String path, String baseChecksum) throws SVNException {
-        }
-
-        public OutputStream textDeltaChunk(String path, SVNDiffWindow diffWindow) throws SVNException {
-            return null;
-        }
-
-        public void textDeltaEnd(String path) throws SVNException {
-        }
-
-        public void changeFileProperty(String path, String name, String value) throws SVNException {
-        }
-
-        public void closeFile(String path, String textChecksum) throws SVNException {
-        }
-
-        public SVNCommitInfo closeEdit() throws SVNException {
-            return null;
-        }
-
-        public void abortEdit() throws SVNException {
         }
     }
 }

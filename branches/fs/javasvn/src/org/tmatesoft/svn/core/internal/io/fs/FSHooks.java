@@ -78,33 +78,34 @@ public class FSHooks {
         return new File(reposRootDir, SVN_REPOS_HOOKS_DIR);
     }
 
-    public static void runPreRevPropChangeHook(File reposRootDir, String propName, String propNewValue, String reposPath, String author, long revision, String action) throws SVNException {
-        invokeChangeRevPropHook(reposRootDir, SVN_REPOS_HOOK_PRE_REVPROP_CHANGE, propName, propNewValue, reposPath, author, revision, action, true);
+    public static void runPreRevPropChangeHook(File reposRootDir, String propName, String propNewValue, String author, long revision, String action) throws SVNException {
+        invokeChangeRevPropHook(reposRootDir, SVN_REPOS_HOOK_PRE_REVPROP_CHANGE, propName, propNewValue, author, revision, action, true);
     }
     
-    public static void runPostRevPropChangeHook(File reposRootDir, String propName, String propOldValue, String reposPath, String author, long revision, String action) throws SVNException {
-        invokeChangeRevPropHook(reposRootDir, SVN_REPOS_HOOK_POST_REVPROP_CHANGE, propName, propOldValue, reposPath, author, revision, action, false);
+    public static void runPostRevPropChangeHook(File reposRootDir, String propName, String propOldValue, String author, long revision, String action) throws SVNException {
+        invokeChangeRevPropHook(reposRootDir, SVN_REPOS_HOOK_POST_REVPROP_CHANGE, propName, propOldValue, author, revision, action, false);
     }
 
-    public static void runStartCommitHook(File reposRootDir, String reposPath, String author) throws SVNException {
+    public static void runStartCommitHook(File reposRootDir, String author) throws SVNException {
         author = author == null ? "" : author;
-        runCommitHook(reposRootDir, SVN_REPOS_HOOK_START_COMMIT, reposPath, author, true);
+        runCommitHook(reposRootDir, SVN_REPOS_HOOK_START_COMMIT, author, true);
     }
 
-    public static void runPreCommitHook(File reposRootDir, String reposPath, String txnName) throws SVNException {
-        runCommitHook(reposRootDir, SVN_REPOS_HOOK_PRE_COMMIT, reposPath, txnName, true);
+    public static void runPreCommitHook(File reposRootDir, String txnName) throws SVNException {
+        runCommitHook(reposRootDir, SVN_REPOS_HOOK_PRE_COMMIT, txnName, true);
     }
 
-    public static void runPostCommitHook(File reposRootDir, String reposPath, long committedRevision) throws SVNException {
-        runCommitHook(reposRootDir, SVN_REPOS_HOOK_POST_COMMIT, reposPath, String.valueOf(committedRevision), false);
+    public static void runPostCommitHook(File reposRootDir, long committedRevision) throws SVNException {
+        runCommitHook(reposRootDir, SVN_REPOS_HOOK_POST_COMMIT, String.valueOf(committedRevision), false);
     }
     
-    private static void runCommitHook(File reposRootDir, String hookName, String reposPath, String secondArg, boolean readErrorStream) throws SVNException {
+    private static void runCommitHook(File reposRootDir, String hookName, String secondArg, boolean readErrorStream) throws SVNException {
         File hookFile = getHookFile(reposRootDir, hookName);
         if(hookFile == null){
             return;
         }
         Process hookProc = null;
+        String reposPath = reposRootDir.getAbsolutePath().replace(File.separatorChar, '/');
         try{
             String executableName = hookFile.getName().toLowerCase();
             if(executableName.endsWith(".bat") || executableName.endsWith(".cmd")){
@@ -123,7 +124,7 @@ public class FSHooks {
         runHook(hookFile, hookProc, null, readErrorStream);
     }
     
-    private static void invokeChangeRevPropHook(File reposRootDir, String hookName, String propName, String propValue, String reposPath, String author, long revision, String action, boolean isPre) throws SVNException {
+    private static void invokeChangeRevPropHook(File reposRootDir, String hookName, String propName, String propValue, String author, long revision, String action, boolean isPre) throws SVNException {
         File hookFile = getHookFile(reposRootDir, hookName);
         if(hookFile == null && isPre){
             SVNErrorManager.error("svn: Repository has not been enabled to accept revision propchanges;" + SVNFileUtil.getNativeEOLMarker() + 
@@ -133,6 +134,7 @@ public class FSHooks {
         }
         author = author == null ? "" : author;
         Process hookProc = null;
+        String reposPath = reposRootDir.getAbsolutePath().replace(File.separatorChar, '/');
         try{
             String executableName = hookFile.getName().toLowerCase();
             if(executableName.endsWith(".bat") || executableName.endsWith(".cmd")){

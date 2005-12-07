@@ -18,7 +18,13 @@ package org.tmatesoft.svn.core;
 public class SVNProperty {
 
     public static final String SVN_PREFIX = "svn:";
-
+    
+    /* These are transaction properties that correspond to the bitfields
+     * in the 'flags' argument to svn_fs_lock().  
+     */
+    public static final String TXN_CHECK_LOCKS = SVN_PREFIX + "check-locks";
+    public static final String TXN_CHECK_OUT_OF_DATENESS = SVN_PREFIX + "check-ood";
+    
     public static final String SVN_WC_PREFIX = "svn:wc:";
 
     public static final String SVN_ENTRY_PREFIX = "svn:entry:";

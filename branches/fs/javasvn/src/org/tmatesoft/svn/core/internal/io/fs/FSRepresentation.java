@@ -22,6 +22,7 @@ public class FSRepresentation {
     private long mySize;
     private long myExpandedSize;
     private String myHexDigest;
+    private String myTxnId = FSID.ID_INAPPLICABLE;
     
     public FSRepresentation(long revision, long offset, long size, long expandedSize, String hexDigest){
         myRevision = revision;
@@ -29,6 +30,14 @@ public class FSRepresentation {
         mySize = size;
         myExpandedSize = expandedSize;
         myHexDigest = hexDigest;
+    }
+
+    public FSRepresentation(){
+        myRevision = FSConstants.SVN_INVALID_REVNUM;
+        myOffset = -1;
+        mySize = -1;
+        myExpandedSize = -1;
+        myHexDigest = null;
     }
     
     public void setRevision(long rev){
@@ -81,5 +90,15 @@ public class FSRepresentation {
     
     public String toString(){
         return myRevision + " " + myOffset + " " + mySize + " " + myExpandedSize + " " + myHexDigest;
+    }
+
+    
+    public String getTxnId() {
+        return myTxnId;
+    }
+
+    
+    public void setTxnId(String txnId) {
+        myTxnId = txnId;
     }
 }

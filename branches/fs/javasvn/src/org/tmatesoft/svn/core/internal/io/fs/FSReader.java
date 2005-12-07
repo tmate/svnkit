@@ -857,7 +857,6 @@ public class FSReader {
         revNode.setCopyRootPath(cpyroot[1]);
     }
 
-    // isPred - if true - predecessor's id, otherwise a node id
     public static FSID parseID(String revNodeId, FSID id) throws SVNException {
         int firstDotInd = revNodeId.indexOf('.');
         int secondDotInd = revNodeId.lastIndexOf('.');
@@ -922,7 +921,20 @@ public class FSReader {
         } catch (NumberFormatException nfe) {
             throw new SVNException();
         }
-
+        if(FSRepository.isInvalidRevision(rev)){
+            FSRepresentation represent = new FSRepresentation();
+            represent.setRevision(rev);
+            represent.setTxnId(revNode.getId().getTxnID());
+            if(isData){
+                revNode.setTextRepresentation(represent);
+            }else{
+                revNode.setPropsRepresentation(represent);
+            }
+            //is it a mutable representation?
+            if(!isData || revNode.getType() == SVNNodeKind.DIR){
+                return;
+            }
+        }
         long offset = -1;
         try {
             offset = Long.parseLong(offsets[1]);

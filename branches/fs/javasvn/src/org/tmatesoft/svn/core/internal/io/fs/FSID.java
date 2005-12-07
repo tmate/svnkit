@@ -18,13 +18,11 @@ package org.tmatesoft.svn.core.internal.io.fs;
  */
 public class FSID {
     public static final String ID_INAPPLICABLE = "inapplicable";
-    
     private String myNodeID;
     private String myCopyID;
     private String myTxnID;
     private long myRevision;
     private long myOffset;
-
     
     public FSID(){
         myNodeID = ID_INAPPLICABLE;
@@ -41,6 +39,13 @@ public class FSID {
         return false;
     }
     
+    public static boolean isTxn(String txnId){
+        if(txnId != null && txnId != ID_INAPPLICABLE){
+            return true;
+        }
+        return false;
+    }
+
     public FSID(String nodeId, String txnId, String copyId, long revision, long offset){
         myNodeID = (nodeId == null) ? ID_INAPPLICABLE :  nodeId;
         myCopyID = (copyId == null) ? ID_INAPPLICABLE : copyId;
