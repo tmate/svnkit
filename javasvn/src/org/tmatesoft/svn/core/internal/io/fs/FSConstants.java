@@ -25,9 +25,12 @@ public class FSConstants {
     public static final String SVN_REPOS_TXNS_DIR = "transactions";
     public static final String TXN_PATH_EXT = ".txn";
     public static final String PATH_PREFIX_NODE = "node.";
+    //txn specific paths
     public static final String TXN_PATH_REV = "rev";
     public static final String TXN_PATH_CHANGES = "changes";
     public static final String TXN_PATH_NEXT_IDS = "next-ids";
+    public static final String TXN_PATH_TXN_PROPS = "props";
+    
     public static final String SVN_REPOS_DB_LOCKFILE = "db.lock";
     public static final String SVN_REPOS_DB_LOGS_LOCKFILE = "db-logs.lock";
     public static final String SVN_REPOS_CONF_SVNSERVE_CONF_FILE = "svnserve.conf";
@@ -66,6 +69,19 @@ public class FSConstants {
     public static final String REP_PLAIN = "PLAIN";
     public static final int MD5_DIGESTSIZE = 16;
     
+    //transaction beginning bitmask flags
+    /* Do on-the-fly out-of-dateness checks.  That is, an fs routine may
+     * throw error if a caller tries to edit an out-of-date item in the
+     * transaction.  
+     * 
+     * Not yet implemented. 
+     */
+    public static final int SVN_FS_TXN_CHECK_OUT_OF_DATENESS = 0x00001;
+    /* Do on-the-fly lock checks.  That is, an fs routine may throw error
+     * if a caller tries to edit a locked item without having rights to the lock.
+     */
+    public static final int SVN_FS_TXN_CHECK_LOCKS = 0x00002;
+
     // uuid format - 36 symbols
     public static final int SVN_UUID_FILE_LENGTH = 36;
     // if > max svn 1.2 stops working

@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Map;
 import java.util.HashMap;
+import java.util.Date;
 
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNLock;
@@ -29,13 +30,66 @@ import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNProperties;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
 import org.tmatesoft.svn.core.internal.util.SVNTimeUtil;
+import org.tmatesoft.svn.core.SVNRevisionProperty;
+import org.tmatesoft.svn.core.SVNProperty;
 
 /**
  * @version 1.0
  * @author  TMate Software Ltd.
  */
 public class FSWriter {
-    /* Copy a source revision node  into the current transaction txnId. */
+    public static FSTransaction beginTxn(long baseRevision, int flags, FSRevisionNodePool revNodesPool, File reposRootDir) throws SVNException {
+        FSTransaction txn = createTxn(baseRevision, revNodesPool, reposRootDir);
+        /* Put a datestamp on the newly created txn, so we always know
+         * exactly how old it is.  (This will help sysadmins identify
+         * long-abandoned txns that may need to be manually removed.)  When
+         * a txn is promoted to a revision, this property will be
+         * automatically overwritten with a revision datestamp. 
+         */
+        String commitTime = SVNTimeUtil.formatDate(new Date(System.currentTimeMillis()));
+        setTransactionProperty(reposRootDir, txn.getTxnId(), SVNRevisionProperty.DATE, commitTime);
+        /* Set temporary txn props that represent the requested 'flags'
+         * behaviors. 
+         */
+        if((flags & FSConstants.SVN_FS_TXN_CHECK_OUT_OF_DATENESS) != 0){
+            setTransactionProperty(reposRootDir, txn.getTxnId(), SVNProperty.TXN_CHECK_OUT_OF_DATENESS, "true");
+        }
+        if((flags & FSConstants.SVN_FS_TXN_CHECK_LOCKS) != 0){
+            setTransactionProperty(reposRootDir, txn.getTxnId(), SVNProperty.TXN_CHECK_LOCKS, "true");
+        }
+        return txn;
+    }
+    
+    //create txn dir & necessary files in the fs
+    public static FSTransaction createTxn(long baseRevision, FSRevisionNodePool revNodesPool, File reposRootDir) throws SVNException {
+        /* Get the txn id. */
+        String txnId = FSWriter.createTxnDir(baseRevision, reposRootDir); 
+        //TODO: add to FSTransaction an equivalent of txn_vtable
+        FSTransaction txn = new FSTransaction(baseRevision, txnId);
+        FSRevisionNode root = revNodesPool.getRootRevisionNode(baseRevision, reposRootDir);// FSReader.getRootRevNode(reposRootDir, baseRevision)
+        if(root == null){
+            SVNErrorManager.error("svn: No such revision " + baseRevision);
+        }
+        /* Create a new root node for this transaction. */
+        FSWriter.createNewTxnNodeRevisionFromRevision(txn.getTxnId(), root, reposRootDir);
+        /* Create an empty rev file. */
+        SVNFileUtil.createEmptyFile(FSRepositoryUtil.getTxnRevFile(txn.getTxnId(), reposRootDir));
+        /* Create an empty changes file. */
+        SVNFileUtil.createEmptyFile(FSRepositoryUtil.getTxnChangesFile(txn.getTxnId(), reposRootDir));
+        /* Write the next-ids file. */
+        OutputStream nextIdsFile = null;
+        try{
+            nextIdsFile = SVNFileUtil.openFileForWriting(FSRepositoryUtil.getTxnNextIdsFile(txn.getTxnId(), reposRootDir));
+            nextIdsFile.write("0 0\n".getBytes());
+        }catch(IOException ioe){
+            SVNErrorManager.error("svn: Can't write to '" + FSRepositoryUtil.getTxnNextIdsFile(txn.getTxnId(), reposRootDir).getAbsolutePath() + "': " + ioe.getMessage());  
+        }finally{
+            SVNFileUtil.closeFile(nextIdsFile);
+        }
+        return txn;
+    }
+    
+    /* Copy a source revision node into the current transaction txnId. */
     public static void createNewTxnNodeRevisionFromRevision(String txnId, FSRevisionNode sourceNode, File reposRootDir) throws SVNException {
         if(sourceNode.getId().isTxn()){
             SVNErrorManager.error("svn: Copying from transactions not allowed");
@@ -77,11 +131,11 @@ public class FSWriter {
         String count = FSConstants.HEADER_COUNT + ": " + revNode.getCount() + "\n";
         revNodeFile.write(count.getBytes());
         if(revNode.getTextRepresentation() != null){
-            String textRepresentation = FSConstants.HEADER_TEXT + ": " + (revNode.getId().isTxn() && revNode.getType() == SVNNodeKind.DIR ? "-1" : revNode.getTextRepresentation().toString()) + "\n";
+            String textRepresentation = FSConstants.HEADER_TEXT + ": " + (FSID.isTxn(revNode.getTextRepresentation().getTxnId()) && revNode.getType() == SVNNodeKind.DIR ? "-1" : revNode.getTextRepresentation().toString()) + "\n";
             revNodeFile.write(textRepresentation.getBytes());
         }
         if(revNode.getPropsRepresentation() != null){
-            String propsRepresentation = FSConstants.HEADER_PROPS + ": " + (revNode.getId().isTxn() ? "-1" : revNode.getPropsRepresentation().toString()) + "\n";
+            String propsRepresentation = FSConstants.HEADER_PROPS + ": " + (FSID.isTxn(revNode.getPropsRepresentation().getTxnId()) ? "-1" : revNode.getPropsRepresentation().toString()) + "\n";
             revNodeFile.write(propsRepresentation.getBytes());
         }
         String cpath = FSConstants.HEADER_COUNT + ": " + revNode.getCount() + "\n";
@@ -207,11 +261,16 @@ public class FSWriter {
         }
     }
 
-    public static void setRevisionProperty(File reposRootDir, long revision, String propertyName, String propertyNewValue, String propertyOldValue, String reposPath, String userName, String action) throws SVNException {
-        FSHooks.runPreRevPropChangeHook(reposRootDir, propertyName, propertyNewValue, reposPath, userName, revision, action);
+    public static void setTransactionProperty(File reposRootDir, String txnId, String propertyName, String propertyValue) throws SVNException {
+        SVNProperties revProps = new SVNProperties(FSRepositoryUtil.getTxnPropsFile(txnId, reposRootDir), null);
+        revProps.setPropertyValue(propertyName, propertyValue);
+    }
+
+    public static void setRevisionProperty(File reposRootDir, long revision, String propertyName, String propertyNewValue, String propertyOldValue, String userName, String action) throws SVNException {
+        FSHooks.runPreRevPropChangeHook(reposRootDir, propertyName, propertyNewValue, userName, revision, action);
         SVNProperties revProps = new SVNProperties(FSRepositoryUtil.getRevisionPropertiesFile(reposRootDir, revision), null);
         revProps.setPropertyValue(propertyName, propertyNewValue);
-        FSHooks.runPostRevPropChangeHook(reposRootDir, propertyName, propertyOldValue, reposPath, userName, revision, action);
+        FSHooks.runPostRevPropChangeHook(reposRootDir, propertyName, propertyOldValue, userName, revision, action);
     }
 
     public static boolean ensureDirExists(File dir, boolean create){
@@ -272,5 +331,4 @@ public class FSWriter {
         }
         return null;
     }
-    
 }

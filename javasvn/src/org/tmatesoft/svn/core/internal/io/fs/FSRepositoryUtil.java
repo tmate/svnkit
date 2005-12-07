@@ -135,28 +135,21 @@ public class FSRepositoryUtil {
     }
     
     public static Map getRevisionProperties(File reposRootDir, long revision) throws SVNException {
-        /*
-        Map allProps = new HashMap();
-        String author = getRevisionProperty(reposRootDir, revision, SVNRevisionProperty.AUTHOR);
-        String date = getRevisionProperty(reposRootDir, revision, SVNRevisionProperty.DATE);
-        String log = getRevisionProperty(reposRootDir, revision, SVNRevisionProperty.LOG);
-        */
-        File revPropFile = getRevisionPropertiesFile(reposRootDir, revision);
-        SVNProperties revProps = new SVNProperties(revPropFile, null);
+        File revPropsFile = getRevisionPropertiesFile(reposRootDir, revision);
+        SVNProperties revProps = new SVNProperties(revPropsFile, null);
         return revProps.asMap();
-        /*
-        allProps.put(SVNRevisionProperty.AUTHOR, author);
-        allProps.put(SVNRevisionProperty.DATE, date);
-        allProps.put(SVNRevisionProperty.LOG, log);
-
-        return allProps;
-        */
     }
 
     public static String getRevisionProperty(File reposRootDir, long revision, String revPropName) throws SVNException {
-        File revPropFile = getRevisionPropertiesFile(reposRootDir, revision);
-        SVNProperties revProps = new SVNProperties(revPropFile, null);
+        File revPropsFile = getRevisionPropertiesFile(reposRootDir, revision);
+        SVNProperties revProps = new SVNProperties(revPropsFile, null);
         return revProps.getPropertyValue(revPropName);
+    }
+
+    public static Map getTransactionProperties(File reposRootDir, String txnId) throws SVNException {
+        File txnPropsFile = getTxnPropsFile(txnId, reposRootDir);
+        SVNProperties revProps = new SVNProperties(txnPropsFile, null);
+        return revProps.asMap();
     }
 
     public static String getRepositoryUUID(File reposRootDir) throws SVNException {
@@ -301,6 +294,10 @@ public class FSRepositoryUtil {
 
     public static File getTxnChangesFile(String id, File reposRootDir) {
         return new File(getTxnDir(id, reposRootDir), FSConstants.TXN_PATH_CHANGES);
+    }
+
+    public static File getTxnPropsFile(String id, File reposRootDir) {
+        return new File(getTxnDir(id, reposRootDir), FSConstants.TXN_PATH_TXN_PROPS);
     }
 
     public static File getTxnNextIdsFile(String id, File reposRootDir) {
