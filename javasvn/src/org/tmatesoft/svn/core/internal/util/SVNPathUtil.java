@@ -376,4 +376,60 @@ public class SVNPathUtil {
         }        
         return count;
     }
+    public static String canonicalizeAbsPath(String path){
+    	int newPathCount = 0;
+    	boolean eatingSlashes = false;
+    	StringBuffer newString = new StringBuffer();
+    	
+    	//No path, no problem
+    	if(path == null){
+    		return null;
+    	}    	
+    	//If no content in path
+    	if(path.compareTo("") == 0){
+    		path = new String("/");
+    	}
+    	//Set leading '/' character
+    	if(path.startsWith("/") == false){
+    		newString.insert(newPathCount++, '/');
+		}
+    	//dispose of slashes number of that is 
+    	for(int count = 0; count < path.length(); ++count){
+    		if(path.charAt(count) == '/'){
+    			if(eatingSlashes == true){
+    				continue;
+    			}
+    			eatingSlashes = true;
+    		}else{
+    			if(eatingSlashes == true){
+    				eatingSlashes = false;
+    			}
+    		}
+    		newString.insert(newPathCount++, path.charAt(count));
+    	}    		
+    	if(newPathCount > 0 && newString.charAt(newPathCount-1) == '/'){
+    		newString.deleteCharAt(newPathCount - 1);
+    	}
+    	return new String(newString);
+    }    
+    
+    public static String pathIsChild(String path, String pathChild){
+    	if(path == null || pathChild == null){
+    		return null;
+    	}
+    	if(pathChild.compareTo(path) == 0){
+    		return null;
+    	}
+    	int count = 0;
+    	for(count = 0;count < path.length() && count < pathChild.length();count++ ){
+    		if(path.charAt(count) != pathChild.charAt(count)){
+    			return null;
+    		}
+    	}    
+    	if(pathChild.charAt(count) == '/'){
+    		count++;
+    	}
+    	return pathChild.substring(count);    	    	    	
+    }
+
 }
