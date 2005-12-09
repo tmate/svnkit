@@ -97,7 +97,7 @@ public abstract class FSRevisionNodePool {
         while(true){
             entry = SVNPathUtil.head(rest);
             next = SVNPathUtil.removeHead(rest);//strArray[1];
-            pathSoFar = "/".equals(pathSoFar) ? pathSoFar + entry : SVNPathUtil.append(pathSoFar, entry);
+            pathSoFar = SVNPathUtil.concatToAbs(pathSoFar, entry);
             if(entry == null || "".equals(entry)){
                 child = here;
             }else{

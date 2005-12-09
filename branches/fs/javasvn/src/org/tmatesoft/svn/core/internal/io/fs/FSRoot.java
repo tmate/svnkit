@@ -49,10 +49,6 @@ public class FSRoot {
         return myIsTxnRoot;
     }
     
-    public void setTxnRoot(boolean isTxnRoot) {
-        myIsTxnRoot = isTxnRoot;
-    }
-
     public long getRevision() {
         return myRevision;
     }

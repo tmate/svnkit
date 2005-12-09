@@ -52,10 +52,10 @@ public class FSWriter {
          * behaviors. 
          */
         if((flags & FSConstants.SVN_FS_TXN_CHECK_OUT_OF_DATENESS) != 0){
-            setTransactionProperty(reposRootDir, txn.getTxnId(), SVNProperty.TXN_CHECK_OUT_OF_DATENESS, "true");
+            setTransactionProperty(reposRootDir, txn.getTxnId(), SVNProperty.TXN_CHECK_OUT_OF_DATENESS, SVNProperty.toString(true));
         }
         if((flags & FSConstants.SVN_FS_TXN_CHECK_LOCKS) != 0){
-            setTransactionProperty(reposRootDir, txn.getTxnId(), SVNProperty.TXN_CHECK_LOCKS, "true");
+            setTransactionProperty(reposRootDir, txn.getTxnId(), SVNProperty.TXN_CHECK_LOCKS, SVNProperty.toString(true));
         }
         return txn;
     }

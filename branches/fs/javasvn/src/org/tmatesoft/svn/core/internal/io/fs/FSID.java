@@ -33,10 +33,7 @@ public class FSID {
     }
     
     public boolean isTxn(){
-        if(myTxnID != ID_INAPPLICABLE && myTxnID != null){
-            return true;
-        }
-        return false;
+        return isTxn(myTxnID);
     }
     
     public static boolean isTxn(String txnId){

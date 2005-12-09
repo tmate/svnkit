@@ -202,7 +202,12 @@ public class FSReader {
         if (child == null || child.length() == 0 || "..".equals(child) || child.indexOf('/') != -1) {
             SVNErrorManager.error("svn: Attempted to open node with an illegal name '" + child + "'");
         }
-        Map entries = getDirEntries(parent, reposRootDir);
+        //first try to ask the object's cache for entries
+        Map entries = parent.getDirContents(); 
+        if(entries == null){
+            entries = getDirEntries(parent, reposRootDir);
+            parent.setDirContents(entries);
+        }
         FSRepresentationEntry entry = entries != null ? (FSRepresentationEntry) entries.get(child) : null;
         return entry;
     }
@@ -219,8 +224,12 @@ public class FSReader {
     }
 
     private static Map getDirContents(FSRevisionNode revNode, File reposRootDir) throws SVNException {
-        if(revNode.getTextRepresentation() != null && revNode.getTextRepresentation().getTxnId() != null){
-            
+        if(revNode.getTextRepresentation() != null && revNode.getTextRepresentation().isTxn()){
+            /* The representation is mutable.  Read the old directory
+             * contents from the mutable children file, followed by the
+             * changes we've made in this transaction. 
+             */
+
         
         }else if(revNode.getTextRepresentation() != null){
             InputStream is = null;
@@ -949,7 +958,7 @@ public class FSReader {
         return os.toByteArray();
     }
 
-    public static long readBytesFromStream(long bytesToRead, InputStream is, OutputStream os) throws IOException {
+    private static long readBytesFromStream(long bytesToRead, InputStream is, OutputStream os) throws IOException {
         if (is == null) {
             return -1;
         }

@@ -92,13 +92,15 @@ public class FSRepresentation {
         return myRevision + " " + myOffset + " " + mySize + " " + myExpandedSize + " " + myHexDigest;
     }
 
-    
     public String getTxnId() {
         return myTxnId;
     }
-
     
     public void setTxnId(String txnId) {
         myTxnId = txnId;
+    }
+    
+    public boolean isTxn(){
+        return FSID.isTxn(myTxnId);
     }
 }
