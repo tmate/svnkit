@@ -24,6 +24,7 @@ public class FSConstants {
     public static final String SVN_REPOS_CONF_DIR = "conf";
     public static final String SVN_REPOS_TXNS_DIR = "transactions";
     public static final String TXN_PATH_EXT = ".txn";
+    public static final String TXN_PATH_EXT_CHILDREN = ".children";
     public static final String PATH_PREFIX_NODE = "node.";
     //txn specific paths
     public static final String TXN_PATH_REV = "rev";

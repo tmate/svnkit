@@ -17,13 +17,15 @@ import java.util.Stack;
 import java.io.File;
 
 import org.tmatesoft.svn.core.SVNCommitInfo;
+import org.tmatesoft.svn.core.SVNNodeKind;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNRevisionProperty;
+import org.tmatesoft.svn.core.SVNProperty;
 import org.tmatesoft.svn.core.io.ISVNEditor;
 import org.tmatesoft.svn.core.io.ISVNWorkspaceMediator;
 import org.tmatesoft.svn.core.io.diff.SVNDiffWindow;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
-
+import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 
 /**
  * @version 1.0
@@ -36,6 +38,7 @@ public class FSCommitEditor implements ISVNEditor {
     private String myBasePath;
     private String myLogMessage;
     private FSTransactionInfo myTxn;
+    private FSRoot myTxnRoot;
     private boolean isTxnOwner;
     private boolean keepLocks;
     private File myReposRootDir;
@@ -84,6 +87,15 @@ public class FSCommitEditor implements ISVNEditor {
                 FSWriter.setTransactionProperty(myReposRootDir, myTxn.getTxnId(), SVNRevisionProperty.LOG, myLogMessage);
             }
         }
+        Map txnProps = FSRepositoryUtil.getTransactionProperties(myReposRootDir, myTxn.getTxnId());
+        int flags = 0;
+        if(txnProps.get(SVNProperty.TXN_CHECK_OUT_OF_DATENESS) != null){
+            flags |= FSConstants.SVN_FS_TXN_CHECK_OUT_OF_DATENESS;
+        }
+        if(txnProps.get(SVNProperty.TXN_CHECK_LOCKS) != null){
+            flags |= FSConstants.SVN_FS_TXN_CHECK_LOCKS;
+        }
+        myTxnRoot = new FSRoot(myTxn.getTxnId(), flags);
         DirBaton dirBaton = new DirBaton(revision, myBasePath, false);  
         myDirsStack.push(dirBaton);
     }
@@ -110,21 +122,29 @@ public class FSCommitEditor implements ISVNEditor {
 
     public void openDir(String path, long revision) throws SVNException {
         DirBaton parentBaton = (DirBaton)myDirsStack.peek();
-        //TODO: fix it in SVNPathUtil.append
-        String fullPath = "/".equals(parentBaton.getPath()) ? parentBaton.getPath() + path : SVNPathUtil.append(parentBaton.getPath(), path); 
+        String fullPath = SVNPathUtil.concatToAbs(parentBaton.getPath(), path); 
         /* Check path in our transaction.  If it does not exist,
          * return a 'Path not present' error. 
          */
-
+        SVNNodeKind kind = myRepository.checkNodeKind(fullPath, myTxnRoot, -1);
+        if(kind == SVNNodeKind.NONE){
+            SVNErrorManager.error("Path '" + path + "' not present");
+        }
+        /* Build a new dir baton for this directory */
+        DirBaton dirBaton = new DirBaton(revision, fullPath, parentBaton.isCopied());  
+        myDirsStack.push(dirBaton);
     }
     
     public void deleteEntry(String path, long revision) throws SVNException {
+        
     }
 
     public void absentDir(String path) throws SVNException {
+        //does nothing
     }
 
     public void absentFile(String path) throws SVNException {
+        //does nothing
     }
 
     public void addDir(String path, String copyFromPath, long copyFromRevision) throws SVNException {
@@ -134,12 +154,17 @@ public class FSCommitEditor implements ISVNEditor {
     }
 
     public void closeDir() throws SVNException {
+        myDirsStack.pop();
     }
 
     public void addFile(String path, String copyFromPath, long copyFromRevision) throws SVNException {
     }
 
     public void openFile(String path, long revision) throws SVNException {
+        DirBaton parentBaton = (DirBaton)myDirsStack.peek();
+        String fullPath = SVNPathUtil.concatToAbs(parentBaton.getPath(), path); 
+        /* Get this node's node-rev (doubles as an existence check). */
+        FSRevisionNode revNode = myRepository.getRevisionNodePool().getRevisionNode(myTxnRoot, fullPath, myReposRootDir);
     }
 
     public void applyTextDelta(String path, String baseChecksum) throws SVNException {

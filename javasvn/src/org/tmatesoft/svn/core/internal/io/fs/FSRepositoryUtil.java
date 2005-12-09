@@ -288,6 +288,10 @@ public class FSRepositoryUtil {
         return new File(getTxnDir(id.getTxnID(), reposRootDir), FSConstants.PATH_PREFIX_NODE + id.getNodeID() + "." + id.getCopyID());
     }
 
+    public static File getTxnRevNodeChildrenFile(FSID id, File reposRootDir) {
+        return new File(getTxnRevNodeFile(id, reposRootDir), FSConstants.TXN_PATH_EXT_CHILDREN);
+    }
+
     public static File getTxnRevFile(String id, File reposRootDir) {
         return new File(getTxnDir(id, reposRootDir), FSConstants.TXN_PATH_REV);
     }

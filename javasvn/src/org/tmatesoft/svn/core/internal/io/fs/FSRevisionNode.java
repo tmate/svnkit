@@ -11,8 +11,8 @@
  */
 package org.tmatesoft.svn.core.internal.io.fs;
 
+import java.util.Map;
 import org.tmatesoft.svn.core.SVNNodeKind;
-
 
 public class FSRevisionNode {
     //id: a.b.r<revID>/offset
@@ -45,6 +45,9 @@ public class FSRevisionNode {
     //copyroot: <revID> <created-path>
     private long myCopyRootRevision;    
     private String myCopyRootPath;
+
+    //for only node-revs representing dirs 
+    private Map myDirContents;
     
     public FSRevisionNode(){
     }
@@ -153,5 +156,13 @@ public class FSRevisionNode {
         clone.setPropsRepresentation(myPropsRepresentation);
         clone.setTextRepresentation(myTextRepresentation);
         return clone;
+    }
+
+    public Map getDirContents() {
+        return myDirContents;
+    }
+
+    public void setDirContents(Map dirContents) {
+        this.myDirContents = dirContents;
     }
 }
