@@ -38,8 +38,8 @@ import org.tmatesoft.svn.core.SVNProperty;
  * @author  TMate Software Ltd.
  */
 public class FSWriter {
-    public static FSTransaction beginTxn(long baseRevision, int flags, FSRevisionNodePool revNodesPool, File reposRootDir) throws SVNException {
-        FSTransaction txn = createTxn(baseRevision, revNodesPool, reposRootDir);
+    public static FSTransactionInfo beginTxn(long baseRevision, int flags, FSRevisionNodePool revNodesPool, File reposRootDir) throws SVNException {
+        FSTransactionInfo txn = createTxn(baseRevision, revNodesPool, reposRootDir);
         /* Put a datestamp on the newly created txn, so we always know
          * exactly how old it is.  (This will help sysadmins identify
          * long-abandoned txns that may need to be manually removed.)  When
@@ -61,11 +61,11 @@ public class FSWriter {
     }
     
     //create txn dir & necessary files in the fs
-    public static FSTransaction createTxn(long baseRevision, FSRevisionNodePool revNodesPool, File reposRootDir) throws SVNException {
+    public static FSTransactionInfo createTxn(long baseRevision, FSRevisionNodePool revNodesPool, File reposRootDir) throws SVNException {
         /* Get the txn id. */
         String txnId = FSWriter.createTxnDir(baseRevision, reposRootDir); 
-        //TODO: add to FSTransaction an equivalent of txn_vtable
-        FSTransaction txn = new FSTransaction(baseRevision, txnId);
+        //TODO: add to FSTransactionInfo an equivalent of txn_vtable
+        FSTransactionInfo txn = new FSTransactionInfo(baseRevision, txnId);
         FSRevisionNode root = revNodesPool.getRootRevisionNode(baseRevision, reposRootDir);// FSReader.getRootRevNode(reposRootDir, baseRevision)
         if(root == null){
             SVNErrorManager.error("svn: No such revision " + baseRevision);

@@ -135,9 +135,7 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
 
     private void openRepository() throws SVNException {
         lock();
-
         String eol = SVNFileUtil.getNativeEOLMarker();
-
         String errorMessage = "svn: Unable to open an ra_local session to URL" + eol + "svn: Unable to open repository '" + getLocation() + "'";
 
         // Perform steps similar to svn's ones
@@ -215,6 +213,7 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
             rootDir = "/" + rootDir;
         }
         setRepositoryCredentials(uuid, SVNURL.parseURIEncoded(getLocation().getProtocol() + "://" + rootDir));
+        myRevNodesPool.clearAllCaches();
     }
 
     private void closeRepository() throws SVNException {
@@ -392,7 +391,7 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
         }
     }
 
-    private SVNNodeKind checkNodeKind(String repositoryPath, FSRevisionNode root, long revision) throws SVNException {
+    private SVNNodeKind checkNodeKind(String repositoryPath, FSRoot root, long revision) throws SVNException {
         FSRevisionNode revNode = root == null ? myRevNodesPool.getRevisionNode(revision, repositoryPath, myReposRootDir) : myRevNodesPool.getRevisionNode(root, repositoryPath, myReposRootDir);
         return revNode == null ? SVNNodeKind.NONE : revNode.getType();
     }
@@ -1298,10 +1297,10 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
         /* Is there a need to check here that both roots 
          *  Check that both paths are files. 
          */
-        if(checkNodeKind(path1, root1, -1) != SVNNodeKind.FILE){
+        if(checkNodeKind(path1, new FSRoot(root1.getId().getRevision(), root1), -1) != SVNNodeKind.FILE){
             SVNErrorManager.error("svn: '" + path1 + "' is not a file");
         }
-        if(checkNodeKind(path2, root2, -1) != SVNNodeKind.FILE){
+        if(checkNodeKind(path2, new FSRoot(root2.getId().getRevision(), root2), -1) != SVNNodeKind.FILE){
             SVNErrorManager.error("svn: '" + path2 + "' is not a file");
         }
         FSRevisionNode revNode1 = myRevNodesPool.getRevisionNode(root1, path1, myReposRootDir);
@@ -1690,7 +1689,7 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
     	return new SVNLocationEntry(node.getCopyFromRevision(), node.getCopyFromPath());
     }
     
-    private static FSClosestCopy closestCopy(File reposRootDir, FSRevisionNode root, String path)throws SVNException{
+    private FSClosestCopy closestCopy(File reposRootDir, FSRevisionNode root, String path)throws SVNException{
     	FSParentPath parentPath = new FSParentPath();
     	FSRevisionNode copyDstRoot = new FSRevisionNode();    	
     	long createdRev;
@@ -1707,7 +1706,7 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
     		return null;
     	}    	
     	try{
-    		parentPath = FSParentPath.openParentPath(reposRootDir, root, path, 0, null);
+    		parentPath = myRevNodesPool.getParentPath(new FSRoot(root.getId().getRevision(), root), path, false, reposRootDir); //FSParentPath.openParentPath(reposRootDir, root, path, 0, null);
     	}catch(SVNException ex){
     		SVNErrorManager.error("Unable get FSParentPath");
     	}
