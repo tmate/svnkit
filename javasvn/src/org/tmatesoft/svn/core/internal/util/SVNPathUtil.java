@@ -80,17 +80,6 @@ public class SVNPathUtil {
         return "";
     }
 
-    public static String removeHead(String path) {
-        for(int i = 0; i < path.length(); i++) {
-            if (path.charAt(i) == '/') {
-                if(i != path.length() - 1){
-                    return path.substring(i+1); 
-                }
-            }
-        }
-        return "";
-    }
-
     public static String getCommonPathAncestor(String path1, String path2) {
         if (path1 == null || path2 == null) {
             return null;
@@ -365,7 +354,25 @@ public class SVNPathUtil {
         }
         return path;
     }
-    
+
+    public static String removeHead(String path) {
+        for(int i = 0; i < path.length(); i++) {
+            if (path.charAt(i) == '/') {
+                int ind = i;
+                for(; ind < path.length(); ind++){
+                    if(path.charAt(ind) == '/'){
+                        continue;
+                    }
+                    break;
+                }
+                if(ind < path.length()){
+                    return path.substring(ind); 
+                }
+            }
+        }
+        return "";
+    }
+
     public static int getSegmentsCount(String path) {
         int count = path.length() > 0 ? 1 : 0;
         // skipe first char, then count number of '/'
@@ -376,6 +383,7 @@ public class SVNPathUtil {
         }        
         return count;
     }
+    
     public static String canonicalizeAbsPath(String path){
     	int newPathCount = 0;
     	boolean eatingSlashes = false;
@@ -386,15 +394,15 @@ public class SVNPathUtil {
     		return null;
     	}    	
     	//If no content in path
-    	if(path.compareTo("") == 0){
+    	if("".equals(path)){
     		path = new String("/");
     	}
     	//Set leading '/' character
-    	if(path.startsWith("/") == false){
+    	if(!path.startsWith("/")){
     		newString.insert(newPathCount++, '/');
 		}
     	//dispose of slashes number of that is 
-    	for(int count = 0; count < path.length(); ++count){
+    	for(int count = 0; count < path.length(); count++){
     		if(path.charAt(count) == '/'){
     			if(eatingSlashes == true){
     				continue;
@@ -407,10 +415,10 @@ public class SVNPathUtil {
     		}
     		newString.insert(newPathCount++, path.charAt(count));
     	}    		
-    	if(newPathCount > 0 && newString.charAt(newPathCount-1) == '/'){
+    	if(newPathCount > 1 && newString.charAt(newPathCount-1) == '/'){
     		newString.deleteCharAt(newPathCount - 1);
     	}
-    	return new String(newString);
+    	return newString.toString();
     }    
     
     public static String pathIsChild(String path, String pathChild){
