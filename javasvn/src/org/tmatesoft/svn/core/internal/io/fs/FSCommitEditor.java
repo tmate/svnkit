@@ -35,14 +35,14 @@ public class FSCommitEditor implements ISVNEditor {
     private String myAuthor;
     private String myBasePath;
     private String myLogMessage;
-    private FSTransaction myTxn;
+    private FSTransactionInfo myTxn;
     private boolean isTxnOwner;
     private boolean keepLocks;
     private File myReposRootDir;
     private FSRepository myRepository;
     private Stack myDirsStack;
     
-    public FSCommitEditor(String path, String logMessage, String userName, Map lockTokens, boolean keepLocks, ISVNWorkspaceMediator mediator, FSTransaction txn, FSRepository repository){
+    public FSCommitEditor(String path, String logMessage, String userName, Map lockTokens, boolean keepLocks, ISVNWorkspaceMediator mediator, FSTransactionInfo txn, FSRepository repository){
         myMediator = mediator;
         myLockTokens = lockTokens;
         myAuthor = userName;
@@ -88,11 +88,11 @@ public class FSCommitEditor implements ISVNEditor {
         myDirsStack.push(dirBaton);
     }
     
-    private FSTransaction beginTransactionForCommit(long baseRevision) throws SVNException {
+    private FSTransactionInfo beginTransactionForCommit(long baseRevision) throws SVNException {
         /* Run start-commit hooks. */
         FSHooks.runStartCommitHook(myReposRootDir, myAuthor);
         /* Begin the transaction, ask for the fs to do on-the-fly lock checks. */
-        FSTransaction txn = FSWriter.beginTxn(baseRevision, FSConstants.SVN_FS_TXN_CHECK_LOCKS, myRepository.getRevisionNodePool(), myReposRootDir);
+        FSTransactionInfo txn = FSWriter.beginTxn(baseRevision, FSConstants.SVN_FS_TXN_CHECK_LOCKS, myRepository.getRevisionNodePool(), myReposRootDir);
         /* We pass the author and log message to the filesystem by adding
          * them as properties on the txn.  Later, when we commit the txn,
          * these properties will be copied into the newly created revision. 

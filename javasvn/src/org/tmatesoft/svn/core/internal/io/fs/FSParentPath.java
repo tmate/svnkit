@@ -44,7 +44,8 @@ public class FSParentPath
 	//constructors
 	public FSParentPath(){		
 	}
-	public FSParentPath(FSRevisionNode newRevNode, String newNameEntry, FSParentPath newParent, int newCopyStyle, String newCopySrcPath){
+	
+    public FSParentPath(FSRevisionNode newRevNode, String newNameEntry, FSParentPath newParent, int newCopyStyle, String newCopySrcPath){
 		revNode = newRevNode;
 		nameEntry = newNameEntry;
 		parent = newParent;
@@ -116,94 +117,6 @@ public class FSParentPath
 		return this.getNameEntry() != null ? SVNPathUtil.append(pathSoFar, this.getNameEntry()) : pathSoFar;
 	}
 
-	//static methods
-	//!!!!!need to implement cache
-	public static FSParentPath openParentPath(File reposRootDir, FSRevisionNode root, String path, int flags, String txnId)throws SVNException{		
-		FSRevisionNode here;
-		FSParentPath parentPath;
-		String rest;
-		String canonPath = SVNPathUtil.canonicalizeAbsPath(path);
-		String pathSoFar = "/";
-		
-		//make some checks
-		if(reposRootDir == null || root == null){			
-			SVNErrorManager.error("bad input args: FSRevisionNode root == null, File reposRootDir == null");//just for diagnostics
-		}
-		
-		//Make a parent_path item for the root node, using its own current
-	    //copy id
-		here = root;		
-		parentPath = new FSParentPath(here, null, null);
-		parentPath.setCopyStyle(FSParentPath.COPY_ID_INHERIT_SELF);
-		
-		rest = canonPath.substring(1);// skip the leading '/'
-		
-		/* Whenever we are at the top of this loop:
-	     - HERE is our current directory,
-	     - ID is the node revision ID of HERE,
-	     - REST is the path we're going to find in HERE, and 
-	     - PARENT_PATH includes HERE and all its parents.  */
-		
-		while(true){
-			String next;
-			String entry;
-			FSRevisionNode child = null;
-			
-			String[] strArray = FSParentPath.nextEntryName(rest);
-			entry = strArray[0];
-			next = strArray[1];
-			
-			pathSoFar = SVNPathUtil.append(pathSoFar, entry);
-			
-			if((entry == null) || (entry.compareTo("") == 0)){
-				child = here;
-			}else{
-				//FSRevisionNode cachedNode;
-				
-				//need to implement caching
-		        //cached_node = dag_node_cache_get (root, path_so_far, pool);
-		        //if (cached_node)
-		        //    child = cached_node;
-		        //  else
-		        //    err = svn_fs_fs__dag_open (&child, here, entry, pool);
-				try{
-					child = FSReader.getChildDirNode(entry, here, reposRootDir);
-				}catch(SVNException ex){
-					SVNErrorManager.error("");					
-				}
-				if(child == null){
-					/* If this was the last path component, and the caller
-	                 said it was optional, then don't return an error;
-	                 just put a NULL node pointer in the path.  */	              
-					if( ((flags & FSParentPath.OPEN_PATH_LAST_OPTIONAL) != 0) && (next == null || next == "") ){
-						return new FSParentPath(null, entry, parentPath);
-					}else{
-						//!!!here might be check for is_txn_root
-						SVNErrorManager.error("File not found: revision " + root.getId().getRevision() + " path " + path);						
-					}										
-				}	
-				parentPath.setParentPath(child, entry, parentPath);
-				SVNLocationEntry copyInherEntry = null;
-				if(txnId != null){
-					copyInherEntry = FSParentPath.getCopyInheritance(reposRootDir, parentPath, txnId);
-					parentPath.setCopyStyle((int)copyInherEntry.getRevision());
-					parentPath.setCopySrcPath(copyInherEntry.getPath());
-				}
-				//!!!!need to implement cache				
-			}		
-			if(next == null || next.compareTo("") == 0){
-				break;
-			}
-		    //The path isn't finished yet; we'd better be in a directory
-			if(child.getType() != SVNNodeKind.DIR){
-				SVNErrorManager.error(pathSoFar + "is not a directory in filesystem");
-			}
-			rest = next;
-			here = child;
-		}		
-		return parentPath;
-	}
-	
 	//Return value consist of :
 	//1:	SVNLocationEntry.revision
 	//		copy inheritance style
@@ -305,26 +218,23 @@ public class FSParentPath
 			retVal[0] = path;
 			retVal[1] = null;
 			return retVal;
-		}else{
-			int slashCount = slashOccurence + 1;
-			while(path.charAt(slashCount) == '/'){
-				slashCount++;
-				if(slashCount == path.length()){					
-					break;
-				}				
-			}
-			retVal[0] = path.substring(0, slashOccurence);
-			retVal[1] = path.substring(slashCount, path.length());
-			return retVal;
-		}		
+		}
+        int slashCount = slashOccurence + 1;
+        while(path.charAt(slashCount) == '/'){
+            slashCount++;
+            if(slashCount == path.length()){					
+                break;
+            }				
+        }
+        retVal[0] = path.substring(0, slashOccurence);
+        retVal[1] = path.substring(slashCount, path.length());
+        return retVal;
 	}
 	
 	//Copy id inheritance style 
-	public static int COPY_ID_INHERIT_UNKNOWN = 0;
-	public static int COPY_ID_INHERIT_SELF = 1;
-	public static int COPY_ID_INHERIT_PARENT = 2;
-	public static int COPY_ID_INHERIT_NEW = 3;
+	public static final int COPY_ID_INHERIT_UNKNOWN = 0;
+	public static final int COPY_ID_INHERIT_SELF = 1;
+	public static final int COPY_ID_INHERIT_PARENT = 2;
+	public static final int COPY_ID_INHERIT_NEW = 3;
 	
-	//flags for openParentPath()
-	private static int OPEN_PATH_LAST_OPTIONAL = 1;
 }

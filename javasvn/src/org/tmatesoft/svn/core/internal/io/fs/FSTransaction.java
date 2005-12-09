@@ -11,33 +11,80 @@
  */
 package org.tmatesoft.svn.core.internal.io.fs;
 
+import java.util.Collection;
+import java.util.Map;
 
 /**
  * @version 1.0
  * @author  TMate Software Ltd.
  */
 public class FSTransaction {
-    private long myBaseRevision;
-    private String myTxnId;
+    /* kind of transaction. */
+    FSTransactionKind myKind;
     
-    public FSTransaction(long revision, String id) {
-        myBaseRevision = revision;
-        myTxnId = id;
-    }
+    /* node revision id of the root node.  */
+    FSID myRootId;
+    
+    /* node revision id of the node which is the root of the revision
+     * upon which this txn is base.  (unfinished only) 
+     */
+    FSID myBaseId;
+    
+    /* copies list (String copy-ids), or null if there have been
+     * no copies in this transaction.  
+     */
+    Collection myCopies;
+    
+    /* property list (String name, String value).
+     * may be null if there are no properties.  
+     */
+    Map myProperties;
 
-    public long getBaseRevision() {
-        return myBaseRevision;
+    public FSTransaction(FSTransactionKind txnKind, FSID rootId, FSID baseId, Collection copies, Map properties) {
+        myKind = txnKind;
+        myRootId = rootId;
+        myBaseId = baseId;
+        myCopies = copies;
+        myProperties = properties;
     }
-
-    public void setBaseRevision(long baseRevision) {
-        myBaseRevision = baseRevision;
+    
+    public FSID getBaseId() {
+        return myBaseId;
     }
-
-    public String getTxnId() {
-        return myTxnId;
+    
+    public void setBaseId(FSID baseId) {
+        myBaseId = baseId;
     }
-
-    public void setTxnId(String txnId) {
-        myTxnId = txnId;
+    
+    public Collection getCopies() {
+        return myCopies;
+    }
+    
+    public void setCopies(Collection copies) {
+        myCopies = copies;
+    }
+    
+    public FSTransactionKind getKind() {
+        return myKind;
+    }
+    
+    public void setKind(FSTransactionKind kind) {
+        myKind = kind;
+    }
+    
+    public Map getProperties() {
+        return myProperties;
+    }
+    
+    public void setProperties(Map properties) {
+        myProperties = properties;
+    }
+    
+    public FSID getRootId() {
+        return myRootId;
+    }
+    
+    public void setRootId(FSID rootId) {
+        myRootId = rootId;
     }
 }

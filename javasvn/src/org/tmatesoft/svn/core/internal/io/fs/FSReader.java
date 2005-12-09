@@ -11,8 +11,6 @@
  */
 package org.tmatesoft.svn.core.internal.io.fs;
 
-import java.util.*;
-
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNLock;
 import org.tmatesoft.svn.core.SVNNodeKind;
@@ -68,8 +66,6 @@ public class FSReader {
         }
         return lock;
     }
-    
-    
     
     public static SVNLock fetchLock(String repositoryPath, Collection children, File reposRootDir) throws SVNException {
         File digestLockFile = FSRepositoryUtil.getDigestFileFromRepositoryPath(repositoryPath, reposRootDir);
@@ -129,7 +125,37 @@ public class FSReader {
         
         return lock;
     }
+    
+    public static FSTransaction getTxn(String txnId, File reposRootDir) throws SVNException {
+        FSTransaction txn = getTxn(txnId, false, reposRootDir);
+        if(txn.getKind() != FSTransactionKind.TXN_KIND_NORMAL){
+            SVNErrorManager.error("Cannot modify transaction named '" + txnId + "' in filesystem '" + reposRootDir.getAbsolutePath() + "'");
+        }
+        return txn;
+    }
 
+    /* If expectDead is true, this transaction must be a dead one, 
+     * else an error is returned. If expectDead is false, an error is 
+     * thrown if the transaction is *not* dead. 
+     */
+    private static FSTransaction getTxn(String txnId, boolean expectDead, File reposRootDir) throws SVNException {
+        FSTransaction txn = fetchTxn(txnId, reposRootDir);
+        if(expectDead && txn.getKind() != FSTransactionKind.TXN_KIND_DEAD){
+            SVNErrorManager.error("Transaction is not dead: '" + txnId + "'");
+        }
+        if(!expectDead && txn.getKind() == FSTransactionKind.TXN_KIND_DEAD){
+            SVNErrorManager.error("Transaction is dead: '" + txnId + "'");
+        }
+        return txn;
+    }
+
+    private static FSTransaction fetchTxn(String txnId, File reposRootDir) throws SVNException {
+        Map txnProps = FSRepositoryUtil.getTransactionProperties(reposRootDir, txnId);
+        FSID rootId = new FSID("0", txnId, "0", FSConstants.SVN_INVALID_REVNUM, -1);
+        FSRevisionNode revNode = getRevNodeFromID(reposRootDir, rootId);
+        return new FSTransaction(FSTransactionKind.TXN_KIND_NORMAL, revNode.getId(), revNode.getPredecessorId(), null, txnProps);
+    }
+    
     /*
      * If root is not null, tries to find the rev-node for repositoryPath 
      * in the provided root, otherwise if root is null, uses the provided 
@@ -139,15 +165,14 @@ public class FSReader {
         if(repositoryPath == null){
             return null;
         }
-        String absPath = repositoryPath;
+        String absPath = SVNPathUtil.canonicalizeAbsPath(repositoryPath);
         String nextPathComponent = null;
         FSRevisionNode parent = root != null ? root : FSReader.getRootRevNode(reposRootDir, revision);
         FSRevisionNode child = null;
         while (true) {
             nextPathComponent = SVNPathUtil.head(absPath);
             absPath = SVNPathUtil.removeHead(absPath);
-
-            if (nextPathComponent.length() == 0) {
+            if ("".equals(nextPathComponent)) {
                 child = parent;
             } else {
                 child = FSReader.getChildDirNode(nextPathComponent, parent, reposRootDir);
@@ -166,7 +191,6 @@ public class FSReader {
     
     public static FSRevisionNode getChildDirNode(String child, FSRevisionNode parent, File reposRootDir) throws SVNException {
         if (child == null || child.length() == 0 || "..".equals(child) || child.indexOf('/') != -1) {
-
             SVNErrorManager.error("svn: Attempted to open node with an illegal name '" + child + "'");
         }
         Map entries = getDirEntries(parent, reposRootDir);
@@ -187,30 +211,32 @@ public class FSReader {
         if (revNode == null || revNode.getType() != SVNNodeKind.DIR) {
             SVNErrorManager.error("svn: Can't get entries of non-directory");
         }
-
-        return getDirContents(revNode.getTextRepresentation(), reposRootDir);
+        return getDirContents(revNode, reposRootDir);
     }
 
     public static Map getProperties(FSRevisionNode revNode, File reposRootDir) throws SVNException {
         return getProplist(revNode.getPropsRepresentation(), reposRootDir);
     }
 
-    private static Map getDirContents(FSRepresentation representation, File reposRootDir) throws SVNException {
-        if (representation == null) {
-            return new HashMap();
-        }
-        InputStream is = null;
-        try {
-            is = readPlainRepresentation(representation, reposRootDir);
-            return parsePlainRepresentation(is, false);
-        } catch (IOException ioe) {
-            SVNErrorManager.error("svn: Can't read representation in revision file '" + FSRepositoryUtil.getRevisionFile(reposRootDir, representation.getRevision()).getAbsolutePath() + "': "
-                    + ioe.getMessage());
-        } catch (SVNException svne) {
-            SVNErrorManager.error("svn: Revision file '" + FSRepositoryUtil.getRevisionFile(reposRootDir, representation.getRevision()).getAbsolutePath() + "' corrupt"
-                    + SVNFileUtil.getNativeEOLMarker() + svne.getMessage());
-        } finally {
-            SVNFileUtil.closeFile(is);
+    private static Map getDirContents(FSRevisionNode revNode, File reposRootDir) throws SVNException {
+        if(revNode.getTextRepresentation() != null && revNode.getTextRepresentation().getTxnId() != null){
+            
+        
+        }else if(revNode.getTextRepresentation() != null){
+            InputStream is = null;
+            FSRepresentation textRepresent = revNode.getTextRepresentation(); 
+            try {
+                is = readPlainRepresentation(textRepresent, reposRootDir);
+                return parsePlainRepresentation(is, false);
+            } catch (IOException ioe) {
+                SVNErrorManager.error("svn: Can't read representation in revision file '" + FSRepositoryUtil.getRevisionFile(reposRootDir, textRepresent.getRevision()).getAbsolutePath() + "': "
+                        + ioe.getMessage());
+            } catch (SVNException svne) {
+                SVNErrorManager.error("svn: Revision file '" + FSRepositoryUtil.getRevisionFile(reposRootDir, textRepresent.getRevision()).getAbsolutePath() + "' corrupt"
+                        + SVNFileUtil.getNativeEOLMarker() + svne.getMessage());
+            } finally {
+                SVNFileUtil.closeFile(is);
+            }
         }
         return new HashMap();
     }
@@ -498,13 +524,11 @@ public class FSReader {
         if (values == null || values.length < 2) {
             throw new SVNException();
         }
-
         SVNNodeKind type = SVNNodeKind.parseKind(values[0]);
-        if (type != SVNNodeKind.DIR && type != SVNNodeKind.FILE) {
+        FSID id = parseID(values[1]);
+        if ((type != SVNNodeKind.DIR && type != SVNNodeKind.FILE) || id == null) {
             throw new SVNException();
         }
-
-        FSID id = parseID(values[1], null);
         return new FSRepresentationEntry(id, type, name);
     }
 
@@ -568,10 +592,10 @@ public class FSReader {
     }
 
     public static FSRevisionNode getRevNodeFromID(File reposRootDir, FSID id) throws SVNException {
-        File revFile = FSRepositoryUtil.getRevisionFile(reposRootDir, id.getRevision());
+        File revFile = !id.isTxn() ? FSRepositoryUtil.getRevisionFile(reposRootDir, id.getRevision()) : FSRepositoryUtil.getTxnRevNodeFile(id, reposRootDir);
 
         FSRevisionNode revNode = new FSRevisionNode();
-        long offset = id.getOffset();
+        long offset = !id.isTxn() ? id.getOffset() : 0;
 
         Map headers = readRevNodeHeaders(revFile, offset);
 
@@ -581,11 +605,11 @@ public class FSReader {
             SVNErrorManager.error("svn: Missing node-id in node-rev in revision file '" + revFile.getAbsolutePath() + "'");
         }
 
-        try {
-            revNode.setId(parseID(revNodeId, null));
-        } catch (SVNException svne) {
+        FSID revnodeId = parseID(revNodeId);    
+        if(revnodeId == null){
             SVNErrorManager.error("svn: Corrupt node-id in node-rev in revision file '" + revFile.getAbsolutePath() + "'");
         }
+        revNode.setId(revnodeId);
 
         // Read the type.
         SVNNodeKind nodeKind = SVNNodeKind.parseKind((String) headers.get(FSConstants.HEADER_TYPE));
@@ -617,7 +641,7 @@ public class FSReader {
             try {
                 parseRepresentationHeader(propsRepr, revNode, false);
             } catch (SVNException svne) {
-                throw new SVNException("svn: Malformed props rep offset line in node-rev '" + revFile.getAbsolutePath() + "'");
+                SVNErrorManager.error("svn: Malformed props rep offset line in node-rev '" + revFile.getAbsolutePath() + "'");
             }
         }
 
@@ -627,25 +651,25 @@ public class FSReader {
             try {
                 parseRepresentationHeader(textRepr, revNode, true);
             } catch (SVNException svne) {
-                throw new SVNException("svn: Malformed text rep offset line in node-rev '" + revFile.getAbsolutePath() + "'");
+                SVNErrorManager.error("svn: Malformed text rep offset line in node-rev '" + revFile.getAbsolutePath() + "'");
             }
         }
 
         // Get the created path.
         String cpath = (String) headers.get(FSConstants.HEADER_CPATH);
         if (cpath == null) {
-            throw new SVNException("svn: Missing cpath in node-rev in revision file '" + revFile.getAbsolutePath() + "'");
+            SVNErrorManager.error("svn: Missing cpath in node-rev in revision file '" + revFile.getAbsolutePath() + "'");
         }
         revNode.setCreatedPath(cpath);
 
         // Get the predecessor rev-node id (if any).
         String predId = (String) headers.get(FSConstants.HEADER_PRED);
         if (predId != null) {
-            try {
-                revNode.setPredecessorId(parseID(predId, null));
-            } catch (SVNException svne) {
-                throw new SVNException("svn: Corrupt node-id in node-rev in revision file '" + revFile.getAbsolutePath() + "'");
+            FSID predRevNodeId = parseID(predId);
+            if(predRevNodeId == null){
+                SVNErrorManager.error("svn: Corrupt node-id in node-rev in revision file '" + revFile.getAbsolutePath() + "'");
             }
+            revNode.setPredecessorId(predRevNodeId);
         }
 
         // Get the copyroot.
@@ -718,49 +742,36 @@ public class FSReader {
         revNode.setCopyRootPath(cpyroot[1]);
     }
 
-    public static FSID parseID(String revNodeId, FSID id) throws SVNException {
-        int firstDotInd = revNodeId.indexOf('.');
-        int secondDotInd = revNodeId.lastIndexOf('.');
-        int rInd = revNodeId.indexOf('r', secondDotInd);
-
-        if (rInd != -1) {// we've a revision id
-            int slashInd = revNodeId.indexOf('/');
-
-            if (firstDotInd <= 0 || firstDotInd == secondDotInd || rInd <= 0 || slashInd <= 0) {
-                throw new SVNException();
-            }
-
-            String nodeId = revNodeId.substring(0, firstDotInd);
-            String copyId = revNodeId.substring(firstDotInd + 1, secondDotInd);
-
-            if (nodeId == null || nodeId.length() == 0 || copyId == null || copyId.length() == 0) {
-                throw new SVNException();
-            }
+    public static FSID parseID(String revNodeId) {
+        /* Now, we basically just need to "split" this data on `.'
+         * characters.
+         */
+        String[] idParts = revNodeId.split("\\.");
+        if(idParts.length != 3){
+            return null;
+        }
+        /* Node Id */
+        String nodeId = idParts[0];  
+        /* Copy Id */
+        String copyId = idParts[1];
+        if(idParts[2].charAt(0) == 'r'){
+            /* This is a revision type ID */
+            int slashInd = idParts[2].indexOf('/');
             long rev = -1;
             long offset = -1;
             try {
-                rev = Long.parseLong(revNodeId.substring(rInd + 1, slashInd));
-                offset = Long.parseLong(revNodeId.substring(slashInd + 1));
+                rev = Long.parseLong(idParts[2].substring(1, slashInd));
+                offset = Long.parseLong(idParts[2].substring(slashInd + 1));
             } catch (NumberFormatException nfe) {
-                throw new SVNException();
+                return null;
             }
-
-            if (id == null) {
-                id = new FSID(nodeId, FSID.ID_INAPPLICABLE, copyId, rev, offset);
-                return id;
-            }
-
-            id.setNodeID(nodeId);
-            id.setCopyID(copyId);
-            id.setRevision(rev);
-            id.setOffset(offset);
-            return id;
+            return new FSID(nodeId, FSID.ID_INAPPLICABLE, copyId, rev, offset);
+        }else if(idParts[2].charAt(0) == 't'){
+            /* This is a transaction type ID */
+            String txnId = idParts[2].substring(1);
+            return new FSID(nodeId, txnId, copyId, FSConstants.SVN_INVALID_REVNUM, -1);
         }
-
-        // else it's a txn id
-
-        return null;// just be this null before being implemented
-
+        return null;
     }
 
     // isData - if true - text, otherwise - props
@@ -850,7 +861,7 @@ public class FSReader {
     }
 
     // Read in a rev-node given its offset in a rev-file.
-    public static Map readRevNodeHeaders(File revFile, long offset) throws SVNException {
+    private static Map readRevNodeHeaders(File revFile, long offset) throws SVNException {
         if (offset < 0) {
             return null;
         }
@@ -1081,9 +1092,8 @@ public class FSReader {
     public static String readStringFromReportFile(InputStream reportFile) throws IOException {
         int length = readNumberFromReportFile(reportFile);
         if (length == 0) {
-            return "";// ?
+            return "";
         }
-
         byte[] buffer = new byte[length];
         reportFile.read(buffer);
         return new String(buffer);
