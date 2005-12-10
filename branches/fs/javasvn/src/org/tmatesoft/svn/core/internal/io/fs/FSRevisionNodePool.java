@@ -116,7 +116,7 @@ public abstract class FSRevisionNodePool {
                     }
                     return null;
                 }   
-                parentPath.setParentPath(child, entry, parentPath);
+                parentPath.setParentPath(child, entry, new FSParentPath(parentPath));
                 SVNLocationEntry copyInherEntry = null;
                 if(txnId != null){
                     copyInherEntry = FSParentPath.getCopyInheritance(reposRootDir, parentPath, txnId);

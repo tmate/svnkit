@@ -12,7 +12,6 @@ import org.tmatesoft.svn.core.internal.wc.*;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.io.*;
-import org.tmatesoft.svn.core.*;
 
 /**
  * @author Tim
@@ -192,7 +191,7 @@ public class FSParentPath
 	
 	//the function returns 2 strings 
 	//1 string is:
-	//			a null-terminated copy of the first component of PATH.
+	//			a copy of the first component of PATH.
 	//		    If path is empty, or consists entirely of
 	//			slashes, return the empty string
 	//2 string is:
@@ -212,6 +211,7 @@ public class FSParentPath
 		if(path == null){
 			retVal[0] = null;
 			retVal[1] = null;
+			return retVal;
 		}		
 		int slashOccurence = path.indexOf('/');		
 		if(slashOccurence == -1){
