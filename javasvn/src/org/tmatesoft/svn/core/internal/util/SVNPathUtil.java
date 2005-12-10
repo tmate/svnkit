@@ -68,6 +68,41 @@ public class SVNPathUtil {
         }
         return result.toString();
     }
+
+    public static String concatToAbs(String f, String s) {
+        f = canonicalizeAbsPath(f);
+        f = f == null ? "" : f;
+        s = s == null ? "" : s;
+        if("/".equals(f)){
+            int i = 0;
+            for(; i < s.length(); i++){
+                if(s.charAt(i) == '/'){
+                    continue;
+                }
+                break;
+            }
+            return f + s.substring(i);
+        }
+        StringBuffer result = new StringBuffer(f.length() + s.length());
+        for(int i = 0; i < f.length(); i++) {
+            char ch = f.charAt(i);
+            if (i + 1 == f.length() && ch == '/') {
+                break;
+            }
+            result.append(ch);
+        }
+        for(int i = 0; i < s.length(); i++) {
+            char ch = s.charAt(i);
+            if (i == 0 && ch != '/' && result.length() > 0) {
+                result.append('/');
+            }
+            if (i + 1 == s.length() && ch == '/') {
+                break;
+            }
+            result.append(ch);
+        }
+        return result.toString();
+    }
     
     public static String removeTail(String path) {
         int index = path.length() - 1;
@@ -365,9 +400,7 @@ public class SVNPathUtil {
                     }
                     break;
                 }
-                if(ind < path.length()){
-                    return path.substring(ind); 
-                }
+                return path.substring(ind); 
             }
         }
         return "";
