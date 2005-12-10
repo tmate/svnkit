@@ -24,34 +24,31 @@ import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 public class FSNodeHistory
 {	
 	//path and revision of historical location
-	SVNLocationEntry histEntry;
+	private SVNLocationEntry historyEntry;
 	
 	//internal-use hints about where to resume the history search
-	SVNLocationEntry hintsEntry;
+	private SVNLocationEntry searchResumeEntry;
 	
-	//FALSE until the first call to svn_fs_history_prev()
-	boolean isInteresting;
+	//FALSE until the first call to fsHistoryPrev()
+	private boolean isInteresting;
 	
-	//default constructor
-	public FSNodeHistory(){		
-	}
-	public FSNodeHistory(SVNLocationEntry historyEntry, boolean interest, SVNLocationEntry hintsEntr){
-		histEntry = historyEntry;
-		hintsEntry = hintsEntr;
+	public FSNodeHistory(SVNLocationEntry newHistoryEntry, boolean interest, SVNLocationEntry newSearchResumeEntry){
+		historyEntry = newHistoryEntry;
+		searchResumeEntry = newSearchResumeEntry;		
 		isInteresting = interest;
 	}
 	//methods-accessors
 	public SVNLocationEntry getHistoryEntry(){
-		return histEntry;
+		return historyEntry;
 	}
-	public void setHistoryEntry(SVNLocationEntry historyEntry){
-		histEntry = historyEntry;		
+	public void setHistoryEntry(SVNLocationEntry newHistoryEntry){
+		historyEntry = newHistoryEntry;		
 	}
-	public SVNLocationEntry getHintsEntry(){
-		return hintsEntry;
+	public SVNLocationEntry getSearchResumeEntry(){
+		return searchResumeEntry;
 	}
-	public void setHintsEntry(SVNLocationEntry hintsEntr){
-		hintsEntry = hintsEntr;
+	public void setHintsEntry(SVNLocationEntry newSearchResumeEntry){
+		searchResumeEntry = newSearchResumeEntry;
 	}
 	public boolean getInterest(){
 		return isInteresting;
@@ -70,7 +67,6 @@ public class FSNodeHistory
 		if(parPath.getParentPath() != null){
 			parentEntry = FSNodeHistory.findYoungestCopyroot(reposRootDir, parPath.getParentPath());
 		}
-		//myEntry = FSDAGNode.getCopyrootFromFSDAGNode(reposRootDir, parPath.getDAGNode());
 		myEntry = new SVNLocationEntry(parPath.getRevNode().getCopyFromRevision(), parPath.getRevNode().getCopyFromPath()); 
 		if(myEntry == null){
 			System.out.println("returning value (SVNLocationEntry myEntry) is null");
@@ -88,49 +84,50 @@ public class FSNodeHistory
 		}	
 	}
 	
-    public static boolean checkAncestryOfPegPath(File reposRootDir, String fsPath, long pegRev, long futureRev)throws SVNException{
-    	FSRevisionNode root;
-    	FSNodeHistory history=null;
-    	SVNLocationEntry currentHistory;
-    	
-    	try{
-    		root = FSReader.getRootRevNode(reposRootDir, futureRev);
-    		history = getNodeHistory(reposRootDir, root, fsPath);
-    	}catch(SVNException ex){
-    		System.out.println(ex.getMessage());
-    	}
-    	
-    	fsPath = null;
-    	
-    	while(true){  
-    		try{
-    			history = fsHistoryPrev(reposRootDir, history, true);
-    		}catch(SVNException ex){
-    			SVNErrorManager.error("bad execution of fsHistoryPrev() function");    			
+    public static boolean checkAncestryOfPegPath(File reposRootDir, String fsPath, long pegRev, long futureRev, FSRevisionNodePool revNodesPool)throws SVNException{
+    	try{    
+    		String localFsAPath = null;
+    		if(fsPath == null){
+    			SVNErrorManager.error("invalid path in repository");
+    		}else{
+    			localFsAPath = new String(fsPath);
     		}
-    		if(history == null){  
+    		FSRevisionNode root = FSReader.getRootRevNode(reposRootDir, futureRev);
+    		FSNodeHistory history = getNodeHistory(reposRootDir, root, fsPath);    	
+    		fsPath = null;
+    		
+    		while(true){  
+    			history = fsHistoryPrev(reposRootDir, history, true, revNodesPool);
+    			
+    			if(history == null){  
     			//!!!possible fsPath == null or path == null
     			//previous variant, I suppose it not to be right, look at source code!!!
     			//return (fsPath.compareTo(path) == 0);
-    			return false;    			
-    		}
-    		currentHistory = new SVNLocationEntry(history.getHistoryEntry().getRevision(), history.getHistoryEntry().getPath()); 
+    				return false;    			
+    			}
+    			SVNLocationEntry currentHistory = new SVNLocationEntry(history.getHistoryEntry().getRevision(), history.getHistoryEntry().getPath()); 
  		
-    		if(fsPath == null){
-    			//!!!possible fsPath == null or currentHistory.getPath() == null
-    			fsPath = new String(currentHistory.getPath());
+    			if(fsPath == null){
+    				//!!!possible fsPath == null or currentHistory.getPath() == null
+    				fsPath = new String(currentHistory.getPath());
+    			}
+    			if(currentHistory.getRevision() <= pegRev){
+    				return (history != null && (fsPath.compareTo(currentHistory.getPath()) == 0));
+    			}
+    		}   
+    		}catch(SVNException ex){
+    			SVNErrorManager.error("");
     		}
-    		if(currentHistory.getRevision() <= pegRev){
-    			return (history != null && (fsPath.compareTo(currentHistory.getPath()) == 0));
-    		}
-    	}    	
+    	return false;
     }
     
     //Retrun FSNodeHistory as an opaque node history object which represents
     //PATH under ROOT. ROOT must be a revision root    
     public static FSNodeHistory getNodeHistory(File reposRootDir, FSRevisionNode root, String path)throws SVNException{
+    	if(root == null){
+    		SVNErrorManager.error("invalid node root of repository");
+    	}
     	SVNNodeKind kind = FSRepository.checkPath(reposRootDir, root, path);;    	
-    	
     	if(kind == SVNNodeKind.NONE){
     		SVNErrorManager.error("File not found: revision " + root.getId().getRevision() + " path " + path);
     	}
@@ -139,7 +136,7 @@ public class FSNodeHistory
     			false, new SVNLocationEntry(FSConstants.SVN_INVALID_REVNUM, null));
     }
     	
-    public static FSNodeHistory historyPrev(File reposRootDir, FSNodeHistory hist, boolean crossCopies)throws SVNException{
+    private static FSNodeHistory historyPrev(File reposRootDir, FSNodeHistory hist, boolean crossCopies, FSRevisionNodePool revNodesPool)throws SVNException{
     	String srcPath = null;
     	String path = hist.getHistoryEntry().getPath();
     	SVNLocationEntry commitEntry;
@@ -158,14 +155,13 @@ public class FSNodeHistory
         //the chase, then our last report was on the destination of a
         //copy.  If we are crossing copies, start from those locations,
         //otherwise, we're all done here
-    	//!!!!!what will happen if hist.getHintsEntry() == null ??????? I suppose the programm will fail!!!!
-    	if(hist.getHintsEntry() != null && hist.getHintsEntry().getPath() != null && FSRepository.isValidRevision(hist.getHintsEntry().getRevision()) ){
+    	if((hist.getSearchResumeEntry() != null) && (hist.getSearchResumeEntry().getPath() != null) && FSRepository.isValidRevision(hist.getSearchResumeEntry().getRevision()) ){
     		reported = false;
     		if(crossCopies == false){
     			return null;
     		}
-    		path = hist.getHintsEntry().getPath();
-    		revision = hist.getHintsEntry().getRevision();
+    		path = hist.getSearchResumeEntry().getPath();
+    		revision = hist.getSearchResumeEntry().getRevision();
     	}
     	//Construct a ROOT for the current revision
     	try{
@@ -174,7 +170,8 @@ public class FSNodeHistory
     		System.out.println(ex.getMessage());
     	}
     	try{
-    	parentPath = FSParentPath.openParentPath(reposRootDir, root, path, 0, null);	//this is the simulation of initialization
+    	//parentPath = FSParentPath.openParentPath(reposRootDir, root, path, 0, null);    	
+    	parentPath = revNodesPool.getParentPath(new FSRoot(root.getId().getRevision(), root), path, true, reposRootDir);	
     	}catch(SVNException ex){
     		SVNErrorManager.error("");
     	}
@@ -284,11 +281,12 @@ public class FSNodeHistory
 		}
 	}
     
-    public static FSNodeHistory fsHistoryPrev(File reposRootDir, FSNodeHistory hist, boolean crossCopies)throws SVNException{
+    public static FSNodeHistory fsHistoryPrev(File reposRootDir, FSNodeHistory hist,  boolean crossCopies, FSRevisionNodePool revNodesPool)throws SVNException{    
     	FSNodeHistory prevHist = null;
-    	
-    	//!!!!!What happend if hist == null or reposRootDir == null, I suppose the program fali :(
-    	if(hist.getHistoryEntry().getPath().compareTo("/") == 0){
+    	if(hist == null){
+    		SVNErrorManager.error("invalid history object");
+    	}
+    	if("/".compareTo(hist.getHistoryEntry().getPath()) == 0){
     		if(hist.getInterest() == false){
     			return new FSNodeHistory(new SVNLocationEntry(hist.getHistoryEntry().getRevision(), "/"), true,
     					new SVNLocationEntry(FSConstants.SVN_INVALID_REVNUM, null));
@@ -300,7 +298,8 @@ public class FSNodeHistory
     		prevHist = hist;
     		while(true){
     			try{
-    				prevHist = historyPrev(reposRootDir, prevHist, crossCopies);
+    				prevHist = historyPrev(reposRootDir, prevHist, crossCopies, revNodesPool);
+    				throw new SVNException();
     			}catch(SVNException ex){
     				SVNErrorManager.error("bad execution of historyPrev() function");
     			}
