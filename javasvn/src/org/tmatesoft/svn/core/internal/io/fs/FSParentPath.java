@@ -187,50 +187,7 @@ public class FSParentPath
 			return new SVNLocationEntry(FSParentPath.COPY_ID_INHERIT_SELF, null);
 		}
 		return new SVNLocationEntry(FSParentPath.COPY_ID_INHERIT_NEW, child.getRevNode().getCreatedPath());
-	}
-	
-	//the function returns 2 strings 
-	//1 string is:
-	//			a copy of the first component of PATH.
-	//		    If path is empty, or consists entirely of
-	//			slashes, return the empty string
-	//2 string is:
-	//		    If the component is followed by one or more slashes, we set 2 string
-	//		    to be after the slashes. If the component ends PATH, we set
-	//			2 string to zero.  This means:
-	//			   - If 2 string is zero, then the component ends the PATH, and there
-	//				 are no trailing slashes in the path.
-	//			   - If 2 string points at PATH's terminating null character, then
-	//				 the component returned was the last, and PATH ends with one or more
-	//				 slash characters.
-	//			   - Otherwise, 2 string points to the beginning of the next component
-	//				 of PATH.  You can pass this value to nextEntryName to extract
-	//				 the next component.
-	public static String[] nextEntryName(String path){
-		String[] retVal = new String[2];
-		if(path == null){
-			retVal[0] = null;
-			retVal[1] = null;
-			return retVal;
-		}		
-		int slashOccurence = path.indexOf('/');		
-		if(slashOccurence == -1){
-			retVal[0] = path;
-			retVal[1] = null;
-			return retVal;
-		}
-        int slashCount = slashOccurence + 1;
-        while(path.charAt(slashCount) == '/'){
-            slashCount++;
-            if(slashCount == path.length()){					
-                break;
-            }				
-        }
-        retVal[0] = path.substring(0, slashOccurence);
-        retVal[1] = path.substring(slashCount, path.length());
-        return retVal;
-	}
-	
+	}	
 	//Copy id inheritance style 
 	public static final int COPY_ID_INHERIT_UNKNOWN = 0;
 	public static final int COPY_ID_INHERIT_SELF = 1;
