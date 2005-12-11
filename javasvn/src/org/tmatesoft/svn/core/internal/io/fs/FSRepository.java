@@ -928,8 +928,6 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
         } finally {
             closeRepository();
         }
-        
-        
         //TODO: to delete when finished!
         return null;
     }

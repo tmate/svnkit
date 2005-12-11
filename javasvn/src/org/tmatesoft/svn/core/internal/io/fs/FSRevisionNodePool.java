@@ -122,7 +122,7 @@ public abstract class FSRevisionNodePool {
             }
             //The path isn't finished yet; we'd better be in a directory
             if(child.getType() != SVNNodeKind.DIR){
-                SVNErrorManager.error(pathSoFar + "is not a directory in filesystem");
+                SVNErrorManager.error("'" + pathSoFar + "' is not a directory in filesystem");
             }
             rest = next;
             here = child;

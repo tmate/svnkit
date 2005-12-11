@@ -36,6 +36,7 @@ import java.io.FileNotFoundException;
 import java.io.File;
 import java.util.Date;
 import java.util.LinkedList;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Collection;
 import java.util.HashMap;
@@ -47,12 +48,80 @@ public class FSReader {
     // to mean the end of a file
     public static final long FILE_END_POS = -1;
 
+    public static void allowLockedOperation(String path, final String username, final Collection lockTokens, boolean recursive, boolean haveWriteLock, File reposRootDir) throws SVNException {
+        path = SVNPathUtil.canonicalizeAbsPath(path);
+        if(recursive){
+            IFSLockHandler handler = new IFSLockHandler(){
+                private String myUsername = username;
+                private Collection myTokens = lockTokens;
+                public void handleLock(SVNLock lock) throws SVNException{
+                    verifyLock(lock, myTokens, myUsername);
+                }
+            };
+            /* Discover all locks at or below the path. */
+            walkDigestFiles(FSRepositoryUtil.getDigestFileFromRepositoryPath(path, reposRootDir), handler, haveWriteLock, reposRootDir);
+        }else{
+            /* Discover and verify any lock attached to the path. */
+            SVNLock lock = getLock(path, haveWriteLock, null, reposRootDir);
+            if(lock != null){
+                verifyLock(lock, lockTokens, username);
+            }
+        }
+    }
+    
+    /* A recursive function that calls getLocksHandler for
+     * all locks in and under PATH in FS.
+     * haveWriteLock should be true if the caller (directly or indirectly)
+     * has the FS write lock. 
+     */
+    private static void walkDigestFiles(File digestFile, IFSLockHandler getLocksHandler, boolean haveWriteLock, File reposRootDir) throws SVNException {
+        Collection children = new LinkedList();
+        /* First, send up any locks in the current path. */
+        SVNLock lock = fetchLock(digestFile, null, children, reposRootDir);
+        if(lock != null){
+            Date current = new Date(System.currentTimeMillis());
+            /* Don't report an expired lock. */
+            if(lock.getExpirationDate() == null || current.compareTo(lock.getExpirationDate()) < 0){
+                getLocksHandler.handleLock(lock);
+            }else if(haveWriteLock) {
+                /* Only remove the lock if we have the write lock.
+                 * Read operations shouldn't change the filesystem. 
+                 */
+                FSWriter.deleteLock(lock, reposRootDir);
+            }
+        }
+        /* Now, recurse on this thing's child entries (if any; bail otherwise). */
+        if(children.isEmpty()){
+            return;
+        }
+        for(Iterator entries = children.iterator(); entries.hasNext();){
+            String digestName = (String)entries.next();
+            File childDigestFile = FSRepositoryUtil.getDigestFileFromDigest(digestName, reposRootDir);
+            walkDigestFiles(childDigestFile, getLocksHandler, haveWriteLock, reposRootDir);
+        }
+    }
+
+    /* Utility function:  verify that a lock can be used. */
+    private static void verifyLock(SVNLock lock, Collection lockTokens, String username) throws SVNException {
+        if(username == null || "".equals(username)){
+            SVNErrorManager.error("Cannot verify lock on path '" + lock.getPath() + "'; no username available");
+        }else if(username.compareTo(lock.getOwner()) != 0){
+            SVNErrorManager.error("User " + username + " does not own lock on path '" + lock.getPath() + "' (currently locked by " + lock.getOwner() + ")");
+        }
+        for(Iterator tokens = lockTokens.iterator(); tokens.hasNext();){
+            String token = (String)tokens.next();
+            if(token.equals(lock.getID())){
+                return;
+            }
+        }
+        SVNErrorManager.error("Cannot verify lock on path '" + lock.getPath() + "'; no matching lock-token available");
+    }
+    
     public static SVNLock getLock(String repositoryPath, boolean haveWriteLock, Collection children, File reposRootDir) throws SVNException {
-        SVNLock lock = fetchLock(repositoryPath, children, reposRootDir);
+        SVNLock lock = fetchLock(null, repositoryPath, children, reposRootDir);
         if(lock == null){
             return null;//SVNErrorManager.error("svn: No lock on path '" + fsAbsPath + "' in filesystem '" + FSRepositoryUtil.getRepositoryDBDir(reposRootDir).getAbsolutePath() + "'");
         }
-        
         Date current = new Date(System.currentTimeMillis());
         /* Don't return an expired lock. */
         if(lock.getExpirationDate() != null && current.compareTo(lock.getExpirationDate()) > 0){
@@ -67,8 +136,8 @@ public class FSReader {
         return lock;
     }
     
-    public static SVNLock fetchLock(String repositoryPath, Collection children, File reposRootDir) throws SVNException {
-        File digestLockFile = FSRepositoryUtil.getDigestFileFromRepositoryPath(repositoryPath, reposRootDir);
+    public static SVNLock fetchLock(File digestFile, String repositoryPath, Collection children, File reposRootDir) throws SVNException {
+        File digestLockFile = digestFile == null ? FSRepositoryUtil.getDigestFileFromRepositoryPath(repositoryPath, reposRootDir) : digestFile;
         SVNProperties props = new SVNProperties(digestLockFile, null);
         Map lockProps = null;
         try{
@@ -229,14 +298,24 @@ public class FSReader {
              * contents from the mutable children file, followed by the
              * changes we've made in this transaction. 
              */
-
-        
+            File childrenFile = FSRepositoryUtil.getTxnRevNodeChildrenFile(revNode.getId(), reposRootDir);
+            InputStream file = SVNFileUtil.openFileForReading(childrenFile);
+            Map entries = null;
+            try{
+                entries = parsePlainRepresentation(file, false, "END");
+                entries.putAll(parsePlainRepresentation(file, false, null));
+            }catch(IOException ioe){
+                SVNErrorManager.error("");
+            }finally{
+                SVNFileUtil.closeFile(file);
+            }
+            return entries;
         }else if(revNode.getTextRepresentation() != null){
             InputStream is = null;
             FSRepresentation textRepresent = revNode.getTextRepresentation(); 
             try {
                 is = readPlainRepresentation(textRepresent, reposRootDir);
-                return parsePlainRepresentation(is, false);
+                return parsePlainRepresentation(is, false, "END");
             } catch (IOException ioe) {
                 SVNErrorManager.error("svn: Can't read representation in revision file '" + FSRepositoryUtil.getRevisionFile(reposRootDir, textRepresent.getRevision()).getAbsolutePath() + "': "
                         + ioe.getMessage());
@@ -257,7 +336,7 @@ public class FSReader {
         InputStream is = null;
         try {
             is = readPlainRepresentation(representation, reposRootDir);
-            return parsePlainRepresentation(is, true);
+            return parsePlainRepresentation(is, true, "END");
         } catch (IOException ioe) {
             SVNErrorManager.error("svn: Can't read representation in revision file '" + FSRepositoryUtil.getRevisionFile(reposRootDir, representation.getRevision()).getAbsolutePath() + "': "
                     + ioe.getMessage());
@@ -300,23 +379,19 @@ public class FSReader {
             } catch (NoSuchAlgorithmException nsae) {
                 SVNErrorManager.error("svn: Can't check the digest in revision file '" + revFile.getAbsolutePath() + "': " + nsae.getMessage());
             }
-
             ByteArrayOutputStream os = new ByteArrayOutputStream();
             try {
                 readBytesFromStream(representation.getSize(), is, os);
             } catch (IOException ioe) {
                 SVNErrorManager.error("svn: Can't read representation in revision file '" + revFile.getAbsolutePath() + "': " + ioe.getMessage());
             }
-
             byte[] bytes = os.toByteArray();
             digest.update(bytes);
-
             // Compare read and expected checksums
             if (!MessageDigest.isEqual(SVNFileUtil.fromHexDigest(representation.getHexDigest()), digest.digest())) {
                 SVNErrorManager.error("svn: Checksum mismatch while reading representation:" + SVNFileUtil.getNativeEOLMarker() + "   expected:  " + representation.getHexDigest()
                         + SVNFileUtil.getNativeEOLMarker() + "     actual:  " + SVNFileUtil.toHexDigest(digest));
             }
-
             return new ByteArrayInputStream(bytes);
         } finally {
             SVNFileUtil.closeFile(is);
@@ -501,30 +576,24 @@ public class FSReader {
      * representation - so, isProps is needed to differentiate between text and
      * props repreentation
      */
-    private static Map parsePlainRepresentation(InputStream is, boolean isProps) throws IOException, SVNException {
+    private static Map parsePlainRepresentation(InputStream is, boolean isProps, String terminator) throws IOException, SVNException {
+        Map entries = SVNProperties.asMap(is, terminator);
         Map representationMap = new HashMap();
-        ByteArrayOutputStream os = new ByteArrayOutputStream();
-        while (readEntry('K', is, os)) {
-            String key = new String(os.toByteArray(), "UTF-8");
-            os.reset();
-            if (!readEntry('V', is, os)) {
-                throw new IOException("malformed file format");
-            }
-            String value = new String(os.toByteArray(), "UTF-8");
-            os.reset();
+        Object[] names = entries.keySet().toArray();
+        for(int i = 0; i < names.length; i++){
+            String name = (String)names[i];
             if (!isProps) {
                 FSRepresentationEntry nextRepEntry = null;
                 try {
-                    nextRepEntry = parseRepEntryValue(key, value);
+                    nextRepEntry = parseRepEntryValue(name, (String)entries.get(names[i]));
                 } catch (SVNException svne) {
-                    SVNErrorManager.error("svn: Directory entry '" + key + "' corrupt");
+                    SVNErrorManager.error("svn: Directory entry '" + name + "' corrupt");
                 }
-                representationMap.put(key, nextRepEntry);
+                representationMap.put(name, nextRepEntry);
             } else {
-                representationMap.put(key, value);
+                representationMap.put(name, entries.get(name));
             }
         }
-
         return representationMap;
     }
 
@@ -539,60 +608,6 @@ public class FSReader {
             throw new SVNException();
         }
         return new FSRepresentationEntry(id, type, name);
-    }
-
-    private static boolean readEntry(char type, InputStream is, OutputStream os) throws IOException {
-        int length = readLength(is, type);
-        if (length < 0) {
-            return false;
-        }
-        if (os != null) {
-            byte[] value = new byte[length];
-            int r = is.read(value);
-            if (r < length) {
-                throw new IOException("malformed file format");
-            }
-            os.write(value, 0, r);
-        } else {
-            while (length > 0) {
-                length -= is.skip(length);
-            }
-        }
-        if (is.read() != '\n') {
-            throw new IOException("malformed file format");
-        }
-        return true;
-    }
-
-    private static int readLength(InputStream is, char type) throws IOException {
-        byte[] buffer = new byte[255];
-        int r = is.read(buffer, 0, 4);
-        if (r != 4) {
-            throw new IOException("malformed file format");
-        }
-        // either END\n or K x\n
-        if (buffer[0] == 'E' && buffer[1] == 'N' && buffer[2] == 'D' && buffer[3] == '\n') {
-            return -1;
-        } else if (buffer[0] == type && buffer[1] == ' ') {
-            int i = 4;
-            if (buffer[3] != '\n') {
-                while (true) {
-                    int b = is.read();
-                    if (b < 0) {
-                        throw new IOException("malformed file format");
-                    } else if (b == '\n') {
-                        break;
-                    }
-                    buffer[i] = (byte) (0xFF & b);
-                    i++;
-                }
-            } else {
-                i = 3;
-            }
-            String length = new String(buffer, 2, i - 2);
-            return Integer.parseInt(length);
-        }
-        throw new IOException("malformed file format");
     }
 
     public static FSRevisionNode getRootRevNode(File reposRootDir, long revision) throws SVNException {
