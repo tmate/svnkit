@@ -76,12 +76,10 @@ public class FSNodeHistory
 		if(parentEntry != null){
 			if(myEntry.getRevision() >= parentEntry.getRevision()){
 				return myEntry;
-			}else{
-				return parentEntry;
 			}
-		}else{
-			return myEntry;
-		}	
+            return parentEntry;
+		}
+        return myEntry;
 	}
 	
     public static boolean checkAncestryOfPegPath(File reposRootDir, String fsPath, long pegRev, long futureRev, FSRevisionNodePool revNodesPool)throws SVNException{
@@ -175,18 +173,17 @@ public class FSNodeHistory
     			prevHist = new FSNodeHistory(new SVNLocationEntry(commitEntry.getRevision(), commitEntry.getPath()),
     					true, new SVNLocationEntry(FSConstants.SVN_INVALID_REVNUM, null));
     			return prevHist;
-    		}else{
-    	        //... or we *have* reported on this revision, and must now
-                //progress toward this node's predecessor (unless there is
-                //no predecessor, in which case we're all done!)
-    			FSID predId = revNode.getPredecessorId();
-    			if(predId == null || predId.getRevision() < 0 ){
-    				return prevHist;
-    			}
-    	        //Replace NODE and friends with the information from its predecessor
-   				revNode = FSReader.getRevNodeFromID(reposRootDir, predId);
-   				commitEntry = new SVNLocationEntry(revNode.getId().getRevision(), revNode.getCreatedPath());
     		}
+    	    //... or we *have* reported on this revision, and must now
+            //progress toward this node's predecessor (unless there is
+            //no predecessor, in which case we're all done!)
+            FSID predId = revNode.getPredecessorId();
+            if(predId == null || predId.getRevision() < 0 ){
+                return prevHist;
+            }
+            //Replace NODE and friends with the information from its predecessor
+            revNode = FSReader.getRevNodeFromID(reposRootDir, predId);
+            commitEntry = new SVNLocationEntry(revNode.getId().getRevision(), revNode.getCreatedPath());
     	}
 		//Find the youngest copyroot in the path of this node, including itself
     	SVNLocationEntry copyrootEntry = FSNodeHistory.findYoungestCopyroot(reposRootDir, parentPath);
@@ -238,9 +235,8 @@ public class FSNodeHistory
 				retry = true;
 			}
 			return new FSNodeHistory(new SVNLocationEntry(dstRev, path), retry ? false : true, new SVNLocationEntry(srcEntry.getRevision(), srcEntry.getPath()));
-		}else{
-			return new FSNodeHistory(commitEntry, true, new SVNLocationEntry(FSConstants.SVN_INVALID_REVNUM, null));
 		}
+        return new FSNodeHistory(commitEntry, true, new SVNLocationEntry(FSConstants.SVN_INVALID_REVNUM, null));
 	}
     
     public FSNodeHistory fsHistoryPrev(File reposRootDir, boolean crossCopies, FSRevisionNodePool revNodesPool)throws SVNException{    

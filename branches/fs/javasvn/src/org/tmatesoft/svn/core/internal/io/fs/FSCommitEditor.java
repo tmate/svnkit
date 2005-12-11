@@ -13,6 +13,8 @@ package org.tmatesoft.svn.core.internal.io.fs;
 
 import java.io.OutputStream;
 import java.util.Map;
+import java.util.Collection;
+import java.util.LinkedList;
 import java.util.Stack;
 import java.io.File;
 
@@ -44,6 +46,7 @@ public class FSCommitEditor implements ISVNEditor {
     private File myReposRootDir;
     private FSRepository myRepository;
     private Stack myDirsStack;
+    private String myLastFileFullPath;
     
     public FSCommitEditor(String path, String logMessage, String userName, Map lockTokens, boolean keepLocks, ISVNWorkspaceMediator mediator, FSTransactionInfo txn, FSRepository repository){
         myMediator = mediator;
@@ -165,9 +168,28 @@ public class FSCommitEditor implements ISVNEditor {
         String fullPath = SVNPathUtil.concatToAbs(parentBaton.getPath(), path); 
         /* Get this node's node-rev (doubles as an existence check). */
         FSRevisionNode revNode = myRepository.getRevisionNodePool().getRevisionNode(myTxnRoot, fullPath, myReposRootDir);
+        /* If the node our caller has is an older revision number than the
+        one in our transaction, return an out-of-dateness error. */
+        if(FSRepository.isValidRevision(revision) && revision < revNode.getId().getRevision()){
+            SVNErrorManager.error("Out of date: '" + fullPath + "' in transaction '" + myTxnRoot.getTxnId() + "'");
+        }
+        myLastFileFullPath = fullPath;
     }
 
     public void applyTextDelta(String path, String baseChecksum) throws SVNException {
+        /* Call getParentPath with the flag entryMustExist set to true, as we 
+         * want this to return an error if the node for which we are searching 
+         * doesn't exist. 
+         */
+        FSParentPath parentPath = myRepository.getRevisionNodePool().getParentPath(myTxnRoot, path, true, myReposRootDir);
+        /* Check (non-recursively) to see if path is locked; if so, check
+         * that we can use it. 
+         */
+        if((myTxnRoot.getTxnFlags() & FSConstants.SVN_FS_TXN_CHECK_LOCKS) != 0){
+            FSReader.allowLockedOperation(path, myAuthor, myLockTokens.values(), false, false, myReposRootDir);
+        }
+        /* Now, make sure this path is mutable. */
+
     }
 
     public OutputStream textDeltaChunk(String path, SVNDiffWindow diffWindow) throws SVNException {

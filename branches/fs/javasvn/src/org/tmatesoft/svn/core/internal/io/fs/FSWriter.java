@@ -185,11 +185,10 @@ public class FSWriter {
         String childToKill = null;
         Collection children = new ArrayList();;
         while(true){
-            FSReader.fetchLock(reposPath, children, reposRootDir);
+            FSReader.fetchLock(null, reposPath, children, reposRootDir);
             if(childToKill != null){
                 children.remove(childToKill);
             }
-            
             /* Delete the lock.*/
             if(children.size() == 0){
                 /* Special case:  no goodz, no file.  And remember to nix
@@ -201,7 +200,7 @@ public class FSWriter {
             }else{
                 FSWriter.writeDigestLockFile(null, children, reposPath, reposRootDir);
                 childToKill = null;
-                /* ? Why should we go upper rewriting files where nothing is changed?
+                /* TODO: Why should we go upper rewriting files where nothing is changed?
                  * For now i guess we should break here, maybe later i'll figure out
                  * the reason of non-stopping   
                  */
@@ -224,7 +223,7 @@ public class FSWriter {
             SVNErrorManager.error("svn: Can't create a directory at '" + FSRepositoryUtil.getDBLocksDir(reposRootDir).getAbsolutePath() + "'");
         }
         File digestLockFile = FSRepositoryUtil.getDigestFileFromRepositoryPath(repositoryPath, reposRootDir);
-        File lockDigestSubdir = FSRepositoryUtil.getLockDigestSubdirectory(FSRepositoryUtil.getDigestFromRepositoryPath(repositoryPath), reposRootDir);
+        File lockDigestSubdir = FSRepositoryUtil.getDigestSubdirectoryFromDigest(FSRepositoryUtil.getDigestFromRepositoryPath(repositoryPath), reposRootDir);
         if(!ensureDirExists(lockDigestSubdir, true)){
             SVNErrorManager.error("svn: Can't create a directory at '" + FSRepositoryUtil.getDBLocksDir(reposRootDir).getAbsolutePath() + "'");
         }

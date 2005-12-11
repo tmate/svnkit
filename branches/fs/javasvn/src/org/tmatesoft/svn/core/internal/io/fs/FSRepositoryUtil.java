@@ -99,12 +99,16 @@ public class FSRepositoryUtil {
     }
     
     public static File getDigestFileFromRepositoryPath(String repositoryPath, File reposRootDir) throws SVNException {
-        String digestPath = getDigestFromRepositoryPath(repositoryPath);
-        return new File(getLockDigestSubdirectory(digestPath, reposRootDir), digestPath);
+        String digest = getDigestFromRepositoryPath(repositoryPath);
+        return new File(getDigestSubdirectoryFromDigest(digest, reposRootDir), digest);
+    }
+
+    public static File getDigestFileFromDigest(String digest, File reposRootDir) {
+        return new File(getDigestSubdirectoryFromDigest(digest, reposRootDir), digest);
     }
     
-    public static File getLockDigestSubdirectory(String digestPath, File reposRootDir){
-        return new File(FSRepositoryUtil.getDBLocksDir(reposRootDir), digestPath.substring(0, FSConstants.DIGEST_SUBDIR_LEN -1));
+    public static File getDigestSubdirectoryFromDigest(String digest, File reposRootDir){
+        return new File(FSRepositoryUtil.getDBLocksDir(reposRootDir), digest.substring(0, FSConstants.DIGEST_SUBDIR_LEN));
     }
     
     public static String getDigestFromRepositoryPath(String repositoryPath) throws SVNException {
