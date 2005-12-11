@@ -72,32 +72,25 @@ public abstract class FSRevisionNodePool {
     }
 
     private FSParentPath openPath(FSRoot root, String path, boolean isLastComponentOptional, String txnId, File reposRootDir)throws SVNException{     
-        String canonPath = SVNPathUtil.canonicalizeAbsPath(path);
+    	String canonPath = SVNPathUtil.canonicalizeAbsPath(path);
         FSRevisionNode here = getRootNode(root, reposRootDir);;
-        FSParentPath parentPath = null;
-        String rest = null;
         String pathSoFar = "/";
         
-        //Make a parent_path item for the root node, using its own current
-        //copy id
-        parentPath = new FSParentPath(here, null, null);
+        //Make a parentPath item for the root node, using its own current copy-id
+        FSParentPath parentPath = new FSParentPath(here, null, null);
         parentPath.setCopyStyle(FSParentPath.COPY_ID_INHERIT_SELF);
         
-        rest = canonPath.substring(1);// skip the leading '/'
+        String rest = canonPath.substring(1);// skip the leading '/'
         
         /* Whenever we are at the top of this loop:
          - HERE is our current directory,
-         - ID is the node revision ID of HERE,
          - REST is the path we're going to find in HERE, and 
          - PARENT_PATH includes HERE and all its parents.  */
-        String next = null;
-        String entry = null;
-        FSRevisionNode child = null;
-        
         while(true){
-            entry = SVNPathUtil.head(rest);
-            next = SVNPathUtil.removeHead(rest);//strArray[1];
+            String entry = SVNPathUtil.head(rest);
+            String next = SVNPathUtil.removeHead(rest);//strArray[1];
             pathSoFar = SVNPathUtil.concatToAbs(pathSoFar, entry);
+            FSRevisionNode child = null;
             if(entry == null || "".equals(entry)){
                 child = here;
             }else{

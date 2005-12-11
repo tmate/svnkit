@@ -577,7 +577,7 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
             FSNodeHistory history = FSNodeHistory.getNodeHistory(myReposRootDir, root, parentPath);
             //get revisions we are interested in
             while(true){
-            	history = FSNodeHistory.fsHistoryPrev(myReposRootDir, history, true, myRevNodesPool);            	
+            	history = history.fsHistoryPrev(myReposRootDir, /*history,*/ true, myRevNodesPool);            	
             	if(history == null){
             		break;
             	}
