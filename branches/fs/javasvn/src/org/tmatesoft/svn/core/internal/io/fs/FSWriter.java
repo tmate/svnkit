@@ -77,15 +77,7 @@ public class FSWriter {
         /* Create an empty changes file. */
         SVNFileUtil.createEmptyFile(FSRepositoryUtil.getTxnChangesFile(txn.getTxnId(), reposRootDir));
         /* Write the next-ids file. */
-        OutputStream nextIdsFile = null;
-        try{
-            nextIdsFile = SVNFileUtil.openFileForWriting(FSRepositoryUtil.getTxnNextIdsFile(txn.getTxnId(), reposRootDir));
-            nextIdsFile.write("0 0\n".getBytes());
-        }catch(IOException ioe){
-            SVNErrorManager.error("svn: Can't write to '" + FSRepositoryUtil.getTxnNextIdsFile(txn.getTxnId(), reposRootDir).getAbsolutePath() + "': " + ioe.getMessage());  
-        }finally{
-            SVNFileUtil.closeFile(nextIdsFile);
-        }
+        writeNextIds(txn.getTxnId(), "0", "0", reposRootDir);
         return txn;
     }
     
@@ -150,6 +142,22 @@ public class FSWriter {
         }
         revNodeFile.write("\n".getBytes());
     }
+
+    /* Write out the currently available next nodeId and copyId
+     * for transaction id in filesystem. 
+     */
+    public static void writeNextIds(String txnId, String nodeId, String copyId, File reposRootDir) throws SVNException {
+        OutputStream nextIdsFile = null;
+        try{
+            nextIdsFile = SVNFileUtil.openFileForWriting(FSRepositoryUtil.getTxnNextIdsFile(txnId, reposRootDir));
+            String ids = nodeId + " " + copyId + "\n";
+            nextIdsFile.write(ids.getBytes());
+        }catch(IOException ioe){
+            SVNErrorManager.error("svn: Can't write to '" + FSRepositoryUtil.getTxnNextIdsFile(txnId, reposRootDir).getAbsolutePath() + "': " + ioe.getMessage());  
+        }finally{
+            SVNFileUtil.closeFile(nextIdsFile);
+        }
+    }
     
     /* Create a unique directory for a transaction in FS based on the 
      * provided revision. Return the ID for this transaction. 
@@ -201,8 +209,7 @@ public class FSWriter {
                 FSWriter.writeDigestLockFile(null, children, reposPath, reposRootDir);
                 childToKill = null;
                 /* TODO: Why should we go upper rewriting files where nothing is changed?
-                 * For now i guess we should break here, maybe later i'll figure out
-                 * the reason of non-stopping   
+                 * Should we break here?
                  */
                 break;
             }

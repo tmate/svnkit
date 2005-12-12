@@ -48,6 +48,31 @@ public class FSReader {
     // to mean the end of a file
     public static final long FILE_END_POS = -1;
 
+    /* String[0] - is to be the fetched out node-id
+     * String[1] - is to be the fetched out copy-id
+     */
+    public static String[] readNextIds(String txnId, File reposRootDir) throws SVNException {
+        String[] ids = new String[2];
+        ByteArrayOutputStream idsBuffer = new ByteArrayOutputStream();
+        InputStream nextIdsFile = SVNFileUtil.openFileForReading(FSRepositoryUtil.getTxnNextIdsFile(txnId, reposRootDir));
+        try{
+            readBytesFromStream(FSConstants.MAX_KEY_SIZE*2 + 3, nextIdsFile, idsBuffer);
+        }catch(IOException ioe){
+            SVNErrorManager.error("Can't read length line in file '" + FSRepositoryUtil.getTxnNextIdsFile(txnId, reposRootDir).getAbsolutePath() + "': " + ioe.getMessage());
+        }finally{
+            SVNFileUtil.closeFile(nextIdsFile);
+        }
+        String idsToParse = idsBuffer.toString();
+        idsToParse = idsToParse.split("\\n")[0];
+        String[] parsedIds = idsToParse.split(" ");
+        if(parsedIds.length < 2){
+            SVNErrorManager.error("next-ids file corrupt");
+        }
+        ids[0] = parsedIds[0];
+        ids[1] = parsedIds[1];
+        return ids;
+    }
+    
     public static void allowLockedOperation(String path, final String username, final Collection lockTokens, boolean recursive, boolean haveWriteLock, File reposRootDir) throws SVNException {
         path = SVNPathUtil.canonicalizeAbsPath(path);
         if(recursive){
@@ -977,7 +1002,6 @@ public class FSReader {
         if (is == null) {
             return -1;
         }
-
         if (os != null) {
             long bytesRead = 0;
             while (bytesRead != bytesToRead) {

@@ -69,6 +69,23 @@ public class FSConstants {
     public static final String REP_DELTA = "DELTA";
     public static final String REP_PLAIN = "PLAIN";
     public static final int MD5_DIGESTSIZE = 16;
+    /* The alphanumeric keys passed in and out of nextKey()
+     * are guaranteed never to be longer than this many bytes.
+     * It is therefore safe to declare a key as "byte[MAX_KEY_SIZE] key".
+     * Note that this limit will be a problem if the number of
+     * keys in a table ever exceeds
+
+        18217977168218728251394687124089371267338971528174
+        76066745969754933395997209053270030282678007662838
+        67331479599455916367452421574456059646801054954062
+        15017704234999886990788594743994796171248406730973
+        80736524850563115569208508785942830080999927310762
+        50733948404739350551934565743979678824151197232629
+        947748581376,
+
+       but that's a risk we'll live with for now. 
+    */
+    public static final int MAX_KEY_SIZE = 200;
     
     //transaction beginning bitmask flags
     /* Do on-the-fly out-of-dateness checks.  That is, an fs routine may

@@ -64,8 +64,8 @@ public class FSNodeHistory
 		SVNLocationEntry parentEntry = null;
 		SVNLocationEntry myEntry;		
 		
-		if(parPath.getParentPath() != null){
-			parentEntry = FSNodeHistory.findYoungestCopyroot(reposRootDir, parPath.getParentPath());
+		if(parPath.getParent() != null){
+			parentEntry = FSNodeHistory.findYoungestCopyroot(reposRootDir, parPath.getParent());
 		}
 		myEntry = new SVNLocationEntry(parPath.getRevNode().getCopyFromRevision(), parPath.getRevNode().getCopyFromPath()); 
 		if(myEntry == null){
