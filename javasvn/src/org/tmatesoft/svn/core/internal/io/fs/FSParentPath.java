@@ -54,7 +54,7 @@ public class FSParentPath
 	public FSParentPath(FSParentPath newParentPath){
 		revNode = newParentPath.getRevNode();
 		nameEntry = newParentPath.getNameEntry();
-		parent = newParentPath.getParentPath();
+		parent = newParentPath.getParent();
 		copyStyle = newParentPath.getCopyStyle();
 		copySrcPath = newParentPath.getCopySrcPath();		
 	}
@@ -79,7 +79,7 @@ public class FSParentPath
 	public void setNameEntry(String newNameEntry){
 		nameEntry = newNameEntry;
 	}
-	public FSParentPath getParentPath(){
+	public FSParentPath getParent(){
 		return parent;
 	}
 	public void setParent(FSParentPath newParent){
@@ -109,8 +109,8 @@ public class FSParentPath
 	public String constructParentPath(){
 		String pathSoFar = "/";
 		
-		if(this.getParentPath() != null){
-			pathSoFar = this.getParentPath().constructParentPath();
+		if(this.getParent() != null){
+			pathSoFar = this.getParent().constructParentPath();
 		}
 		
 		return this.getNameEntry() != null ? SVNPathUtil.append(pathSoFar, this.getNameEntry()) : pathSoFar;
@@ -125,7 +125,7 @@ public class FSParentPath
 		if(child == null){
 			SVNErrorManager.error("argument FSParentPath have to be valid");			
 		}
-		if(child.getParentPath() == null){
+		if(child.getParent() == null){
 			SVNErrorManager.error("argument FSParentPath have to be not root");
 			return null;
 		}
@@ -133,7 +133,7 @@ public class FSParentPath
 			SVNErrorManager.error("argument String txnID = null");
 		}
 		FSID childID = child.getRevNode().getId();
-		FSID parentID = child.getParentPath().getRevNode().getId();
+		FSID parentID = child.getParent().getRevNode().getId();
 		FSID copyrootID = new FSID();
 		String childCopyID = childID.getCopyID();
 		String parentCopyID = parentID.getCopyID();

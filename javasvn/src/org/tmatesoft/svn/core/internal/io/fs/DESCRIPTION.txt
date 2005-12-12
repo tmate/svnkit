@@ -122,7 +122,7 @@ and so on... I guess write func will grow as we move further (with commit)
 8)PathInfo - represents path info that was reported by metods of 
 ISVNReporter
 
-9)FSConstants - some repository-related constants 
+9)FSConstants - some basic repository-related constants (taken from native svn)
 
 10)FSHooks - this class is responsible for invoking hook programms 
 before/after definite operations, like changing rev props.
@@ -137,4 +137,30 @@ full file contents in a definite revision.
 root rev nodes as well as other rev nodes. Used to optimize the run-time 
 characteristics.
 
+13)IFSLockHandler - used to define a handler that is called while checking 
+for lock(s) on a path. Known implementations (for now is the same as svn's 
+get_locks_callback() function ): handler verifies the lock passed redirecting the 
+call to the verifyLock routine. This is done to check whether a one has rights 
+to commit to a file.
+
+14)FSKeyGenerator - is a kind of a generator that produces new node- and copy-ids 
+according to the same algorithm that the native svn uses.
+
+15)FSTransactionInfo - information of the created transaction (at the start of a commit) 
+that holds BASE REVISION (against which a commit is running), TRANSACTION ID - a name 
+of an in-filesystem transaction (the name of a txn directory ubder db/transaction)
+
+16)FSTransactionKind indicates the kind of a transaction - this kind is a state 
+of a particular txn. A txn may be normal & uncommitted yet (commit is running), 
+committed, and uncommitted & dead - commit failed.
+
+17)FSTransaction - a representation of an in-filesystem txn: holds the txn root, 
+its kind (or state), txn properties (several of them becomes rev props), copy-ids of 
+all copied nodes, baseId against which a txn is committed.
+
+18)FSRoot - roots may be revision roots (immutable, those that were committed and 
+no longer be changed), and txn roots (mutable, that are being changing as commit 
+runs). There are methods that should work for both kinds of roots (like openPath()). 
+So, FSRoot is an abstraction that allows to realize such methods.
+ 
 

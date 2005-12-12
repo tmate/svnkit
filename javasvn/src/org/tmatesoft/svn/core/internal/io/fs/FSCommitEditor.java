@@ -46,7 +46,6 @@ public class FSCommitEditor implements ISVNEditor {
     private File myReposRootDir;
     private FSRepository myRepository;
     private Stack myDirsStack;
-    private String myLastFileFullPath;
     
     public FSCommitEditor(String path, String logMessage, String userName, Map lockTokens, boolean keepLocks, ISVNWorkspaceMediator mediator, FSTransactionInfo txn, FSRepository repository){
         myMediator = mediator;
@@ -173,7 +172,6 @@ public class FSCommitEditor implements ISVNEditor {
         if(FSRepository.isValidRevision(revision) && revision < revNode.getId().getRevision()){
             SVNErrorManager.error("Out of date: '" + fullPath + "' in transaction '" + myTxnRoot.getTxnId() + "'");
         }
-        myLastFileFullPath = fullPath;
     }
 
     public void applyTextDelta(String path, String baseChecksum) throws SVNException {
@@ -181,17 +179,59 @@ public class FSCommitEditor implements ISVNEditor {
          * want this to return an error if the node for which we are searching 
          * doesn't exist. 
          */
-        FSParentPath parentPath = myRepository.getRevisionNodePool().getParentPath(myTxnRoot, path, true, myReposRootDir);
+        DirBaton parentBaton = (DirBaton)myDirsStack.peek();
+        String fullPath = SVNPathUtil.concatToAbs(parentBaton.getPath(), path);
+        FSParentPath parentPath = myRepository.getRevisionNodePool().getParentPath(myTxnRoot, fullPath, true, myReposRootDir);
         /* Check (non-recursively) to see if path is locked; if so, check
          * that we can use it. 
          */
         if((myTxnRoot.getTxnFlags() & FSConstants.SVN_FS_TXN_CHECK_LOCKS) != 0){
-            FSReader.allowLockedOperation(path, myAuthor, myLockTokens.values(), false, false, myReposRootDir);
+            FSReader.allowLockedOperation(fullPath, myAuthor, myLockTokens.values(), false, false, myReposRootDir);
         }
         /* Now, make sure this path is mutable. */
 
     }
 
+    /* Make the node referred to by parentPath mutable, if it isn't
+     * already.  root must be the root from which
+     * parentPath descends.  Clone any parent directories as needed.
+     * Adjust the dag nodes in PARENT_PATH to refer to the clones.  Use
+     * ERROR_PATH in error messages.  */
+    private void makePathMutable(FSRoot root, FSParentPath parentPath, String errorPath, File reposRootDir) throws SVNException {
+        String txnId = root.getTxnId();
+        /* Is the node mutable already?  */
+        if(parentPath.getRevNode().getId().isTxn()){
+            return;
+        }
+        /* Are we trying to clone the root, or somebody's child node?  */
+        if(parentPath.getParent() != null){
+            /* We're trying to clone somebody's child.  Make sure our parent
+             * is mutable.  
+             */
+            makePathMutable(root, parentPath.getParent(), errorPath, reposRootDir);
+            FSID parentId = null;
+            String copyId = null;
+            switch(parentPath.getCopyStyle()){
+                case FSParentPath.COPY_ID_INHERIT_PARENT:
+                    parentId = parentPath.getParent().getRevNode().getId();
+                    copyId = parentId.getCopyID();
+                    break;
+                case FSParentPath.COPY_ID_INHERIT_NEW:
+                    copyId = reserveCopyId(txnId);
+                    break;
+                    
+            }
+        }
+    }
+    
+    private String reserveCopyId(String txnId) throws SVNException {
+        /* First read in the current next-ids file. */
+        String[] nextIds = FSReader.readNextIds(txnId, myReposRootDir);
+        String copyId = FSKeyGenerator.generateNextKey(nextIds[1].toCharArray());
+        FSWriter.writeNextIds(txnId, nextIds[0], copyId, myReposRootDir);
+        return "_" + nextIds[1];
+    }
+    
     public OutputStream textDeltaChunk(String path, SVNDiffWindow diffWindow) throws SVNException {
         return null;
     }
