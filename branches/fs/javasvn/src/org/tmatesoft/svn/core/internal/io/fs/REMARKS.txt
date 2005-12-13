@@ -1,6 +1,8 @@
 Remarks to the file:/// protocol implementation (FSRepository):
 
-1) Pool for rev-nodes will surely optimize the methods run time
+1) Pool for rev-nodes will surely optimize the methods run time 
+
+   **SOLVED**
 
 2) For now in update operations (when ignoring ancestry) when there's a need 
    to compare bytes of two files, I use ByteArrayOutputStream to fetch the file 
@@ -14,12 +16,23 @@ Remarks to the file:/// protocol implementation (FSRepository):
    
    - Now I'm writing all the contents to files - is it better, guess 
      not the ideal solution
+
 3) If it's true that in an FSFS repository a file may be represented with
    more than one diff window in a particular revision, it may cause a 
    trouble in getFile()? That is we'll have to keep the same source view 
    during applying those windows - now every next applying delta is 
    followed by replacing a previous source view with a previous target.
+
 4) I've noticed a problem with invoking a pre-revprop-change hook - 
    svn sucessfully manages to try an empty hook file, but in Java 
    Runtime.getRuntime().exec(cmd) failed to run an empty file - what's
-   the problem?
+   the problem? 
+   
+   **SOLVED**
+
+5) It looks strange how delete_lock() works - why does it rewrite those
+   files that haven't change? Why don't the svn devs make a break after 
+   all interesting changes have been done? Whether there's a thing that I'm 
+   not able to understand at now and there's a thing that prevents the devs 
+   from breaking, or there's something they don't still know about:)
+   

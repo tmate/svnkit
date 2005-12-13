@@ -102,8 +102,9 @@ public abstract class FSRevisionNodePool {
                 }
                 if(child == null){
                     /* If this was the last path component, and the caller
-                     said it was optional, then don't return an error;
-                     just put a NULL node pointer in the path.  */                
+                     * said it was optional, then don't return an error;
+                     * just put a null node pointer in the path.  
+                     */                
                     if(isLastComponentOptional && (next == null || "".equals(next)) ){
                         return new FSParentPath(null, entry, parentPath);
                     }

@@ -38,6 +38,112 @@ import org.tmatesoft.svn.core.SVNProperty;
  * @author  TMate Software Ltd.
  */
 public class FSWriter {
+    
+    public static FSRevisionNode cloneChild(FSRevisionNode parent, String parentPath, String childName, String copyId, String txnId, boolean isParentCopyRoot, File reposRootDir) throws SVNException {
+        /* First check that the parent is mutable. */
+        if(!parent.getId().isTxn()){
+            SVNErrorManager.error("Attempted to clone child of non-mutable node");
+        }
+        /* Make sure that NAME is a single path component. */
+        if(!SVNPathUtil.isSinglePathComponent(childName)){
+            SVNErrorManager.error("Attempted to make a child clone with an illegal name '" + childName + "'");
+        }
+        /* Find the node named childName in parent's entries list if it exists. */
+        /* parent's current entry named childName */
+        FSRevisionNode childNode = FSReader.getChildDirNode(childName, parent, reposRootDir);
+        /* node id we'll put into new node */
+        FSID newNodeId = null;
+        /* Check for mutability in the node we found.  If it's mutable, we
+         * don't need to clone it. 
+         */
+        if(childNode.getId().isTxn()){
+            /* This has already been cloned */
+            newNodeId = childNode.getId(); 
+        }else{
+            if(isParentCopyRoot){
+                childNode.setCopyRootPath(parent.getCopyRootPath());
+                childNode.setCopyRootRevision(parent.getCopyRootRevision());
+            }
+            childNode.setCopyFromPath(null);
+            childNode.setCopyFromRevision(FSConstants.SVN_INVALID_REVNUM);
+            childNode.setPredecessorId(childNode.getId());
+            if(childNode.getCount() != -1){
+                childNode.setCount(childNode.getCount() + 1);
+            }
+            childNode.setCreatedPath(SVNPathUtil.concatToAbs(parentPath, childName));
+            newNodeId = createSuccessor(childNode.getId(), childNode, copyId, txnId, reposRootDir);
+        }
+        /* Replace the id in the parent's entry list with the id which
+         * refers to the mutable clone of this child. 
+         */
+
+        //TODO
+        return null;
+    }
+    
+    private static void setEntry(FSRevisionNode parentRevNode, String entryName, FSID entryId, SVNNodeKind kind, String txnId, File reposRootDir) throws SVNException {
+        FSRepresentation textRep = parentRevNode.getTextRepresentation();
+        File childrenFile = FSRepositoryUtil.getTxnRevNodeChildrenFile(parentRevNode.getId(), reposRootDir);
+        OutputStream dst = null;
+        File tmpFile = null;
+        try{
+            tmpFile = SVNFileUtil.createUniqueFile(childrenFile.getParentFile(), childrenFile.getName(), ".tmp");
+            if(textRep == null || !textRep.isTxn()){
+                /* Before we can modify the directory, we need to dump its old
+                 * contents into a mutable representation file. 
+                 */
+                Map entries = FSReader.getDirEntries(parentRevNode, reposRootDir);
+                Map unparsedEntries = FSRepositoryUtil.unparseDirEntries(entries);
+                dst = SVNFileUtil.openFileForWriting(tmpFile);
+                SVNProperties.setProperties(unparsedEntries, dst, SVNProperties.SVN_HASH_TERMINATOR);
+                /* Mark the node-rev's data rep as mutable. */
+                textRep = new FSRepresentation();
+                textRep.setRevision(FSConstants.SVN_INVALID_REVNUM);
+                textRep.setTxnId(txnId);
+                parentRevNode.setTextRepresentation(textRep);
+                putTxnRevisionNode(parentRevNode.getId(), parentRevNode, reposRootDir);
+            }else{
+                /* The directory rep is already mutable, so just open it for append. */
+                dst = SVNFileUtil.openFileForWriting(tmpFile, true);
+            }
+            /* Make a note if we have this directory cached. */
+            Map dirContents = parentRevNode.getDirContents();
+            /* Append an incremental hash entry for the entry change, and 
+             * update the cached directory if necessary. 
+             */
+            if(entryId != null){
+                SVNProperties.appendProperty(entryName, kind + " " + entryId.toString(), dst);
+                if(dirContents != null){
+                    dirContents.put(entryName, new FSEntry(entryId, kind, entryName));
+                }
+            }else{
+                SVNProperties.setPropertyDeleted(entryName, dst);
+                if(dirContents != null){
+                    dirContents.remove(entryName);
+                }
+            }
+        }finally{
+            SVNFileUtil.closeFile(dst);            
+        }
+        if (tmpFile != null) {
+            SVNFileUtil.rename(tmpFile, childrenFile);
+            SVNFileUtil.setReadonly(childrenFile, true);
+        }
+    }
+    
+    private static FSID createSuccessor(FSID oldId, FSRevisionNode newRevNode, String copyId, String txnId, File reposRootDir) throws SVNException {
+        if(copyId == null){
+            copyId = oldId.getCopyID();
+        }
+        FSID id = FSID.createTxnId(oldId.getNodeID(), copyId, txnId);
+        if(newRevNode.getCopyRootPath() == null){
+            newRevNode.setCopyRootPath(newRevNode.getCopyFromPath());
+            newRevNode.setCopyRootRevision(newRevNode.getId().getRevision());
+        }
+        putTxnRevisionNode(newRevNode.getId(), newRevNode, reposRootDir);
+        return id;
+    }
+    
     public static FSTransactionInfo beginTxn(long baseRevision, int flags, FSRevisionNodePool revNodesPool, File reposRootDir) throws SVNException {
         FSTransactionInfo txn = createTxn(baseRevision, revNodesPool, reposRootDir);
         /* Put a datestamp on the newly created txn, so we always know
@@ -92,11 +198,11 @@ public class FSWriter {
         revNode.setCopyFromPath(null);
         revNode.setCopyFromRevision(FSConstants.SVN_INVALID_REVNUM);
         /* For the transaction root, the copyroot never changes. */
-        revNode.setId(new FSID(sourceNode.getId().getNodeID(), txnId, sourceNode.getId().getCopyID(), FSConstants.SVN_INVALID_REVNUM, -1));
-        putTxnNodeRevision(revNode.getId(), revNode, reposRootDir);
+        revNode.setId(FSID.createTxnId(sourceNode.getId().getNodeID(), sourceNode.getId().getCopyID(), txnId));
+        putTxnRevisionNode(revNode.getId(), revNode, reposRootDir);
     }
 
-    private static void putTxnNodeRevision(FSID id, FSRevisionNode revNode, File reposRootDir) throws SVNException{
+    private static void putTxnRevisionNode(FSID id, FSRevisionNode revNode, File reposRootDir) throws SVNException{
         if(!id.isTxn()){
             SVNErrorManager.error("svn: Attempted to write to non-transaction");
         }
