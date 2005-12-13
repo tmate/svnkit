@@ -68,7 +68,20 @@ public class SVNPathUtil {
         }
         return result.toString();
     }
-
+    
+    public static boolean isSinglePathComponent(String name){
+        /* Can't be empty or `..'  */
+        if(name == null || "".equals(name) || "..".equals(name)){
+            return true;
+        }
+        /* Slashes are bad */
+        if(name.indexOf('/') != -1){
+            return false;
+        }
+        /* It is valid.  */
+        return true; 
+    }
+    
     public static String concatToAbs(String f, String s) {
         f = canonicalizeAbsPath(f);
         f = f == null ? "" : f;
