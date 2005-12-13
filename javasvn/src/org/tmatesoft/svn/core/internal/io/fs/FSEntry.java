@@ -17,16 +17,15 @@ import org.tmatesoft.svn.core.SVNNodeKind;
  * @version 1.0
  * @author  TMate Software Ltd.
  */
-public class FSRepresentationEntry {
+public class FSEntry {
     private FSID myId;
     private SVNNodeKind myType;
     private String myName;
     
-    public FSRepresentationEntry(){
-        
+    public FSEntry(){
     }
     
-    public FSRepresentationEntry(FSID id, SVNNodeKind type, String name){
+    public FSEntry(FSID id, SVNNodeKind type, String name){
         myId = id;
         myType = type;
         myName = name;
@@ -54,5 +53,9 @@ public class FSRepresentationEntry {
 
     public String getName(){
         return myName;
+    }
+    
+    public String toString(){
+        return myType + " " + myId;
     }
 }

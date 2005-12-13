@@ -245,7 +245,7 @@ public class FSReader {
 
     private static FSTransaction fetchTxn(String txnId, File reposRootDir) throws SVNException {
         Map txnProps = FSRepositoryUtil.getTransactionProperties(reposRootDir, txnId);
-        FSID rootId = new FSID("0", txnId, "0", FSConstants.SVN_INVALID_REVNUM, -1);
+        FSID rootId = FSID.createTxnId("0", "0", txnId);
         FSRevisionNode revNode = getRevNodeFromID(reposRootDir, rootId);
         return new FSTransaction(FSTransactionKind.TXN_KIND_NORMAL, revNode.getId(), revNode.getPredecessorId(), null, txnProps);
     }
@@ -284,25 +284,34 @@ public class FSReader {
     }
     
     public static FSRevisionNode getChildDirNode(String child, FSRevisionNode parent, File reposRootDir) throws SVNException {
-        if (child == null || child.length() == 0 || "..".equals(child) || child.indexOf('/') != -1) {
+        /* Make sure that NAME is a single path component. */
+        if (!SVNPathUtil.isSinglePathComponent(child)) {
             SVNErrorManager.error("svn: Attempted to open node with an illegal name '" + child + "'");
         }
-        Map entries = getDirEntries(parent, reposRootDir);
-        FSRepresentationEntry entry = entries != null ? (FSRepresentationEntry) entries.get(child) : null;
-        return entry == null ? null : getRevNodeFromID(reposRootDir, entry.getId());
-    }
-
-    public static FSRepresentationEntry getChildEntry(String child, FSRevisionNode parent, File reposRootDir) throws SVNException {
-        if (child == null || child.length() == 0 || "..".equals(child) || child.indexOf('/') != -1) {
-            SVNErrorManager.error("svn: Attempted to open node with an illegal name '" + child + "'");
-        }
+        /* Now get the node that was requested. */
         //first try to ask the object's cache for entries
         Map entries = parent.getDirContents(); 
         if(entries == null){
             entries = getDirEntries(parent, reposRootDir);
             parent.setDirContents(entries);
         }
-        FSRepresentationEntry entry = entries != null ? (FSRepresentationEntry) entries.get(child) : null;
+        FSEntry entry = entries != null ? (FSEntry) entries.get(child) : null;
+        return entry == null ? null : getRevNodeFromID(reposRootDir, entry.getId());
+    }
+
+    public static FSEntry getChildEntry(String child, FSRevisionNode parent, File reposRootDir) throws SVNException {
+        /* Make sure that NAME is a single path component. */
+        if (!SVNPathUtil.isSinglePathComponent(child)) {
+            SVNErrorManager.error("svn: Attempted to open node with an illegal name '" + child + "'");
+        }
+        /* Now get the node that was requested. */
+        //first try to ask the object's cache for entries
+        Map entries = parent.getDirContents(); 
+        if(entries == null){
+            entries = getDirEntries(parent, reposRootDir);
+            parent.setDirContents(entries);
+        }
+        FSEntry entry = entries != null ? (FSEntry) entries.get(child) : null;
         return entry;
     }
     
@@ -327,7 +336,7 @@ public class FSReader {
             InputStream file = SVNFileUtil.openFileForReading(childrenFile);
             Map entries = null;
             try{
-                entries = parsePlainRepresentation(file, false, "END");
+                entries = parsePlainRepresentation(file, false, SVNProperties.SVN_HASH_TERMINATOR);
                 entries.putAll(parsePlainRepresentation(file, false, null));
             }catch(IOException ioe){
                 SVNErrorManager.error("");
@@ -340,7 +349,7 @@ public class FSReader {
             FSRepresentation textRepresent = revNode.getTextRepresentation(); 
             try {
                 is = readPlainRepresentation(textRepresent, reposRootDir);
-                return parsePlainRepresentation(is, false, "END");
+                return parsePlainRepresentation(is, false, SVNProperties.SVN_HASH_TERMINATOR);
             } catch (IOException ioe) {
                 SVNErrorManager.error("svn: Can't read representation in revision file '" + FSRepositoryUtil.getRevisionFile(reposRootDir, textRepresent.getRevision()).getAbsolutePath() + "': "
                         + ioe.getMessage());
@@ -351,7 +360,7 @@ public class FSReader {
                 SVNFileUtil.closeFile(is);
             }
         }
-        return new HashMap();
+        return new HashMap();//returns an empty map, must not be null!!
     }
 
     private static Map getProplist(FSRepresentation representation, File reposRootDir) throws SVNException {
@@ -361,7 +370,7 @@ public class FSReader {
         InputStream is = null;
         try {
             is = readPlainRepresentation(representation, reposRootDir);
-            return parsePlainRepresentation(is, true, "END");
+            return parsePlainRepresentation(is, true, SVNProperties.SVN_HASH_TERMINATOR);
         } catch (IOException ioe) {
             SVNErrorManager.error("svn: Can't read representation in revision file '" + FSRepositoryUtil.getRevisionFile(reposRootDir, representation.getRevision()).getAbsolutePath() + "': "
                     + ioe.getMessage());
@@ -608,7 +617,7 @@ public class FSReader {
         for(int i = 0; i < names.length; i++){
             String name = (String)names[i];
             if (!isProps) {
-                FSRepresentationEntry nextRepEntry = null;
+                FSEntry nextRepEntry = null;
                 try {
                     nextRepEntry = parseRepEntryValue(name, (String)entries.get(names[i]));
                 } catch (SVNException svne) {
@@ -622,7 +631,7 @@ public class FSReader {
         return representationMap;
     }
 
-    private static FSRepresentationEntry parseRepEntryValue(String name, String value) throws SVNException {
+    private static FSEntry parseRepEntryValue(String name, String value) throws SVNException {
         String[] values = value.split(" ");
         if (values == null || values.length < 2) {
             throw new SVNException();
@@ -632,7 +641,7 @@ public class FSReader {
         if ((type != SVNNodeKind.DIR && type != SVNNodeKind.FILE) || id == null) {
             throw new SVNException();
         }
-        return new FSRepresentationEntry(id, type, name);
+        return new FSEntry(id, type, name);
     }
 
     public static FSRevisionNode getRootRevNode(File reposRootDir, long revision) throws SVNException {
@@ -818,7 +827,7 @@ public class FSReader {
         }else if(idParts[2].charAt(0) == 't'){
             /* This is a transaction type ID */
             String txnId = idParts[2].substring(1);
-            return new FSID(nodeId, txnId, copyId, FSConstants.SVN_INVALID_REVNUM, -1);
+            return FSID.createTxnId(nodeId, copyId, txnId);
         }
         return null;
     }

@@ -17,6 +17,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Iterator;
 
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNProperty;
@@ -25,6 +26,7 @@ import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.internal.wc.SVNFileType;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNProperties;
+import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
 
 
 /**
@@ -32,6 +34,27 @@ import org.tmatesoft.svn.core.internal.wc.SVNProperties;
  * @author  TMate Software Ltd.
  */
 public class FSRepositoryUtil {
+    
+    public static Map unparseDirEntries(Map entries){
+        Map unparsedEntries = new HashMap();
+        for(Iterator names = entries.keySet().iterator(); names.hasNext();){
+            String name = (String)names.next();
+            FSEntry dirEntry = (FSEntry)entries.get(name); 
+            String unparsedVal = dirEntry.toString();
+            unparsedEntries.put(name, unparsedVal);
+        }
+        return unparsedEntries;
+    }
+    
+    /* Return a text string describing the absolute path of parentPath.
+     */
+    public static String getAbsParentPath(FSParentPath parentPath){
+        String pathSoFar = "/";
+        if(parentPath.getParent() != null){
+            pathSoFar = getAbsParentPath(parentPath.getParent());
+        }
+        return parentPath.getNameEntry() != null ? SVNPathUtil.concatToAbs(pathSoFar, parentPath.getNameEntry()) : pathSoFar;    
+    }
     
     public static Map getPropsDiffs(Map sourceProps, Map targetProps){
         Map result = new HashMap();
@@ -293,7 +316,7 @@ public class FSRepositoryUtil {
     }
 
     public static File getTxnRevNodeChildrenFile(FSID id, File reposRootDir) {
-        return new File(getTxnRevNodeFile(id, reposRootDir), FSConstants.TXN_PATH_EXT_CHILDREN);
+        return new File(getTxnDir(id.getTxnID(), reposRootDir), FSConstants.PATH_PREFIX_NODE + id.getNodeID() + "." + id.getCopyID() + FSConstants.TXN_PATH_EXT_CHILDREN);
     }
 
     public static File getTxnRevFile(String id, File reposRootDir) {

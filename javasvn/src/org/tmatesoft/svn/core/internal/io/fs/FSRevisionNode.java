@@ -163,6 +163,6 @@ public class FSRevisionNode {
     }
 
     public void setDirContents(Map dirContents) {
-        this.myDirContents = dirContents;
+        myDirContents = dirContents;
     }
 }

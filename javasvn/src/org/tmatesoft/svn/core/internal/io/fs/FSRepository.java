@@ -439,7 +439,7 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
 
         while (dirEntries.hasNext()) {
             String name = (String) dirEntries.next();
-            FSRepresentationEntry repEntry = (FSRepresentationEntry) entries.get(name);
+            FSEntry repEntry = (FSEntry) entries.get(name);
             if (repEntry != null) {
                 dirEntriesList.add(buildDirEntry(repEntry, null, reposRootDir, includeLogs));
             }
@@ -470,7 +470,7 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
         return properties;
     }
 	
-    private SVNDirEntry buildDirEntry(FSRepresentationEntry repEntry, FSRevisionNode revNode, File reposRootDir, boolean includeLogs) throws SVNException {
+    private SVNDirEntry buildDirEntry(FSEntry repEntry, FSRevisionNode revNode, File reposRootDir, boolean includeLogs) throws SVNException {
         FSRevisionNode entryNode = revNode == null ? FSReader.getRevNodeFromID(reposRootDir, repEntry.getId()) : revNode;
 
         // dir size is equated to 0
@@ -550,7 +550,7 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
                         + getRepositoryPath(path) + "'");
             }
             entries.addAll(getDirEntries(parent, myReposRootDir, null, includeCommitMessages));
-            SVNDirEntry parentDirEntry = buildDirEntry(new FSRepresentationEntry(parent.getId(), parent.getType(), ""), parent, myReposRootDir, false);
+            SVNDirEntry parentDirEntry = buildDirEntry(new FSEntry(parent.getId(), parent.getType(), ""), parent, myReposRootDir, false);
             parentDirEntry.setPath(parent.getCreatedPath());
             return parentDirEntry;
         } finally {
@@ -1034,8 +1034,8 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
 
         String fullTargetPath = myReporterContext.getReportTargetPath(); 
         String fullSourcePath = SVNPathUtil.concatToAbs(getRepositoryPath(""), myReporterContext.getReportTarget());
-        FSRepresentationEntry targetEntry = fakeDirEntry(fullTargetPath, myReporterContext.getTargetRoot(), myReporterContext.getTargetRevision());
-        FSRepresentationEntry sourceEntry = fakeDirEntry(fullSourcePath, null, sourceRevision);
+        FSEntry targetEntry = fakeDirEntry(fullTargetPath, myReporterContext.getTargetRoot(), myReporterContext.getTargetRevision());
+        FSEntry sourceEntry = fakeDirEntry(fullSourcePath, null, sourceRevision);
         
         /* 
          * If the operand is a locally added file or directory, it won't
@@ -1114,9 +1114,9 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
             
             String entryEditPath = SVNPathUtil.append(editPath, entryName);
             String entryTargetPath = SVNPathUtil.concatToAbs(targetPath, entryName);
-            FSRepresentationEntry targetEntry = (FSRepresentationEntry)targetEntries.get(entryName);
+            FSEntry targetEntry = (FSEntry)targetEntries.get(entryName);
             String entrySourcePath = sourcePath != null ? SVNPathUtil.concatToAbs(sourcePath, entryName) : null;
-            FSRepresentationEntry sourceEntry = sourceEntries != null ? (FSRepresentationEntry)sourceEntries.get(entryName) : null;
+            FSEntry sourceEntry = sourceEntries != null ? (FSEntry)sourceEntries.get(entryName) : null;
             updateEntry(sourceRevision, entrySourcePath, sourceEntry, entryTargetPath, targetEntry, entryEditPath, pathInfo, myReporterContext.isRecursive());
             /* Don't revisit this entryName in the target or source entries. */
             targetEntries.remove(entryName);
@@ -1131,7 +1131,7 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
         if(sourceEntries != null){
             Object[] names = sourceEntries.keySet().toArray();
             for(int i = 0; i < names.length; i++){
-                FSRepresentationEntry srcEntry = (FSRepresentationEntry)sourceEntries.get(names[i]);
+                FSEntry srcEntry = (FSEntry)sourceEntries.get(names[i]);
                 if(targetEntries.get(srcEntry.getName()) == null){
                     /* There is no corresponding target entry, so delete. */
                     String entryEditPath = SVNPathUtil.append(editPath, srcEntry.getName());
@@ -1144,12 +1144,12 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
         /* Loop over the dirents in the target. */
         Object[] names = targetEntries.keySet().toArray();
         for(int i = 0; i < names.length; i++){
-            FSRepresentationEntry tgtEntry = (FSRepresentationEntry)targetEntries.get(names[i]);
+            FSEntry tgtEntry = (FSEntry)targetEntries.get(names[i]);
             /* Compose the report, editor, and target paths for this entry. */
             String entryEditPath = SVNPathUtil.append(editPath, tgtEntry.getName());
             String entryTargetPath = SVNPathUtil.concatToAbs(targetPath, tgtEntry.getName());
             /* Look for an entry with the same name in the source dirents. */
-            FSRepresentationEntry srcEntry = sourceEntries != null ? (FSRepresentationEntry)sourceEntries.get(tgtEntry.getName()) : null;
+            FSEntry srcEntry = sourceEntries != null ? (FSEntry)sourceEntries.get(tgtEntry.getName()) : null;
             String entrySourcePath = srcEntry != null ? SVNPathUtil.concatToAbs(sourcePath, tgtEntry.getName()) : null;
             updateEntry(sourceRevision, entrySourcePath, srcEntry, entryTargetPath, tgtEntry, entryEditPath, null, myReporterContext.isRecursive());
         }        
@@ -1342,7 +1342,7 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
      * finishReport() needs to force us to recurse into the target even if 
      * that flag is not set.) 
      */
-    private void updateEntry(long sourceRevision, String sourcePath, FSRepresentationEntry sourceEntry, String targetPath, FSRepresentationEntry targetEntry, String editPath, PathInfo pathInfo, boolean recursive) throws SVNException {
+    private void updateEntry(long sourceRevision, String sourcePath, FSEntry sourceEntry, String targetPath, FSEntry targetEntry, String editPath, PathInfo pathInfo, boolean recursive) throws SVNException {
         /* For non-switch operations, follow link path in the target. */
         if(pathInfo != null && pathInfo.getLinkPath() != null && !myReporterContext.isSwitch()){
             targetPath = pathInfo.getLinkPath();
@@ -1412,11 +1412,11 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
         }
     }
     
-    private FSRepresentationEntry fakeDirEntry(String reposPath, FSRevisionNode root, long revision) throws SVNException {
+    private FSEntry fakeDirEntry(String reposPath, FSRevisionNode root, long revision) throws SVNException {
         FSRevisionNode node = root != null ? myRevNodesPool.getRevisionNode(root, reposPath, myReposRootDir) : myRevNodesPool.getRevisionNode(revision, reposPath, myReposRootDir);
-        FSRepresentationEntry dirEntry = null;
+        FSEntry dirEntry = null;
         if(node != null){
-            dirEntry = new FSRepresentationEntry(node.getId(), node.getType(), SVNPathUtil.tail(node.getCreatedPath()));
+            dirEntry = new FSEntry(node.getId(), node.getType(), SVNPathUtil.tail(node.getCreatedPath()));
         }
         return dirEntry;
     }

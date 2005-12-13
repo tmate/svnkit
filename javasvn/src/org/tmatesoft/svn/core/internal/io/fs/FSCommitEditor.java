@@ -219,8 +219,28 @@ public class FSCommitEditor implements ISVNEditor {
                 case FSParentPath.COPY_ID_INHERIT_NEW:
                     copyId = reserveCopyId(txnId);
                     break;
-                    
+                case FSParentPath.COPY_ID_INHERIT_SELF:
+                    break;
+                case FSParentPath.COPY_ID_INHERIT_UNKNOWN:
+                    //well, svn aborts here, should we do the same?
+                    /* uh-oh -- somebody didn't calculate copy-ID
+                     * inheritance data. 
+                     */                    
+                    SVNErrorManager.error("FATAL error: can not make path mutable");;
             }
+            /* Determine what copyroot our new child node should use. */
+            String copyRootPath = parentPath.getRevNode().getCopyRootPath();
+            long copyRootRevision = parentPath.getRevNode().getCopyRootRevision();
+            FSRevisionNode copyRootNode = myRepository.getRevisionNodePool().getRevisionNode(copyRootRevision, copyRootPath, myReposRootDir);
+            FSID childId = parentPath.getRevNode().getId();
+            FSID copyRootId = copyRootNode.getId();
+            boolean isParentCopyRoot = false;
+            if(!childId.getNodeID().equals(copyRootId.getNodeID())){
+                isParentCopyRoot = true;
+            }
+            /* Now make this node mutable.  */
+            String clonePath = FSRepositoryUtil.getAbsParentPath(parentPath.getParent());
+            
         }
     }
     
