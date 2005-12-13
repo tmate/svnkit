@@ -31,7 +31,8 @@ import org.tmatesoft.svn.core.SVNException;
  * @author TMate Software Ltd.
  */
 public class SVNProperties {
-
+    public static final String SVN_HASH_TERMINATOR = "END";
+    
     private File myFile;
 
     private String myPath;
@@ -95,6 +96,66 @@ public class SVNProperties {
             SVNFileUtil.closeFile(is);
         }
         return result;
+    }
+
+    public static Map asMap(InputStream hashStream, String terminator) throws IOException {
+        Map result = new HashMap();
+        if (hashStream == null) {
+            return result;
+        }
+        ByteArrayOutputStream nameOS = new ByteArrayOutputStream();
+        while (readProperty('K', hashStream, nameOS, terminator)) {
+            String name = new String(nameOS.toByteArray(), "UTF-8");
+            nameOS.reset();
+            readProperty('V', hashStream, nameOS, terminator);
+            String value = new String(nameOS.toByteArray(), "UTF-8");
+            result.put(name, value);
+            nameOS.reset();
+        }
+        return result;
+    }
+
+    private static boolean readProperty(char type, InputStream is, OutputStream os, String terminator) throws IOException {
+        int length = readLength(is, type, terminator);
+        if (length < 0) {
+            return false;
+        }
+        if (os != null) {
+            byte[] value = new byte[length];
+            int r = is.read(value);
+            os.write(value, 0, r);
+        } else {
+            while(length > 0) {
+                length -= is.skip(length);
+            }
+        }
+        return is.read() == '\n';
+    }
+    
+    private static int readLength(InputStream is, char type, String terminator) throws IOException {
+        byte[] buffer = new byte[256];
+        int r = -1;
+        int i = 0;
+        while((r = is.read()) != '\n'){
+            if(r == -1){
+                break;
+            }
+            buffer[i++] = (byte) (0xFF & r);
+        }
+        if(r == -1 && terminator == null){
+            return -1;
+        }else if(r == -1){
+            throw new IOException("malformed hash file format");
+        }
+        String line = new String(buffer, 0, i);
+        if(terminator != null && terminator.equals(line)){
+            return -1;
+        }
+        if (line.length() > 2 && line.charAt(0) == type && line.charAt(1) == ' ') {
+            String length = line.substring(2);
+            return Integer.parseInt(length);
+        }
+        throw new IOException("malformed hash file format");
     }
 
     public boolean compareTo(SVNProperties properties,
@@ -370,6 +431,48 @@ public class SVNProperties {
         if (tmpFile != null) {
             SVNFileUtil.rename(tmpFile, target);
             SVNFileUtil.setReadonly(target, true);
+        }
+    }
+
+    public static void setProperties(Map namesToValues, OutputStream target, String terminator) throws SVNException {
+        try {
+            Object[] keys = namesToValues.keySet().toArray();
+            for(int i = 0; i < keys.length; i++){
+                String propertyName = (String)keys[i];
+                writeProperty(target, 'K', propertyName.getBytes());
+                String propertyValue = (String)namesToValues.get(propertyName);
+                writeProperty(target, 'V', propertyValue.getBytes());
+            }
+            if(terminator != null){
+                String terminatingLine = terminator + "\n";
+                target.write(terminatingLine.getBytes());
+            }
+        }catch(IOException ioe){    
+            SVNErrorManager.error(ioe.getMessage());
+        }
+    }
+    
+    public static void appendProperty(String name, String value, OutputStream target) throws SVNException {
+        if(name == null || value == null){
+            return;
+        }
+        try {
+            writeProperty(target, 'K', name.getBytes());
+            writeProperty(target, 'V', value.getBytes());
+        }catch(IOException ioe){    
+            SVNErrorManager.error(ioe.getMessage());
+        }
+    }
+    
+    //only for commit txns
+    public static void setPropertyDeleted(String name, OutputStream target) throws SVNException {
+        if(name == null){
+            return;
+        }
+        try {
+            writeProperty(target, 'D', name.getBytes());
+        }catch(IOException ioe){    
+            SVNErrorManager.error(ioe.getMessage());
         }
     }
     
