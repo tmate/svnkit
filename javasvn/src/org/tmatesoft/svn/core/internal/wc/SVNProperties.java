@@ -98,64 +98,97 @@ public class SVNProperties {
         return result;
     }
 
-    public static Map asMap(InputStream hashStream, String terminator) throws IOException {
-        Map result = new HashMap();
+    public static Map asMap(Map result, InputStream hashStream, boolean incremental, String terminator) throws IOException {
+        result = result == null ? new HashMap() : result;
         if (hashStream == null) {
             return result;
         }
-        ByteArrayOutputStream nameOS = new ByteArrayOutputStream();
-        while (readProperty('K', hashStream, nameOS, terminator)) {
-            String name = new String(nameOS.toByteArray(), "UTF-8");
-            nameOS.reset();
-            readProperty('V', hashStream, nameOS, terminator);
-            String value = new String(nameOS.toByteArray(), "UTF-8");
-            result.put(name, value);
-            nameOS.reset();
-        }
-        return result;
-    }
-
-    private static boolean readProperty(char type, InputStream is, OutputStream os, String terminator) throws IOException {
-        int length = readLength(is, type, terminator);
-        if (length < 0) {
-            return false;
-        }
-        if (os != null) {
-            byte[] value = new byte[length];
-            int r = is.read(value);
-            os.write(value, 0, r);
-        } else {
-            while(length > 0) {
-                length -= is.skip(length);
+        while(true){
+            /* Read a key length line.  Might be END, though. */
+            Object[] newLine = readLine(hashStream); 
+            boolean eof = ((Boolean)newLine[1]).booleanValue();
+            String line = (String)newLine[0];
+            /* Check for the end of the hash. */
+            if((terminator == null && eof && line.length() == 0) || (terminator != null && terminator.equals(line))){
+                return result;
+            }
+            /* Check for unexpected end of stream */
+            if(eof){
+                throw new IOException("malformed hash file format");
+            }
+            if(line.length() >= 3 && line.charAt(0) == 'K' && line.charAt(1) == ' '){
+                /* Get the length of the key */
+                int keyLength = Integer.parseInt(line.substring(2));
+                if(keyLength < 0){
+                    throw new IOException("malformed hash file format");
+                }
+                /* Now read that much into a buffer. */
+                byte[] key = new byte[keyLength];
+                int r = hashStream.read(key);
+                String keyName = new String(key, 0, r);
+                /* Suck up extra newline after key data */
+                if(hashStream.read() != '\n'){
+                    throw new IOException("malformed hash file format");
+                }
+                /* Read a val length line */
+                newLine = readLine(hashStream); 
+                line = (String)newLine[0];
+                if(line.length() >= 3 && line.charAt(0) == 'V' && line.charAt(1) == ' '){
+                    /* Get the length of the value */
+                    int valueLength = Integer.parseInt(line.substring(2));
+                    if(valueLength < 0){
+                        throw new IOException("malformed hash file format");
+                    }
+                    /* Now read that much into a buffer. */
+                    byte[] value = new byte[valueLength];
+                    r = hashStream.read(value);
+                    String valueName = new String(value, 0, r);
+                    /* Suck up extra newline after key data */
+                    if(hashStream.read() != '\n'){
+                        throw new IOException("malformed hash file format");
+                    }
+                    /* Add a new hash entry. */
+                    result.put(keyName, valueName);
+                }else{
+                    throw new IOException("malformed hash file format");
+                }
+            }else if(incremental && line.length() >= 3 && line.charAt(0) == 'D' && line.charAt(1) == ' '){
+                /* Get the length of the key */
+                int keyLength = Integer.parseInt(line.substring(2));
+                if(keyLength < 0){
+                    throw new IOException("malformed hash file format");
+                }
+                /* Now read that much into a buffer. */
+                byte[] key = new byte[keyLength];
+                int r = hashStream.read(key);
+                String keyName = new String(key, 0, r);
+                /* Remove this hash entry. */
+                result.remove(keyName);
+                /* Suck up extra newline after key data */
+                if(hashStream.read() != '\n'){
+                    throw new IOException("malformed hash file format");
+                }
+            }else{
+                throw new IOException("malformed hash file format");
             }
         }
-        return is.read() == '\n';
     }
     
-    private static int readLength(InputStream is, char type, String terminator) throws IOException {
-        byte[] buffer = new byte[256];
+    private static Object[] readLine(InputStream is) throws IOException {
+        StringBuffer buffer = new StringBuffer();
         int r = -1;
-        int i = 0;
+        boolean eof = false;
         while((r = is.read()) != '\n'){
             if(r == -1){
+                eof = true;
                 break;
             }
-            buffer[i++] = (byte) (0xFF & r);
+            buffer.append((char)r);
         }
-        if(r == -1 && terminator == null){
-            return -1;
-        }else if(r == -1){
-            throw new IOException("malformed hash file format");
-        }
-        String line = new String(buffer, 0, i);
-        if(terminator != null && terminator.equals(line)){
-            return -1;
-        }
-        if (line.length() > 2 && line.charAt(0) == type && line.charAt(1) == ' ') {
-            String length = line.substring(2);
-            return Integer.parseInt(length);
-        }
-        throw new IOException("malformed hash file format");
+        Object[] result = new Object[2];
+        result[0] = buffer.toString();
+        result[1] = new Boolean(eof);
+        return result;
     }
 
     public boolean compareTo(SVNProperties properties,
@@ -465,7 +498,7 @@ public class SVNProperties {
     }
     
     //only for commit txns
-    public static void setPropertyDeleted(String name, OutputStream target) throws SVNException {
+    public static void appendPropertyDeleted(String name, OutputStream target) throws SVNException {
         if(name == null){
             return;
         }
