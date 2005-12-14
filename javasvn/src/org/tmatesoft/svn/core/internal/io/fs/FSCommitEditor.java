@@ -195,14 +195,15 @@ public class FSCommitEditor implements ISVNEditor {
     /* Make the node referred to by parentPath mutable, if it isn't
      * already.  root must be the root from which
      * parentPath descends.  Clone any parent directories as needed.
-     * Adjust the dag nodes in PARENT_PATH to refer to the clones.  Use
-     * ERROR_PATH in error messages.  */
+     * Adjust the dag nodes in parentPath to refer to the clones.  Use
+     * errorPath in error messages.  */
     private void makePathMutable(FSRoot root, FSParentPath parentPath, String errorPath, File reposRootDir) throws SVNException {
         String txnId = root.getTxnId();
         /* Is the node mutable already?  */
         if(parentPath.getRevNode().getId().isTxn()){
             return;
         }
+        FSRevisionNode clone = null;
         /* Are we trying to clone the root, or somebody's child node?  */
         if(parentPath.getParent() != null){
             /* We're trying to clone somebody's child.  Make sure our parent
@@ -240,8 +241,30 @@ public class FSCommitEditor implements ISVNEditor {
             }
             /* Now make this node mutable.  */
             String clonePath = FSRepositoryUtil.getAbsParentPath(parentPath.getParent());
-            
+            clone = FSWriter.cloneChild(parentPath.getParent().getRevNode(), clonePath, parentPath.getNameEntry(), copyId, txnId, isParentCopyRoot, myReposRootDir);
+            //TODO: Update the path cache.
+        }else{
+            /* We're trying to clone the root directory.  */
+            if(root.isTxnRoot()){
+                /* Get the node id's of the root directories of the transaction 
+                 * and its base revision.  
+                 */
+                FSTransaction txn = FSReader.getTxn(txnId, reposRootDir);
+                /* If they're the same, we haven't cloned the transaction's 
+                 * root directory yet. 
+                 */
+                if(txn.getRootId().equals(txn.getBaseId())){
+                    SVNErrorManager.error("FATAL error: txn '" + txnId + "', txn root id '" + txn.getRootId() + "', txn base id '" + txn.getBaseId() + "'");
+                }
+                /* One way or another, root_id now identifies a cloned root node. */
+                clone = FSReader.getRevNodeFromID(reposRootDir, txn.getRootId());
+            }else{
+                /* If it's not a transaction root, we can't change its contents.  */
+                SVNErrorManager.error("File is not mutable: filesystem '" + myReposRootDir.getAbsolutePath() + "', revision " + root.getRevision() + ", path '" + errorPath + "'");
+            }
         }
+        /* Update the PARENT_PATH link to refer to the clone.  */
+        parentPath.setRevNode(clone);
     }
     
     private String reserveCopyId(String txnId) throws SVNException {

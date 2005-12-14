@@ -72,13 +72,13 @@ public class FSWriter {
             }
             childNode.setCreatedPath(SVNPathUtil.concatToAbs(parentPath, childName));
             newNodeId = createSuccessor(childNode.getId(), childNode, copyId, txnId, reposRootDir);
+            /* Replace the id in the parent's entry list with the id which
+             * refers to the mutable clone of this child. 
+             */
+            setEntry(parent, childName, newNodeId, childNode.getType(), txnId, reposRootDir);
         }
-        /* Replace the id in the parent's entry list with the id which
-         * refers to the mutable clone of this child. 
-         */
-
-        //TODO
-        return null;
+        /* Initialize the youngster. */
+        return FSReader.getRevNodeFromID(reposRootDir, newNodeId);
     }
     
     private static void setEntry(FSRevisionNode parentRevNode, String entryName, FSID entryId, SVNNodeKind kind, String txnId, File reposRootDir) throws SVNException {
@@ -117,7 +117,7 @@ public class FSWriter {
                     dirContents.put(entryName, new FSEntry(entryId, kind, entryName));
                 }
             }else{
-                SVNProperties.setPropertyDeleted(entryName, dst);
+                SVNProperties.appendPropertyDeleted(entryName, dst);
                 if(dirContents != null){
                     dirContents.remove(entryName);
                 }

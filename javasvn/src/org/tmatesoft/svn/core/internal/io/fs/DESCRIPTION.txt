@@ -66,7 +66,7 @@ written as a full text, not delta, but for files it's not true)
 18d06e569b1a1c111c2574773e0b2aeb - hex representation of the MD5 checksum for 
 the full contents
 
-5)FSRepresentationEntry - this class represents a dir node's entry, for example 
+5)FSEntry - this class represents a dir node's entry, for example 
 this is the representation of the dir contents (for the above example of the 
 root rev node):
 
