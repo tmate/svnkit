@@ -11,44 +11,52 @@ public class QSequenceLineReaderTest extends TestCase {
 	// Accessing ==============================================================
 
 	public void test() throws IOException {
-		test("A simple string.", 1);
-		test("Two\nlines.", 2);
-		test("Three\nli\nnes.", 3);
-		test("\nLine\n", 2);
-		test("Line\r\n\r", 2);
-		test("Line\r\n\r\n", 2);
-		test("Line\r\r", 2);
-		test("Line\r\r ", 3);
-		test("Line\n\r\r", 3);
-		test("\n\n\n", 3);
-		test("", 0);
+		test("A simple string.", 1, false);
+		test("Two\nlines.", 2, false);
+		test("Three\nli\nnes.", 3, false);
+		test("\nLine\n", 2, false);
+		test("Line\r\n\r", 2, false);
+		test("Line\r\n\r\n", 2, false);
+		test("Line\r\r", 2, false);
+		test("Line\r\r ", 3, false);
+		test("Line\n\r\r", 3, false);
+		test("\n\n\n", 3, false);
+		test("", 0, false);
 
-		test("Line", 1);
-		test("Line\n", 1);
-		test("Line\r\n", 1);
-		test("Line\n\r", 2);
-		test("Line\n\r\r", 3);
+		test("Line", 1, true);
+		test("Line\n", 2, true);
+		test("Line\r\n", 2, true);
+		test("Line\n\r", 3, true);
+		test("Line\n\r\r", 4, true);
 	}
 
 	// Utils ==================================================================
 
-	private void test(String testString, int expectedLineCount) throws IOException {
+	private void test(String testString, int expectedLineCount, boolean skipEol) throws IOException {
 		final byte[] bytes = testString.getBytes();
+		byte[] customEolBytes = skipEol ? new byte[0] : null;
 		final QSequenceLineMemoryCache cache = new QSequenceLineMemoryCache();
-		final QSequenceLineReader reader = new QSequenceLineReader(4);
+		final QSequenceLineReader reader = new QSequenceLineReader(4, customEolBytes);
 		reader.read(new ByteArrayInputStream(bytes), cache);
-		assertEquals(expectedLineCount, cache.getLineCount());
+		final QSequenceLineMemoryCache lines = cache;
+		assertEquals(expectedLineCount, lines.getLineCount());
 
-		for (int index = 0; index < cache.getLineCount(); index++) {
-			final QSequenceLine line = cache.getLine(index);
+		for (int index = 0; index < lines.getLineCount(); index++) {
+			final QSequenceLine line = lines.getLine(index);
 			if (index == 0) {
 				assertEquals(0, line.getFrom());
 			}
-			else if (index == cache.getLineCount() - 1) {
+			else if (index == lines.getLineCount() - 1) {
 				assertEquals(bytes.length, line.getFrom() + line.getLength());
 			}
 			else {
-				final int expectedTo = (int)cache.getLine(index - 1).getFrom() + cache.getLine(index - 1).getLength();
+				int expectedTo = (int)lines.getLine(index - 1).getFrom() + lines.getLine(index - 1).getLength();
+				if (skipEol && expectedTo >= 0 && bytes[expectedTo] == '\r') {
+					expectedTo++;
+				}
+				if (skipEol && expectedTo >= 0 && bytes[expectedTo] == '\n') {
+					expectedTo++;
+				}
 				assertEquals(expectedTo, line.getFrom());
 			}
 

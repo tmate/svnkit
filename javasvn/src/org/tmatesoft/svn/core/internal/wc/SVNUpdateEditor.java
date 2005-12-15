@@ -37,7 +37,6 @@ public class SVNUpdateEditor implements ISVNEditor {
     private String mySwitchURL;
     private String myTarget;
     private String myTargetURL;
-    private String myRootURL;
     private boolean myIsRecursive;
     private SVNWCAccess myWCAccess;
     private SVNDirectoryInfo myCurrentDirectory;
@@ -60,7 +59,6 @@ public class SVNUpdateEditor implements ISVNEditor {
 
         SVNEntry entry = wcAccess.getAnchor().getEntries().getEntry("", true);
         myTargetURL = entry.getURL();
-        myRootURL = entry.getRepositoryRoot();
         if (myTarget != null) {
             myTargetURL = SVNPathUtil.append(myTargetURL, SVNEncodingUtil.uriEncode(myTarget));
         }
@@ -155,7 +153,7 @@ public class SVNUpdateEditor implements ISVNEditor {
         entry.setDeleted(false);
         parentDir.getEntries().save(true);
 
-        SVNDirectory dir = parentDir.createChildDirectory(name, myCurrentDirectory.URL, null, myTargetRevision);
+        SVNDirectory dir = parentDir.createChildDirectory(name, myCurrentDirectory.URL, myTargetRevision);
         if (dir == null) {
             SVNErrorManager.error("svn: Failed to add directory '" + path + "': directory is missing or not locked");
         } else {
@@ -245,11 +243,12 @@ public class SVNUpdateEditor implements ISVNEditor {
             SVNLog log = myCurrentDirectory.getLog(true);
 
             if (modifiedProps != null && !modifiedProps.isEmpty()) {
+                SVNProperties props = dir.getProperties("", false);
+                Map locallyModified = dir.getBaseProperties("", false).compareTo(props);
                 myWCAccess.addExternals(dir, (String) modifiedProps.get(SVNProperty.EXTERNALS));
 
-                Map oldBaseProps = dir.getBaseProperties("", false).asMap();
-                propStatus = dir.mergeProperties("", oldBaseProps, modifiedProps, true, log);
-                if (myCurrentDirectory.IsAdded && !dir.hasPropModifications("")) {
+                propStatus = dir.mergeProperties("", modifiedProps, locallyModified, true, log);
+                if (locallyModified == null || locallyModified.isEmpty()) {
                     Map command = new HashMap();
                     command.put(SVNLog.NAME_ATTR, "");
                     command.put(SVNProperty.shortPropertyName(SVNProperty.PROP_TIME), SVNLog.WC_TIMESTAMP);
@@ -312,18 +311,23 @@ public class SVNUpdateEditor implements ISVNEditor {
             }
         }
         File baseTmpFile = dir.getBaseFile(myCurrentFile.Name, true);
+        SVNFileUtil.copyFile(baseFile, baseTmpFile, false);
+        if (!baseTmpFile.exists()) {
+            SVNFileUtil.createEmptyFile(baseTmpFile);
+        }
         myCurrentFile.TextUpdated = true;
-        myDeltaProcessor.applyTextDelta(baseFile, baseTmpFile, true);
     }
 
     public OutputStream textDeltaChunk(String commitPath, SVNDiffWindow diffWindow) throws SVNException {
-        return myDeltaProcessor.textDeltaChunk(diffWindow);
+        File file = myCurrentFile.getDirectory().getBaseFile(myCurrentFile.Name + ".txtdelta", true);
+        return myDeltaProcessor.textDeltaChunk(file, diffWindow);
     }
 
     public void textDeltaEnd(String commitPath) throws SVNException {
-        if (myDeltaProcessor.textDeltaEnd()) {
-            myCurrentFile.Checksum = myDeltaProcessor.getChecksum();
-        }
+        File baseTmpFile = myCurrentFile.getDirectory().getBaseFile(myCurrentFile.Name, true);
+        File targetFile = myCurrentFile.getDirectory().getBaseFile(myCurrentFile.Name + ".tmp", true);
+        myCurrentFile.Checksum = myDeltaProcessor.textDeltaEnd(baseTmpFile, targetFile, true);
+        SVNFileUtil.rename(targetFile, baseTmpFile);
     }
 
     public void closeFile(String commitPath, String textChecksum) throws SVNException {
@@ -354,6 +358,8 @@ public class SVNUpdateEditor implements ISVNEditor {
         SVNStatusType lockStatus = SVNStatusType.LOCK_UNCHANGED;
 
         boolean magicPropsChanged = false;
+        SVNProperties props = dir.getProperties(name, false);
+        Map locallyModifiedProps = dir.getBaseProperties(name, false).compareTo(props);
         if (modifiedProps != null && !modifiedProps.isEmpty()) {
             magicPropsChanged = modifiedProps.containsKey(SVNProperty.EXECUTABLE) || 
             modifiedProps.containsKey(SVNProperty.NEEDS_LOCK) || 
@@ -361,9 +367,7 @@ public class SVNUpdateEditor implements ISVNEditor {
             modifiedProps.containsKey(SVNProperty.EOL_STYLE) || 
             modifiedProps.containsKey(SVNProperty.SPECIAL);
         }
-        Map oldBaseProps = dir.getBaseProperties(name, false).asMap();
-        boolean isLocalPropsModified = !myCurrentFile.IsAdded && dir.hasPropModifications(name);
-        SVNStatusType propStatus = dir.mergeProperties(name, oldBaseProps, modifiedProps, true, log);
+        SVNStatusType propStatus = dir.mergeProperties(name, modifiedProps, locallyModifiedProps, true, log);
         if (modifiedEntryProps != null) {
             lockStatus = log.logChangedEntryProperties(name, modifiedEntryProps);
         }
@@ -416,7 +420,6 @@ public class SVNUpdateEditor implements ISVNEditor {
                 // do test merge.
                 String oldEolStyle = null;
                 String oldKeywords = null;
-                SVNProperties props = dir.getProperties(myCurrentFile.Name, false);
                 try {
                     if (magicPropsChanged && 
                             (modifiedProps.containsKey(SVNProperty.EOL_STYLE) || modifiedProps.containsKey(SVNProperty.KEYWORDS))) {
@@ -461,7 +464,7 @@ public class SVNUpdateEditor implements ISVNEditor {
             log.addCommand(SVNLog.MAYBE_READONLY, command, false);
             command.clear();
         }
-        if (!isLocalPropsModified) {
+        if (locallyModifiedProps == null || locallyModifiedProps.isEmpty()) {
             command.put(SVNLog.NAME_ATTR, name);
             command.put(SVNProperty.shortPropertyName(SVNProperty.PROP_TIME), SVNLog.WC_TIMESTAMP);
             log.addCommand(SVNLog.MODIFY_ENTRY, command, false);
@@ -521,7 +524,7 @@ public class SVNUpdateEditor implements ISVNEditor {
         if (myTarget != null) {
             if (dir.getChildDirectory(myTarget) == null) {
                 SVNEntry entry = dir.getEntries().getEntry(myTarget, true);
-                boolean save = bumpEntry(dir.getEntries(), entry, mySwitchURL, myRootURL, myTargetRevision, false);
+                boolean save = bumpEntry(dir.getEntries(), entry, mySwitchURL, myTargetRevision, false);
                 if (save) {
                     dir.getEntries().save(true);
                 } else {
@@ -531,12 +534,12 @@ public class SVNUpdateEditor implements ISVNEditor {
             }
             dir = dir.getChildDirectory(myTarget);
         }
-        bumpDirectory(dir, mySwitchURL, myRootURL);
+        bumpDirectory(dir, mySwitchURL);
     }
 
-    private void bumpDirectory(SVNDirectory dir, String url, String rootURL) throws SVNException {
+    private void bumpDirectory(SVNDirectory dir, String url) throws SVNException {
         SVNEntries entries = dir.getEntries();
-        boolean save = bumpEntry(entries, entries.getEntry("", true), url, rootURL, myTargetRevision, false);
+        boolean save = bumpEntry(entries, entries.getEntry("", true), url, myTargetRevision, false);
         Map childDirectories = new HashMap();
         for (Iterator ents = entries.entries(true); ents.hasNext();) {
             SVNEntry entry = (SVNEntry) ents.next();
@@ -545,7 +548,7 @@ public class SVNUpdateEditor implements ISVNEditor {
             }
             String childURL = url != null ? SVNPathUtil.append(url, SVNEncodingUtil.uriEncode(entry.getName())) : null;
             if (entry.getKind() == SVNNodeKind.FILE) {
-                save |= bumpEntry(entries, entry, childURL, rootURL, myTargetRevision, true);
+                save |= bumpEntry(entries, entry, childURL, myTargetRevision, true);
             } else if (myIsRecursive && entry.getKind() == SVNNodeKind.DIR) {
                 SVNDirectory childDirectory = dir.getChildDirectory(entry.getName());
                 if (!entry.isScheduledForAddition() && (childDirectory == null || !childDirectory.isVersioned())) {
@@ -565,14 +568,14 @@ public class SVNUpdateEditor implements ISVNEditor {
             SVNDirectory child = (SVNDirectory) children.next();
             String childURL = (String) childDirectories.get(child);
             if (child != null) {
-                bumpDirectory(child, childURL, rootURL);
+                bumpDirectory(child, childURL);
             } else {
                 SVNDebugLog.logInfo("svn: Directory object is null in bump directories method");
             }
         }
     }
 
-    private static boolean bumpEntry(SVNEntries entries, SVNEntry entry, String url, String rootURL, long revision, boolean delete) {
+    private static boolean bumpEntry(SVNEntries entries, SVNEntry entry, String url, long revision, boolean delete) {
         if (entry == null) {
             return false;
         }
@@ -580,7 +583,6 @@ public class SVNUpdateEditor implements ISVNEditor {
         if (url != null) {
             save = entry.setURL(url);
         }
-        save |= entry.setRepositoryRoot(rootURL);
         if (revision >= 0 && !entry.isScheduledForAddition() && !entry.isScheduledForReplacement()) {
             save |= entry.setRevision(revision);
         }

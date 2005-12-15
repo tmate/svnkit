@@ -10,9 +10,9 @@ final class QSequenceLineMemoryCache implements QSequenceLineCache {
 
 	// Constants ==============================================================
 
-	public static QSequenceLineMemoryCache read(InputStream is) throws IOException {
+	public static QSequenceLineMemoryCache read(InputStream is, byte[] customEolBytes) throws IOException {
 		final QSequenceLineMemoryCache cache = new QSequenceLineMemoryCache();
-		final QSequenceLineReader reader = new QSequenceLineReader();
+		final QSequenceLineReader reader = new QSequenceLineReader(customEolBytes);
 		reader.read(is, cache);
 		return cache;
 	}

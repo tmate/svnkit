@@ -10,6 +10,7 @@
  */
 package org.tmatesoft.svn.core.wc;
 
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
@@ -17,6 +18,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 
@@ -25,8 +27,10 @@ import org.tmatesoft.svn.core.SVNProperty;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNTranslator;
+import org.tmatesoft.svn.util.SVNDebugLog;
 
 import de.regnis.q.sequence.line.diff.QDiffGenerator;
+import de.regnis.q.sequence.line.diff.QDiffGeneratorFactory;
 import de.regnis.q.sequence.line.diff.QDiffManager;
 import de.regnis.q.sequence.line.diff.QDiffUniGenerator;
 
@@ -47,7 +51,7 @@ public class DefaultSVNDiffGenerator implements ISVNDiffGenerator {
     protected static final byte[] HEADER_SEPARATOR = "===================================================================".getBytes();
     protected static final byte[] EOL = SVNTranslator.getEOL("native");
     protected static final String WC_REVISION_LABEL = "(working copy)";
-    protected static final InputStream EMPTY_FILE_IS = SVNFileUtil.DUMMY_IN;
+    protected static final InputStream EMPTY_FILE_IS = new ByteArrayInputStream(new byte[0]);
 
     private boolean myIsForcedBinaryDiff;
     private String myAnchorPath1;
@@ -100,10 +104,7 @@ public class DefaultSVNDiffGenerator implements ISVNDiffGenerator {
             return ".";
         }
         if (path.startsWith(basePath + "/")) {
-            path = path.substring(basePath.length() + 1);
-            if (path.startsWith("./")) {
-                path = path.substring("./".length());
-            }
+            return path.substring(basePath.length() + 1);
         }
         return path;
     }
@@ -151,6 +152,7 @@ public class DefaultSVNDiffGenerator implements ISVNDiffGenerator {
             try {
                 bos.close();
                 bos.writeTo(result);
+                SVNDebugLog.logInfo(bos.toString());
             } catch (IOException e) {
             }
         }
@@ -218,6 +220,7 @@ public class DefaultSVNDiffGenerator implements ISVNDiffGenerator {
             try {
                 bos.close();
                 bos.writeTo(result);
+                SVNDebugLog.logInfo(bos.toString());
             } catch (IOException inner) {
             }
             SVNErrorManager.error("svn: Failed to save diff data: " + e.getMessage());
@@ -257,16 +260,9 @@ public class DefaultSVNDiffGenerator implements ISVNDiffGenerator {
                 try {
                     bos.close();
                     bos.writeTo(result);
+                    SVNDebugLog.logInfo(bos.toString());
                 } catch (IOException e) {
                 }
-            }
-            return;
-        }
-        if (file1 == file2 && file1 == null) {
-            try {
-                bos.close();
-                bos.writeTo(result);
-            } catch (IOException e) {
             }
             return;
         }
@@ -297,7 +293,9 @@ public class DefaultSVNDiffGenerator implements ISVNDiffGenerator {
             is2 = file2 == null ? EMPTY_FILE_IS : SVNFileUtil.openFileForReading(file2);
 
             QDiffUniGenerator.setup();
-            QDiffGenerator generator = QDiffManager.getDiffGenerator(QDiffUniGenerator.TYPE, null);
+            Map generatorProperties = new HashMap();
+            generatorProperties.put(QDiffGeneratorFactory.COMPARE_EOL_PROPERTY, Boolean.TRUE.toString());
+            QDiffGenerator generator = QDiffManager.getDiffGenerator(QDiffUniGenerator.TYPE, generatorProperties);
             Writer writer = new OutputStreamWriter(bos, getEncoding());
             QDiffManager.generateTextDiff(is1, is2, getEncoding(), writer, generator);
             writer.flush();
@@ -310,6 +308,7 @@ public class DefaultSVNDiffGenerator implements ISVNDiffGenerator {
             try {
                 bos.close();
                 bos.writeTo(result);
+                SVNDebugLog.logInfo(bos.toString());
             } catch (IOException inner) {
                 //
             }

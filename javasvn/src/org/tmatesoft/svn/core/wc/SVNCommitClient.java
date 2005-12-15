@@ -352,40 +352,6 @@ public class SVNCommitClient extends SVNBasicClient {
      *                          </ul>
      */
     public SVNCommitInfo doImport(File path, SVNURL dstURL, String commitMessage, boolean recursive) throws SVNException {
-        return doImport(path, dstURL, commitMessage, true, recursive);
-    }
-
-    /**
-     * Committs an addition of a local unversioned file or directory into 
-     * the repository. If the destination URL (<code>dstURL</code>) contains any
-     * non-existent parent directories they will be automatically created by the
-     * server. 
-     * 
-     * @param  path             a local unversioned file or directory to be imported
-     *                          into the repository
-     * @param  dstURL           a URL-string that represents a repository location
-     *                          where the <code>path</code> will be imported            
-     * @param  commitMessage    a string to be a commit log message
-     * @param  useGlobalIgnores if <span class="javakeyword">true</span> 
-     *                          then those paths that match global ignore patterns controlled 
-     *                          by a config options driver (see {@link ISVNOptions#isIgnored(String) isIgnored()}) 
-     *                          will not be imported, otherwise global ignore patterns are not  
-     *                          used
-     * @param  recursive        this flag is relevant only when the <code>path</code> is 
-     *                          a directory: if <span class="javakeyword">true</span> then the entire directory
-     *                          tree will be imported including all child directories, otherwise 
-     *                          only items located in the directory itself
-     * @return                  information on a new revision as the result
-     *                          of the commit
-     * @throws SVNException     if one of the following is true:
-     *                          <ul>
-     *                          <li><code>dstURL</code> is invalid
-     *                          <li>the path denoted by <code>dstURL</code> already
-     *                          exists
-     *                          <li><code>path</code> contains a reserved name - <i>'.svn'</i>
-     *                          </ul>
-     */
-    public SVNCommitInfo doImport(File path, SVNURL dstURL, String commitMessage, boolean useGlobalIgnores, boolean recursive) throws SVNException {
         // first find dstURL root.
         SVNRepository repos = null;
         SVNFileType srcKind = SVNFileType.getType(path);
@@ -437,13 +403,9 @@ public class SVNCommitClient extends SVNBasicClient {
         }
         boolean changed;
         if (srcKind == SVNFileType.DIRECTORY) {
-            changed = importDir(path, path, newDirPath, useGlobalIgnores, recursive, commitEditor);
+            changed = importDir(path, path, newDirPath, recursive, commitEditor);
         } else {
-            if (useGlobalIgnores && getOptions().isIgnored(path.getName())) {
-                changed = false;
-            } else {
-                changed = importFile(path.getParentFile(), path, srcKind, filePath, commitEditor);
-            }
+            changed = importFile(path.getParentFile(), path, srcKind, filePath, commitEditor);
         }
         if (!changed) {
             try {
@@ -859,7 +821,7 @@ public class SVNCommitClient extends SVNBasicClient {
         return packetsArray;        
     }
 
-    private boolean importDir(File rootFile, File dir, String importPath, boolean useGlobalIgnores, boolean recursive, ISVNEditor editor) throws SVNException {
+    private boolean importDir(File rootFile, File dir, String importPath, boolean recursive, ISVNEditor editor) throws SVNException {
         checkCancelled();
         File[] children = dir.listFiles();
         boolean changed = false;
@@ -867,11 +829,11 @@ public class SVNCommitClient extends SVNBasicClient {
             File file = children[i];
             if (SVNFileUtil.getAdminDirectoryName().equals(file.getName())) {
                 SVNEvent skippedEvent = SVNEventFactory.createSkipEvent(
-                        rootFile, file, SVNEventAction.SKIP, SVNNodeKind.NONE);
+                        rootFile, file, SVNEventAction.SKIP, SVNEventAction.COMMIT_ADDED, SVNNodeKind.NONE);
                 handleEvent(skippedEvent, ISVNEventHandler.UNKNOWN);
                 continue;
             }
-            if (useGlobalIgnores && getOptions().isIgnored(file.getName())) {
+            if (getOptions().isIgnored(file.getName())) {
                 continue;
             }
             String path = importPath == null ? file.getName() : SVNPathUtil.append(importPath, file.getName());
@@ -883,9 +845,9 @@ public class SVNCommitClient extends SVNBasicClient {
                         file, SVNEventAction.COMMIT_ADDED, SVNNodeKind.DIR,
                         null);
                 handleEvent(event, ISVNEventHandler.UNKNOWN);
-                importDir(rootFile, file, path, useGlobalIgnores, recursive, editor);
+                importDir(rootFile, file, path, recursive, editor);
                 editor.closeDir();
-            } else if (fileType == SVNFileType.FILE || fileType == SVNFileType.SYMLINK){
+            } else {
                 changed |= importFile(rootFile, file, fileType, path, editor);
             }
 

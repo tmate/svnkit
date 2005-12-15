@@ -31,7 +31,6 @@ import org.tmatesoft.svn.core.auth.ISVNSSLManager;
 import org.tmatesoft.svn.core.auth.SVNAuthentication;
 import org.tmatesoft.svn.core.auth.SVNPasswordAuthentication;
 import org.tmatesoft.svn.core.auth.SVNSSHAuthentication;
-import org.tmatesoft.svn.core.auth.SVNSSLAuthentication;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
 import org.tmatesoft.svn.core.wc.SVNWCUtil;
 
@@ -103,7 +102,6 @@ public class DefaultSVNAuthenticationManager implements ISVNAuthenticationManage
         String sslAuthorityFiles = (String) properties.get("ssl-authority-files"); // "pem" files
         String sslClientCert = (String) properties.get("ssl-client-cert-file"); // PKCS#12
         String sslClientCertPassword = (String) properties.get("ssl-client-cert-password");
-        boolean promptForClientCert = "yes".equalsIgnoreCase((String) properties.get("ssl-client-cert-prompt"));
         
         File clientCertFile = sslClientCert != null ? new File(sslClientCert) : null;
         Collection trustStorages = new ArrayList();
@@ -117,7 +115,7 @@ public class DefaultSVNAuthenticationManager implements ISVNAuthenticationManage
         }
         File[] serverCertFiles = (File[]) trustStorages.toArray(new File[trustStorages.size()]);
         File authDir = new File(myConfigDirectory, "auth/svn.ssl.server");
-        return new DefaultSVNSSLManager(authDir, url, serverCertFiles, trustAll, clientCertFile, sslClientCertPassword, promptForClientCert, this);
+        return new DefaultSVNSSLManager(authDir, url, serverCertFiles, trustAll, clientCertFile, sslClientCertPassword, this);
     }
 
     private Map getHostProperties(String host) {
@@ -363,8 +361,7 @@ public class DefaultSVNAuthenticationManager implements ISVNAuthenticationManage
             if (auth == null || realm == null) {
                 return;
             }
-            String kind = auth instanceof SVNSSHAuthentication ? 
-                    ISVNAuthenticationManager.SSH : (auth instanceof SVNSSLAuthentication) ? ISVNAuthenticationManager.SSL : ISVNAuthenticationManager.PASSWORD;
+            String kind = auth instanceof SVNSSHAuthentication ? ISVNAuthenticationManager.SSH : ISVNAuthenticationManager.PASSWORD;
             getRuntimeAuthStorage().putData(kind, realm, auth);
         }
         

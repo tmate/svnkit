@@ -86,10 +86,6 @@ public class PropgetCommand extends SVNCommand implements ISVNPropertyHandler {
     }
     
     public void handleProperty(long revision, SVNPropertyData property) throws SVNException {
-        myOut.print(property.getValue());
-        if (!myIsStrict) {
-            myOut.println();
-        }
     }
     
 }

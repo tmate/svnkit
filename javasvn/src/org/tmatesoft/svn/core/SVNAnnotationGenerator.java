@@ -93,7 +93,6 @@ public class SVNAnnotationGenerator implements ISVNFileRevisionHandler {
     private List myLines;
     private SVNDeltaProcessor myDeltaProcessor;
     private ISVNEventHandler myCancelBaton;
-    private long myStartRevision;
     
     /**
      * Constructs an annotation generator object. A user may want to have
@@ -103,11 +102,10 @@ public class SVNAnnotationGenerator implements ISVNFileRevisionHandler {
      * 
      * @param path           a file path (relative to a repository location)
      * @param tmpDirectory   a revision to stop at
-     * @param startRevision  a start revision to begin annotation with
      * @param cancelBaton    a baton which is used to check if an operation 
      *                       is cancelled
      */
-    public SVNAnnotationGenerator(String path, File tmpDirectory, long startRevision, ISVNEventHandler cancelBaton) {
+    public SVNAnnotationGenerator(String path, File tmpDirectory, ISVNEventHandler cancelBaton) {
         myTmpDirectory = tmpDirectory;
         myCancelBaton = cancelBaton;
         myPath = path;
@@ -116,7 +114,6 @@ public class SVNAnnotationGenerator implements ISVNFileRevisionHandler {
         }
         myLines = new ArrayList();
         myDeltaProcessor = new SVNDeltaProcessor();
-        myStartRevision = startRevision;
     }
     
     public void openRevision(SVNFileRevision fileRevision) throws SVNException {
@@ -126,49 +123,47 @@ public class SVNAnnotationGenerator implements ISVNFileRevisionHandler {
             SVNErrorManager.error("svn: Cannot calculate blame information for binary file '" + myPath + "'");
         }
         myCurrentRevision = fileRevision.getRevision();
-        boolean known = fileRevision.getRevision() >= myStartRevision;
         if (myCancelBaton != null) {
             SVNEvent event = SVNEventFactory.createAnnotateEvent(myPath, myCurrentRevision);
             myCancelBaton.handleEvent(event, ISVNEventHandler.UNKNOWN);
             myCancelBaton.checkCancelled();
         }
-        Map props = fileRevision.getProperties();
-        if (known && props != null && props.get(SVNRevisionProperty.AUTHOR) != null) {
+        Map props = fileRevision.getRevisionProperties();
+        if (props != null && props.get(SVNRevisionProperty.AUTHOR) != null) {
             myCurrentAuthor = props.get(SVNRevisionProperty.AUTHOR).toString();
         } else {
             myCurrentAuthor = null;
         }
-        if (known && props != null && props.get(SVNRevisionProperty.DATE) != null) {
-            myCurrentDate = SVNTimeUtil.parseDate(fileRevision.getProperties().get(SVNRevisionProperty.DATE).toString());
+        if (props != null && props.get(SVNRevisionProperty.DATE) != null) {
+            myCurrentDate = SVNTimeUtil.parseDate(fileRevision.getRevisionProperties().get(SVNRevisionProperty.DATE).toString());
         } else {
             myCurrentDate = null;
         }
-        if (myPreviousFile == null) {
-            // create previous file.
-            myPreviousFile = SVNFileUtil.createUniqueFile(myTmpDirectory, "annotate", ".tmp");
-            SVNFileUtil.createEmptyFile(myPreviousFile);
+        if (myCurrentFile != null) {
+            myCurrentFile.delete();
         }
+        myCurrentFile = null;
     }
-    
+
     public void closeRevision(String token) throws SVNException {
     }
     
     public void applyTextDelta(String token) throws SVNException {
-        if (myCurrentFile != null) {
-            myCurrentFile.delete();
-        } else {
-            myCurrentFile = SVNFileUtil.createUniqueFile(myTmpDirectory, "annotate", ".tmp");;
+        if (myPreviousFile == null) {
+            myPreviousFile = SVNFileUtil.createUniqueFile(myTmpDirectory, "annotate", ".tmp");
+            SVNFileUtil.createEmptyFile(myPreviousFile);
         }
-        myDeltaProcessor.applyTextDelta(myPreviousFile, myCurrentFile, false);
-    }
+        myCurrentFile = SVNFileUtil.createUniqueFile(myTmpDirectory, "annotate", ".tmp");
+    }    
 
     public OutputStream textDeltaChunk(String token, SVNDiffWindow diffWindow) throws SVNException {
-        return myDeltaProcessor.textDeltaChunk(diffWindow);
+        File tmpFile = SVNFileUtil.createUniqueFile(myTmpDirectory, "annotate.chunk", ".tmp");
+        SVNFileUtil.createEmptyFile(tmpFile);
+        return myDeltaProcessor.textDeltaChunk(tmpFile, diffWindow);
     }
 
     public void textDeltaEnd(String token) throws SVNException {
-        myDeltaProcessor.textDeltaEnd();
-        
+        myDeltaProcessor.textDeltaEnd(myPreviousFile, myCurrentFile, false);
         RandomAccessFile left = null;
         RandomAccessFile right = null;
         try {
@@ -178,7 +173,7 @@ public class SVNAnnotationGenerator implements ISVNFileRevisionHandler {
             ArrayList newLines = new ArrayList();
             int lastStart = 0;
 
-            final QSequenceLineResult result = QSequenceLineMedia.createBlocks(new QSequenceLineRAFileData(left), new QSequenceLineRAFileData(right));
+            final QSequenceLineResult result = QSequenceLineMedia.createBlocks(new QSequenceLineRAFileData(left), new QSequenceLineRAFileData(right), null);
             try {
                 List blocksList = result.getBlocks();
                 for(int i = 0; i < blocksList.size(); i++) {
@@ -195,7 +190,7 @@ public class SVNAnnotationGenerator implements ISVNFileRevisionHandler {
                     // copy all from right.
                     for (int j = block.getRightFrom(); j <= block.getRightTo(); j++) {
                         LineInfo line = new LineInfo();
-                        line.revision = myCurrentDate != null ? myCurrentRevision : -1;
+                        line.revision = myCurrentRevision;
                         line.author = myCurrentAuthor;
                         line.line = result.getRightCache().getLine(j).getBytes();
                         line.date = myCurrentDate;

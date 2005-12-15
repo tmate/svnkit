@@ -20,7 +20,6 @@ import org.tmatesoft.svn.cli.SVNCommand;
 import org.tmatesoft.svn.core.SVNCommitInfo;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNURL;
-import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.wc.SVNCopyClient;
 import org.tmatesoft.svn.core.wc.SVNRevision;
 
@@ -35,9 +34,6 @@ public class CopyCommand extends SVNCommand {
                 final String path = getCommandLine().getPathAt(0);
                 final String url = getCommandLine().getURL(0);
                 if (getCommandLine().isPathURLBefore(url, path)) {
-                    if (getCommandLine().getArgumentValue(SVNArgument.MESSAGE) != null) {
-                        SVNErrorManager.error("svn: Local, non-commit operations do not take a log message.");
-                    }
                     runRemoteToLocal(out, err);
                 } else {
                     runLocalToRemote(out, err);
@@ -46,9 +42,6 @@ public class CopyCommand extends SVNCommand {
                 runRemote(out, err);
             }
         } else {
-            if (getCommandLine().getArgumentValue(SVNArgument.MESSAGE) != null) {
-                SVNErrorManager.error("svn: Local, non-commit operations do not take a log message.");
-            }
             runLocally(out, err);
         }
     }
@@ -83,7 +76,7 @@ public class CopyCommand extends SVNCommand {
             return;
         }
 
-        String commitMessage = getCommitMessage();
+        String commitMessage = (String) getCommandLine().getArgumentValue(SVNArgument.MESSAGE);
         getClientManager().setEventHandler(new SVNCommandEventProcessor(out, err, false));
         SVNCopyClient updater = getClientManager().getCopyClient();
         SVNCommitInfo result = updater.doCopy(SVNURL.parseURIEncoded(srcURL), srcRevision, SVNURL.parseURIEncoded(dstURL), false, commitMessage);
@@ -111,7 +104,7 @@ public class CopyCommand extends SVNCommand {
         if (matchTabsInPath(srcPath, err) || matchTabsInURL(dstURL, err)) {
             return;
         }
-        String message = getCommitMessage();
+        String message = (String) getCommandLine().getArgumentValue(SVNArgument.MESSAGE);
         SVNRevision revision = SVNRevision.parse((String) getCommandLine().getArgumentValue(SVNArgument.REVISION));
         if (revision == null || !revision.isValid()) {
             revision = SVNRevision.WORKING;

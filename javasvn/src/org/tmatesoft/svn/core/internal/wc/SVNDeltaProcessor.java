@@ -11,12 +11,16 @@
  */
 package org.tmatesoft.svn.core.internal.wc;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FilterOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.Collection;
+import java.util.Iterator;
+import java.util.LinkedList;
 
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.io.diff.SVNDiffWindow;
@@ -29,65 +33,90 @@ import org.tmatesoft.svn.core.io.diff.SVNDiffWindowApplyBaton;
  */
 public class SVNDeltaProcessor {
     
-    private String myChecksum;
-    
-    private SVNDiffWindow myLastWindow;
-    private ByteArrayOutputStream myDataStream;
-    private SVNDiffWindowApplyBaton myApplyBaton;
-    
-    public SVNDeltaProcessor() {
-        myDataStream = new ByteArrayOutputStream(110*1024);
-    }
-    
-    public void applyTextDelta(File baseFile, File targetFile, boolean computeCheksum) throws SVNException {
-        MessageDigest digest = null;
-        try {
-            digest = computeCheksum ? MessageDigest.getInstance("MD5") : null;
-        } catch (NoSuchAlgorithmException e1) {
-        }
-        if (!targetFile.exists()) {
-            SVNFileUtil.createEmptyFile(targetFile);
-        }
-        myChecksum = null;
-        myDataStream.reset();
-        if (baseFile != null) {
-            myApplyBaton = SVNDiffWindowApplyBaton.create(baseFile, targetFile, digest);
-        } else {
-            myApplyBaton = SVNDiffWindowApplyBaton.create(SVNFileUtil.DUMMY_IN, SVNFileUtil.openFileForWriting(targetFile), digest);
-        }
-    }
+    private File myChunkFile;
+    private ChunkOutputStream myChunkStream;
+    private Collection myWindows;
 
-    public OutputStream textDeltaChunk(SVNDiffWindow window) throws SVNException {
-        if (myLastWindow != null) {
-            // apply last window.
-            myLastWindow.apply(myApplyBaton, new ByteArrayInputStream(myDataStream.toByteArray()));
+    public OutputStream textDeltaChunk(File chunkFile, SVNDiffWindow window) throws SVNException {
+        if (myChunkStream != null) {
+            myWindows.add(window);
+            return myChunkStream;
         }
-        myLastWindow = window;
-        myDataStream.reset();
-        return myDataStream;
+        myWindows = new LinkedList();
+        myChunkFile = chunkFile;
+        myChunkStream = new ChunkOutputStream(SVNFileUtil.openFileForWriting(myChunkFile));
+        myWindows.add(window);
+        return myChunkStream;
     }
     
-    public String getChecksum() {
-        return myChecksum;
-    }
-    
-    public boolean textDeltaEnd() throws SVNException {
-        boolean result = false;
-        if (myLastWindow != null) {
-            // apply last window.
-            result = true;
-            myLastWindow.apply(myApplyBaton, new ByteArrayInputStream(myDataStream.toByteArray()));
+    public String textDeltaEnd(File baseFile, File targetFile, boolean computeChecksum) throws SVNException {
+        String checksum = null;
+        if (myChunkStream != null) {
+            try {
+                myChunkStream.reallyClose();
+            } catch (IOException e) {
+                SVNErrorManager.error(e.getMessage());
+            } finally {
+                myChunkStream = null;
+            }
         }
-        myLastWindow = null;
-        myDataStream.reset();
-        close();
-        return result;
+        if (myChunkFile == null) {
+            // no chunks was received, but delta end was, that denotes empty file.
+            SVNFileUtil.createEmptyFile(targetFile);
+            close();
+            return null;
+        }
+        try {
+            if (myWindows == null || myWindows.isEmpty()) {
+                close();
+                return null;
+            }
+            InputStream data = SVNFileUtil.openFileForReading(myChunkFile);
+            MessageDigest digest = null;
+            try {
+                digest = computeChecksum ? MessageDigest.getInstance("MD5") : null;
+            } catch (NoSuchAlgorithmException e) {
+            }
+            SVNDiffWindowApplyBaton baton = SVNDiffWindowApplyBaton.create(baseFile, targetFile, digest);
+            try {
+                for (Iterator windows = myWindows.iterator(); windows.hasNext();) {
+                    SVNDiffWindow window = (SVNDiffWindow) windows.next();
+                    window.apply(baton, data);
+                }
+            } finally {
+                SVNFileUtil.closeFile(data);
+                checksum = baton.close();
+            }
+        } finally {
+            close();
+        }
+        return checksum;
     }
     
     public void close() {
-        if (myApplyBaton != null) {
-            myChecksum = myApplyBaton.close();
-            myApplyBaton = null;
+        if (myChunkFile != null) {
+            myChunkFile.delete();
+        }
+        myChunkFile = null;
+        myWindows = null;
+        myChunkStream = null;
+        return;
+    }
+    
+    private static class ChunkOutputStream extends FilterOutputStream {
+        public ChunkOutputStream(OutputStream out) {
+            super(out);
+        }
+        public void close() {
+        }
+        
+        public void write(byte[] b, int off, int len) throws IOException {
+            out.write(b, off, len);
+            out.flush();
+        }
+        public void reallyClose() throws IOException {
+            super.close();
         }
     }
+
 }

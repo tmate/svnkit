@@ -243,7 +243,6 @@ public class SVNUpdateClient extends SVNBasicClient {
         long revNumber = getRevisionNumber(revision, repos, null);
         SVNNodeKind targetNodeKind = repos.checkPath("", revNumber);
         String uuid = repos.getRepositoryUUID();
-        SVNURL repositoryRoot = repos.getRepositoryRoot(true);
         if (targetNodeKind == SVNNodeKind.FILE) {
             SVNErrorManager.error("svn: URL '" + url + "' refers to a file not a directory");
         } else if (targetNodeKind == SVNNodeKind.NONE) {
@@ -260,7 +259,7 @@ public class SVNUpdateClient extends SVNBasicClient {
                 //
             }
             if (!dstPath.exists() || wcAccess == null || entry == null) {
-                createVersionedDirectory(dstPath, url, repositoryRoot, uuid, revNumber);
+                createVersionedDirectory(dstPath, url, uuid, revNumber);
                 result = doUpdate(dstPath, revision, recursive);
             } else if (dstPath.isDirectory() && entry != null) {
                 if (url.equals(entry.getSVNURL())) {
@@ -574,12 +573,10 @@ public class SVNUpdateClient extends SVNBasicClient {
                             (String) properties.get(SVNProperty.LAST_AUTHOR),
                             (String) properties.get(SVNProperty.COMMITTED_DATE),
                             (String) properties.get(SVNProperty.COMMITTED_REVISION));
-            byte[] eols = null;
-            if (SVNProperty.EOL_STYLE_NATIVE.equals(properties.get(SVNProperty.EOL_STYLE))) {
-                eols = SVNTranslator.getWorkingEOL(eolStyle != null ? eolStyle : (String) properties.get(SVNProperty.EOL_STYLE));
-            } else if (properties.containsKey(SVNProperty.EOL_STYLE)) {
-                eols = SVNTranslator.getWorkingEOL((String) properties.get(SVNProperty.EOL_STYLE));
+            if (eolStyle == null) {
+                eolStyle = (String) properties.get(SVNProperty.EOL_STYLE);
             }
+            byte[] eols = SVNTranslator.getWorkingEOL(eolStyle);
             SVNTranslator.translate(tmpFile, dstPath, eols, keywords, properties.get(SVNProperty.SPECIAL) != null, true);
             tmpFile.delete();
             if (properties.get(SVNProperty.EXECUTABLE) != null) {
@@ -609,23 +606,59 @@ public class SVNUpdateClient extends SVNBasicClient {
      * @throws SVNException
      */
     public void doRelocate(File dst, SVNURL oldURL, SVNURL newURL, boolean recursive) throws SVNException {
-        doRelocate(dst, oldURL, newURL, recursive, true);        
-    }
-    
-    public void doRelocate(File dst, SVNURL oldURL, SVNURL newURL, boolean recursive, boolean validateUUID) throws SVNException {
+        SVNRepository repos = createRepository(newURL, true);
+        repos.testConnection();
+
+        String uuid = repos.getRepositoryUUID();
         SVNWCAccess wcAccess = createWCAccess(dst);
         try {
             wcAccess.open(true, recursive);
             SVNEntry entry = wcAccess.getTargetEntry();
-            String name = "";
-            if (entry != null && entry.isFile()) {
-                name = entry.getName();
+            String oldUUID = null;
+            if (entry != null) {
+                oldUUID = entry.getUUID();
             }
-            doRelocate(wcAccess.getTarget(), name, oldURL.toString(), newURL.toString(), recursive, validateUUID ? new HashMap() : null);
+            if (oldUUID == null || !oldUUID.equals(uuid)) {
+                SVNErrorManager.error("The repository at '" + newURL + "' has uuid '" + uuid + "', but the WC has '" + oldUUID + "'");
+            }
+            doRelocate(wcAccess.getAnchor(), wcAccess.getTargetName(), oldURL.toString(), newURL.toString(), recursive);
         } finally {
             wcAccess.close(true);
 
         }
+    }
+
+    private void doRelocate(SVNDirectory dir, String targetName, String oldURL, String newURL, boolean recursive) throws SVNException {
+        SVNEntries entries = dir.getEntries();
+        for (Iterator ents = entries.entries(true); ents.hasNext();) {
+            SVNEntry entry = (SVNEntry) ents.next();
+            if (targetName != null && !"".equals(targetName)) {
+                if (!targetName.equals(entry.getName())) {
+                    continue;
+                }
+            }
+            String copyFromURL = entry.getCopyFromURL();
+            
+            if (copyFromURL != null && copyFromURL.startsWith(oldURL)) {
+                copyFromURL = copyFromURL.substring(oldURL.length());
+                copyFromURL = SVNPathUtil.append(newURL, copyFromURL);
+                entry.setCopyFromURL(copyFromURL);
+            }
+            if (recursive && entry.isDirectory() && !"".equals(entry.getName())) {
+                if (dir.getChildDirectory(entry.getName()) != null) {
+                    doRelocate(dir.getChildDirectory(entry.getName()), null,
+                            oldURL, newURL, recursive);
+                }
+            } else if (entry.isFile() || "".equals(entry.getName())) {
+                String url = entry.getURL();
+                if (url.startsWith(oldURL)) {
+                    url = url.substring(oldURL.length());
+                    url = SVNPathUtil.append(newURL, url);
+                    entry.setURL(url);
+                }
+            }
+        }
+        dir.getEntries().save(true);
     }
 
     private void handleExternals(SVNWCAccess wcAccess) {
@@ -641,6 +674,7 @@ public class SVNUpdateClient extends SVNBasicClient {
                 if (external.getOldURL() == null) {
                     external.getFile().mkdirs();
                     dispatchEvent(SVNEventFactory.createUpdateExternalEvent(wcAccess, ""));
+                    SVNDebugLog.logInfo("doing checkout on rev: " + revision);
                     doCheckout(external.getNewURL(), external.getFile(), revision, revision, true);
                 } else if (external.getNewURL() == null) {
                     if (SVNWCAccess.isVersionedDirectory(external.getFile())) {
@@ -656,10 +690,12 @@ public class SVNUpdateClient extends SVNBasicClient {
                     deleteExternal(external);
                     external.getFile().mkdirs();
                     dispatchEvent(SVNEventFactory.createUpdateExternalEvent(wcAccess, ""));
+                    SVNDebugLog.logInfo("doing checkout on rev: " + revision);
                     doCheckout(external.getNewURL(), external.getFile(), revision, revision, true);
                 } else {
                     if (!external.getFile().isDirectory()) {
                         external.getFile().mkdirs();
+                        SVNDebugLog.logInfo("doing checkout on rev: " + revision);
                         doCheckout(external.getNewURL(), external.getFile(), revision, revision, true);
                     } else {
                         String url = null;
@@ -672,6 +708,7 @@ public class SVNUpdateClient extends SVNBasicClient {
                             deleteExternal(external);
                             external.getFile().mkdirs();
                             dispatchEvent(SVNEventFactory.createUpdateExternalEvent(wcAccess, ""));
+                            SVNDebugLog.logInfo("doing checkout on rev: " + revision);
                             doCheckout(external.getNewURL(), external.getFile(), revision, revision, true);
                         } else {
                             dispatchEvent(SVNEventFactory.createUpdateExternalEvent(wcAccess, ""));
@@ -708,7 +745,7 @@ public class SVNUpdateClient extends SVNBasicClient {
         }
     }
 
-    private SVNDirectory createVersionedDirectory(File dstPath, SVNURL url, SVNURL rootURL, String uuid, long revNumber) throws SVNException {
+    private SVNDirectory createVersionedDirectory(File dstPath, SVNURL url, String uuid, long revNumber) throws SVNException {
         SVNDirectory.createVersionedDirectory(dstPath);
         // add entry first.
         SVNDirectory dir = new SVNDirectory(null, "", dstPath);
@@ -719,98 +756,11 @@ public class SVNUpdateClient extends SVNBasicClient {
         }
         entry.setURL(url.toString());
         entry.setUUID(uuid);
-        entry.setRepositoryRootURL(rootURL);
         entry.setKind(SVNNodeKind.DIR);
         entry.setRevision(revNumber);
         entry.setIncomplete(true);
 
         entries.save(true);
         return dir;
-    }
-    
-    private Map validateRelocateTargetURL(SVNURL targetURL, String expectedUUID, Map validatedURLs) throws SVNException {
-        if (validatedURLs == null) {
-            return null;
-        }
-        for(Iterator targetURLs = validatedURLs.keySet().iterator(); targetURLs.hasNext();) {
-            SVNURL validatedURL = (SVNURL) targetURLs.next();
-            if (targetURL.toString().startsWith(validatedURL.toString())) {
-                continue;
-            }
-            String validatedUUID = (String) validatedURLs.get(validatedURL);
-            if (validatedUUID != null && validatedUUID.equals(expectedUUID)) {
-                return validatedURLs;
-            }
-            SVNErrorManager.error("The repository at '" + validatedURL + "' has uuid '" + validatedUUID + "', but the WC has '" + expectedUUID + "'");
-        }
-        SVNRepository repos = createRepository(targetURL, true);
-        repos.testConnection();
-        String actualUUID = repos.getRepositoryUUID();
-        if (actualUUID == null || !actualUUID.equals(expectedUUID)) {
-            SVNErrorManager.error("The repository at '" + targetURL + "' has uuid '" + actualUUID + "', but the WC has '" + expectedUUID + "'");
-        }
-        validatedURLs.put(targetURL, actualUUID);
-        return validatedURLs;
-    }
-    
-    private Map relocateEntry(SVNEntry entry, String from, String to, Map validatedURLs) throws SVNException {
-        if (entry.getRepositoryRoot() != null) {
-            // that is what i do not understand :)
-            String repos = entry.getRepositoryRoot();
-            if (from.length() > repos.length()) {
-                String fromPath = from.substring(repos.length());
-                if (!to.endsWith(fromPath)) {
-                    SVNErrorManager.error("Relocate can only change the repository part of URL");
-                }
-                from = repos;
-                to = to.substring(0, to.length() - fromPath.length());
-            }
-            if (repos.startsWith(from)) {
-                entry.setRepositoryRoot(to + repos.substring(from.length()));
-            }
-        }
-        if (entry.getURL() != null && entry.getURL().startsWith(from)) {
-            entry.setURL(to + entry.getURL().substring(from.length()));
-            if (entry.getUUID() != null && validatedURLs != null) {
-                validatedURLs = validateRelocateTargetURL(entry.getSVNURL(), entry.getUUID(), validatedURLs);
-            }
-        }
-        if (entry.getCopyFromURL() != null && entry.getCopyFromURL().startsWith(from)) {
-            entry.setCopyFromURL(to + entry.getCopyFromURL().substring(from.length()));
-            if (entry.getUUID() != null && validatedURLs != null) {
-                validatedURLs = validateRelocateTargetURL(entry.getCopyFromSVNURL(), entry.getUUID(), validatedURLs);
-            }
-        }
-        return validatedURLs;
-    }
-    
-    private Map doRelocate(SVNDirectory dir, String name, String from, String to, boolean recursive, Map validatedURLs) throws SVNException {
-        if (!"".equals(name)) {
-            SVNEntry entry = dir.getEntries().getEntry(name, true);
-            relocateEntry(entry, from, to, validatedURLs);
-            dir.getEntries().save(true);
-            return validatedURLs;
-        }
-        SVNEntry rootEntry = dir.getEntries().getEntry("", true);
-        validatedURLs = relocateEntry(rootEntry, from, to, validatedURLs);
-        // now all child entries that doesn't has repos/url has new values.
-        for(Iterator ents = dir.getEntries().entries(true); ents.hasNext();) {
-            SVNEntry entry = (SVNEntry) ents.next();
-            if ("".equals(entry.getName())) {
-                continue;
-            }
-            if (recursive && entry.isDirectory() && 
-                    (entry.isScheduledForAddition() || !entry.isDeleted()) &&
-                    !entry.isAbsent()) {
-                SVNDirectory childDir = dir.getChildDirectory(entry.getName());
-                if (childDir != null) {
-                    validatedURLs = doRelocate(childDir, "", from, to, recursive, validatedURLs);
-                }
-            }
-            validatedURLs = relocateEntry(entry, from, to, validatedURLs);
-        }
-        dir.getEntries().save(true);
-        return validatedURLs;
-        
     }
 }

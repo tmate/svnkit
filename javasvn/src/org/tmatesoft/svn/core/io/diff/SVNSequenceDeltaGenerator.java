@@ -42,20 +42,6 @@ import de.regnis.q.sequence.line.QSequenceLineResult;
 public class SVNSequenceDeltaGenerator implements ISVNDeltaGenerator {
 
 	private static final SVNAllDeltaGenerator ALL_DELTA_GENERATOR = new SVNAllDeltaGenerator();
-
-    /**
-     * Memory threshold. 
-     * 
-     * <p>
-     * When comparing one file against another (working vs. base), 
-     * if each file has got a length less than this memory threshold, the files will 
-     * be compared in the memory. Otherwise if at least one of the files has a length 
-     * greater than the memory threshold, the files will be compared in the filesystem.
-     * 
-     * <p>
-     * This threshold may be defined via setting the <span class="javakeyword">"javasvn.sequence.memorythreshold"</span> 
-     * system property (before the first <b>SVNSequenceDeltaGenerator</b> instance is created).    
-	 */
 	private final int memoryThreshold;
 	private final int fileSegmentSize;
 	private final double searchDepthExponent;
@@ -120,7 +106,7 @@ public class SVNSequenceDeltaGenerator implements ISVNDeltaGenerator {
 	private static void doGenerateDiffWindow(String commitPath, ISVNRAData workFile, ISVNRAData baseFile, ISVNEditor consumer, int memoryTreshold, int fileSegmentSize, double searchDepthExponent, final File tempDirectory) throws IOException, SVNException {
 		final QSequenceLineResult result;
 		try {
-			result = QSequenceLineMedia.createBlocks(new SVNSequenceLineRAData(baseFile), new SVNSequenceLineRAData(workFile), memoryTreshold, fileSegmentSize, searchDepthExponent, new QSequenceLineFixedTempDirectoryFactory(tempDirectory));
+			result = QSequenceLineMedia.createBlocks(new SVNSequenceLineRAData(baseFile), new SVNSequenceLineRAData(workFile), null, memoryTreshold, fileSegmentSize, searchDepthExponent, new QSequenceLineFixedTempDirectoryFactory(tempDirectory));
 		}
 		catch (QSequenceException ex) {
 			throw new SVNException(ex);

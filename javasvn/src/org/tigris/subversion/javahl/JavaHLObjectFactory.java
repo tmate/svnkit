@@ -127,6 +127,10 @@ public class JavaHLObjectFactory {
         if(status.getCommittedRevision() != null){
             lastChangedRevision = status.getCommittedRevision().getNumber();
         }
+        if (status.getRemoteRevision() != null && 
+                status.getRemoteRevision() != SVNRevision.UNDEFINED) {
+            lastChangedRevision = status.getRemoteRevision().getNumber();
+        }
         Date d = status.getCommittedDate();
         long lastChangedDate = -1;
         if(d != null){
@@ -169,17 +173,10 @@ public class JavaHLObjectFactory {
         if (path != null) {
             path = path.replace(File.separatorChar, '/');
         }
-        
-        long reposRev = status.getRemoteRevision() != null ? status.getRemoteRevision().getNumber() : -1;
-        long reposDate = status.getRemoteDate() != null ? status.getRemoteDate().getTime() * 1000 : -1;
-        String reposAuthor = status.getRemoteAuthor();
-        int reposKind = getNodeKind(status.getRemoteKind());
-        
+
         Status st = new Status(path, url, nodeKind, revision, lastChangedRevision, lastChangedDate, lastCommitAuthor, textStatus, propStatus,
                 repositoryTextStatus, repositoryPropStatus, locked, copied, conflictOld, conflictNew, conflictWorking, urlCopiedFrom, revisionCopiedFrom,
-                switched, lockToken, lockOwner, lockComment, lockCreationDate, reposLock,
-                /* remote: rev, date, kind, author */
-                reposRev, reposDate, reposKind, reposAuthor);
+                switched, lockToken, lockOwner, lockComment, lockCreationDate, reposLock);
         return st;
     }
 

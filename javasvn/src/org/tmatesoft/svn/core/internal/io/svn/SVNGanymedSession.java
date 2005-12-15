@@ -29,7 +29,6 @@ import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 
 import ch.ethz.ssh2.Connection;
-import ch.ethz.ssh2.InteractiveCallback;
 import ch.ethz.ssh2.crypto.PEMDecoder;
 
 /**
@@ -64,7 +63,7 @@ public class SVNGanymedSession {
             String password = credentials.getPassword();
             String userName = credentials.getUserName();
             
-            password = "".equals(password) && privateKey != null ? null : password;
+            password = "".equals(password) ? null : password;
             passphrase = "".equals(passphrase) ? null : passphrase;
             
             if (privateKey != null && !isValidPrivateKey(privateKey, passphrase)) {
@@ -83,37 +82,15 @@ public class SVNGanymedSession {
                 boolean authenticated;
                 if (privateKey != null) {
                     authenticated = connection.authenticateWithPublicKey(userName, privateKey, passphrase);
-                } else if (password != null) {
-                    String[] methods = connection.getRemainingAuthMethods(userName);
-                    authenticated = false;
-                    for (int i = 0; i < methods.length; i++) {
-                        if ("password".equals(methods[i])) {
-                            authenticated = connection.authenticateWithPassword(userName, password);                    
-                        } else if ("keyboard-interactive".equals(methods[i])) {
-                            final String p = password;
-                            authenticated = connection.authenticateWithKeyboardInteractive(userName, new InteractiveCallback() {
-                                public String[] replyToChallenge(String name, String instruction, int numPrompts, String[] prompt, boolean[] echo) throws Exception {
-                                    String[] reply = new String[numPrompts];
-                                    for (int i = 0; i < reply.length; i++) {
-                                        reply[i] = p;
-                                    }
-                                    return reply;
-                                }
-                            });
-                        }
-                        if (authenticated) {
-                            break;
-                        }
-                    }
                 } else {
-                    throw new SVNAuthenticationException("svn: Either password or OpenSSH private key file required for svn+ssh connection");
+                    authenticated = connection.authenticateWithPassword(userName, password);
                 }
                 if (authenticated) {
                     if (isUsePersistentConnection()) {
                         ourConnectionsPool.put(key, connection);
                     }
                 } else {
-                    throw new SVNAuthenticationException("svn: SSH server rejects provided credentials (" + (privateKey != null ? "private key" : "password") + ")");
+                    throw new SVNAuthenticationException("svn: Authentication failed");
                 }
             } catch (IOException e) {
                 if (connection != null) {

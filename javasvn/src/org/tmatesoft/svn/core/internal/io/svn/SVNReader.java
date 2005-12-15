@@ -259,7 +259,6 @@ class SVNReader {
                     String word = readWord(is);
                     if ("failure".equals(word)) {
                         // read errors and throw
-                        unconditionalThrow = true;
                         readChar(is, '(');
                         StringBuffer errorMessage = new StringBuffer();
                         try {

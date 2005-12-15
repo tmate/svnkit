@@ -63,10 +63,13 @@ public class SVNEntry implements Comparable {
         return url;
     }
     
-    public SVNURL getSVNURL() throws SVNException {
+    public SVNURL getSVNURL() {
         String url = getURL();
         if (url != null) {
-            return SVNURL.parseURIEncoded(url);
+            try {
+                return SVNURL.parseURIEncoded(url);
+            } catch (SVNException e) {
+            }
         }
         return null;
     }
@@ -76,11 +79,13 @@ public class SVNEntry implements Comparable {
     }
 
     public boolean isDirectory() {
-        return SVNProperty.KIND_DIR.equals(myEntries.getPropertyValue(myName, SVNProperty.KIND));
+        return SVNProperty.KIND_DIR.equals(myEntries.getPropertyValue(myName,
+                SVNProperty.KIND));
     }
 
     public long getRevision() {
-        String revStr = myEntries.getPropertyValue(myName, SVNProperty.REVISION);
+        String revStr = myEntries
+                .getPropertyValue(myName, SVNProperty.REVISION);
         if (revStr == null && !"".equals(myName)) {
             revStr = myEntries.getPropertyValue("", SVNProperty.REVISION);
         }
@@ -120,7 +125,8 @@ public class SVNEntry implements Comparable {
     }
 
     public boolean isDeleted() {
-        return Boolean.TRUE.toString().equals(myEntries.getPropertyValue(myName, SVNProperty.DELETED));
+        return Boolean.TRUE.toString().equals(
+                myEntries.getPropertyValue(myName, SVNProperty.DELETED));
     }
 
     public boolean isAbsent() {
@@ -205,7 +211,8 @@ public class SVNEntry implements Comparable {
     }
 
     public void setKind(SVNNodeKind kind) {
-        String kindStr = kind == SVNNodeKind.DIR ? SVNProperty.KIND_DIR : (kind == SVNNodeKind.FILE ? SVNProperty.KIND_FILE : null);
+        String kindStr = kind == SVNNodeKind.DIR ? SVNProperty.KIND_DIR
+                : (kind == SVNNodeKind.FILE ? SVNProperty.KIND_FILE : null);
         myEntries.setPropertyValue(myName, SVNProperty.KIND, kindStr);
     }
 
@@ -246,7 +253,8 @@ public class SVNEntry implements Comparable {
     }
 
     public void setLockCreationDate(String date) {
-        myEntries.setPropertyValue(myName, SVNProperty.LOCK_CREATION_DATE, date);
+        myEntries
+                .setPropertyValue(myName, SVNProperty.LOCK_CREATION_DATE, date);
     }
 
     public void setLockToken(String token) {
@@ -286,17 +294,21 @@ public class SVNEntry implements Comparable {
     }
 
     public void setCopied(boolean copied) {
-        myEntries.setPropertyValue(myName, SVNProperty.COPIED, copied ? Boolean.TRUE.toString() : null);
+        myEntries.setPropertyValue(myName, SVNProperty.COPIED,
+                copied ? Boolean.TRUE.toString() : null);
     }
 
     public String getCopyFromURL() {
         return myEntries.getPropertyValue(myName, SVNProperty.COPYFROM_URL);
     }
 
-    public SVNURL getCopyFromSVNURL() throws SVNException {
+    public SVNURL getCopyFromSVNURL() {
         String url = getCopyFromURL();
         if (url != null) {
-            return SVNURL.parseURIEncoded(url);
+            try {
+                return SVNURL.parseURIEncoded(url);
+            } catch (SVNException e) {
+            }
         }
         return null;
     }
@@ -327,33 +339,15 @@ public class SVNEntry implements Comparable {
         return myEntries.getPropertyValue(myName, SVNProperty.UUID);
     }
 
-    public String getRepositoryRoot() {
-        return myEntries.getPropertyValue(myName, SVNProperty.REPOS);
-    }
-
-    public SVNURL getRepositoryRootURL() throws SVNException {
-        String url = getRepositoryRoot();
-        if (url != null) {
-            return SVNURL.parseURIEncoded(url);
-        }
-        return null;
-    }
-    
-    public boolean setRepositoryRoot(String url) {
-        return myEntries.setPropertyValue(myName, SVNProperty.REPOS, url);
-    }
-
-    public boolean setRepositoryRootURL(SVNURL url) {
-        return setRepositoryRoot(url == null ? null : url.toString());
-    }
-
     public void loadProperties(Map entryProps) {
         if (entryProps == null) {
             return;
         }
-        for (Iterator propNames = entryProps.keySet().iterator(); propNames.hasNext();) {
+        for (Iterator propNames = entryProps.keySet().iterator(); propNames
+                .hasNext();) {
             String propName = (String) propNames.next();
-            myEntries.setPropertyValue(myName, propName, (String) entryProps.get(propName));
+            myEntries.setPropertyValue(myName, propName, (String) entryProps
+                    .get(propName));
         }
     }
 

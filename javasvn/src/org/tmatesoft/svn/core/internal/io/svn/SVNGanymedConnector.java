@@ -32,7 +32,7 @@ import ch.ethz.ssh2.StreamGobbler;
  */
 public class SVNGanymedConnector implements ISVNConnector {
 
-    private static final String SVNSERVE_COMMAND = "svnserve -t";
+    private static final String SVNSERVE_COMMAND = "svnserve --tunnel";
 
     private Session mySession;
     private InputStream myInputStream;
@@ -58,8 +58,8 @@ public class SVNGanymedConnector implements ISVNConnector {
                     if (connection == null) {
                         SVNErrorManager.error("svn: Connection to '" + realm + "'failed");
                     }
-                    authManager.acknowledgeAuthentication(true, ISVNAuthenticationManager.SSH, realm, null, authentication);
-                    repository.setExternalUserName(authentication.getUserName());
+//                    authManager.acknowledgeAuthentication(true, ISVNAuthenticationManager.SSH, realm, null, authentication);
+                    repository.setExternalAuthentication(authentication);
                     break;
                 } catch (SVNAuthenticationException e) {
                     authManager.acknowledgeAuthentication(false, ISVNAuthenticationManager.SSH, realm, e.getMessage(), authentication);

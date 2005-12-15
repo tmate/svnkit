@@ -25,7 +25,6 @@ import org.tmatesoft.svn.core.auth.ISVNAuthenticationProvider;
 import org.tmatesoft.svn.core.auth.SVNAuthentication;
 import org.tmatesoft.svn.core.auth.SVNPasswordAuthentication;
 import org.tmatesoft.svn.core.auth.SVNSSHAuthentication;
-import org.tmatesoft.svn.core.auth.SVNSSLAuthentication;
 
 /**
  * @version 1.0
@@ -68,13 +67,7 @@ public class EclipseSVNAuthenticationManager extends DefaultSVNAuthenticationMan
             realm = realm == null ? DEFAULT_URL.toString() : realm;
             Map info = Platform.getAuthorizationInfo(DEFAULT_URL, realm, kind);
             // convert info to SVNAuthentication.
-            if (info != null && ISVNAuthenticationManager.SSL.equals(kind)) {
-                String path = (String) info.get("cert");
-                String password = (String) info.get("password");
-                if (path != null) {
-                    return new SVNSSLAuthentication(new File(path), password, authMayBeStored);
-                }
-            } else if (info != null && !info.isEmpty() && info.get("username") != null) {
+            if (info != null && !info.isEmpty() && info.get("username") != null) {
                 if (ISVNAuthenticationManager.PASSWORD.equals(kind)) {
                     return new SVNPasswordAuthentication((String) info.get("username"), (String) info.get("password"), authMayBeStored);
                 } else if (ISVNAuthenticationManager.SSH.equals(kind)) {
@@ -101,7 +94,7 @@ public class EclipseSVNAuthenticationManager extends DefaultSVNAuthenticationMan
         }
 
         public void saveAuthentication(SVNAuthentication auth, String kind, String realm) {
-            if (!(auth instanceof SVNSSLAuthentication) && (auth.getUserName() == null || "".equals(auth.getUserName()))) {
+            if (auth.getUserName() == null || "".equals(auth.getUserName())) {
                 return;
             }
             realm = realm == null ? DEFAULT_URL.toString() : realm;
@@ -122,16 +115,6 @@ public class EclipseSVNAuthenticationManager extends DefaultSVNAuthenticationMan
                 }
                 if (sshAuth.getPortNumber() >= 0) {
                     info.put("port", Integer.toString(sshAuth.getPortNumber()));
-                }
-            } else if (auth instanceof SVNSSLAuthentication) {
-                SVNSSLAuthentication sslAuth = (SVNSSLAuthentication) auth;
-                File path = sslAuth.getCertificateFile();
-                String password = sslAuth.getPassword();
-                if (path != null) {
-                    info.put("cert", path.getAbsolutePath());
-                    if (password != null && !"".equals(password)) {
-                        info.put("password", password);
-                    }
                 }
             }
             try {

@@ -843,23 +843,6 @@ public class SVNClientImpl implements SVNClientInterface {
         return null;
     }
 
-    public void streamFileContent(String path, Revision revision, Revision pegRevision, int bufferSize, OutputStream stream) throws ClientException {
-        SVNWCClient client = getSVNWCClient();
-        try {
-            if(isURL(path)){
-                client.doGetFileContents(SVNURL.parseURIEncoded(path),
-                        JavaHLObjectFactory.getSVNRevision(pegRevision),
-                        JavaHLObjectFactory.getSVNRevision(revision), true, stream);
-            }else{
-                client.doGetFileContents(new File(path).getAbsoluteFile(),
-                        JavaHLObjectFactory.getSVNRevision(pegRevision),
-                        JavaHLObjectFactory.getSVNRevision(revision), true, stream);
-            }
-        } catch (SVNException e) {
-            throwException(e);
-        }
-    }
-
     public void relocate(String from, String to, String path, boolean recurse) throws ClientException {
         SVNUpdateClient client = getSVNUpdateClient();
         try {
@@ -1165,15 +1148,5 @@ public class SVNClientImpl implements SVNClientInterface {
                         || pathOrUrl.startsWith("https://")
                         || pathOrUrl.startsWith("svn://") 
                         || pathOrUrl.startsWith("svn+ssh://"));
-    }
-
-    public String getAdminDirectoryName() {
-        return SVNFileUtil.getAdminDirectoryName();
-    }
-
-    public boolean isAdminDirectory(String name) {
-        return name != null && (SVNFileUtil.isWindows) ?
-                name.equalsIgnoreCase(SVNFileUtil.getAdminDirectoryName()) :
-                name.equals(SVNFileUtil.getAdminDirectoryName());
     }
 }

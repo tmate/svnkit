@@ -12,18 +12,12 @@
 
 package org.tmatesoft.svn.cli;
 
-import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
 import java.io.PrintStream;
-import java.util.Arrays;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Set;
 import java.util.StringTokenizer;
 
 import org.tmatesoft.svn.core.SVNException;
@@ -44,8 +38,6 @@ public abstract class SVNCommand {
     private String myPassword;
 
     private static Map ourCommands;
-    private static Set ourPegCommands;
-    
     private boolean myIsStoreCreds;
     private SVNClientManager myClientManager;
 
@@ -77,41 +69,6 @@ public abstract class SVNCommand {
         return myClientManager;
     }
 
-    protected String getCommitMessage() throws SVNException {
-        String fileName = (String) getCommandLine().getArgumentValue(SVNArgument.FILE);
-        if (fileName != null) {
-            FileInputStream is = null;
-            ByteArrayOutputStream bos = new ByteArrayOutputStream();
-            try {
-                is = new FileInputStream(fileName);
-                while (true) {
-                    int r = is.read();
-                    if (r < 0) {
-                        break;
-                    }
-                    if (r == 0) {
-                        // invalid
-                        throw new SVNException("error: commit message contains a zero byte");
-                    }
-                    bos.write(r);
-                }
-            } catch (IOException e) {
-                throw new SVNException(e);
-            } finally {
-                try {
-                    if (is != null) {
-                        is.close();
-                    }
-                    bos.close();
-                } catch (IOException e) {
-                    throw new SVNException(e);
-                }
-            }
-            return new String(bos.toByteArray());
-        }
-        return (String) getCommandLine().getArgumentValue(SVNArgument.MESSAGE);
-    }
-
     public static SVNCommand getCommand(String name) {
         if (name == null) {
             return null;
@@ -141,26 +98,6 @@ public abstract class SVNCommand {
             //
         }
         return null;
-    }
-
-    public static boolean hasPegRevision(String commandName) {
-        if (commandName == null) {
-            return false;
-        }
-        String fullName = null;
-        for (Iterator keys = ourCommands.keySet().iterator(); keys.hasNext();) {
-            String[] names = (String[]) keys.next();
-            for (int i = 0; i < names.length; i++) {
-                if (commandName.equalsIgnoreCase(names[i])) {
-                    fullName = names[0];
-                    break;
-                }
-            }
-            if (fullName != null) {
-                break;
-            }
-        }
-        return fullName != null && ourPegCommands.contains(fullName);
     }
 
     protected static SVNRevision parseRevision(SVNCommandLine commandLine) {
@@ -234,19 +171,14 @@ public abstract class SVNCommand {
         ourCommands.put(new String[] { "merge" }, "org.tmatesoft.svn.cli.command.MergeCommand");
         ourCommands.put(new String[] { "export" }, "org.tmatesoft.svn.cli.command.ExportCommand");
         ourCommands.put(new String[] { "cleanup" }, "org.tmatesoft.svn.cli.command.CleanupCommand");
+
         ourCommands.put(new String[] { "lock" }, "org.tmatesoft.svn.cli.command.LockCommand");
         ourCommands.put(new String[] { "unlock" }, "org.tmatesoft.svn.cli.command.UnlockCommand");
+
         ourCommands.put(new String[] { "annotate", "blame", "praise", "ann" }, "org.tmatesoft.svn.cli.command.AnnotateCommand");
-        
-        ourPegCommands = new HashSet();
-        ourPegCommands.addAll(Arrays.asList(
-                new String[] {"cat", "annotate", "checkout", "diff", "export", "info", "ls", "merge", "propget", "proplist"}));
     }
 
     protected static int getLinesCount(String str) {
-        if ("".equals(str)) {
-            return 1;
-        }
         int count = 0;
         for(StringTokenizer lines = new StringTokenizer(str, "\n"); lines.hasMoreTokens();) {
             lines.nextToken();

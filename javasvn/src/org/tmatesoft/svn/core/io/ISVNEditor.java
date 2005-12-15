@@ -91,9 +91,8 @@ public interface ISVNEditor {
     public void deleteEntry(String path, long revision) throws SVNException;
     
     /**
-     * Indicates that a path is present as a subdirectory in the edit source, 
-     * but can not be conveyed to the edit consumer (perhaps because of 
-     * authorization restrictions). 
+     * Says that a directory item is missing. Although it may be still
+     * under version control, but it's currently absent. 
      * 
      * @param  path			 a dir path relative to the root       
      *                       directory opened by {@link #openRoot(long) openRoot()}
@@ -102,9 +101,8 @@ public interface ISVNEditor {
     public void absentDir(String path) throws SVNException;
     
     /**
-     * Indicates that a path is present as a file in the edit source, 
-     * but can not be conveyed to the edit consumer (perhaps because of 
-     * authorization restrictions). 
+     * Says that a file item is missing. Although it may be still
+     * under version control, but it's currently absent. 
      * 
      * @param  path				a file path relative to the root       
      *                          directory opened by {@link #openRoot(long) openRoot()}

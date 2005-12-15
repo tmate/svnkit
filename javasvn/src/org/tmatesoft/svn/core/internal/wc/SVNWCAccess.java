@@ -235,7 +235,9 @@ public class SVNWCAccess implements ISVNEventHandler {
                 myDirectories.put(myName, myTarget);
             }
             if (recursive) {
-                if (myTarget == myAnchor && (myName != null && !"".equals(myName))) {
+                // target may be the same as anchor in case "name" does not exist.
+                // in that case anchor should be locked, but not recursively.
+                if (myName != null && !"".equals(myName) && myTarget == myAnchor) {
                     return;
                 }
                 visitDirectories(myTarget == myAnchor ? "" : myName, myTarget,
@@ -430,7 +432,8 @@ public class SVNWCAccess implements ISVNEventHandler {
         return addDirectory(path, file, false, false);
     }
 
-    public SVNDirectory addDirectory(String path, File file, boolean recursive, boolean lock) throws SVNException {
+    public SVNDirectory addDirectory(String path, File file, boolean recursive,
+            boolean lock) throws SVNException {
         if (file == null || !file.isDirectory()) {
             return null;
         }
@@ -441,7 +444,7 @@ public class SVNWCAccess implements ISVNEventHandler {
             }
             if (recursive) {
                 File[] dirs = file.listFiles();
-                for (int i = 0; i < dirs.length; i++) {
+                for (int i = 0; dirs != null && i < dirs.length; i++) {
                     File childDir = dirs[i];
                     if (SVNFileUtil.getAdminDirectoryName().equals(childDir)) {
                         continue;
