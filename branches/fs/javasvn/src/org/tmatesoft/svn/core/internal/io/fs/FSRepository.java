@@ -641,13 +641,14 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
     }
 
     /*TODO need implement function send_change_rev;*/
+    /*TODO check the correctness of existing code*/
     public long log(String[] targetPaths, long startRevision, long endRevision, boolean changedPath, boolean strictNode, long limit, ISVNLogEntryHandler handler) throws SVNException {
     	try{
     		openRepository();
         	ArrayList absPaths = new ArrayList(0);
         	if(targetPaths != null){
         		for(int count = 0; count < targetPaths.length; count++){
-        			absPaths.add(SVNPathUtil.append("", targetPaths[count]));
+        			absPaths.add(SVNPathUtil.concatToAbs("", targetPaths[count]));
         		}
         	}
         	long headRevision = getYoungestRev(myReposRootDir);
@@ -673,26 +674,84 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
         	}        	
        	    
         	/* If paths were specified, then we only really care about revisions
-            in which those paths were changed.  So we ask the filesystem for
-            all the revisions in which any of the paths was changed.
-
-            SPECIAL CASE: If we were given only path, and that path is empty,
-            then the results are the same as if we were passed no paths at
-            all.  Why?  Because the answer to the question "In which
-            revisions was the root of the filesystem changed?" is always
-            "Every single one of them."  And since this section of code is
-            only about answering that question, and we already know the
-            answer ... well, you get the picture.*/
-        	int sendCount;
-        	if(absPaths == null || (absPaths.size() == 1 && absPaths.get(0) == null)){
-        		sendCount = (int)(histEnd - histStart + 1);
+            *  in which those paths were changed.  So we ask the filesystem for
+            *  all the revisions in which any of the paths was changed.
+            *  
+            *  SPECIAL CASE: If we were given only path, and that path is empty,
+            *  then the results are the same as if we were passed no paths at
+            *  all.  Why?  Because the answer to the question "In which
+            *  revisions was the root of the filesystem changed?" is always
+            *  "Every single one of them."  And since this section of code is
+            *  only about answering that question, and we already know the
+            *  answer ... well, you get the picture.*/
+        	long sendCount = 0;
+        	if(absPaths == null || (absPaths.size() == 1 && "".equals(absPaths.get(0)))){
+        		sendCount = histEnd - histStart + 1;
         		if(limit != 0 && sendCount > limit){
-        			sendCount = (int)limit;
+        			sendCount = limit;
         		}
         		for(int count = 0; count < sendCount; count++){
         			long rev = histStart + count;
         			if(startRevision > endRevision){
         				rev = histEnd + count;
+        			}
+        			/*TODO implement send_change_rev*/
+        		}
+        	}
+        	ArrayList histories = new ArrayList(0);
+        	for(int count = 0; count < absPaths.size(); count++){
+        		String thisPath = (String)absPaths.get(count);
+        		FSRevisionNode root = myRevNodesPool.getRootRevisionNode(histEnd, myReposRootDir);        		
+        		LogPathInfo info = new LogPathInfo(root, thisPath, FSNodeHistory.getNodeHistory(myReposRootDir, root, thisPath), FSConstants.SVN_INVALID_REVNUM);
+        		info.pickUpNextHistory(myReposRootDir, strictNode, histStart);
+        		histories.add(info);
+        	}
+        	/*TODO check correctness of following code*/
+        	/*!!!!svn implementation is not good desision*/
+        	boolean anyHistLeft = true;
+        	ArrayList revsArr = null;
+        	for(long current = histEnd; current >= histStart && anyHistLeft; ){        		
+        		long tempRev = FSConstants.SVN_INVALID_REVNUM;
+        		boolean changed = false;
+        		anyHistLeft = false;
+        		for(int count = 0; count < histories.size(); count++){        			
+        			LogPathInfo info = ((LogPathInfo)histories.get(count));
+        			if(info.getHistory() == null){
+        				continue;
+        			}
+        			if(info.getHistoryRevision() > tempRev){
+        				tempRev = info.getHistoryRevision();        				
+        			}        			
+        		}        		
+        		current = tempRev;
+        		for(int count = 0; count < histories.size(); count++){
+        			LogPathInfo info = ((LogPathInfo)histories.get(count));
+        	        /* Check history for this path in current rev. */
+        			changed = info.checkHistory(myReposRootDir, current, strictNode, histStart);
+        			if(info.getHistory() == null){
+        				anyHistLeft = true;
+        			}
+        		}
+        		if(changed == true){
+        			if(startRevision > endRevision){
+        				/*TODO here need to be a send_change_rev*/
+        				if(limit != 0 && ++sendCount >= limit){
+        					break;
+        				}
+        			}else
+        			{
+        				if(revsArr == null){
+        					revsArr = new ArrayList(0);
+        				}	
+        				revsArr.add(new Long(current));
+        			}
+        		}
+        	}
+        	if(revsArr != null){
+        		for(int count = 0; count < revsArr.size(); count++){
+        			/*TODO send_change_rev need to be implemented*/
+        			if(limit != 0 && count + 1 >= limit){
+        				break;
         			}
         		}
         	}
@@ -700,11 +759,87 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
     		SVNErrorManager.error(null);
     	}finally{
     		closeRepository();
-    	}
-
+    	}    	   	
         return 0;
-
     }
+    
+    /*TODO continue implement sendChangeRev function*/
+    private void sendChangeRev(long revNum, boolean discoverChangedPath, ISVNLogEntryHandler handler)throws SVNException{    	
+    	Map rProps = FSRepositoryUtil.getRevisionProperties(myReposRootDir, revNum);
+    	String author = (String)rProps.get(SVNRevisionProperty.AUTHOR);
+    	String data = (String)rProps.get(SVNRevisionProperty.DATE);
+    	String message = (String)rProps.get(SVNRevisionProperty.LOG);
+    	
+    }
+    
+    private class LogPathInfo{
+    	private FSRevisionNode root;
+    	private String path;
+    	private FSNodeHistory hist;
+    	private long historyRev;
+    	
+    	private LogPathInfo(FSRevisionNode newRoot, String newPath, FSNodeHistory newHist, long newHistoryRev){
+    		root = newRoot;
+    		path = newPath;
+    		hist = newHist;
+    		historyRev = newHistoryRev;
+    	}
+    	private void setRoot(FSRevisionNode newRoot){
+    		root = newRoot;
+    	}
+    	private void setPath(String newPath){
+    		path = newPath;    		
+    	}
+    	private void setHistory(FSNodeHistory newHist){
+    		hist = newHist;
+    	}
+    	private void setRevision(long newRev){
+    		historyRev = newRev;
+    	}
+    	private FSNodeHistory getHistory(){
+    		return hist;
+    	}
+    	private long getHistoryRevision(){
+    		return historyRev;
+    	}
+    	/*Set hist field of the class to next history for the path
+    	 * If no more history is available or the history revision is less
+    	 * than (earlier) than START, or the history is not available due
+    	 * to authorization, then HIST is set to NULL.
+    	 *
+    	 * A STRICT value of FALSE will indicate to follow history across copied
+    	 * paths.
+    	 */
+    	private void pickUpNextHistory(File reposRootDir, boolean strict, long start)throws SVNException{
+    		FSNodeHistory tempHist = hist.fsHistoryPrev(reposRootDir, strict ? true : false, myRevNodesPool);
+    		if(tempHist == null){
+    			hist = null;
+    			return;
+    		}else{
+    			hist = tempHist;
+    		}
+    		path = hist.getHistoryEntry().getPath();
+    		historyRev = hist.getHistoryEntry().getRevision();
+    		if(historyRev < start){
+    			hist = null;
+    			return;
+    		}
+    		return;
+    	}
+    	/* Set HIST to the next history for the path *if* there is history
+    	 * available and HISTORY_REV is equal to or greater than CURRENT.
+    	 */
+    	private boolean checkHistory(File reposRootDir, long currRev, boolean strict, long start)throws SVNException{
+    		if(hist == null){
+    			return false;
+    		}
+    		if(historyRev < currRev){
+    			return false;
+    		}
+    		this.pickUpNextHistory(reposRootDir, strict, start);
+    		return true;
+    	}
+    }    
 
     public int getLocations(String pathCame, long pegRevision, long[] revisions, ISVNLocationEntryHandler handler) throws SVNException {
     	try{
