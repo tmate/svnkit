@@ -91,8 +91,6 @@ public class SVNURL {
         if (!DEFAULT_PORTS.containsKey(myProtocol)) {
             SVNErrorManager.error("svn: invalid URL '" + url + "': protocol '" + myProtocol + "' is not supported");
         }
-
-
         if("file".equals(myProtocol)){
             URL testURL = null;
             //file protocol specifics - may be make this common?
@@ -101,30 +99,39 @@ public class SVNURL {
             } catch (MalformedURLException e) {
                 SVNErrorManager.error("svn: invalid URL '" + url + "': " + e.getMessage());
             }
-            if(testURL.getPath()==null || "".equals(testURL.getPath())){
+            if(testURL.getPath() == null || "".equals(testURL.getPath())){
                 //no path, only host - follow subversion behaviour
                 SVNErrorManager.error("svn: Local URL '" + url + "' contains only a hostname, no path");
             }
-
             myHost = "";
             if (uriEncoded) {
                 // autoencode it.
                 myEncodedPath = SVNEncodingUtil.autoURIEncode(testURL.getPath());
                 SVNEncodingUtil.assertURISafe(myEncodedPath);
+                myPath = SVNEncodingUtil.uriDecode(myEncodedPath);
                 try{
-                    myPath = new File(SVNEncodingUtil.uriDecode(myEncodedPath)).getCanonicalPath();
+                    myPath = new File(myPath).getCanonicalPath();
                 }catch(IOException ioe){
-                    myPath = new File(SVNEncodingUtil.uriDecode(myEncodedPath)).getAbsolutePath();
+                    SVNErrorManager.error("Can not convert path '" + myPath + "' to a canonical form");
+                    //myPath = new File(SVNEncodingUtil.uriDecode(myEncodedPath)).getAbsolutePath();
                 }
+                if(!myPath.startsWith("/")){
+                    myPath = "/" + myPath;
+                }
+                myPath = myPath.replace(File.separatorChar, '/');
             } else {
                 try{
                     myPath = new File(testURL.getPath()).getCanonicalPath();
                 }catch(IOException ioe){
-                    myPath = new File(testURL.getPath()).getAbsolutePath();
+                    SVNErrorManager.error("Can not convert path '" + myPath + "' to a canonical form");
+                    //myPath = new File(testURL.getPath()).getAbsolutePath();
                 }
+                if(!myPath.startsWith("/")){
+                    myPath = "/" + myPath;
+                }
+                myPath = myPath.replace(File.separatorChar, '/');
                 myEncodedPath = SVNEncodingUtil.uriEncode(myPath);
             }
-            myPath = myPath.replace(File.separatorChar, '/');
             myUserName = testURL.getUserInfo();
             myPort = testURL.getPort();
             

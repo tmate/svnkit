@@ -20,6 +20,7 @@ import java.util.Map;
 import java.util.Iterator;
 
 import org.tmatesoft.svn.core.SVNException;
+import org.tmatesoft.svn.core.SVNNodeKind;
 import org.tmatesoft.svn.core.SVNProperty;
 import org.tmatesoft.svn.core.SVNRevisionProperty;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
@@ -34,6 +35,12 @@ import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
  * @author  TMate Software Ltd.
  */
 public class FSRepositoryUtil {
+    public static String getFileChecksum(FSRevisionNode revNode) throws SVNException {
+        if(revNode.getType() != SVNNodeKind.FILE){
+            SVNErrorManager.error("svn: Attempted to get checksum of a *non*-file node");
+        }
+        return revNode.getTextRepresentation() != null ? revNode.getTextRepresentation().getHexDigest() : "";
+    }
     
     public static Map unparseDirEntries(Map entries){
         Map unparsedEntries = new HashMap();
