@@ -847,9 +847,6 @@ public class FSReader {
         long rev = -1;
         try {
             rev = Long.parseLong(offsets[0]);
-            if (rev < 0) {
-                throw new NumberFormatException();
-            }
         } catch (NumberFormatException nfe) {
             throw new SVNException();
         }

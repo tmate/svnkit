@@ -88,7 +88,7 @@ public abstract class FSRevisionNodePool {
          - PARENT_PATH includes HERE and all its parents.  */
         while(true){
             String entry = SVNPathUtil.head(rest);
-            String next = SVNPathUtil.removeHead(rest);//strArray[1];
+            String next = SVNPathUtil.removeHead(rest);
             pathSoFar = SVNPathUtil.concatToAbs(pathSoFar, entry);
             FSRevisionNode child = null;
             if(entry == null || "".equals(entry)){

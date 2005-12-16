@@ -55,16 +55,16 @@ public class FSID {
         myOffset = offset;
     }
 
-    public void setNodeID(String nodeID){
-        myNodeID = nodeID;
+    public void setNodeID(String nodeId){
+        myNodeID = (nodeId == null) ? ID_INAPPLICABLE :  nodeId;
     }
 
-    public void setCopyID(String copyID){
-        myCopyID = copyID;
+    public void setCopyID(String copyId){
+        myCopyID = (copyId == null) ? ID_INAPPLICABLE : copyId;
     }
 
-    public void setTxnID(String txnID){
-        myTxnID = txnID;
+    public void setTxnID(String txnId){
+        myTxnID = (txnId == null) ? ID_INAPPLICABLE :  txnId;
     }
     
     public void setRevision(long rev){

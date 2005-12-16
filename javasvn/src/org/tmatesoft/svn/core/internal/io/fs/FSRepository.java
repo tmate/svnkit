@@ -206,7 +206,8 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
         try {
             rootDir = myReposRootDir.getCanonicalPath();
         } catch (IOException ioe) {
-            rootDir = myReposRootDir.getAbsolutePath();
+            SVNErrorManager.error("Can not convert path '" + myReposRootDir.getAbsolutePath() + "' to a canonical form");
+            //rootDir = myReposRootDir.getAbsolutePath();
         }
         rootDir = rootDir.replace(File.separatorChar, '/');
         if (!rootDir.startsWith("/")) {
@@ -1104,7 +1105,7 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
     public void linkPath(SVNURL url, String path, String lockToken, long revision, boolean startEmpty) throws SVNException {
         assertValidRevision(revision);
         SVNURL reposRootURL = getRepositoryRoot();
-        if(url.toString().indexOf(reposRootURL.toString()) == -1){
+        if(url.getPath().indexOf(reposRootURL.getPath()) == -1){
             SVNErrorManager.error("'" + url + "'" + SVNFileUtil.getNativeEOLMarker() + "is not the same repository as" + SVNFileUtil.getNativeEOLMarker() + "'" + reposRootURL + "'");
         }
         String reposLinkPath = url.toString().substring(reposRootURL.toString().length());
@@ -1320,7 +1321,7 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
                 return;
             }
             FSRevisionNode sourceNode = myRevNodesPool.getRevisionNode(sourceRoot, sourcePath, myReposRootDir);
-            sourceHexDigest = getFileChecksum(sourceNode);
+            sourceHexDigest = FSRepositoryUtil.getFileChecksum(sourceNode);
         }
         /* Sends the delta stream if desired, or just calls 
          * the editor's textDeltaEnd() if not. 
@@ -1375,7 +1376,7 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
         /* Same sizes? Well, if their checksums differ, we know 
          * they differ. 
          */
-        if(!getFileChecksum(revNode1).equals(getFileChecksum(revNode2))){
+        if(!FSRepositoryUtil.getFileChecksum(revNode1).equals(FSRepositoryUtil.getFileChecksum(revNode2))){
             return true;
         }
         /* Same sizes, same checksums. Chances are really good that 
@@ -1422,12 +1423,6 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
         return revNode.getTextRepresentation() != null ? revNode.getTextRepresentation().getExpandedSize() : 0;
     }
 
-    private String getFileChecksum(FSRevisionNode revNode) throws SVNException {
-        if(revNode.getType() != SVNNodeKind.FILE){
-            SVNErrorManager.error("svn: Attempted to get checksum of a *non*-file node");
-        }
-        return revNode.getTextRepresentation() != null ? revNode.getTextRepresentation().getHexDigest() : "";
-    }
     
     /*
      * Returns true if nodes' representations are different.
@@ -1542,7 +1537,7 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
             }
             diffFiles(sourceRevision, sourcePath, targetPath, editPath, pathInfo != null ? pathInfo.getLockToken() : null);
             FSRevisionNode targetNode = myRevNodesPool.getRevisionNode(myReporterContext.getTargetRoot(), targetPath, myReposRootDir);
-            String targetHexDigest = getFileChecksum(targetNode);
+            String targetHexDigest = FSRepositoryUtil.getFileChecksum(targetNode);
             myReporterContext.getEditor().closeFile(editPath, targetHexDigest);
         }
     }
