@@ -37,6 +37,7 @@ import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNLock;
 import org.tmatesoft.svn.core.SVNNodeKind;
 import org.tmatesoft.svn.core.SVNURL;
+import org.tmatesoft.svn.core.SVNLogEntry;
 import org.tmatesoft.svn.core.io.SVNFileRevision;
 import org.tmatesoft.svn.core.io.ISVNEditor;
 import org.tmatesoft.svn.core.io.ISVNReporter;
@@ -641,9 +642,8 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
 
     }
 
-    /*TODO need implement function send_change_rev;*/
     /*TODO check the correctness of existing code*/
-    public long log(String[] targetPaths, long startRevision, long endRevision, boolean changedPath, boolean strictNode, long limit, ISVNLogEntryHandler handler) throws SVNException {
+    public long log(String[] targetPaths, long startRevision, long endRevision, boolean discoverChangedPath, boolean strictNode, long limit, ISVNLogEntryHandler handler) throws SVNException {
     	try{
     		openRepository();
         	ArrayList absPaths = new ArrayList(0);
@@ -695,8 +695,8 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
         			long rev = histStart + count;
         			if(startRevision > endRevision){
         				rev = histEnd + count;
-        			}
-        			/*TODO implement send_change_rev*/
+        			}        			
+        			sendChangeRev(rev, discoverChangedPath, handler);
         		}
         	}
         	ArrayList histories = new ArrayList(0);
@@ -734,8 +734,8 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
         			}
         		}
         		if(changed == true){
-        			if(startRevision > endRevision){
-        				/*TODO here need to be a send_change_rev*/
+        			if(startRevision > endRevision){        				
+        				sendChangeRev(current, discoverChangedPath, handler);
         				if(limit != 0 && ++sendCount >= limit){
         					break;
         				}
@@ -749,8 +749,8 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
         		}
         	}
         	if(revsArr != null){
-        		for(int count = 0; count < revsArr.size(); count++){
-        			/*TODO send_change_rev need to be implemented*/
+        		for(int count = 0; count < revsArr.size(); count++){        			
+        			sendChangeRev(((Long)revsArr.get(revsArr.size() - count - 1)).longValue(), discoverChangedPath, handler);
         			if(limit != 0 && count + 1 >= limit){
         				break;
         			}
@@ -762,16 +762,40 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
     		closeRepository();
     	}    	   	
         return 0;
-    }
-    
-    /*TODO continue implement sendChangeRev function*/
+    }    
     private void sendChangeRev(long revNum, boolean discoverChangedPath, ISVNLogEntryHandler handler)throws SVNException{    	
     	Map rProps = FSRepositoryUtil.getRevisionProperties(myReposRootDir, revNum);
+    	Map changedPaths = null;
     	String author = (String)rProps.get(SVNRevisionProperty.AUTHOR);
-    	String data = (String)rProps.get(SVNRevisionProperty.DATE);
+    	Date date = (Date)rProps.get(SVNRevisionProperty.DATE);
     	String message = (String)rProps.get(SVNRevisionProperty.LOG);
     	
+   	   /* Discover changed paths if the user requested them
+        * or if we need to check that they are readable
+        */
+    	if(revNum > 0 && discoverChangedPath == true){
+    		FSRevisionNode newRoot = FSReader.getRootRevNode(myReposRootDir, revNum);
+    		changedPaths = detectChanged(newRoot);
+    	}
+    	handler.handleLogEntry(new SVNLogEntry(changedPaths, revNum, author, date, message));
     }
+    /*TODO implement detectChanged() function*/
+    private Map detectChanged(FSRevisionNode root){
+    	return  null;
+    }
+    /* Return MAP with hash containing
+     * descriptions of the paths changed under ROOT. The hash is keyed
+     * with const char * paths an dhas svn_fs_path_change_t * values
+     */
+    private Map getFSpathChanged(FSRoot root, Map copyFromCache){   
+    	if(root.isTxnRoot() == true){
+    		/*TODO implement svn_fs_fs__txn_changes_fetch function, which will be completely here*/
+    	}else{
+    		/*TODO implementing svn_fs_fs__paths_changed, here will be body of the function*/
+    	}
+    	return null;
+    }
+    
     
     private class LogPathInfo{
     	private FSRevisionNode root;

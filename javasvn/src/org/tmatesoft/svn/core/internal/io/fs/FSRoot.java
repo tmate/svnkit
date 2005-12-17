@@ -11,6 +11,9 @@
  */
 package org.tmatesoft.svn.core.internal.io.fs;
 
+import java.util.Map;
+import java.util.HashMap;
+
 
 /**
  * @version 1.0
@@ -28,13 +31,19 @@ public class FSRoot {
     /* For revision roots, the node-rev representation of the root */
     private FSRevisionNode myRootRevNode;
     
+    /* Cache structure for mapping String PATH to String COPYFROM_STRING, 
+     * so that pathsChanged can remember all the copyfrom information in the changes file.
+     * COPYFROM_STRING has the format "REV PATH", or is the empty string if
+     * the path was added without history*/
+    private Map myCopyfromCache;
+    
     public FSRoot(long revision, FSRevisionNode root) {
         myRevision = revision;
         myRootRevNode = root;
         myIsTxnRoot = false;
         myTxnId = null;
         myTxnFlags = 0;
-
+        myCopyfromCache = new HashMap();
     }
 
     public FSRoot(String id, int flags) {
@@ -43,6 +52,7 @@ public class FSRoot {
         myIsTxnRoot = true;
         myRevision = FSConstants.SVN_INVALID_REVNUM;
         myRootRevNode = null;
+        myCopyfromCache = new HashMap();
     }
 
     public boolean isTxnRoot() {
@@ -79,5 +89,13 @@ public class FSRoot {
 
     public void setTxnId(String txnId) {
         myTxnId = txnId;
+    }
+    
+    public Map getCopyfromCache(){
+    	return myCopyfromCache;
+    }
+    
+    public void setCopyfromCache(Map newCopyfromCache){
+    	myCopyfromCache = newCopyfromCache;
     }
 }
