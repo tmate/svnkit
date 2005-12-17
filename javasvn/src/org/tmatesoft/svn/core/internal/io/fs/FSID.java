@@ -55,6 +55,14 @@ public class FSID {
         myOffset = offset;
     }
 
+    public FSID(FSID id){
+        myNodeID = (id.getNodeID() == null) ? ID_INAPPLICABLE :  id.getNodeID();
+        myCopyID = (id.getCopyID() == null) ? ID_INAPPLICABLE : id.getCopyID();
+        myTxnID = (id.getTxnID() == null) ? ID_INAPPLICABLE :  id.getTxnID(); 
+        myRevision = id.getRevision();
+        myOffset = id.getOffset();
+    }
+
     public void setNodeID(String nodeId){
         myNodeID = (nodeId == null) ? ID_INAPPLICABLE :  nodeId;
     }

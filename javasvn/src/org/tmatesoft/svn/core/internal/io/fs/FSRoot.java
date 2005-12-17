@@ -14,6 +14,8 @@ package org.tmatesoft.svn.core.internal.io.fs;
 import java.util.Map;
 import java.util.HashMap;
 
+import org.tmatesoft.svn.core.SVNException;
+import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 
 /**
  * @version 1.0
@@ -36,6 +38,9 @@ public class FSRoot {
      * COPYFROM_STRING has the format "REV PATH", or is the empty string if
      * the path was added without history*/
     private Map myCopyfromCache;
+    
+    //only for transactions 
+    private Map myRevNodesCache;
     
     public FSRoot(long revision, FSRevisionNode root) {
         myRevision = revision;
@@ -97,5 +102,38 @@ public class FSRoot {
     
     public void setCopyfromCache(Map newCopyfromCache){
     	myCopyfromCache = newCopyfromCache;
+    }
+    
+    public void putRevNodeToCache(String path, FSRevisionNode node) throws SVNException {
+        if(myRevNodesCache == null){
+            myRevNodesCache = new HashMap();
+        }
+        /* Assert valid input. */
+        if(!path.startsWith("/")){
+            SVNErrorManager.error("Invalid path '" + path + "'");
+        }
+        myRevNodesCache.put(path, node);
+    }
+
+    public void removeRevNodeFromCache(String path) throws SVNException {
+        if(myRevNodesCache == null){
+            return;
+        }
+        /* Assert valid input. */
+        if(!path.startsWith("/")){
+            SVNErrorManager.error("Invalid path '" + path + "'");
+        }
+        myRevNodesCache.remove(path);
+    }
+    
+    public FSRevisionNode fetchRevNodeFromCache(String path) throws SVNException {
+        if(myRevNodesCache == null){
+            return null;
+        }
+        /* Assert valid input. */
+        if(!path.startsWith("/")){
+            SVNErrorManager.error("Invalid path '" + path + "'");
+        }
+        return (FSRevisionNode)myRevNodesCache.get(path);
     }
 }

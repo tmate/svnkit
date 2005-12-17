@@ -31,6 +31,14 @@ public class FSRepresentation {
         myExpandedSize = expandedSize;
         myHexDigest = hexDigest;
     }
+   
+    public FSRepresentation(FSRepresentation representation){
+        myRevision = representation.getRevision();
+        myOffset = representation.getOffset();
+        mySize = representation.getSize();
+        myExpandedSize = representation.getExpandedSize();
+        myHexDigest = representation.getHexDigest();
+    }
 
     public FSRepresentation(){
         myRevision = FSConstants.SVN_INVALID_REVNUM;

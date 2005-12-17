@@ -31,8 +31,18 @@ Remarks to the file:/// protocol implementation (FSRepository):
    **SOLVED**
 
 5) It looks strange how delete_lock() works - why does it rewrite those
-   files that haven't change? Why don't the svn devs make a break after 
+   files that haven't been changed? Why don't the svn devs make a break after 
    all interesting changes have been done? Whether there's a thing that I'm 
    not able to understand at now and there's a thing that prevents the devs 
    from breaking, or there's something they don't still know about:)
    
+6) I've got big doubts on how the rev nodes pool is realized now. Should think
+   of how to make it simplier and easier to use. The point is that now immutable
+   rev-nodes are stored in the pool (at the first time each of them is 
+   requested), but txn mutable rev-nodes are cached inside the FSRoot 
+   representation for the txn root, - that is because we must not mix them 
+   with immutable ones as it would cause plenty of problems and great confuse.
+   SVN devs cache all rev-nodes in separate root representations, while we
+   are doing that only for txns. Maybe I should leave it as it is and maybe 
+   it's not an issue at all, since it's pretty handy to have a single pool for
+   reading operations. Hmm.. We'll see what we shall see.

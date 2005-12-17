@@ -175,7 +175,7 @@ public class FSCommitEditor implements ISVNEditor {
             /* Now use the copyFromPath as an absolute path within the
              * repository to make the copy from. 
              */      
-            FSRoot copyRoot = new FSRoot(copyFromRevision, FSReader.getRootRevNode(myReposRootDir, copyFromRevision));
+            FSRoot copyRoot = new FSRoot(copyFromRevision, myRevNodesPool.getRootRevisionNode(copyFromRevision, myReposRootDir));
             makeCopy(copyRoot, copyFromPath, myTxnRoot, fullPath, true);
             isCopied = true;
         }else{
@@ -227,8 +227,13 @@ public class FSCommitEditor implements ISVNEditor {
             makePathMutable(toRoot, toParentPath.getParent(), toPath);
             /* Canonicalize the copyfrom path. */
             String fromCanonPath = SVNPathUtil.canonicalizeAbsPath(fromPath);
+            copy(toParentPath.getParent().getRevNode(), toParentPath.getNameEntry(), fromNode, preserveHistory, fromRoot.getRevision(), fromCanonPath, txnId);
+            if(changeKind == FSPathChangeKind.FS_PATH_CHANGE_REPLACE){
+                toRoot.removeRevNodeFromCache(toParentPath.getAbsPath());
+            }
+            /* Make a record of this modification in the changes table. */
+            FSRevisionNode newNode = myRevNodesPool.getRevisionNode(toRoot, toPath, myReposRootDir);
             
-
         }else{
             /* Copying from transaction roots not currently available.
                Note that when copying from mutable trees, you have to make sure that
@@ -241,7 +246,36 @@ public class FSCommitEditor implements ISVNEditor {
             SVNErrorManager.error("Copy from mutable tree not currently supported");
         }
     }
-
+    
+    private void copy(FSRevisionNode toNode, String entryName, FSRevisionNode fromNode, boolean preserveHistory, long fromRevision, String fromPath, String txnId) throws SVNException {
+        FSID id = null;
+        if(preserveHistory){
+            FSID srcId = fromNode.getId();
+            /* Make a copy of the original node revision. */
+            FSRevisionNode toRevNode = FSRevisionNode.dumpRevisionNode(fromNode);
+            /* Reserve a copy ID for this new copy. */
+            String copyId = reserveCopyId(txnId);
+            /* Create a successor with its predecessor pointing at the copy
+             * source. 
+             */
+            toRevNode.setPredecessorId(new FSID(srcId));
+            if(toRevNode.getCount() != -1){
+                toRevNode.setCount(toRevNode.getCount() + 1);
+            }
+            toRevNode.setCreatedPath(SVNPathUtil.concatToAbs(toNode.getCreatedPath(), entryName));
+            toRevNode.setCopyFromPath(fromPath);
+            toRevNode.setCopyFromRevision(fromRevision);
+            /* Set the copyroot equal to our own id. */
+            toRevNode.setCopyRootPath(null);
+            id = FSWriter.createSuccessor(srcId, toRevNode, copyId, txnId, myReposRootDir);
+        }else{
+            /* don't preserve history */
+            id = fromNode.getId();
+        }
+        /* Set the entry in toNode to the new id. */
+        FSWriter.setEntry(toNode, entryName, id, fromNode.getType(), txnId, myReposRootDir);
+    }
+    
     public void changeDirProperty(String name, String value) throws SVNException {
     }
 
@@ -346,9 +380,10 @@ public class FSCommitEditor implements ISVNEditor {
                 isParentCopyRoot = true;
             }
             /* Now make this node mutable.  */
-            String clonePath = FSRepositoryUtil.getAbsParentPath(parentPath.getParent());
+            String clonePath = parentPath.getParent().getAbsPath();
             clone = FSWriter.cloneChild(parentPath.getParent().getRevNode(), clonePath, parentPath.getNameEntry(), copyId, txnId, isParentCopyRoot, myReposRootDir);
-            //TODO: Update the path cache.
+            /* Update the path cache. */
+            root.putRevNodeToCache(parentPath.getAbsPath(), clone);
         }else{
             /* We're trying to clone the root directory.  */
             if(root.isTxnRoot()){
