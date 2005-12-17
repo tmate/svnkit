@@ -142,19 +142,25 @@ public class FSRevisionNode {
         return myCopyRootPath;
     }
     
-    public FSRevisionNode cloneRevisionNode(){
+    public static FSRevisionNode dumpRevisionNode(FSRevisionNode revNode){
         FSRevisionNode clone = new FSRevisionNode();
-        clone.setId(myId);
-        clone.setPredecessorId(myPredecessorId);
-        clone.setType(myType);
-        clone.setCopyFromPath(myCopyFromPath);
-        clone.setCopyFromRevision(myCopyFromRevision);
-        clone.setCopyRootPath(myCopyRootPath);
-        clone.setCopyRootRevision(myCopyRootRevision);
-        clone.setCount(myCount);
-        clone.setCreatedPath(myCreatedPath);
-        clone.setPropsRepresentation(myPropsRepresentation);
-        clone.setTextRepresentation(myTextRepresentation);
+        clone.setId(new FSID(revNode.getId()));
+        if(revNode.getPredecessorId() != null){
+            clone.setPredecessorId(new FSID(revNode.getPredecessorId()));
+        }
+        clone.setType(revNode.getType());
+        clone.setCopyFromPath(revNode.getCopyFromPath());
+        clone.setCopyFromRevision(revNode.getCopyFromRevision());
+        clone.setCopyRootPath(revNode.getCopyRootPath());
+        clone.setCopyRootRevision(revNode.getCopyRootRevision());
+        clone.setCount(revNode.getCount());
+        clone.setCreatedPath(revNode.getCreatedPath());
+        if(revNode.getPropsRepresentation() != null){
+            clone.setPropsRepresentation(new FSRepresentation(revNode.getPropsRepresentation()));
+        }
+        if(revNode.getTextRepresentation() != null){
+            clone.setTextRepresentation(new FSRepresentation(revNode.getTextRepresentation()));
+        }
         return clone;
     }
 

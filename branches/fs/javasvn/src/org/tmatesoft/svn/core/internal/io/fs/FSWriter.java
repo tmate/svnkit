@@ -81,7 +81,7 @@ public class FSWriter {
         return FSReader.getRevNodeFromID(reposRootDir, newNodeId);
     }
     
-    private static void setEntry(FSRevisionNode parentRevNode, String entryName, FSID entryId, SVNNodeKind kind, String txnId, File reposRootDir) throws SVNException {
+    public static void setEntry(FSRevisionNode parentRevNode, String entryName, FSID entryId, SVNNodeKind kind, String txnId, File reposRootDir) throws SVNException {
         FSRepresentation textRep = parentRevNode.getTextRepresentation();
         File childrenFile = FSRepositoryUtil.getTxnRevNodeChildrenFile(parentRevNode.getId(), reposRootDir);
         OutputStream dst = null;
@@ -131,7 +131,7 @@ public class FSWriter {
         }
     }
     
-    private static FSID createSuccessor(FSID oldId, FSRevisionNode newRevNode, String copyId, String txnId, File reposRootDir) throws SVNException {
+    public static FSID createSuccessor(FSID oldId, FSRevisionNode newRevNode, String copyId, String txnId, File reposRootDir) throws SVNException {
         if(copyId == null){
             copyId = oldId.getCopyID();
         }
@@ -192,7 +192,7 @@ public class FSWriter {
         if(sourceNode.getId().isTxn()){
             SVNErrorManager.error("svn: Copying from transactions not allowed");
         }
-        FSRevisionNode revNode = sourceNode.cloneRevisionNode(); 
+        FSRevisionNode revNode = FSRevisionNode.dumpRevisionNode(sourceNode); 
         revNode.setPredecessorId(sourceNode.getId());
         revNode.setCount(revNode.getCount() + 1);
         revNode.setCopyFromPath(null);

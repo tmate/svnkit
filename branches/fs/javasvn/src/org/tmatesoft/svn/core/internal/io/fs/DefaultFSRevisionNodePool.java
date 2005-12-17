@@ -21,9 +21,9 @@ import java.util.Map;
 public class DefaultFSRevisionNodePool extends FSRevisionNodePool {
     private Map myRootsCache = new TreeMap();
     private Map myRevisionsCache = new TreeMap();
-    private int myRootsCacheSize = 10;
-    private int myRevisionNodesCacheSize = 10;
-    private int myRevisionsCacheSize = 10;
+    private int myRootsCacheSize = 100;
+    private int myRevisionNodesCacheSize = 100;
+    private int myRevisionsCacheSize = 100;
     
     public DefaultFSRevisionNodePool(){
     }

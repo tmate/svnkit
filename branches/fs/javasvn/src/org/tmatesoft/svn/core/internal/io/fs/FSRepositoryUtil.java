@@ -27,8 +27,6 @@ import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.internal.wc.SVNFileType;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNProperties;
-import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
-
 
 /**
  * @version 1.0
@@ -51,16 +49,6 @@ public class FSRepositoryUtil {
             unparsedEntries.put(name, unparsedVal);
         }
         return unparsedEntries;
-    }
-    
-    /* Return a text string describing the absolute path of parentPath.
-     */
-    public static String getAbsParentPath(FSParentPath parentPath){
-        String pathSoFar = "/";
-        if(parentPath.getParent() != null){
-            pathSoFar = getAbsParentPath(parentPath.getParent());
-        }
-        return parentPath.getNameEntry() != null ? SVNPathUtil.concatToAbs(pathSoFar, parentPath.getNameEntry()) : pathSoFar;    
     }
     
     public static Map getPropsDiffs(Map sourceProps, Map targetProps){

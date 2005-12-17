@@ -116,6 +116,16 @@ public class FSParentPath
 		return this.getNameEntry() != null ? SVNPathUtil.append(pathSoFar, this.getNameEntry()) : pathSoFar;
 	}
 
+    /* Return a text string describing the absolute path of parentPath.
+     */
+    public String getAbsPath(){
+        String pathSoFar = "/";
+        if(getParent() != null){
+            pathSoFar = getAbsPath();
+        }
+        return getNameEntry() != null ? SVNPathUtil.concatToAbs(pathSoFar, getNameEntry()) : pathSoFar;    
+    }
+
 	//Return value consist of :
 	//1:	SVNLocationEntry.revision
 	//		copy inheritance style
