@@ -11,6 +11,9 @@
  */
 package org.tmatesoft.svn.core.internal.io.fs;
 
+import java.util.HashMap;
+import java.util.Map;
+
 
 /**
  * @version 1.0
@@ -31,6 +34,20 @@ public class FSConstants {
     public static final String TXN_PATH_CHANGES = "changes";
     public static final String TXN_PATH_NEXT_IDS = "next-ids";
     public static final String TXN_PATH_TXN_PROPS = "props";
+    //change actions - for commits
+    public static final String ACTION_MODIFY = "modify";
+    public static final String ACTION_ADD = "add";
+    public static final String ACTION_DELETE = "delete";
+    public static final String ACTION_REPLACE = "replace";
+    public static final String ACTION_RESET = "reset";
+    public static final Map CHANGE_KINDS_TO_ACTIONS = new HashMap();
+    static {
+        CHANGE_KINDS_TO_ACTIONS.put(FSPathChangeKind.FS_PATH_CHANGE_MODIFY, ACTION_MODIFY);
+        CHANGE_KINDS_TO_ACTIONS.put(FSPathChangeKind.FS_PATH_CHANGE_ADD, ACTION_ADD);
+        CHANGE_KINDS_TO_ACTIONS.put(FSPathChangeKind.FS_PATH_CHANGE_DELETE, ACTION_DELETE);
+        CHANGE_KINDS_TO_ACTIONS.put(FSPathChangeKind.FS_PATH_CHANGE_REPLACE, ACTION_REPLACE);
+        CHANGE_KINDS_TO_ACTIONS.put(FSPathChangeKind.FS_PATH_CHANGE_RESET, ACTION_RESET);
+    }
     
     public static final String SVN_REPOS_DB_LOCKFILE = "db.lock";
     public static final String SVN_REPOS_DB_LOGS_LOCKFILE = "db-logs.lock";

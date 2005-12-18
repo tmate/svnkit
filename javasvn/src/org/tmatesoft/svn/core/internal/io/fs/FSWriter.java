@@ -202,12 +202,13 @@ public class FSWriter {
         putTxnRevisionNode(revNode.getId(), revNode, reposRootDir);
     }
 
-    private static void putTxnRevisionNode(FSID id, FSRevisionNode revNode, File reposRootDir) throws SVNException{
+    public static void putTxnRevisionNode(FSID id, FSRevisionNode revNode, File reposRootDir) throws SVNException{
         if(!id.isTxn()){
             SVNErrorManager.error("svn: Attempted to write to non-transaction");
         }
-        OutputStream revNodeFile = SVNFileUtil.openFileForWriting(FSRepositoryUtil.getTxnRevNodeFile(id, reposRootDir));
+        OutputStream revNodeFile = null;
         try{
+            revNodeFile = SVNFileUtil.openFileForWriting(FSRepositoryUtil.getTxnRevNodeFile(id, reposRootDir));
             writeTxnNodeRevision(revNodeFile, revNode);
         }catch(IOException ioe){
             SVNErrorManager.error("svn: Can't write to txn file");
@@ -248,7 +249,29 @@ public class FSWriter {
         }
         revNodeFile.write("\n".getBytes());
     }
-
+    
+    /* Write a single change entry - path, path change info, and copyfrom
+     * string into the changes file.
+     */
+    public static void writeChangeEntry(OutputStream changesFile, String path, FSPathChange pathChange, String copyfrom) throws SVNException, IOException {
+        String changeString = (String)FSConstants.CHANGE_KINDS_TO_ACTIONS.get(pathChange.getChangeKind());
+        if(changeString == null){
+            SVNErrorManager.error("Invalid change type");
+        }
+        String idString = null;
+        if(pathChange.getRevNodeId() != null){
+            idString = pathChange.getRevNodeId().toString();
+        }else{
+            idString = FSConstants.ACTION_RESET;
+        }
+        String output = idString + " " + changeString + " " + SVNProperty.toString(pathChange.isTextModified()) + " " + SVNProperty.toString(pathChange.arePropertiesModified()) + " " + path + "\n"; 
+        changesFile.write(output.getBytes());
+        if(copyfrom != null){
+            changesFile.write(copyfrom.getBytes());
+        }
+        changesFile.write("\n".getBytes());
+    }
+    
     /* Write out the currently available next nodeId and copyId
      * for transaction id in filesystem. 
      */
