@@ -12,6 +12,7 @@
 package org.tmatesoft.svn.core.internal.io.fs;
 
 import java.io.OutputStream;
+import java.io.IOException;
 import java.util.Map;
 import java.util.Collection;
 import java.util.LinkedList;
@@ -171,7 +172,7 @@ public class FSCommitEditor implements ISVNEditor {
             if(kind != SVNNodeKind.NONE && !parentBaton.isCopied()){
                 SVNErrorManager.error("Out of date: '" + fullPath + "' in transaction '" + myTxnRoot.getTxnId() + "'");
             }
-            copyFromPath = myRepository.getRepositoryPath(SVNEncodingUtil.uriDecode(copyFromPath));
+            copyFromPath = SVNPathUtil.concatToAbs(myBasePath, SVNEncodingUtil.uriDecode(copyFromPath));
             /* Now use the copyFromPath as an absolute path within the
              * repository to make the copy from. 
              */      
@@ -179,10 +180,113 @@ public class FSCommitEditor implements ISVNEditor {
             makeCopy(copyRoot, copyFromPath, myTxnRoot, fullPath, true);
             isCopied = true;
         }else{
-            
+            /* No ancestry given, just make a new directory.  We don't
+             * bother with an out-of-dateness check here because
+             * makeDir() will error out if path already exists.
+             */
+            makeDir(myTxnRoot, fullPath);
         }
-        
+        /* Build a new dir baton for this directory. */
+        DirBaton dirBaton = new DirBaton(FSConstants.SVN_INVALID_REVNUM, fullPath, isCopied);  
+        myDirsStack.push(dirBaton);
     }
+    
+    /* Create a new directory named "path" in "root".  The new directory has
+     * no entries, and no properties.  root must be the root of a
+     * transaction, not a revision.  
+     */
+    private void makeDir(FSRoot root, String path) throws SVNException {
+        String txnId = root.getTxnId();
+        FSParentPath parentPath = myRevNodesPool.getParentPath(root, path, false, myReposRootDir);
+        /* If there's already a sub-directory by that name, complain.  This
+         * also catches the case of trying to make a subdirectory named `/'.  
+         */
+        if(parentPath.getRevNode() != null){
+            pathAlreadyExistsError(root, path);
+        }
+        /* Check (recursively) to see if some lock is 'reserving' a path at
+         * that location, or even some child-path; if so, check that we can
+         * use it. 
+         */
+        if((root.getTxnFlags() & FSConstants.SVN_FS_TXN_CHECK_LOCKS) != 0){
+            FSReader.allowLockedOperation(path, myAuthor, myLockTokens.values(), true, false, myReposRootDir);            
+        }
+        /* Create the subdirectory.  */
+        makePathMutable(root, parentPath.getParent(), path);
+        FSRevisionNode subDirNode = makeEntry(parentPath.getParent().getRevNode(), parentPath.getParent().getAbsPath(), parentPath.getNameEntry(), true, txnId);
+        /* Add this directory to the path cache. */
+        root.putRevNodeToCache(parentPath.getAbsPath(), subDirNode);
+        /* Make a record of this modification in the changes table. */
+        addChange(txnId, path, subDirNode.getId(), FSPathChangeKind.FS_PATH_CHANGE_ADD, false, false, FSConstants.SVN_INVALID_REVNUM, null);
+    }
+    
+    /* Make a new entry named entryName in parent. If isDir is true, then the
+     * node revision the new entry points to will be a directory, else it
+     * will be a file. parent must be mutable, and must not have an entry named 
+     * entryName.  
+     */
+    private FSRevisionNode makeEntry(FSRevisionNode parent, String parentPath, String entryName, boolean isDir, String txnId) throws SVNException {
+        /* Make sure that entryName is a single path component. */
+        if(!SVNPathUtil.isSinglePathComponent(entryName)){
+            SVNErrorManager.error("Attempted to create a node with an illegal name '" + entryName + "'");
+        }
+        /* Make sure that parent is a directory */
+        if(parent.getType() != SVNNodeKind.DIR){
+            SVNErrorManager.error("Attempted to create entry in non-directory parent");
+        }
+        /* Check that the parent is mutable. */
+        if(!parent.getId().isTxn()){
+            SVNErrorManager.error("Attempted to clone child of non-mutable node");
+        }
+        /* Create the new node's node-revision */
+        FSRevisionNode newRevNode = new FSRevisionNode();
+        newRevNode.setType(isDir ? SVNNodeKind.DIR : SVNNodeKind.FILE);
+        newRevNode.setCreatedPath(SVNPathUtil.concatToAbs(parentPath, entryName));
+        newRevNode.setCopyRootPath(parent.getCopyRootPath());
+        newRevNode.setCopyRootRevision(parent.getCopyRootRevision());
+        newRevNode.setCopyFromRevision(FSConstants.SVN_INVALID_REVNUM);
+        newRevNode.setCopyFromPath(null);
+        FSID newNodeId = createNode(newRevNode, parent.getId().getCopyID(), txnId);
+        /* Get a new node for our new node */
+        FSRevisionNode childNode = FSReader.getRevNodeFromID(myReposRootDir, newNodeId);
+        /* We can safely call setEntry() because we already know that
+         * parent is mutable, and we just created childNode, so we know it has
+         * no ancestors (therefore, parent cannot be an ancestor of child) 
+         */
+        FSWriter.setEntry(parent, entryName, childNode.getId(), newRevNode.getType(), txnId, myReposRootDir);
+        return childNode;
+    }
+
+    private FSID createNode(FSRevisionNode revNode, String copyId, String txnId) throws SVNException {
+        /* Get a new node-id for this node. */
+        String nodeId = getNewTxnNodeId(txnId);
+        FSID id = FSID.createTxnId(nodeId, copyId, txnId);
+        revNode.setId(id);
+        FSWriter.putTxnRevisionNode(id, revNode, myReposRootDir);
+        return id;
+    }
+
+    /* Get a new and unique to this transaction node-id for transaction
+     * txnId.
+     */
+    private String getNewTxnNodeId(String txnId) throws SVNException {
+        /* First read in the current next-ids file. */
+        String[] curIds = FSReader.readNextIds(txnId, myReposRootDir);
+        String curNodeId = curIds[0];
+        String curCopyId = curIds[1];
+        String nextNodeId = FSKeyGenerator.generateNextKey(curNodeId.toCharArray());
+        FSWriter.writeNextIds(txnId, nextNodeId, curCopyId, myReposRootDir);
+        return "_" + nextNodeId; 
+    }
+    
+    private void pathAlreadyExistsError(FSRoot root, String path) throws SVNException {
+        if(root.isTxnRoot()){
+            SVNErrorManager.error("File already exists: filesystem '" + myReposRootDir.getAbsolutePath() + "', transaction '" + root.getTxnId() + "', path '" + path + "'");
+        }else{
+            SVNErrorManager.error("File already exists: filesystem '" + myReposRootDir.getAbsolutePath() + "', revision " + root.getRevision() + ", path '" + path + "'");
+        }
+    }
+    
     /* Create a copy of fromPath in fromRoot named toPath in toRoot.
      * If fromPath is a directory, copy it recursively. If preserveHistory is true, 
      * then the copy is recorded in the copies table.
@@ -233,7 +337,7 @@ public class FSCommitEditor implements ISVNEditor {
             }
             /* Make a record of this modification in the changes table. */
             FSRevisionNode newNode = myRevNodesPool.getRevisionNode(toRoot, toPath, myReposRootDir);
-            
+            addChange(txnId, toPath, newNode.getId(), changeKind, false, false, fromRoot.getRevision(), fromCanonPath);
         }else{
             /* Copying from transaction roots not currently available.
                Note that when copying from mutable trees, you have to make sure that
@@ -244,6 +348,32 @@ public class FSCommitEditor implements ISVNEditor {
                need not be necessary in the future.
             */
             SVNErrorManager.error("Copy from mutable tree not currently supported");
+        }
+    }
+
+    /* Populating the 'changes' table. Add a change to the changes table in FS, keyed on transaction id,
+     * and indicated that a change of kind "changeKind" occurred on
+     * path (whose node revision id is - or was, in the case of a
+     * deletion, - "id"), and optionally that text or props modifications
+     * occurred.  If the change resulted from a copy, copyFromRevision and
+     * copyFromPath specify under which revision and path the node was
+     * copied from.  If this was not part of a copy, copyFromrevision should
+     * be FSConstants.SVN_INVALID_REVNUM. 
+     */
+    private void addChange(String txnId, String path, FSID id, FSPathChangeKind changeKind, boolean textModified, boolean propsModified, long copyFromRevision, String copyFromPath) throws SVNException {
+        OutputStream changesFile = null;
+        try{
+            changesFile = SVNFileUtil.openFileForWriting(FSRepositoryUtil.getTxnChangesFile(txnId, myReposRootDir), true);
+            String copyfrom = "";
+            if(FSRepository.isValidRevision(copyFromRevision)){
+                copyfrom = copyFromRevision + " " + copyFromPath;
+            }
+            FSPathChange pathChange = new FSPathChange(id, changeKind, textModified, propsModified);
+            FSWriter.writeChangeEntry(changesFile, path, pathChange, copyfrom);
+        }catch(IOException ioe){
+            SVNErrorManager.error("svn: Can't write to '" + FSRepositoryUtil.getTxnChangesFile(txnId, myReposRootDir).getAbsolutePath() + "': " + ioe.getMessage());
+        }finally{
+            SVNFileUtil.closeFile(changesFile);
         }
     }
     
@@ -284,6 +414,61 @@ public class FSCommitEditor implements ISVNEditor {
     }
 
     public void addFile(String path, String copyFromPath, long copyFromRevision) throws SVNException {
+        DirBaton parentBaton = (DirBaton)myDirsStack.peek();
+        String fullPath = SVNPathUtil.concatToAbs(myBasePath, path); 
+        /* Sanity check. */  
+        if(copyFromPath != null && FSRepository.isInvalidRevision(copyFromRevision)){
+            SVNErrorManager.error("Got source path but no source revision for '" + fullPath + "'");
+        }else if(copyFromPath != null){
+            /* Check path in our transaction.  Make sure it does not exist
+             * unless its parent directory was copied (in which case, the
+             * thing might have been copied in as well), else return an
+             * out-of-dateness error. 
+             */
+            SVNNodeKind kind = myRepository.checkNodeKind(fullPath, myTxnRoot, -1);
+            if(kind != SVNNodeKind.NONE && !parentBaton.isCopied()){
+                SVNErrorManager.error("Out of date: '" + fullPath + "' in transaction '" + myTxnRoot.getTxnId() + "'");
+            }
+            copyFromPath = SVNPathUtil.concatToAbs(myBasePath, SVNEncodingUtil.uriDecode(copyFromPath));
+            /* Now use the copyFromPath as an absolute path within the
+             * repository to make the copy from. 
+             */      
+            FSRoot copyRoot = new FSRoot(copyFromRevision, myRevNodesPool.getRootRevisionNode(copyFromRevision, myReposRootDir));
+            makeCopy(copyRoot, copyFromPath, myTxnRoot, fullPath, true);
+        }else{
+            /* No ancestry given, just make a new, empty file.  Note that we
+             * don't perform an existence check here like the copy-from case
+             * does -- that's because makeFile() already errors out
+             * if the file already exists.
+             */
+            makeFile(myTxnRoot, fullPath);
+        }
+    }
+
+    /* Create an empty file path under the root.
+     */
+    private void makeFile(FSRoot root, String path) throws SVNException {
+        String txnId = root.getTxnId();
+        FSParentPath parentPath = myRevNodesPool.getParentPath(root, path, false, myReposRootDir);
+        /* If there's already a file by that name, complain.
+         * This also catches the case of trying to make a file named `/'.  
+         */
+        if(parentPath.getRevNode() != null){
+            pathAlreadyExistsError(root, path);
+        }
+        /* Check (non-recursively) to see if path is locked;  if so, check
+         * that we can use it. 
+         */
+        if((root.getTxnFlags() & FSConstants.SVN_FS_TXN_CHECK_LOCKS) != 0){
+            FSReader.allowLockedOperation(path, myAuthor, myLockTokens.values(), false, false, myReposRootDir);            
+        }
+        /* Create the file.  */
+        makePathMutable(root, parentPath.getParent(), path);
+        FSRevisionNode childNode = makeEntry(parentPath.getParent().getRevNode(), parentPath.getParent().getAbsPath(), parentPath.getNameEntry(), false, txnId);
+        /* Add this file to the path cache. */
+        root.putRevNodeToCache(parentPath.getAbsPath(), childNode);
+        /* Make a record of this modification in the changes table. */
+        addChange(txnId, path, childNode.getId(), FSPathChangeKind.FS_PATH_CHANGE_ADD, false, false, FSConstants.SVN_INVALID_REVNUM, null);
     }
 
     public void openFile(String path, long revision) throws SVNException {
@@ -300,7 +485,7 @@ public class FSCommitEditor implements ISVNEditor {
     }
 
     public void applyTextDelta(String path, String baseChecksum) throws SVNException {
-        /* Call getParentPath with the flag entryMustExist set to true, as we 
+        /* Call getParentPath() with the flag entryMustExist set to true, as we 
          * want this to return an error if the node for which we are searching 
          * doesn't exist. 
          */
