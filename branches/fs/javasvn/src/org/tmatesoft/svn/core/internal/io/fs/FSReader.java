@@ -145,7 +145,7 @@ public class FSReader {
     public static SVNLock getLock(String repositoryPath, boolean haveWriteLock, Collection children, File reposRootDir) throws SVNException {
         SVNLock lock = fetchLock(null, repositoryPath, children, reposRootDir);
         if(lock == null){
-            return null;//SVNErrorManager.error("svn: No lock on path '" + fsAbsPath + "' in filesystem '" + FSRepositoryUtil.getRepositoryDBDir(reposRootDir).getAbsolutePath() + "'");
+            return null;
         }
         Date current = new Date(System.currentTimeMillis());
         /* Don't return an expired lock. */
@@ -289,12 +289,7 @@ public class FSReader {
             SVNErrorManager.error("svn: Attempted to open node with an illegal name '" + child + "'");
         }
         /* Now get the node that was requested. */
-        //first try to ask the object's cache for entries
-        Map entries = parent.getDirContents(); 
-        if(entries == null){
-            entries = getDirEntries(parent, reposRootDir);
-            parent.setDirContents(entries);
-        }
+        Map entries = getDirEntries(parent, reposRootDir); 
         FSEntry entry = entries != null ? (FSEntry) entries.get(child) : null;
         return entry == null ? null : getRevNodeFromID(reposRootDir, entry.getId());
     }
@@ -304,22 +299,24 @@ public class FSReader {
         if (!SVNPathUtil.isSinglePathComponent(child)) {
             SVNErrorManager.error("svn: Attempted to open node with an illegal name '" + child + "'");
         }
-        /* Now get the node that was requested. */
-        //first try to ask the object's cache for entries
-        Map entries = parent.getDirContents(); 
-        if(entries == null){
-            entries = getDirEntries(parent, reposRootDir);
-            parent.setDirContents(entries);
-        }
+        /* Now get the entry that was requested. */
+        Map entries = getDirEntries(parent, reposRootDir); 
         FSEntry entry = entries != null ? (FSEntry) entries.get(child) : null;
         return entry;
     }
     
-    public static Map getDirEntries(FSRevisionNode revNode, File reposRootDir) throws SVNException {
-        if (revNode == null || revNode.getType() != SVNNodeKind.DIR) {
+    public static Map getDirEntries(FSRevisionNode parent, File reposRootDir) throws SVNException {
+        if (parent == null || parent.getType() != SVNNodeKind.DIR) {
             SVNErrorManager.error("svn: Can't get entries of non-directory");
         }
-        return getDirContents(revNode, reposRootDir);
+        //first try to ask the object's cache for entries
+        Map entries = parent.getDirContents(); 
+        if(entries == null){
+            entries = getDirContents(parent, reposRootDir);
+            entries = entries == null ? new HashMap() : entries;
+            parent.setDirContents(entries);
+        }
+        return entries;
     }
 
     public static Map getProperties(FSRevisionNode revNode, File reposRootDir) throws SVNException {

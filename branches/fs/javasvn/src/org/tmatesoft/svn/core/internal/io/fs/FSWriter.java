@@ -39,6 +39,26 @@ import org.tmatesoft.svn.core.SVNProperty;
  */
 public class FSWriter {
     
+    public static void removeRevisionNode(FSID id, File reposRootDir) throws SVNException {
+        /* Fetch the node. */
+        FSRevisionNode node = FSReader.getRevNodeFromID(reposRootDir, id);
+        /* If immutable, do nothing and return immediately. */
+        if(!node.getId().isTxn()){
+            SVNErrorManager.error("Attempted removal of immutable node");
+        }
+        /* Delete the node revision: */
+
+        /* Delete any mutable property representation. */
+        if(node.getPropsRepresentation() != null && node.getPropsRepresentation().isTxn()){
+            SVNFileUtil.deleteFile(FSRepositoryUtil.getTxnRevNodePropsFile(id, reposRootDir));
+        }
+        /* Delete any mutable data representation. */
+        if(node.getTextRepresentation() != null && node.getTextRepresentation().isTxn() && node.getType() == SVNNodeKind.DIR){
+            SVNFileUtil.deleteFile(FSRepositoryUtil.getTxnRevNodeChildrenFile(id, reposRootDir));
+        }
+        SVNFileUtil.deleteFile(FSRepositoryUtil.getTxnRevNodeFile(id, reposRootDir));
+    }
+    
     public static FSRevisionNode cloneChild(FSRevisionNode parent, String parentPath, String childName, String copyId, String txnId, boolean isParentCopyRoot, File reposRootDir) throws SVNException {
         /* First check that the parent is mutable. */
         if(!parent.getId().isTxn()){
@@ -114,7 +134,7 @@ public class FSWriter {
             if(entryId != null){
                 SVNProperties.appendProperty(entryName, kind + " " + entryId.toString(), dst);
                 if(dirContents != null){
-                    dirContents.put(entryName, new FSEntry(entryId, kind, entryName));
+                    dirContents.put(entryName, new FSEntry(new FSID(entryId), kind, entryName));
                 }
             }else{
                 SVNProperties.appendPropertyDeleted(entryName, dst);

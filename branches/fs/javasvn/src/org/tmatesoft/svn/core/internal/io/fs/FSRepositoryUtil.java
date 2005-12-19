@@ -310,6 +310,10 @@ public class FSRepositoryUtil {
         return new File(getTxnDir(id.getTxnID(), reposRootDir), FSConstants.PATH_PREFIX_NODE + id.getNodeID() + "." + id.getCopyID());
     }
 
+    public static File getTxnRevNodePropsFile(FSID id, File reposRootDir) {
+        return new File(getTxnDir(id.getTxnID(), reposRootDir), FSConstants.PATH_PREFIX_NODE + id.getNodeID() + "." + id.getCopyID() + FSConstants.TXN_PATH_EXT_PROPS);
+    }
+
     public static File getTxnRevNodeChildrenFile(FSID id, File reposRootDir) {
         return new File(getTxnDir(id.getTxnID(), reposRootDir), FSConstants.PATH_PREFIX_NODE + id.getNodeID() + "." + id.getCopyID() + FSConstants.TXN_PATH_EXT_CHILDREN);
     }
