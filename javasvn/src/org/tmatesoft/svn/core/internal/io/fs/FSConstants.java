@@ -29,6 +29,7 @@ public class FSConstants {
     public static final String TXN_PATH_EXT = ".txn";
     public static final String TXN_PATH_EXT_CHILDREN = ".children";
     public static final String PATH_PREFIX_NODE = "node.";
+    public static final String TXN_PATH_EXT_PROPS = ".props";
     //txn specific paths
     public static final String TXN_PATH_REV = "rev";
     public static final String TXN_PATH_CHANGES = "changes";

@@ -16,6 +16,7 @@ import java.io.IOException;
 import java.util.Map;
 import java.util.Collection;
 import java.util.LinkedList;
+import java.util.Iterator;
 import java.util.Stack;
 import java.io.File;
 
@@ -144,9 +145,123 @@ public class FSCommitEditor implements ISVNEditor {
     }
     
     public void deleteEntry(String path, long revision) throws SVNException {
-        
+        DirBaton parentBaton = (DirBaton)myDirsStack.peek();
+        String fullPath = SVNPathUtil.concatToAbs(myBasePath, path); 
+        /* Check path in our transaction.  */
+        SVNNodeKind kind = myRepository.checkNodeKind(fullPath, myTxnRoot, -1);
+        /* If path doesn't exist in the txn, that's fine (merge
+         * allows this). 
+         */
+        if(kind == SVNNodeKind.NONE){
+            return;
+        }
+        /* Now, make sure we're deleting the node that we think we're
+         * deleting, else return an out-of-dateness error. 
+         */
+        FSRevisionNode existingNode = myRevNodesPool.getRevisionNode(myTxnRoot, fullPath, myReposRootDir);
+        long createdRev = existingNode.getId().getRevision();
+        if(FSRepository.isValidRevision(revision) && revision < createdRev){
+            SVNErrorManager.error("Out of date: '" + fullPath + "' in transaction '" + myTxnRoot.getTxnId() + "'");
+        }
+        /* Delete files and recursively delete
+         * directories.  
+         */
+        deleteNode(myTxnRoot, fullPath);
     }
-
+    
+    /* Delete the node at path under root.  root must be a transaction
+     * root. 
+     */
+    private void deleteNode(FSRoot root, String path) throws SVNException {
+        String txnId = root.getTxnId();
+        if(!root.isTxnRoot()){
+            SVNErrorManager.error("Root object must be a transaction root");
+        }
+        FSParentPath parentPath = myRevNodesPool.getParentPath(root, path, true, myReposRootDir);
+        /* We can't remove the root of the filesystem.  */
+        if(parentPath.getParent() == null){
+            SVNErrorManager.error("The root directory cannot be deleted");
+        }
+        /* Check to see if path (or any child thereof) is locked; if so,
+         * check that we can use the existing lock(s). 
+         */
+        if((root.getTxnFlags() & FSConstants.SVN_FS_TXN_CHECK_LOCKS) != 0){
+            FSReader.allowLockedOperation(path, myAuthor, myLockTokens.values(), true, false, myReposRootDir);            
+        }
+        /* Make the parent directory mutable, and do the deletion.  */
+        makePathMutable(root, parentPath.getParent(), path);
+        deleteEntry(parentPath.getParent().getRevNode(), parentPath.getNameEntry(), txnId);
+        /* Remove this node and any children from the path cache. */
+        root.removeRevNodeFromCache(parentPath.getAbsPath());
+        /* Make a record of this modification in the changes table. */
+        addChange(txnId, path, parentPath.getRevNode().getId(), FSPathChangeKind.FS_PATH_CHANGE_DELETE, false, false, FSConstants.SVN_INVALID_REVNUM, null);
+    }
+    
+    /* Delete the directory entry named entryName from parent. parent must be 
+     * mutable. entryName must be a single path component. Throws an exception if there is no 
+     * entry entryName in parent.  
+     */
+    private void deleteEntry(FSRevisionNode parent, String entryName, String txnId) throws SVNException {
+        /* Make sure parent is a directory. */
+        if(parent.getType() != SVNNodeKind.DIR){
+            SVNErrorManager.error("Attempted to delete entry '" + entryName + "' from *non*-directory node");
+        }
+        /* Make sure parent is mutable. */
+        if(!parent.getId().isTxn()){
+            SVNErrorManager.error("Attempted to delete entry '" + entryName + "' from immutable directory node");
+        }
+        /* Make sure that entryName is a single path component. */
+        if(!SVNPathUtil.isSinglePathComponent(entryName)){
+            SVNErrorManager.error("Attempted to delete a node with an illegal name '" + entryName + "'");
+        }
+        /* Get a dirent hash for this directory. */
+        Map entries = FSReader.getDirEntries(parent, myReposRootDir);
+        /* Find name in the entries hash. */
+        FSEntry dirEntry = (FSEntry)entries.get(entryName);
+        /* If we never found id in entries (perhaps because there are no
+         * entries or maybe because just there's no such id in the existing 
+         * entries... it doesn't matter), throw an exception.  
+         */
+        if(dirEntry == null){
+            SVNErrorManager.error("Delete failed--directory has no entry '" + entryName + "'");
+        }
+        /* Use the id to get the entry's node.  */
+        /* TODO: Well, I don't understand this place - why svn devs try to get 
+         * the node revision here, - just to act only as a sanity check or what?
+         * The read out node-rev is not used then. The node is got then in 
+         * ...delete_if_mutable. So, that is already a check, but when it's really 
+         * needed.   
+         */
+        FSReader.getRevNodeFromID(myReposRootDir, dirEntry.getId());
+        /* If mutable, remove it and any mutable children from fs. */
+        deleteEntryIfMutable(dirEntry.getId(), txnId);
+        /* Remove this entry from its parent's entries list. */
+        FSWriter.setEntry(parent, entryName, null, SVNNodeKind.UNKNOWN, txnId, myReposRootDir);
+    }
+    
+    private void deleteEntryIfMutable(FSID id, String txnId) throws SVNException {
+        /* Get the node. */
+        FSRevisionNode node = FSReader.getRevNodeFromID(myReposRootDir, id);
+        /* If immutable, do nothing and return immediately. */
+        if(!node.getId().isTxn()){
+            return;
+        }
+        /* Else it's mutable.  Recurse on directories... */
+        if(node.getType() == SVNNodeKind.DIR){
+            /* Loop over hash entries */
+            Map entries = FSReader.getDirEntries(node, myReposRootDir);
+            for(Iterator names = entries.keySet().iterator(); names.hasNext();){
+                String name = (String)names.next();
+                FSEntry entry = (FSEntry)entries.get(name);
+                deleteEntryIfMutable(entry.getId(), txnId);
+            }
+        }
+        /* ... then delete the node itself, after deleting any mutable
+         * representations and strings it points to. 
+         */
+        FSWriter.removeRevisionNode(id, myReposRootDir);
+    }
+    
     public void absentDir(String path) throws SVNException {
         //does nothing
     }
@@ -407,8 +522,31 @@ public class FSCommitEditor implements ISVNEditor {
     }
     
     public void changeDirProperty(String name, String value) throws SVNException {
+        DirBaton dirBaton = (DirBaton)myDirsStack.peek();
+        if(FSRepository.isValidRevision(dirBaton.getBaseRevision())){
+            /* Subversion rule:  propchanges can only happen on a directory
+             * which is up-to-date. 
+             */
+            FSRevisionNode existingNode = myRevNodesPool.getRevisionNode(myTxnRoot, dirBaton.getPath(), myReposRootDir);
+            long createdRev = existingNode.getId().getRevision();
+            if(dirBaton.getBaseRevision() < createdRev){
+                SVNErrorManager.error("Out of date: '" + dirBaton.getPath() + "' in transaction '" + myTxnRoot.getTxnId() + "'");
+            }
+        }
     }
 
+    /* Change, add, or delete a node's property value.  The node affect is
+     * path under root, the property value to modify is propName, and propValue
+     * points to either a string value to set the new contents to, or null
+     * if the property should be deleted. 
+     */
+    private void changeNodeProperty(FSRoot root, String path, String propName, String propValue) throws SVNException {
+        /* Validate the property. */
+        if(!SVNProperty.isRegularProperty(propName)){
+            SVNErrorManager.error("Storage of non-regular property '" + propName + "' is disallowed through the repository interface, and could indicate a bug in your client");
+        }
+    }
+    
     public void closeDir() throws SVNException {
         myDirsStack.pop();
     }
