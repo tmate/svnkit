@@ -533,6 +533,7 @@ public class FSCommitEditor implements ISVNEditor {
                 SVNErrorManager.error("Out of date: '" + dirBaton.getPath() + "' in transaction '" + myTxnRoot.getTxnId() + "'");
             }
         }
+        changeNodeProperty(myTxnRoot, dirBaton.getPath(), name, value);
     }
 
     /* Change, add, or delete a node's property value.  The node affect is
@@ -545,6 +546,33 @@ public class FSCommitEditor implements ISVNEditor {
         if(!SVNProperty.isRegularProperty(propName)){
             SVNErrorManager.error("Storage of non-regular property '" + propName + "' is disallowed through the repository interface, and could indicate a bug in your client");
         }
+        if(!root.isTxnRoot()){
+            SVNErrorManager.error("Root object must be a transaction root");
+        }
+        String txnId = root.getTxnId();
+        FSParentPath parentPath = myRevNodesPool.getParentPath(root, path, true, myReposRootDir);
+        /* Check (non-recursively) to see if path is locked; if so, check
+         * that we can use it. 
+         */
+        if((root.getTxnFlags() & FSConstants.SVN_FS_TXN_CHECK_LOCKS) != 0){
+            FSReader.allowLockedOperation(path, myAuthor, myLockTokens.values(), false, false, myReposRootDir);            
+        }
+        makePathMutable(root, parentPath, path);
+        Map properties = FSReader.getProperties(parentPath.getRevNode(), myReposRootDir);
+        /* If there's no proplist, but we're just deleting a property, exit now. */
+        if(properties.isEmpty() && propValue == null){
+            return;
+        }
+        /* Set the property. */
+        if(propValue == null){
+            properties.remove(propName);
+        }else{
+            properties.put(propName, propValue);
+        }
+        /* Overwrite the node's proplist. */
+        FSWriter.setProplist(parentPath.getRevNode(), properties, myReposRootDir);
+        /* Make a record of this modification in the changes table. */
+        addChange(txnId, path, parentPath.getRevNode().getId(), FSPathChangeKind.FS_PATH_CHANGE_MODIFY, false, true, FSConstants.SVN_INVALID_REVNUM, null);
     }
     
     public void closeDir() throws SVNException {
@@ -747,6 +775,8 @@ public class FSCommitEditor implements ISVNEditor {
     }
 
     public void changeFileProperty(String path, String name, String value) throws SVNException {
+        String fullPath = SVNPathUtil.concatToAbs(myBasePath, path);
+        changeNodeProperty(myTxnRoot, fullPath, name, value);
     }
 
     public void closeFile(String path, String textChecksum) throws SVNException {
@@ -757,6 +787,28 @@ public class FSCommitEditor implements ISVNEditor {
     }
 
     public void abortEdit() throws SVNException {
+        if(myTxn == null || !isTxnOwner){
+            myRepository.closeRepository();
+            return;
+        }
+        purgeTxn();
+        File txnDir = FSRepositoryUtil.getTxnDir(myTxn.getTxnId(), myReposRootDir);
+        if(txnDir.exists()){
+            SVNErrorManager.error("Transaction cleanup failed");
+        }
+        myTxn = null;
+        myTxnRoot = null;
+    }
+    
+    private void purgeTxn() throws SVNException {
+        try{
+            /* Now, purge the transaction: remove the directory 
+             * associated with this transaction. 
+             */
+            SVNFileUtil.deleteAll(FSRepositoryUtil.getTxnDir(myTxn.getTxnId(), myReposRootDir), true);
+        }finally{
+            myRepository.closeRepository();
+        }
     }
     
     private class DirBaton {

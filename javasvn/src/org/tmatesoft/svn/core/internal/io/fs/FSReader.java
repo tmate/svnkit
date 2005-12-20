@@ -320,7 +320,7 @@ public class FSReader {
     }
 
     public static Map getProperties(FSRevisionNode revNode, File reposRootDir) throws SVNException {
-        return getProplist(revNode.getPropsRepresentation(), reposRootDir);
+        return getProplist(revNode, reposRootDir);
     }
 
     private static Map getDirContents(FSRevisionNode revNode, File reposRootDir) throws SVNException {
@@ -330,12 +330,13 @@ public class FSReader {
              * changes we've made in this transaction. 
              */
             File childrenFile = FSRepositoryUtil.getTxnRevNodeChildrenFile(revNode.getId(), reposRootDir);
-            InputStream file = SVNFileUtil.openFileForReading(childrenFile);
+            InputStream file = null;
             Map entries = null;
             try{
+                file = SVNFileUtil.openFileForReading(childrenFile);
                 Map rawEntries = SVNProperties.asMap(null, file, false, SVNProperties.SVN_HASH_TERMINATOR);
                 rawEntries = SVNProperties.asMap(rawEntries, file, true, null);
-                entries = parsePlainRepresentation(rawEntries, false);
+                entries = parsePlainRepresentation(rawEntries);
             }catch(IOException ioe){
                 SVNErrorManager.error(ioe.getMessage());
             }finally{
@@ -348,7 +349,7 @@ public class FSReader {
             try {
                 is = readPlainRepresentation(textRepresent, reposRootDir);
                 Map rawEntries = SVNProperties.asMap(null, is, false, SVNProperties.SVN_HASH_TERMINATOR);
-                return parsePlainRepresentation(rawEntries, false);
+                return parsePlainRepresentation(rawEntries);
             } catch (IOException ioe) {
                 SVNErrorManager.error("svn: Can't read representation in revision file '" + FSRepositoryUtil.getRevisionFile(reposRootDir, textRepresent.getRevision()).getAbsolutePath() + "': "
                         + ioe.getMessage());
@@ -362,25 +363,37 @@ public class FSReader {
         return new HashMap();//returns an empty map, must not be null!!
     }
 
-    private static Map getProplist(FSRepresentation representation, File reposRootDir) throws SVNException {
-        if (representation == null) {
-            return new HashMap();
+    private static Map getProplist(FSRevisionNode revNode, File reposRootDir) throws SVNException {
+        Map properties = new HashMap();
+        if(revNode.getPropsRepresentation() != null && revNode.getPropsRepresentation().isTxn()){
+            File propsFile = FSRepositoryUtil.getTxnRevNodePropsFile(revNode.getId(), reposRootDir);
+            InputStream file = null;
+            try{
+                file = SVNFileUtil.openFileForReading(propsFile);
+                properties = SVNProperties.asMap(properties, file, false, SVNProperties.SVN_HASH_TERMINATOR);
+            }catch(IOException ioe){
+                SVNErrorManager.error(ioe.getMessage());
+            }finally{
+                SVNFileUtil.closeFile(file);
+            }
+        }else if(revNode.getPropsRepresentation() != null){
+            InputStream is = null;
+            FSRepresentation propsRepresent = revNode.getPropsRepresentation();
+            try {
+                is = readPlainRepresentation(propsRepresent, reposRootDir);
+                properties = SVNProperties.asMap(properties, is, false, SVNProperties.SVN_HASH_TERMINATOR);
+                //parsePlainRepresentation(rawEntries, true);
+            } catch (IOException ioe) {
+                SVNErrorManager.error("svn: Can't read representation in revision file '" + FSRepositoryUtil.getRevisionFile(reposRootDir, propsRepresent.getRevision()).getAbsolutePath() + "': "
+                        + ioe.getMessage());
+            } catch (SVNException svne) {
+                SVNErrorManager.error("svn: Revision file '" + FSRepositoryUtil.getRevisionFile(reposRootDir, propsRepresent.getRevision()).getAbsolutePath() + "' corrupt"
+                        + SVNFileUtil.getNativeEOLMarker() + svne.getMessage());
+            } finally {
+                SVNFileUtil.closeFile(is);
+            }
         }
-        InputStream is = null;
-        try {
-            is = readPlainRepresentation(representation, reposRootDir);
-            Map rawEntries = SVNProperties.asMap(null, is, false, SVNProperties.SVN_HASH_TERMINATOR);
-            return parsePlainRepresentation(rawEntries, true);
-        } catch (IOException ioe) {
-            SVNErrorManager.error("svn: Can't read representation in revision file '" + FSRepositoryUtil.getRevisionFile(reposRootDir, representation.getRevision()).getAbsolutePath() + "': "
-                    + ioe.getMessage());
-        } catch (SVNException svne) {
-            SVNErrorManager.error("svn: Revision file '" + FSRepositoryUtil.getRevisionFile(reposRootDir, representation.getRevision()).getAbsolutePath() + "' corrupt"
-                    + SVNFileUtil.getNativeEOLMarker() + svne.getMessage());
-        } finally {
-            SVNFileUtil.closeFile(is);
-        }
-        return null;
+        return properties;//no properties? return an empty map 
     }
 
     public static InputStream readPlainRepresentation(FSRepresentation representation, File reposRootDir) throws SVNException {
@@ -606,26 +619,22 @@ public class FSReader {
     }
 
     /*
-     * PLAIN hash format is common for dir contents as well as for props
-     * representation - so, isProps is needed to differentiate between text and
-     * props repreentation
+     * Now this routine is intended only for parsing dir entries since
+     * the static method asMap() of SVNProperties does all the job for 
+     * reading properties.
      */
-    private static Map parsePlainRepresentation(Map entries, boolean isProps) throws SVNException {
+    private static Map parsePlainRepresentation(Map entries) throws SVNException {
         Map representationMap = new HashMap();
         Object[] names = entries.keySet().toArray();
         for(int i = 0; i < names.length; i++){
             String name = (String)names[i];
-            if (!isProps) {
-                FSEntry nextRepEntry = null;
-                try {
-                    nextRepEntry = parseRepEntryValue(name, (String)entries.get(names[i]));
-                } catch (SVNException svne) {
-                    SVNErrorManager.error("svn: Directory entry '" + name + "' corrupt");
-                }
-                representationMap.put(name, nextRepEntry);
-            } else {
-                representationMap.put(name, entries.get(name));
+            FSEntry nextRepEntry = null;
+            try {
+                nextRepEntry = parseRepEntryValue(name, (String)entries.get(names[i]));
+            } catch (SVNException svne) {
+                SVNErrorManager.error("svn: Directory entry '" + name + "' corrupt");
             }
+            representationMap.put(name, nextRepEntry);
         }
         return representationMap;
     }
@@ -1021,7 +1030,8 @@ public class FSReader {
         }
         return (int) is.skip(bytesToRead);
     }
-
+    //TODO: replace BufferedReader for some own realization of reading
+    //lines (it may cause unpredictable behaviour if a file is HUGE!)
     public static String readNextLine(File file, BufferedReader reader, long skipBytes) throws SVNException {
         skipBytes = (skipBytes < 0) ? 0 : skipBytes;
         long skipped = -1;
@@ -1045,6 +1055,7 @@ public class FSReader {
         return line;
     }
 
+    //to read single line files only
     public static String readSingleLine(File file) throws SVNException {
         InputStream is = SVNFileUtil.openFileForReading(file);
         if (is == null) {

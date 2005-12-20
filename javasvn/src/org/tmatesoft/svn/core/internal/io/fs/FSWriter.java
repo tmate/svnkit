@@ -427,7 +427,25 @@ public class FSWriter {
         revProps.setPropertyValue(propertyName, propertyNewValue);
         FSHooks.runPostRevPropChangeHook(reposRootDir, propertyName, propertyOldValue, userName, revision, action);
     }
-
+    
+    public static void setProplist(FSRevisionNode node, Map properties, File reposRootDir) throws SVNException {
+        /* Sanity check: this node better be mutable! */
+        if(!node.getId().isTxn()){
+            SVNErrorManager.error("Can't set proplist on *immutable* node-revision " + node.getId().toString());
+        }
+        /* Dump the property list to the mutable property file. */
+        File propsFile = null;
+        propsFile = FSRepositoryUtil.getTxnRevNodePropsFile(node.getId(), reposRootDir);
+        SVNProperties.setProperties(properties, propsFile);
+        /* Mark the node-rev's prop rep as mutable, if not already done. */
+        if(node.getPropsRepresentation() == null || !node.getPropsRepresentation().isTxn()){
+            FSRepresentation mutableRep = new FSRepresentation();
+            mutableRep.setTxnId(node.getId().getTxnID());
+            node.setPropsRepresentation(mutableRep);
+            putTxnRevisionNode(node.getId(), node, reposRootDir);
+        }
+    }
+    
     public static boolean ensureDirExists(File dir, boolean create){
         if(!dir.exists() && create == true){
             return dir.mkdirs();

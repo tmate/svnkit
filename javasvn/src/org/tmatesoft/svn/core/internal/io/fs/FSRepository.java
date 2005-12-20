@@ -215,12 +215,12 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
             rootDir = "/" + rootDir;
         }
         setRepositoryCredentials(uuid, SVNURL.parseURIEncoded(getLocation().getProtocol() + "://" + rootDir));
-        myRevNodesPool.clearAllCaches();
     }
 
-    private void closeRepository() throws SVNException {
+    void closeRepository() throws SVNException {
         try {
             unlockDBFile();
+            myRevNodesPool.clearAllCaches();
         } finally {
             unlock();
         }
@@ -1084,10 +1084,11 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
     public ISVNEditor getCommitEditor(String logMessage, Map locks, boolean keepLocks, ISVNWorkspaceMediator mediator) throws SVNException {
         try {
             openRepository();
-            //TODO: create and return an FSCommitEditor instance
-        } finally {
+        } catch(SVNException svne) {
             closeRepository();
+            throw svne;
         }
+        //TODO: create and return an FSCommitEditor instance
         //TODO: to delete when finished!
         return null;
     }
