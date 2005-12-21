@@ -822,17 +822,12 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
         InputStream inputStream = SVNFileUtil.openFileForReading(revFile);
         if (inputStream == null) {
             SVNErrorManager.error("svn: Can't open file '" + revFile.getAbsolutePath() + "'");
-        }
-        BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
-        try{
-            reader.skip(offsetToFirstChanges);
-        }catch(IOException ex){
-            SVNErrorManager.error("Can't skip elements in '" + revFile.getAbsolutePath() + "' file");
-        }
-    
+        }        
+        RandomAccessFile raReader = SVNFileUtil.openRAFileForReading(revFile);
+        
         Map internalMapChangedPath = changedPaths != null ? new HashMap(changedPaths) : new HashMap();  
         Map internalMapCopyfrom = mapCopyfrom != null ? new HashMap(mapCopyfrom) : new HashMap();
-        FSChange change = FSReader.readChanges(revFile, reader);        
+        FSChange change = FSReader.readChanges(revFile, raReader, offsetToFirstChanges, true);        
         while(change != null){
             ArrayList retArr = foldChange(internalMapChangedPath, change, internalMapCopyfrom);
             internalMapChangedPath = (Map)retArr.get(0);
@@ -847,7 +842,7 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
                     /*TODO understand the iteration of HashMap or Map and get key value of current pair key-value*/
                 }
             }
-            change = FSReader.readChanges(revFile, reader);
+            change = FSReader.readChanges(revFile, raReader, 0, false);
         }
         try{
             inputStream.close();

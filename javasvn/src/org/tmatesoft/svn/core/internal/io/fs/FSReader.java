@@ -1165,9 +1165,10 @@ public class FSReader {
         return -1;
     }
   
-    /* Read changes from revision file, BufferedReader reader must be already opened*/
-    public static FSChange readChanges(File readRevisionFile, BufferedReader reader)throws SVNException{
-        String line = FSReader.readNextLine(readRevisionFile, reader, 0);
+    /* Read changes from revision file, RandomAccessFile reader must be already opened*/
+    public static FSChange readChanges(File readRevisionFile, RandomAccessFile raReader, long offsetToChanges, boolean isFirstInvocationForThisRevisionFile)throws SVNException{
+        /*noo affset */
+        String line = FSReader.readNextLine(readRevisionFile, raReader, offsetToChanges, isFirstInvocationForThisRevisionFile);
         if(line.length() == 0){
             return null;
         }        
@@ -1240,7 +1241,7 @@ public class FSReader {
         }
         String pathStr = piecesOfLine[4];
         
-        String nextLine = FSReader.readNextLine(readRevisionFile, reader, 0);        
+        String nextLine = FSReader.readNextLine(readRevisionFile, raReader, 0, isFirstInvocationForThisRevisionFile);        
         SVNLocationEntry copyfromEntry = null;
         if(nextLine.length() == 0){
             copyfromEntry = new SVNLocationEntry(FSConstants.SVN_INVALID_REVNUM, null);

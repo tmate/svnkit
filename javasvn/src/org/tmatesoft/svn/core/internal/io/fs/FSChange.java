@@ -17,25 +17,15 @@ public class FSChange {
     /*Path of the change*/
     private String path;
     
-    /*Node revision ID of the change*/
-    private FSID noderevID;
-    
-    /*The kind of change*/
-    private FSPathChangeKind kind;
-    
-    /*Text or property mods*/
-    private boolean textModi;
-    private boolean propModi;
+    /*the entity consist of noderev, changeKind, isTextModification and isPropsModification*/
+    private FSPathChange myFSPathChange;    
     
     /*Copyfrom revision and path*/
     private SVNLocationEntry copyfromEntry;
     
     public FSChange(String newPath, FSID newID, FSPathChangeKind newKind, boolean newTextMode, boolean newPropMode, SVNLocationEntry newCopyfromEntry){
         path = newPath;
-        noderevID = new FSID(newID);
-        kind = newKind;
-        textModi = newTextMode;
-        propModi = newPropMode;
+        myFSPathChange = new FSPathChange(new FSID(newID), newKind, newTextMode, newPropMode);
         copyfromEntry = new SVNLocationEntry(newCopyfromEntry.getRevision(), newCopyfromEntry.getPath());
     }
     
@@ -44,19 +34,19 @@ public class FSChange {
     }
     
     public FSID getNodeRevID(){
-        return noderevID;
+        return myFSPathChange.getRevNodeId();
     }
     
     public FSPathChangeKind getKind(){
-        return kind;
+        return myFSPathChange.getChangeKind();
     }    
     
     public boolean getTextModi(){
-        return textModi;
+        return myFSPathChange.isTextModified;
     }
     
     public boolean getPropModi(){
-        return propModi;
+        return myFSPathChange.arePropertiesModified;
     }
     
     public SVNLocationEntry getCopyfromEntry(){
