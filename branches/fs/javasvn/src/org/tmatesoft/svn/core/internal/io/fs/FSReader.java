@@ -14,6 +14,7 @@ package org.tmatesoft.svn.core.internal.io.fs;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNLock;
 import org.tmatesoft.svn.core.SVNNodeKind;
+import org.tmatesoft.svn.core.io.SVNLocationEntry;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
 import org.tmatesoft.svn.core.internal.util.SVNTimeUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
@@ -1178,5 +1179,101 @@ public class FSReader {
         }
 
         return -1;
+    }
+  
+    /* Read changes from revision file, BufferedReader reader must be already opened*/
+    public static FSChange readChanges(File readRevisionFile, BufferedReader reader)throws SVNException{
+        String line = FSReader.readNextLine(readRevisionFile, reader, 0);
+        if(line.length() == 0){
+            return null;
+        }        
+        String [] piecesOfLine = line.split(" ");
+        if(piecesOfLine == null){
+            SVNErrorManager.error("Invalid changes line in rev-file");
+        }
+        if(piecesOfLine.length < 1 || piecesOfLine[0] == null){
+            SVNErrorManager.error("Invalid changes line in rev-file");
+        }
+        String nodeRevStr = piecesOfLine[0];
+        FSID nodeRevID = parseID(nodeRevStr);
+        if(piecesOfLine.length < 2 || piecesOfLine[1] == null){
+            SVNErrorManager.error("Invalid changes line in rev-file");
+        }
+        
+        String changesKindStr = piecesOfLine[1];
+        FSPathChangeKind changesKind = null;
+        if(changesKindStr.equals(new String(FSConstants.ACTION_MODIFY))){
+            changesKind.equals(FSPathChangeKind.FS_PATH_CHANGE_MODIFY);
+        }
+        else if(changesKindStr.equals(new String(FSConstants.ACTION_ADD))){
+            changesKind.equals(FSPathChangeKind.FS_PATH_CHANGE_ADD);
+        }
+        else if(changesKindStr.equals(new String(FSConstants.ACTION_DELETE))){
+            changesKind.equals(FSPathChangeKind.FS_PATH_CHANGE_DELETE);
+        }
+        else if(changesKindStr.equals(new String(FSConstants.ACTION_REPLACE))){
+            changesKind.equals(FSPathChangeKind.FS_PATH_CHANGE_REPLACE);
+        }
+        else if(changesKindStr.equals(new String(FSConstants.ACTION_RESET))){
+            changesKind.equals(FSPathChangeKind.FS_PATH_CHANGE_RESET);
+        }
+        else{
+            SVNErrorManager.error("Invalid change kind in rev file");
+        }
+        
+        if(piecesOfLine.length < 3 || piecesOfLine[2] == null){
+            SVNErrorManager.error("Invalid changes line in rev-file");
+        }        
+        String textModeStr = piecesOfLine[2];
+        boolean textModeBool = false;
+        if(textModeStr.equals(FSConstants.FLAG_TRUE)){
+            textModeBool = true;
+        }
+        if(textModeStr.equals(FSConstants.FLAG_FALSE)){
+            textModeBool = false;
+        }
+        else{
+            SVNErrorManager.error("Invalid text-mod flag in rev-file");
+        }
+        
+        if(piecesOfLine.length < 4 || piecesOfLine[3] == null){
+            SVNErrorManager.error("Invalid changes line in rev-file");
+        }
+        String propModeStr = piecesOfLine[3];
+        boolean propModeBool = false;
+        if(propModeStr.equals(new String(FSConstants.FLAG_TRUE))){
+            propModeBool = true;
+        }
+        if(propModeStr.equals(new String(FSConstants.FLAG_FALSE))){
+            propModeBool = false;
+        }
+        else{
+            SVNErrorManager.error("Invalid prop-mod flag in rev-file");
+        }
+        
+        if(piecesOfLine.length < 5 || piecesOfLine[4] == null){
+            SVNErrorManager.error("Invalid changes line in rev-file");
+        }
+        String pathStr = piecesOfLine[4];
+        
+        String nextLine = FSReader.readNextLine(readRevisionFile, reader, 0);        
+        SVNLocationEntry copyfromEntry = null;
+        if(nextLine.length() == 0){
+            copyfromEntry = new SVNLocationEntry(FSConstants.SVN_INVALID_REVNUM, null);
+        }
+        else{
+            String [] piesesOfNextLine = nextLine.split(" ");
+            if(piesesOfNextLine == null){
+                SVNErrorManager.error("Invalid changes line in rev-file");
+            }
+            if(piesesOfNextLine.length < 1 || piesesOfNextLine[0] == null){
+                SVNErrorManager.error("Invalid changes line in rev-file");
+            }
+            if(piesesOfNextLine.length < 2 || piesesOfNextLine[1] == null){
+                SVNErrorManager.error("Invalid changes line in rev-file");
+            }
+            copyfromEntry = new SVNLocationEntry(Long.parseLong(piesesOfNextLine[0]), piesesOfNextLine[1]);
+        }
+        return new FSChange(new String(pathStr), new FSID(nodeRevID), changesKind, textModeBool, propModeBool, copyfromEntry);
     }
 }

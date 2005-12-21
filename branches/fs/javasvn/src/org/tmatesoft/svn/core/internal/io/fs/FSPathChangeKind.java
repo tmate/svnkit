@@ -41,4 +41,8 @@ public class FSPathChangeKind {
         }
         return myID == ((FSPathChangeKind) o).myID;
     }
+    
+    public int intValue(){
+        return myID;
+    }
 }
