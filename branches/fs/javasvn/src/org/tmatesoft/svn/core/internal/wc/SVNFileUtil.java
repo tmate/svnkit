@@ -789,6 +789,24 @@ public class SVNFileUtil {
         return null;
     }
 
+    public static RandomAccessFile openRAFileForReading(File file) throws SVNException {
+        if (file == null) {
+            return null;
+        }
+        if (!file.isFile() || !file.canRead()) {
+            SVNErrorManager.error("svn: Cannot read from '" + file + "': path refers to directory or read access denied");
+        }
+        if (!file.exists()) {
+            SVNErrorManager.error("File '" + file.getAbsolutePath() + "' does not exist");
+        }
+        try {
+            return new RandomAccessFile(file, "r");
+        } catch (FileNotFoundException e) {
+            SVNErrorManager.error("svn: Cannot read from '" + file + "': " + e.getMessage());
+        }
+        return null;
+    }
+
     public static void closeFile(InputStream is) {
         if (is == null) {
             return;
