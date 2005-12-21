@@ -447,6 +447,9 @@ public class FSReader {
     }
 
     public static void readDeltaRepresentation(FSRepresentation representation, OutputStream targetOS, File reposRootDir) throws SVNException {
+        if(representation == null){
+            return;
+        }
         File revFile = FSRepositoryUtil.getRevisionFile(reposRootDir, representation.getRevision());
         DefaultFSDeltaCollector collector = new DefaultFSDeltaCollector();
         getDiffWindow(collector, representation.getRevision(), representation.getOffset(), representation.getSize(), reposRootDir);
@@ -929,24 +932,18 @@ public class FSReader {
         if (offset < 0) {
             return null;
         }
-
-        InputStream is = SVNFileUtil.openFileForReading(revFile);
-        if (is == null) {
-            SVNErrorManager.error("svn: Can't open file '" + revFile.getAbsolutePath() + "'");
-        }
-        BufferedReader reader = new BufferedReader(new InputStreamReader(is));
-
-        boolean isFirstLine = true;
+        RandomAccessFile raFile = null;
         Map map = new HashMap();
         try {
+            raFile = SVNFileUtil.openRAFileForReading(revFile);
+            boolean isFirstLine = true;
             while (true) {
-                String line = readNextLine(revFile, reader, offset);
+                String line = readNextLine(revFile, raFile, offset, isFirstLine);
                 if (line == null || line.length() == 0) {
                     break;
                 }
                 if (isFirstLine) {
                     isFirstLine = false;
-                    offset = 0;
                 }
                 int colonIndex = line.indexOf(':');
                 if (colonIndex < 0) {
@@ -958,7 +955,7 @@ public class FSReader {
                 map.put(localName, localValue.trim());
             }
         } finally {
-            SVNFileUtil.closeFile(reader);
+            SVNFileUtil.closeFile(raFile);
         }
         return map;
     }
@@ -967,50 +964,35 @@ public class FSReader {
         if (bytesToRead < 0 || file == null) {
             return null;
         }
-
         if (!file.canRead() || !file.isFile()) {
             SVNErrorManager.error("svn: Cannot read from '" + file + "': path refers to a directory or read access denied");
         }
-
         RandomAccessFile revRAF = null;
+        byte[] result = null;
         try {
-            revRAF = new RandomAccessFile(file, "r");
-        } catch (FileNotFoundException fnfe) {
-            SVNErrorManager.error("svn: Can't open file '" + file.getAbsolutePath() + "': " + fnfe.getMessage());
-        }
-
-        long fileLength = -1;
-        try {
+            revRAF = SVNFileUtil.openRAFileForReading(file);
+            long fileLength = -1;
             fileLength = revRAF.length();
-        } catch (IOException ioe) {
-            SVNErrorManager.error("svn: Can't open file '" + file.getAbsolutePath() + "': " + ioe.getMessage());
-        }
-
-        if (pos == FILE_END_POS) {
-            pos = fileLength - 1 + offset;
-        } else {
-            pos = pos + offset;
-        }
-        byte[] buf = new byte[bytesToRead];
-
-        int r = -1;
-        try {
+            if (pos == FILE_END_POS) {
+                pos = fileLength - 1 + offset;
+            } else {
+                pos = pos + offset;
+            }
+            byte[] buf = new byte[bytesToRead];
+            int r = -1;
             revRAF.seek(pos + 1);
             r = revRAF.read(buf);
-
             if (r <= 0) {
                 throw new IOException("eof unexpectedly found");
             }
+            result = new byte[r];
+            System.arraycopy(buf, 0, result, 0, r);
         } catch (IOException ioe) {
             SVNErrorManager.error("svn: Can't read length line in file '" + file.getAbsolutePath() + "': " + ioe.getMessage());
         } finally {
             SVNFileUtil.closeFile(revRAF);
         }
-
-        ByteArrayOutputStream os = new ByteArrayOutputStream();
-        os.write(buf, 0, r);
-
-        return os.toByteArray();
+        return result;
     }
 
     private static long readBytesFromStream(long bytesToRead, InputStream is, OutputStream os) throws IOException {
@@ -1031,28 +1013,30 @@ public class FSReader {
         }
         return (int) is.skip(bytesToRead);
     }
-    //TODO: replace BufferedReader for some own realization of reading
+    //TODO: replace BufferedReader for some other realization of reading
     //lines (it may cause unpredictable behaviour if a file is HUGE!)
-    public static String readNextLine(File file, BufferedReader reader, long skipBytes) throws SVNException {
-        skipBytes = (skipBytes < 0) ? 0 : skipBytes;
-        long skipped = -1;
-        try {
-            skipped = reader.skip(skipBytes);
-        } catch (IOException ioe) {
-            SVNErrorManager.error("svn: Can't set position pointer in file '" + file.getAbsolutePath() + "'");
+    public static String readNextLine(File file, RandomAccessFile raFile, long offset, boolean makeOffset) throws SVNException {
+        offset = (offset < 0) ? 0 : offset;
+        if(makeOffset){
+            try {
+                raFile.seek(offset);
+            } catch (IOException ioe) {
+                SVNErrorManager.error("svn: Can't set position pointer in file '" + file.getAbsolutePath() + "'");
+            }
         }
-
-        if (skipped < skipBytes) {
-            SVNErrorManager.error("svn: Can't set position pointer in file '" + file.getAbsolutePath() + "'");
-        }
-
-        String line = null;
-
+        StringBuffer lineBuffer = new StringBuffer();
         try {
-            line = reader.readLine();
+            int r = -1;
+            while((r = raFile.read()) != '\n'){
+                if(r == -1){
+                    break;
+                }
+                lineBuffer.append((char)r);
+            }
         } catch (IOException ioe) {
             SVNErrorManager.error("svn: Can't read file ");
         }
+        String line = lineBuffer.toString();
         return line;
     }
 

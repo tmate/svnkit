@@ -46,3 +46,10 @@ Remarks to the file:/// protocol implementation (FSRepository):
    are doing that only for txns. Maybe I should leave it as it is and maybe 
    it's not an issue at all, since it's pretty handy to have a single pool for
    reading operations. Hmm.. We'll see what we shall see.
+---------------------------------------------------------------------------------
+7) FSRepository.getFile() must be redone!!! It doesn't work correctly with huge |
+   binary files (for example)!! Critical bug!                                   |
+---------------------------------------------------------------------------------
+
+8)I'm afraid
+   
