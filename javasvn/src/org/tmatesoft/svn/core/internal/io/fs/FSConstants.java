@@ -130,4 +130,8 @@ public class FSConstants {
     
     //invalid revision number, suppose it to be -1
     public static final int SVN_INVALID_REVNUM = -1;
+    
+    public static final String FLAG_TRUE = "true";
+    public static final String FLAG_FALSE = "false";
+    
 }
