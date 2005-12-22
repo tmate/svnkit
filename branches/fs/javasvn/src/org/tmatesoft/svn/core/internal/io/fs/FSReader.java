@@ -45,7 +45,53 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 
 public class FSReader {
+    /* Given a representation 'rep', open the correct file and seek to the 
+     * correction location. 
+     */
+    public static RandomAccessFile openAndSeekRepresentation(FSRepresentation rep, File reposRootDir) throws SVNException {
+        if(!rep.isTxn()){
+            return openAndSeekRevision(rep, reposRootDir);
+        }
+        return openAndSeekTransaction(rep, reposRootDir);
+    }
 
+    /* Open the representation for a node-revision in a transaction in 
+     * filesystem. Seek to an offset location before returning. Only appropriate 
+     * for file contents, nor props or directory contents. 
+     */
+    private static RandomAccessFile openAndSeekTransaction(FSRepresentation rep, File reposRootDir) throws SVNException {
+        RandomAccessFile file = null;
+        try{
+            file = SVNFileUtil.openRAFileForReading(FSRepositoryUtil.getTxnRevFile(rep.getHexDigest(), reposRootDir));
+            file.seek(rep.getOffset());
+        }catch(IOException ioe){
+            SVNFileUtil.closeFile(file);
+            SVNErrorManager.error(ioe.getMessage());
+        }catch(SVNException svne){
+            SVNFileUtil.closeFile(file);
+            throw svne;
+        }
+        return file; 
+    }
+
+    /* Open the revision file for a revision in a filesystem. Seek to an offset 
+     * location before returning. 
+     */
+    private static RandomAccessFile openAndSeekRevision(FSRepresentation rep, File reposRootDir) throws SVNException {
+        RandomAccessFile file = null;
+        try{
+            file = SVNFileUtil.openRAFileForReading(FSRepositoryUtil.getRevisionFile(reposRootDir, rep.getRevision()));
+            file.seek(rep.getOffset());
+        }catch(IOException ioe){
+            SVNFileUtil.closeFile(file);
+            SVNErrorManager.error(ioe.getMessage());
+        }catch(SVNException svne){
+            SVNFileUtil.closeFile(file);
+            throw svne;
+        }
+        return file; 
+    }
+    
     // to mean the end of a file
     public static final long FILE_END_POS = -1;
 
@@ -938,7 +984,7 @@ public class FSReader {
             raFile = SVNFileUtil.openRAFileForReading(revFile);
             boolean isFirstLine = true;
             while (true) {
-                String line = readNextLine(revFile, raFile, offset, isFirstLine);
+                String line = readNextLine(revFile, raFile, offset, isFirstLine, 1024);
                 if (line == null || line.length() == 0) {
                     break;
                 }
@@ -1013,28 +1059,34 @@ public class FSReader {
         }
         return (int) is.skip(bytesToRead);
     }
-    //TODO: replace BufferedReader for some other realization of reading
-    //lines (it may cause unpredictable behaviour if a file is HUGE!)
-    public static String readNextLine(File file, RandomAccessFile raFile, long offset, boolean makeOffset) throws SVNException {
+
+    /* limitBytes MUST NOT be 0! it defines the maximum number of bytes 
+     * that should be read (not counting EOL)
+     */ 
+    public static String readNextLine(File file, RandomAccessFile raFile, long offset, boolean makeOffset, int limitBytes) throws SVNException {
         offset = (offset < 0) ? 0 : offset;
         if(makeOffset){
             try {
                 raFile.seek(offset);
             } catch (IOException ioe) {
-                SVNErrorManager.error("svn: Can't set position pointer in file '" + file.getAbsolutePath() + "'");
+                SVNErrorManager.error("svn: Can't set position pointer in " + (file != null ? "file '" + file.getAbsolutePath() + "': " + ioe.getMessage() : "stream"));
             }
         }
         StringBuffer lineBuffer = new StringBuffer();
+        int r = -1;
         try {
-            int r = -1;
             while((r = raFile.read()) != '\n'){
-                if(r == -1){
+                if(r == -1 || limitBytes == 0){
                     break;
                 }
                 lineBuffer.append((char)r);
+                --limitBytes;
             }
         } catch (IOException ioe) {
-            SVNErrorManager.error("svn: Can't read file ");
+            SVNErrorManager.error("Can't read length line in " + (file != null ? "file '" + file.getAbsolutePath() + "': " + ioe.getMessage() : "stream"));
+        }
+        if(limitBytes == 0){
+            SVNErrorManager.error("Can't read length line in " + (file != null ? "file '" + file.getAbsolutePath() + "'" : "stream"));
         }
         String line = lineBuffer.toString();
         return line;
@@ -1168,7 +1220,7 @@ public class FSReader {
     /* Read changes from revision file, RandomAccessFile reader must be already opened*/
     public static FSChange readChanges(File readRevisionFile, RandomAccessFile raReader, long offsetToChanges, boolean isFirstInvocationForThisRevisionFile)throws SVNException{
         /*noo affset */
-        String line = FSReader.readNextLine(readRevisionFile, raReader, offsetToChanges, isFirstInvocationForThisRevisionFile);
+        String line = FSReader.readNextLine(readRevisionFile, raReader, offsetToChanges, isFirstInvocationForThisRevisionFile, 4096);
         if(line.length() == 0){
             return null;
         }        
@@ -1241,7 +1293,7 @@ public class FSReader {
         }
         String pathStr = piecesOfLine[4];
         
-        String nextLine = FSReader.readNextLine(readRevisionFile, raReader, 0, isFirstInvocationForThisRevisionFile);        
+        String nextLine = FSReader.readNextLine(readRevisionFile, raReader, 0, isFirstInvocationForThisRevisionFile, 4096);        
         SVNLocationEntry copyfromEntry = null;
         if(nextLine.length() == 0){
             copyfromEntry = new SVNLocationEntry(FSConstants.SVN_INVALID_REVNUM, null);
