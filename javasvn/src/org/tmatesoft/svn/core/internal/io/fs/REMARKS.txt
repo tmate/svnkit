@@ -51,5 +51,7 @@ Remarks to the file:/// protocol implementation (FSRepository):
    binary files (for example)!! Critical bug!                                   |
 ---------------------------------------------------------------------------------
 
-8)I'm afraid
+8)I'm afraid that opening files with SVNFileUtil.openFileForReading(File file) is 
+a little bit different from what I need: if a file doesn't exist it should throw an
+exception rather than returning a DUMMY IOStream.
    
