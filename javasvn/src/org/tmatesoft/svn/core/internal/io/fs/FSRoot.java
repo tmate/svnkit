@@ -35,8 +35,8 @@ public class FSRoot {
     
     /* Cache structure for mapping String PATH to String COPYFROM_STRING, 
      * so that pathsChanged can remember all the copyfrom information in the changes file.
-     * COPYFROM_STRING has the format "REV PATH", or is the empty string if
-     * the path was added without history*/
+     * COPYFROM_STRING has the format "REV PATH" (i.e SVNLocationEntry), 
+     * or is the empty string (i.e "" : SVNLocationEntry's getPath() == "") if the path was added without history*/
     private Map myCopyfromCache;
     
     //only for transactions 

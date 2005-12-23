@@ -52,4 +52,8 @@ public class FSChange {
     public SVNLocationEntry getCopyfromEntry(){
         return copyfromEntry;
     }
+    
+    public FSPathChange getFSPathChange(){
+        return myFSPathChange;
+    }
 }
