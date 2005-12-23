@@ -655,6 +655,7 @@ public class SVNUpdateClient extends SVNBasicClient {
                     url = url.substring(oldURL.length());
                     url = SVNPathUtil.append(newURL, url);
                     entry.setURL(url);
+                    dir.getWCProperties(entry.getName()).delete();
                 }
             }
         }
