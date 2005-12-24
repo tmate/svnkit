@@ -105,7 +105,7 @@ public class FSRepresentation {
     }
     
     public void setTxnId(String txnId) {
-        myTxnId = txnId;
+        myTxnId = txnId == null ? FSID.ID_INAPPLICABLE : txnId;
     }
     
     public boolean isTxn(){

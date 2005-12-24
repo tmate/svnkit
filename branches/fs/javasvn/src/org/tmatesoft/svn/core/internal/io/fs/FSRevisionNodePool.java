@@ -67,7 +67,6 @@ public abstract class FSRevisionNodePool {
         }
         FSTransaction txn = FSReader.getTxn(root.getTxnId(), reposRootDir);
         FSRevisionNode txnRootRevNode = FSReader.getRevNodeFromID(reposRootDir, txn.getRootId()); 
-//        root.setRootRevisionNode(rootRevNode);??
         return txnRootRevNode;
     }
 
