@@ -46,6 +46,42 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 
 public class FSReader {
+    
+    public static void getFileContents(FSRevisionNode revNode, OutputStream contents, File reposRootDir) throws SVNException {
+        if (revNode.getType() != SVNNodeKind.FILE) {
+            SVNErrorManager.error("svn: Attempted to get textual contents of a *non*-file node");
+        }
+        //FSReader.readDeltaRepresentation(revNode.getTextRepresentation(), contents, myReposRootDir);
+        FSRepresentation textRep = revNode.getTextRepresentation();
+        if(textRep == null){
+            return;
+        }
+        FSInputStream fileStream = null;
+        try{
+            fileStream = FSInputStream.createStream(textRep, reposRootDir);
+            /* Read and write chunks until we get a short read, indicating the
+             * end of the stream.  (We can't get a short write without an
+             * associated error.) 
+             */
+            while(true){
+                byte[] buffer = new byte[FSConstants.SVN_STREAM_CHUNK_SIZE];
+                int length = fileStream.read(buffer);
+                if(length > 0){
+                    contents.write(buffer, 0, length);
+                }
+                if(length != FSConstants.SVN_STREAM_CHUNK_SIZE){
+                    break;
+                }
+            }
+        }catch(IOException ioe){
+            SVNErrorManager.error(ioe.getMessage());
+        }finally{
+            if(fileStream != null){
+                fileStream.close();
+            }
+        }
+    }
+
     /* Given a representation 'rep', open the correct file and seek to the 
      * correction location. 
      */
@@ -550,12 +586,10 @@ public class FSReader {
         if (collector == null) {
             return;
         }
-
         File revFile = FSRepositoryUtil.getRevisionFile(reposRootDir, revision);
         InputStream is = null;
         try {
             is = SVNFileUtil.openFileForReading(revFile);
-
             try {
                 readBytesFromStream(new Long(offset).intValue(), is, null);
             } catch (IOException ioe) {
@@ -569,7 +603,6 @@ public class FSReader {
             } catch (IOException ioe) {
                 SVNErrorManager.error("svn: Can't read file '" + revFile.getAbsolutePath() + "': " + ioe.getMessage());
             }
-
             if (header != null && header.startsWith(FSConstants.REP_DELTA)) {
                 ByteArrayOutputStream os = new ByteArrayOutputStream();
                 try {
@@ -622,7 +655,6 @@ public class FSReader {
                         break;
                     }
                 }
-
                 while (windowsPerRevision.size() > 0) {
                     SVNDiffWindow nextWindow = (SVNDiffWindow) windowsPerRevision.getLast();
                     ByteArrayOutputStream deltaDataBytes = (ByteArrayOutputStream) windowsData.get(nextWindow);

@@ -12,8 +12,8 @@
 package org.tmatesoft.svn.core.internal.io.fs;
 
 import java.io.RandomAccessFile;
-import java.util.List;
 import java.io.File;
+import java.io.IOException;
 import java.util.LinkedList;
 
 import org.tmatesoft.svn.core.SVNException;
@@ -28,17 +28,20 @@ import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
  * @author  TMate Software Ltd.
  */
 public class FSRepresentationState {
-    private RandomAccessFile file;
+    RandomAccessFile file;
     /* The starting offset for the raw svndiff/plaintext data minus header. */
-    private long start;
+    long start;
     /* The current offset into the file. */
-    private long offset;
+    long offset;
     /* The end offset of the raw data. */
-    private long end;
+    long end;
     /* If a delta, what svndiff version? */
-    private int version;
+    int version;
     
-    private int chunkIndex;
+    int chunkIndex;
+
+    public FSRepresentationState() {
+    }
 
     public FSRepresentationState(RandomAccessFile file, long start, long offset, long end, int version, int index) {
         this.file = file;
@@ -48,63 +51,57 @@ public class FSRepresentationState {
         this.version = version;
         chunkIndex = index;
     }
-    
-    public int getChunkIndex() {
-        return chunkIndex;
-    }
-
-    public void setChunkIndex(int chunkIndex) {
-        this.chunkIndex = chunkIndex;
-    }
-    
-    public long getEnd() {
-        return end;
-    }
-    
-    public void setEnd(long end) {
-        this.end = end;
-    }
-
-    public RandomAccessFile getFile() {
-        return file;
-    }
-    
-    public void setFile(RandomAccessFile file) {
-        this.file = file;
-    }
-
-    public long getOffset() {
-        return offset;
-    }
-    
-    public void setOffset(long offset) {
-        this.offset = offset;
-    }
-
-    public long getStart() {
-        return start;
-    }
-
-    public void setStart(long start) {
-        this.start = start;
-    }
-    
-    public int getVersion() {
-        return version;
-    }
-
-    public void setVersion(int version) {
-        this.version = version;
-    }
 
     /* Build an array of FSRepresentationState objects in 'result' giving the delta
      * reps from firstRep to a self-compressed rep. 
+     * NOTE: This list is not used for PLAIN text reading in JavaSVN. Intended only
+     * for reading file deltas.
      */
-    public static List buildRepresentationList(FSRepresentation firstRep, List result, File reposRootDir) throws SVNException {
+    public static LinkedList buildRepresentationList(FSRepresentation firstRep, LinkedList result, File reposRootDir) throws SVNException {
         result = result == null ? new LinkedList() : result;
-        while(true){
-            
+        RandomAccessFile file = null;
+        FSRepresentation rep = new FSRepresentation(firstRep);
+        try{
+            while(true){
+                file = FSReader.openAndSeekRepresentation(rep, reposRootDir);
+                FSRepresentationArgs repArgs = readRepresentationLine(file);
+                /* Create the rep_state for this representation. */
+                FSRepresentationState repState = new FSRepresentationState();
+                repState.file = file;
+                repState.start = file.getFilePointer();
+                repState.offset = repState.start;
+                repState.end = repState.start + rep.getSize();
+                if(!repArgs.isDelta){
+                    /* This is a plaintext, so just return the current repState. */
+                    return result;
+                }
+                /* We are dealing with a delta, find out what version. */
+                byte[] buffer = new byte[4];
+                int r = file.read(buffer);
+                if(!(buffer[0] == 'S' && buffer[1] == 'V' && buffer[2] == 'N' && r == 4)){
+                    SVNErrorManager.error("Malformed svndiff data in representation");
+                }
+                repState.version = buffer[3];
+                repState.chunkIndex = 0;
+                repState.offset+= 4;
+                /* Push this rep onto the list.  If it's self-compressed, we're done. */
+                result.addLast(repState);
+                if(repArgs.isDeltaVsEmpty){
+                    return result;
+                }
+                rep.setRevision(repArgs.myBaseRevision);
+                rep.setOffset(repArgs.myBaseOffset);
+                rep.setSize(repArgs.myBaseLength);
+                rep.setTxnId(null);
+            }
+        }catch(IOException ioe){
+            SVNFileUtil.closeFile(file);
+            SVNErrorManager.error(ioe.getMessage());
+        }catch(SVNException svne){
+            SVNFileUtil.closeFile(file);
+            throw svne;
         }
+        return null;
     }
 
     /* Read the next line from a file and parse it as a text

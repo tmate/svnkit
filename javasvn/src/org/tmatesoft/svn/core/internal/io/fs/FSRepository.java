@@ -414,7 +414,7 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
             } else if (revNode.getType() != SVNNodeKind.FILE) {
                 SVNErrorManager.error("svn: Path at '" + path + "' is not a file, but " + revNode.getType());
             }
-            getFileContents(revNode, contents);
+            FSReader.getFileContents(revNode, contents, myReposRootDir);
             if (properties != null) {
                 properties.putAll(collectProperties(revNode, myReposRootDir));
             }
@@ -422,16 +422,6 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
         } finally {
             closeRepository();
         }
-    }
-    
-    private void getFileContents(FSRevisionNode revNode, OutputStream contents) throws SVNException {
-        if(revNode == null){
-            return;
-        }
-        if (revNode.getType() != SVNNodeKind.FILE) {
-            SVNErrorManager.error("svn: Attempted to get textual contents of a *non*-file node");
-        }
-        FSReader.readDeltaRepresentation(revNode.getTextRepresentation(), contents, myReposRootDir);
     }
     
     // path is relative to this FSRepository's location
@@ -1630,8 +1620,8 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
             OutputStream file2OS = SVNFileUtil.openFileForWriting(tgtFile);
             FSRevisionNode sourceNode = myRevNodesPool.getRevisionNode(sourceRevision, sourcePath, myReposRootDir);
             FSRevisionNode targetNode = myRevNodesPool.getRevisionNode(myReporterContext.getTargetRoot(), targetPath, myReposRootDir);
-            getFileContents(sourceNode, file1OS);
-            getFileContents(targetNode, file2OS);
+            FSReader.getFileContents(sourceNode, file1OS, myReposRootDir);
+            FSReader.getFileContents(targetNode, file2OS, myReposRootDir);
             SVNFileUtil.closeFile(file1OS);
             SVNFileUtil.closeFile(file2OS);
             SVNRAFileData srcRAFile = new SVNRAFileData(srcFile, true);
@@ -1683,8 +1673,8 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
         File file2 = FSWriter.createUniqueTemporaryFile("target", ".tmp");
         OutputStream file1OS = SVNFileUtil.openFileForWriting(file1);
         OutputStream file2OS = SVNFileUtil.openFileForWriting(file2);
-        getFileContents(revNode1, file1OS);
-        getFileContents(revNode2, file2OS);
+        FSReader.getFileContents(revNode1, file1OS, myReposRootDir);
+        FSReader.getFileContents(revNode2, file2OS, myReposRootDir);
         SVNFileUtil.closeFile(file1OS);
         SVNFileUtil.closeFile(file2OS);
         InputStream file1IS = SVNFileUtil.openFileForReading(file1);

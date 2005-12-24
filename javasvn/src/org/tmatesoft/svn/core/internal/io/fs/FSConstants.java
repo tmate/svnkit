@@ -134,4 +134,6 @@ public class FSConstants {
     public static final String FLAG_TRUE = "true";
     public static final String FLAG_FALSE = "false";
     
+    public static final int SVN_STREAM_CHUNK_SIZE = 102400;
+    
 }

@@ -15,6 +15,7 @@ package org.tmatesoft.svn.core.io.diff;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.RandomAccessFile;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -146,6 +147,77 @@ public class SVNDiffWindowBuilder {
                 // all is read.
         }
         return offset;
+    }
+
+    public void accept(RandomAccessFile file) throws SVNException, IOException {       
+        switch (myState) {
+            case HEADER:
+                try{
+                    for(int i = 0; i < myHeader.length; i++) {
+                        if (myHeader[i] < 0) {
+                            int r = file.read();
+                            if (r < 0) {
+                                break;
+                            }
+                            myHeader[i] = (byte) (r & 0xFF);
+                        }
+                    }
+                    if (myHeader[myHeader.length - 1] >= 0) {
+                        myState = OFFSET;
+                        accept(file);
+                        return;
+                    }
+                }catch(IOException ioe){
+                    SVNErrorManager.error(ioe.getMessage());
+                }
+                SVNErrorManager.error("Malformed svndiff data");
+            case OFFSET:
+                for(int i = 0; i < myOffsets.length; i++) {
+                    if (myOffsets[i] < 0) {
+                        readInt(file, myOffsets, i);
+                        if (myOffsets[i] < 0) {
+                            SVNErrorManager.error("Svndiff contains corrupt window header");
+                        }
+                    }
+                }
+                if (myOffsets[myOffsets.length - 1] >= 0) {
+                    myState = INSTRUCTIONS;
+                    accept(file);
+                    return;
+                }
+                SVNErrorManager.error("Svndiff contains corrupt window header");
+            case INSTRUCTIONS:
+                if (myOffsets[3] > 0) {
+                    if (myInstructions == null) {
+                        myInstructions = new byte[myOffsets[3]];                        
+                    }
+                    int length =  myOffsets[3];
+                    // read length bytes (!!!!)
+                    try {
+                        length = file.read(myInstructions, myInstructions.length - length, length);
+                    } catch (IOException e) {
+                        SVNErrorManager.error(e.getMessage());
+                    }
+                    if (length <= 0) {
+                        SVNErrorManager.error("Unexpected end of svndiff input");
+                    }
+                    myOffsets[3] -= length;
+                    if (myOffsets[3] == 0) {
+                        myState = DONE;
+                        if (myDiffWindow == null) {
+                            myDiffWindow = createDiffWindow(myOffsets, myInstructions);
+                        }
+                    }else{
+                        SVNErrorManager.error("Unexpected end of svndiff input");
+                    }
+                }
+                if (myDiffWindow == null) {
+                    myDiffWindow = createDiffWindow(myOffsets, myInstructions);
+                } 
+                myState = DONE;
+            default:
+                // all is read.
+        }
     }
 
     public boolean accept(InputStream is, ISVNEditor consumer, String path) throws SVNException {       
@@ -383,6 +455,23 @@ public class SVNDiffWindowBuilder {
                 is.reset();
                 target[index] = -1;
                 return;
+            }
+            byte b = (byte) (r & 0xFF);
+            target[index] = target[index] << 7;
+            target[index] = target[index] | (b & 0x7f);
+            if ((b & 0x80) != 0) {
+                continue;
+            }
+            return;
+        }
+    }
+
+    private static void readInt(RandomAccessFile file, int[] target, int index) throws SVNException, IOException {
+        target[index] = 0;
+        while(true) {
+            int r = file.read();
+            if (r < 0) {
+                SVNErrorManager.error("Unexpected end of svndiff input");
             }
             byte b = (byte) (r & 0xFF);
             target[index] = target[index] << 7;
