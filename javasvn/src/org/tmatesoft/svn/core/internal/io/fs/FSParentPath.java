@@ -63,7 +63,12 @@ public class FSParentPath
 		nameEntry = newEntry;
 		parent = newParentPath;
 		copyStyle = FSParentPath.COPY_ID_INHERIT_UNKNOWN;
-		copySrcPath = null;
+        if(newRevNode != null){
+            copySrcPath = newRevNode.getCopyFromPath();
+        }else{
+            copySrcPath = null;
+        }
+		
 	}
 	
 	//methods-accessors

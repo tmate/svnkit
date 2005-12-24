@@ -62,17 +62,12 @@ public class FSNodeHistory
 	//filesystem FS, and store the copyroot in *REV_P and *PATH_P.
 	public static SVNLocationEntry findYoungestCopyroot(File reposRootDir, FSParentPath parPath)throws SVNException{		
 		SVNLocationEntry parentEntry = null;
-		SVNLocationEntry myEntry;		
+		SVNLocationEntry myEntry = null;		
 		
 		if(parPath.getParent() != null){
 			parentEntry = FSNodeHistory.findYoungestCopyroot(reposRootDir, parPath.getParent());
 		}
-		myEntry = new SVNLocationEntry(parPath.getRevNode().getCopyFromRevision(), parPath.getRevNode().getCopyFromPath()); 
-		if(myEntry == null){
-			System.out.println("returning value (SVNLocationEntry myEntry) is null");
-			//not good desision
-			return null;
-		}
+		myEntry = new SVNLocationEntry(parPath.getRevNode().getCopyRootRevision(), parPath.getRevNode().getCopyRootPath()); 
 		if(parentEntry != null){
 			if(myEntry.getRevision() >= parentEntry.getRevision()){
 				return myEntry;

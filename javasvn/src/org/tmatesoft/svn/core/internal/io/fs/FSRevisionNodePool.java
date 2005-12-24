@@ -77,7 +77,7 @@ public abstract class FSRevisionNodePool {
         String pathSoFar = "/";
         
         //Make a parentPath item for the root node, using its own current copy-id
-        FSParentPath parentPath = new FSParentPath(here, null, null);
+        FSParentPath parentPath = new FSParentPath(here, "/", null);
         parentPath.setCopyStyle(FSParentPath.COPY_ID_INHERIT_SELF);
         
         String rest = canonPath.substring(1);// skip the leading '/'
@@ -94,12 +94,7 @@ public abstract class FSRevisionNodePool {
             if(entry == null || "".equals(entry)){
                 child = here;
             }else{
-                FSRevisionNode cachedRevNode = fetchRevisionNode(root, pathSoFar, reposRootDir);//getRevisionNode(root.getRootRevisionNode(), pathSoFar, reposRootDir); 
-                if(cachedRevNode != null){
-                    child = cachedRevNode;
-                }else{
-                    child = FSReader.getChildDirNode(entry, here, reposRootDir);
-                }
+                child = this.getRevisionNode(root.getRootRevisionNode(), pathSoFar, reposRootDir);
                 if(child == null){
                     /* If this was the last path component, and the caller
                      * said it was optional, then don't return an error;
@@ -108,6 +103,7 @@ public abstract class FSRevisionNodePool {
                     if(isLastComponentOptional && (next == null || "".equals(next)) ){
                         return new FSParentPath(null, entry, parentPath);
                     }
+                    /*node not found*/
                     return null;
                 }   
                 parentPath.setParentPath(child, entry, new FSParentPath(parentPath));
@@ -117,12 +113,8 @@ public abstract class FSRevisionNodePool {
                     parentPath.setCopyStyle((int)copyInherEntry.getRevision());
                     parentPath.setCopySrcPath(copyInherEntry.getPath());
                 }
-                /* Cache the node we found (if it wasn't already cached). */
-                if(cachedRevNode == null){
-                    cacheRevisionNode(root, pathSoFar, child);
-                }
             }       
-            if(next == null || next.compareTo("") == 0){
+            if(next == null || "".equals(next)){
                 break;
             }
             //The path isn't finished yet; we'd better be in a directory
