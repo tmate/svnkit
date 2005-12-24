@@ -83,35 +83,30 @@ public class FSNodeHistory
 	}
 	
     public static boolean checkAncestryOfPegPath(File reposRootDir, String fsPath, long pegRev, long futureRev, FSRevisionNodePool revNodesPool)throws SVNException{
-    	try{
-    		String localFsPath = null;
-    		if(fsPath == null){
-    			SVNErrorManager.error("invalid path in repository");
-    		}else{
-    			localFsPath = new String(fsPath);
-    		}
-    		FSRevisionNode root = FSReader.getRootRevNode(reposRootDir, futureRev);
-    		FSNodeHistory history = getNodeHistory(reposRootDir, root, localFsPath);    	
-    		localFsPath = null;
-    		SVNLocationEntry currentHistory = null;
-    		while(true){  
-    			history = history.fsHistoryPrev(reposRootDir, true, revNodesPool);    			
-    			if(history == null){  
-    				break;    			
-    			}
-    			currentHistory = new SVNLocationEntry(history.getHistoryEntry().getRevision(), history.getHistoryEntry().getPath()); 		
-    			if(localFsPath == null){
-    				localFsPath = new String(currentHistory.getPath());
-    			}
-    			if(currentHistory.getRevision() <= pegRev){
-    				break;    				
-    			}
-    		}
-    		return (history != null && (localFsPath.compareTo(currentHistory.getPath()) == 0));
-    		}catch(SVNException ex){
-    			SVNErrorManager.error("");
-    		}   
-    	return false;
+   		String localFsPath = null;
+   		if(fsPath == null){
+   			SVNErrorManager.error("invalid path in repository");
+   		}else{
+   			localFsPath = new String(fsPath);
+   		}
+   		FSRevisionNode root = FSReader.getRootRevNode(reposRootDir, futureRev);
+   		FSNodeHistory history = getNodeHistory(reposRootDir, root, localFsPath);    	
+   		localFsPath = null;
+   		SVNLocationEntry currentHistory = null;
+   		while(true){  
+   			history = history.fsHistoryPrev(reposRootDir, true, revNodesPool);    			
+   			if(history == null){  
+   				break;    			
+   			}
+   			currentHistory = new SVNLocationEntry(history.getHistoryEntry().getRevision(), history.getHistoryEntry().getPath()); 		
+   			if(localFsPath == null){
+   				localFsPath = new String(currentHistory.getPath());
+   			}
+   			if(currentHistory.getRevision() <= pegRev){
+   				break;    				
+   			}
+   		}
+   		return (history != null && (localFsPath.compareTo(currentHistory.getPath()) == 0));
     }
     
     //Retrun FSNodeHistory as an opaque node history object which represents
@@ -120,6 +115,7 @@ public class FSNodeHistory
     	if(root == null){
     		SVNErrorManager.error("invalid node root of repository");
     	}
+        /*And we require that the path exist in the root*/
     	SVNNodeKind kind = FSRepository.checkPath(reposRootDir, root, path);;    	
     	if(kind == SVNNodeKind.NONE){
     		SVNErrorManager.error("File not found: revision " + root.getId().getRevision() + " path " + path);

@@ -41,6 +41,7 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.ArrayList;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 
@@ -172,7 +173,7 @@ public class FSReader {
             walkDigestFiles(childDigestFile, getLocksHandler, haveWriteLock, reposRootDir);
         }
     }
-
+    
     /* Utility function:  verify that a lock can be used. */
     private static void verifyLock(SVNLock lock, Collection lockTokens, String username) throws SVNException {
         if(username == null || "".equals(username)){
@@ -1312,5 +1313,27 @@ public class FSReader {
             copyfromEntry = new SVNLocationEntry(Long.parseLong(piesesOfNextLine[0]), piesesOfNextLine[1]);
         }
         return new FSChange(new String(pathStr), new FSID(nodeRevID), changesKind, textModeBool, propModeBool, copyfromEntry);
+    }
+    
+    public static ArrayList walkDigestFiles(File digestFile, File reposRootDir, ArrayList lockArray)throws SVNException{        
+        Collection children = new LinkedList();
+        lockArray = lockArray == null ? new ArrayList(0) : lockArray;        
+        SVNLock currentLock = FSReader.fetchLock(digestFile, reposRootDir.getAbsolutePath(), children, reposRootDir);        
+        if(currentLock != null){
+            Date currentDate = new Date(System.currentTimeMillis());
+            if(currentLock.getExpirationDate() == null || currentDate.compareTo(currentLock.getExpirationDate()) > 0){
+                lockArray.add(currentLock);
+            }            
+        }        
+        if(children == null || children.isEmpty()){
+            return lockArray;
+        }
+        Iterator chIter = children.iterator();
+        while(chIter.hasNext()){
+            String digestName = (String)chIter.next();
+            File childDigestFile = FSRepositoryUtil.getDigestFileFromDigest(digestName, reposRootDir);
+            lockArray = walkDigestFiles(childDigestFile, reposRootDir, lockArray);
+        }                
+        return lockArray;
     }
 }
