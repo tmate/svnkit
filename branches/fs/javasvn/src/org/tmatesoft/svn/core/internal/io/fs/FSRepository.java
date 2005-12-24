@@ -1174,7 +1174,6 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
             	// Follow the copy to its source.  Ignore all revs between the
                 // copy target rev and the copy source rev (non-inclusive).
             	SVNLocationEntry sEntry = copiedFrom(myReposRootDir, croot, cpath, myRevNodesPool);
-            	//!!need to check return value
            		while((count < revisions.length) && locationRevs[count] > sEntry.getRevision() ){
            			++count;
            		}
@@ -2115,12 +2114,12 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
     	if(path == null){
     		return null;
     	}    	
-        FSParentPath parentPath = myRevNodesPool.getParentPath(new FSRoot(root.getId().getRevision(), root), path, false, reposRootDir); //FSParentPath.openParentPath(reposRootDir, root, path, 0, null);
+        FSParentPath parentPath = myRevNodesPool.getParentPath(new FSRoot(root.getId().getRevision(), root), path, true, reposRootDir); //FSParentPath.openParentPath(reposRootDir, root, path, 0, null);
     	
        /* Find the youngest copyroot in the path of this node-rev, which
         * will indicate the target of the innermost copy affecting the node-rev*/    	    	
     	SVNLocationEntry copyDstEntry = FSNodeHistory.findYoungestCopyroot(reposRootDir, parentPath);
-    	if(copyDstEntry == null || copyDstEntry.getRevision() == 0){
+    	if(copyDstEntry == null || copyDstEntry.getRevision() == FSConstants.SVN_INVALID_REVNUM){
     		/*There are no copies affecting this node-rev or copyRoot wasn't find*/
     		return null;
     	}
@@ -2129,12 +2128,16 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
         * revision between COPY_DST_REV and REV.  Make sure that PATH
         * exists as of COPY_DST_REV and is related to this node-rev */
         FSRevisionNode copyDstRoot = FSReader.getRootRevNode(reposRootDir, copyDstEntry.getRevision());
-    	SVNNodeKind kind = checkPath(reposRootDir, root, path);
+    	SVNNodeKind kind = checkPath(reposRootDir, copyDstRoot, path);
     	if(kind == SVNNodeKind.NONE){
     		//return new FSClosestCopy(null, null);
             return null;
     	}
    		FSRevisionNode curRev = FSReader.getRevisionNode(reposRootDir, path, copyDstRoot, 0);
+        if(parentPath.getRevNode() == null || curRev.getId() == null){
+            /*no speech about relation*/
+            return null;
+        }
         if(FSID.checkIdsRelated(parentPath.getRevNode().getId(), curRev.getId()) == false){
 			return null;
 		}    	
