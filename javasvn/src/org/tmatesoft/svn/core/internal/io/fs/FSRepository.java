@@ -50,8 +50,8 @@ import org.tmatesoft.svn.core.io.ISVNReporterBaton;
 import org.tmatesoft.svn.core.io.ISVNSession;
 import org.tmatesoft.svn.core.io.ISVNWorkspaceMediator;
 import org.tmatesoft.svn.core.io.SVNRepository;
-import org.tmatesoft.svn.core.io.diff.SVNRAFileData;
-import org.tmatesoft.svn.core.io.diff.SVNSequenceDeltaGenerator;
+import org.tmatesoft.svn.core.io.diff.ISVNInputStream;
+import org.tmatesoft.svn.core.io.diff.SVNDeltaStream;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
 import org.tmatesoft.svn.core.internal.util.SVNTimeUtil;
 import org.tmatesoft.svn.core.SVNProperty;
@@ -1614,13 +1614,13 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
          */
         myReporterContext.getEditor().applyTextDelta(editPath, sourceHexDigest);
         if(myReporterContext.isSendTextDeltas()){
-            File srcFile = FSWriter.createUniqueTemporaryFile("source", ".tmp");
+/*            File srcFile = FSWriter.createUniqueTemporaryFile("source", ".tmp");
             File tgtFile = FSWriter.createUniqueTemporaryFile("target", ".tmp");
             OutputStream file1OS = SVNFileUtil.openFileForWriting(srcFile);
-            OutputStream file2OS = SVNFileUtil.openFileForWriting(tgtFile);
+            OutputStream file2OS = SVNFileUtil.openFileForWriting(tgtFile);*/
             FSRevisionNode sourceNode = myRevNodesPool.getRevisionNode(sourceRevision, sourcePath, myReposRootDir);
             FSRevisionNode targetNode = myRevNodesPool.getRevisionNode(myReporterContext.getTargetRoot(), targetPath, myReposRootDir);
-            FSReader.getFileContents(sourceNode, file1OS, myReposRootDir);
+/*            FSReader.getFileContents(sourceNode, file1OS, myReposRootDir);
             FSReader.getFileContents(targetNode, file2OS, myReposRootDir);
             SVNFileUtil.closeFile(file1OS);
             SVNFileUtil.closeFile(file2OS);
@@ -1631,7 +1631,22 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
             //generates windows of a fixed length
             generator.generateDiffWindow(editPath, myReporterContext.getEditor(), tgtRAFile, srcRAFile);
             srcFile.delete();
-            tgtFile.delete();
+            tgtFile.delete();*/
+            ISVNInputStream sourceStream = null;
+            ISVNInputStream targetStream = null;
+            try{
+                sourceStream = FSInputStream.createStream(sourceNode, myReposRootDir);
+                targetStream = FSInputStream.createStream(targetNode, myReposRootDir);
+                SVNDeltaStream deltaStream = new SVNDeltaStream(sourceStream, targetStream, myReporterContext.getEditor(), editPath, FSWriter.getTmpDir());
+                deltaStream.sendWindows();
+            }finally{
+                if(sourceStream != null){
+                    sourceStream.close();
+                }
+                if(targetStream != null){
+                    targetStream.close();
+                }
+            }
         }else{
             myReporterContext.getEditor().textDeltaEnd(editPath);
         }

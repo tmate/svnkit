@@ -98,7 +98,48 @@ public class SVNSequenceDeltaGenerator implements ISVNDeltaGenerator {
 		}
 	}
 
-	private static boolean canProcess(ISVNRAData workFile, ISVNRAData baseFile) throws SVNException {
+    public void generateNextDiffWindow(String commitPath, ISVNEditor consumer, ISVNRAData workFile, ISVNRAData baseFile, long sourceViewOffset) throws SVNException {
+        try {
+            if (!canProcess(workFile, baseFile)) {
+                ALL_DELTA_GENERATOR.generateDiffWindow(commitPath, consumer, workFile, baseFile);
+                return;
+            }
+            doGenerateNextDiffWindow(commitPath, workFile, baseFile, consumer, sourceViewOffset, memoryThreshold, fileSegmentSize, searchDepthExponent, tempDirectory);
+        }
+        catch (IOException ex) {
+            throw new SVNException(ex);
+        }
+    }
+
+    private static void doGenerateNextDiffWindow(String commitPath, ISVNRAData workFile, ISVNRAData baseFile, ISVNEditor consumer, long sourceViewOffset, int memoryTreshold, int fileSegmentSize, double searchDepthExponent, File tempDirectory) throws IOException, SVNException {
+        final QSequenceLineResult result;
+        try {
+            result = QSequenceLineMedia.createBlocks(new SVNSequenceLineRAData(baseFile), new SVNSequenceLineRAData(workFile), null, memoryTreshold, fileSegmentSize, searchDepthExponent, tempDirectory);
+        }
+        catch (QSequenceException ex) {
+            throw new SVNException(ex);
+        }
+        try {
+            final List instructions = new ArrayList();
+            final List newDatas = new ArrayList();
+            createInstructions(result, instructions, newDatas);
+
+            final QSequenceLineCache baseLines = result.getLeftCache();
+            final QSequenceLineCache workLines = result.getRightCache();
+            final long sourceLength = baseLines.getLineCount() > 0 ? baseLines.getLine(baseLines.getLineCount() - 1).getTo() + 1 : 0;
+            final long targetLength = workLines.getLineCount() > 0 ? workLines.getLine(workLines.getLineCount() - 1).getTo() + 1 : 0;
+            final long newDataLength = determineNewDataLength(newDatas);
+            final SVNDiffInstruction[] instructionsArray = (SVNDiffInstruction[])instructions.toArray(new SVNDiffInstruction[instructions.size()]);
+            final OutputStream stream = consumer.textDeltaChunk(commitPath, new SVNDiffWindow(sourceViewOffset, sourceLength, targetLength, instructionsArray, newDataLength));
+            sendData(newDatas, stream);
+            stream.close();
+        }
+        finally {
+            result.close();
+        }
+    }
+
+    private static boolean canProcess(ISVNRAData workFile, ISVNRAData baseFile) throws SVNException {
 		InputStream is = workFile.read(0, Math.min(1024, workFile.length()));
 		try {
 			if (SVNFileUtil.detectMimeType(workFile.read(0, Math.min(workFile.length(), 1024))) != null) {
