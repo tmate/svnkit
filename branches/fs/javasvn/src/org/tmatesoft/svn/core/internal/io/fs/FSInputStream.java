@@ -24,18 +24,20 @@ import java.io.ByteArrayOutputStream;
 import java.io.OutputStream;
 
 import org.tmatesoft.svn.core.SVNException;
+import org.tmatesoft.svn.core.SVNNodeKind;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 import org.tmatesoft.svn.core.io.diff.SVNDiffInstruction;
 import org.tmatesoft.svn.core.io.diff.SVNDiffWindowApplyBaton;
 import org.tmatesoft.svn.core.io.diff.SVNDiffWindow;
 import org.tmatesoft.svn.core.io.diff.SVNDiffWindowBuilder;
+import org.tmatesoft.svn.core.io.diff.ISVNInputStream;
 
 /**
  * @version 1.0
  * @author  TMate Software Ltd.
  */
-public class FSInputStream {
+public class FSInputStream implements ISVNInputStream {
     /* The state of all prior delta representations. */
     private LinkedList myRepStateList = new LinkedList();
 
@@ -106,7 +108,14 @@ public class FSInputStream {
         }
     }
     
-    public static FSInputStream createStream(FSRepresentation representation, File reposRootDir) throws SVNException {
+    public static ISVNInputStream createStream(FSRevisionNode fileNode, File reposRootDir) throws SVNException {
+        if (fileNode.getType() != SVNNodeKind.FILE) {
+            SVNErrorManager.error("svn: Attempted to get textual contents of a *non*-file node");
+        }
+        FSRepresentation representation = fileNode.getTextRepresentation(); 
+        if(representation == null){
+            return new FSEmptyInputStream(); 
+        }
         return new FSInputStream(representation, reposRootDir);
     }
     
@@ -249,6 +258,15 @@ public class FSInputStream {
             FSRepresentationState state = (FSRepresentationState)states.next();
             SVNFileUtil.closeFile(state.file);
             states.remove();
+        }
+    }
+    
+    public static class FSEmptyInputStream implements ISVNInputStream {
+        public int read(byte[] buf) throws SVNException {
+            return 0;
+        }
+        
+        public void close() {
         }
     }
 }

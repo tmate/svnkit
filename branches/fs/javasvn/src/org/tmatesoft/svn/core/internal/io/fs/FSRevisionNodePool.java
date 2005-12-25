@@ -44,8 +44,8 @@ public abstract class FSRevisionNodePool {
         }
         FSRevisionNode root = fetchRootRevisionNode(revision);
         if(root == null){
-            FSRevisionNode rootRevNode = FSReader.getRootRevNode(reposRootDir, revision);
-            if(rootRevNode != null){
+            root = FSReader.getRootRevNode(reposRootDir, revision);
+            if(root != null){
                 cacheRootRevisionNode(revision, root);
             }
         }

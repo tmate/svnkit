@@ -24,6 +24,7 @@ import org.tmatesoft.svn.core.io.diff.SVNDiffWindow;
 import org.tmatesoft.svn.core.io.diff.SVNDiffWindowApplyBaton;
 import org.tmatesoft.svn.core.io.diff.SVNDiffWindowBuilder;
 import org.tmatesoft.svn.core.io.diff.SVNDiffInstruction;
+import org.tmatesoft.svn.core.io.diff.ISVNInputStream;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -48,17 +49,9 @@ import java.security.NoSuchAlgorithmException;
 public class FSReader {
     
     public static void getFileContents(FSRevisionNode revNode, OutputStream contents, File reposRootDir) throws SVNException {
-        if (revNode.getType() != SVNNodeKind.FILE) {
-            SVNErrorManager.error("svn: Attempted to get textual contents of a *non*-file node");
-        }
-        //FSReader.readDeltaRepresentation(revNode.getTextRepresentation(), contents, myReposRootDir);
-        FSRepresentation textRep = revNode.getTextRepresentation();
-        if(textRep == null){
-            return;
-        }
-        FSInputStream fileStream = null;
+        ISVNInputStream fileStream = null;
         try{
-            fileStream = FSInputStream.createStream(textRep, reposRootDir);
+            fileStream = FSInputStream.createStream(revNode, reposRootDir);
             /* Read and write chunks until we get a short read, indicating the
              * end of the stream.  (We can't get a short write without an
              * associated error.) 
