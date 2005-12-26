@@ -76,7 +76,7 @@ public abstract class FSRevisionNodePool {
         String pathSoFar = "/";
         
         //Make a parentPath item for the root node, using its own current copy-id
-        FSParentPath parentPath = new FSParentPath(here, "/", null);
+        FSParentPath parentPath = new FSParentPath(here, null, null);
         parentPath.setCopyStyle(FSParentPath.COPY_ID_INHERIT_SELF);
         
         String rest = canonPath.substring(1);// skip the leading '/'
