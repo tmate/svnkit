@@ -101,7 +101,7 @@ public class SVNSequenceDeltaGenerator implements ISVNDeltaGenerator {
     public void generateNextDiffWindow(String commitPath, ISVNEditor consumer, ISVNRAData workFile, ISVNRAData baseFile, long sourceViewOffset) throws SVNException {
         try {
             if (!canProcess(workFile, baseFile)) {
-                ALL_DELTA_GENERATOR.generateDiffWindow(commitPath, consumer, workFile, baseFile);
+                ALL_DELTA_GENERATOR.generateNextDiffWindow(commitPath, consumer, workFile, baseFile, sourceViewOffset);
                 return;
             }
             doGenerateNextDiffWindow(commitPath, workFile, baseFile, consumer, sourceViewOffset, memoryThreshold, fileSegmentSize, searchDepthExponent, tempDirectory);

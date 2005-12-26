@@ -74,41 +74,13 @@ public class FSInputStream implements ISVNInputStream {
         } catch (NoSuchAlgorithmException nsae) {
             SVNErrorManager.error(nsae.getMessage());
         }
-        try{
-            FSRepresentationState.buildRepresentationList(representation, myRepStateList, reposRootDir);
-            for(ListIterator states = myRepStateList.listIterator(); states.hasNext();){
-                FSRepresentationState state = (FSRepresentationState)states.next();
-                myDiffWindowBuilder.reset(SVNDiffWindowBuilder.OFFSET);
-                long currentPos = state.file.getFilePointer();
-                myDiffWindowBuilder.accept(state.file);
-                //go back to the beginning of the window's offsets section
-                state.file.seek(currentPos);
-                int sourceInstructions = 0;
-                for (int i = 0; i < myDiffWindowBuilder.getInstructionsData().length; i++) {
-                    int type = (myDiffWindowBuilder.getInstructionsData()[i] & 0xC0) >> 6;
-                    if (type == SVNDiffInstruction.COPY_FROM_SOURCE) {
-                        sourceInstructions++;
-                    }
-                }
-                if(sourceInstructions == 0){
-                    for(;states.hasNext();){
-                        FSRepresentationState unnecessaryState = (FSRepresentationState)states.next();
-                        SVNFileUtil.closeFile(unnecessaryState.file);
-                        states.remove();
-                    }
-                    break;
-                }
-            }
-        }catch(SVNException svne){
-            close();
-            throw svne;
-        }catch(IOException ioe){
-            close();
-            SVNErrorManager.error(ioe.getMessage());            
-        }
+        FSRepresentationState.buildRepresentationList(representation, myRepStateList, reposRootDir);
     }
     
     public static ISVNInputStream createStream(FSRevisionNode fileNode, File reposRootDir) throws SVNException {
+        if(fileNode == null){
+            return new FSEmptyInputStream();
+        }
         if (fileNode.getType() != SVNNodeKind.FILE) {
             SVNErrorManager.error("svn: Attempted to get textual contents of a *non*-file node");
         }
@@ -173,22 +145,45 @@ public class FSInputStream implements ISVNInputStream {
                 if(myRepStateList.isEmpty()){
                     break;
                 }
-                FSRepresentationState repState = (FSRepresentationState)myRepStateList.getFirst();
-                if(repState.offset == repState.end){
+                FSRepresentationState resultState = (FSRepresentationState)myRepStateList.getFirst();
+                if(resultState.offset == resultState.end){
                     break;
                 }
-                myBuffer = applyNextWindow();
+                int startIndex = 0;
+                for(ListIterator states = myRepStateList.listIterator(); states.hasNext();){
+                    FSRepresentationState curState = (FSRepresentationState)states.next();
+                    startIndex = myRepStateList.indexOf(curState);
+                    myDiffWindowBuilder.reset(SVNDiffWindowBuilder.OFFSET);
+                    try{
+                        long currentPos = curState.file.getFilePointer();
+                        myDiffWindowBuilder.accept(curState.file);
+                        //go back to the beginning of the window's offsets section
+                        curState.file.seek(currentPos);
+                    }catch(IOException ioe){
+                        SVNErrorManager.error(ioe.getMessage());
+                    }
+                    SVNDiffInstruction[] instructions = SVNDiffWindowBuilder.createInstructions(myDiffWindowBuilder.getInstructionsData());
+                    int sourceInstructions = 0;
+                    for(int i = 0; i < instructions.length; i++){
+                        if(instructions[i].type == SVNDiffInstruction.COPY_FROM_SOURCE){
+                            sourceInstructions++;
+                        }
+                    }
+                    if(sourceInstructions == 0){
+                        break;
+                    }
+                }
+                myBuffer = getNextTextChunk(startIndex);
             }
         }
         return targetPos;
     }
     
-    private byte[] applyNextWindow() throws SVNException {
+    private byte[] getNextTextChunk(int startIndex) throws SVNException {
         ByteArrayOutputStream target = new ByteArrayOutputStream();
         ByteArrayOutputStream data = new ByteArrayOutputStream();
         ByteArrayInputStream source = null;
-        FSRepresentationState startState = (FSRepresentationState)myRepStateList.getLast();
-        for(ListIterator states = myRepStateList.listIterator(myRepStateList.indexOf(startState) + 1); states.hasPrevious();){
+        for(ListIterator states = myRepStateList.listIterator(startIndex + 1); states.hasPrevious();){
             FSRepresentationState state = (FSRepresentationState)states.previous();
             data.reset();
             SVNDiffWindow window = null;
