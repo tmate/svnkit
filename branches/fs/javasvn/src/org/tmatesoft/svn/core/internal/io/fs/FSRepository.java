@@ -1614,24 +1614,8 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
          */
         myReporterContext.getEditor().applyTextDelta(editPath, sourceHexDigest);
         if(myReporterContext.isSendTextDeltas()){
-/*            File srcFile = FSWriter.createUniqueTemporaryFile("source", ".tmp");
-            File tgtFile = FSWriter.createUniqueTemporaryFile("target", ".tmp");
-            OutputStream file1OS = SVNFileUtil.openFileForWriting(srcFile);
-            OutputStream file2OS = SVNFileUtil.openFileForWriting(tgtFile);*/
             FSRevisionNode sourceNode = myRevNodesPool.getRevisionNode(sourceRevision, sourcePath, myReposRootDir);
             FSRevisionNode targetNode = myRevNodesPool.getRevisionNode(myReporterContext.getTargetRoot(), targetPath, myReposRootDir);
-/*            FSReader.getFileContents(sourceNode, file1OS, myReposRootDir);
-            FSReader.getFileContents(targetNode, file2OS, myReposRootDir);
-            SVNFileUtil.closeFile(file1OS);
-            SVNFileUtil.closeFile(file2OS);
-            SVNRAFileData srcRAFile = new SVNRAFileData(srcFile, true);
-            SVNRAFileData tgtRAFile = new SVNRAFileData(tgtFile, true);
-            SVNSequenceDeltaGenerator generator = new SVNSequenceDeltaGenerator(FSWriter.getTmpDir());
-            //TODO: replace this single window generation code with code that
-            //generates windows of a fixed length
-            generator.generateDiffWindow(editPath, myReporterContext.getEditor(), tgtRAFile, srcRAFile);
-            srcFile.delete();
-            tgtFile.delete();*/
             ISVNInputStream sourceStream = null;
             ISVNInputStream targetStream = null;
             try{
