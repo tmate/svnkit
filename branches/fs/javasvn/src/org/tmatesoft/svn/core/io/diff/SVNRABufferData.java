@@ -22,12 +22,13 @@ import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
  * @version 1.0
  * @author  TMate Software Ltd.
  */
-public class SVNRAStreamData implements ISVNRAData {
-    private ByteArrayInputStream myStream;
+public class SVNRABufferData implements ISVNRAData {
     private byte[] myBuffer;
+    private int myLength;
     
-    public SVNRAStreamData(byte[] buffer){
-        myBuffer = buffer;
+    public SVNRABufferData(byte[] buffer, int length){
+        myBuffer = length > 0 ? buffer : new byte[0];
+        myLength = length > 0 ? length : 0;
     }
     /**
      * @return
@@ -35,13 +36,6 @@ public class SVNRAStreamData implements ISVNRAData {
      */
     public InputStream readAll() throws SVNException {
         return new ByteArrayInputStream(myBuffer);
-    }
-    
-    private ByteArrayInputStream getStream(){
-        if(myStream == null){
-            myStream = new ByteArrayInputStream(myBuffer);
-        }
-        return myStream;
     }
     
     /**
@@ -52,16 +46,12 @@ public class SVNRAStreamData implements ISVNRAData {
      */
     public InputStream read(long offset, long length) throws SVNException {
         byte[] resultingArray = new byte[(int) length];
-        ByteArrayInputStream stream = getStream();
-        int read = 0;
-        try {
-            stream.reset();
-            stream.skip(offset);
-            read = stream.read(resultingArray);
-        } catch (IOException e) {
-            SVNErrorManager.error(e.getMessage());
-        } 
-        for (int i = read; i < length && read >= 0; i++) {
+        int read = -1;
+        if(offset < myLength){
+            read = (int)Math.min(length, myLength - offset);
+            System.arraycopy(myBuffer, (int)offset, resultingArray, 0, read);
+        }
+        for (int i = read; i < length && read > 0; i++) {
             resultingArray[i] = resultingArray[i - read];
         }
         return new LocalInputStream(resultingArray);
@@ -79,23 +69,23 @@ public class SVNRAStreamData implements ISVNRAData {
                 bytes = ((LocalInputStream) source).getBuffer();
             } else {
                 bytes = new byte[(int) length];
-                source.read(bytes, 0, (int) length);
+                length = source.read(bytes, 0, (int) length);
             }
         } catch (IOException e) {
             SVNErrorManager.error(e.getMessage());
         } 
-        byte[] newBuffer = new byte[bytes.length + myBuffer.length];
-        System.arraycopy(myBuffer, 0, newBuffer, 0, myBuffer.length);
-        System.arraycopy(bytes, 0, newBuffer, myBuffer.length, bytes.length);
+        byte[] newBuffer = new byte[(int)length + myLength];
+        System.arraycopy(myBuffer, 0, newBuffer, 0, myLength);
+        System.arraycopy(bytes, 0, newBuffer, myLength, (int)length);
         myBuffer = newBuffer;
-        myStream = null;
+        myLength += (int)length;
     }
 
     /**
      * @return
      */
     public long length() {
-        return myBuffer.length;
+        return myLength;
     }
 
     /**

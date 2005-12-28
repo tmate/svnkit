@@ -15,8 +15,6 @@ import java.io.IOException;
 import java.io.FileInputStream;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
 import java.io.RandomAccessFile;
 import java.io.FileNotFoundException;
 import java.io.OutputStream;
@@ -50,8 +48,7 @@ import org.tmatesoft.svn.core.io.ISVNReporterBaton;
 import org.tmatesoft.svn.core.io.ISVNSession;
 import org.tmatesoft.svn.core.io.ISVNWorkspaceMediator;
 import org.tmatesoft.svn.core.io.SVNRepository;
-import org.tmatesoft.svn.core.io.diff.ISVNInputStream;
-import org.tmatesoft.svn.core.io.diff.SVNDeltaStream;
+import org.tmatesoft.svn.core.io.diff.SVNDeltaChunksGenerator;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
 import org.tmatesoft.svn.core.internal.util.SVNTimeUtil;
 import org.tmatesoft.svn.core.SVNProperty;
@@ -1616,20 +1613,16 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
         if(myReporterContext.isSendTextDeltas()){
             FSRevisionNode sourceNode = myRevNodesPool.getRevisionNode(sourceRevision, sourcePath, myReposRootDir);
             FSRevisionNode targetNode = myRevNodesPool.getRevisionNode(myReporterContext.getTargetRoot(), targetPath, myReposRootDir);
-            ISVNInputStream sourceStream = null;
-            ISVNInputStream targetStream = null;
+            InputStream sourceStream = null;
+            InputStream targetStream = null;
             try{
                 sourceStream = FSInputStream.createStream(sourceNode, myReposRootDir);
                 targetStream = FSInputStream.createStream(targetNode, myReposRootDir);
-                SVNDeltaStream deltaStream = new SVNDeltaStream(sourceStream, targetStream, myReporterContext.getEditor(), editPath, FSWriter.getTmpDir());
-                deltaStream.sendWindows();
+                SVNDeltaChunksGenerator deltaGenerator = new SVNDeltaChunksGenerator(sourceStream, targetStream, myReporterContext.getEditor(), editPath, FSWriter.getTmpDir());
+                deltaGenerator.sendWindows();
             }finally{
-                if(sourceStream != null){
-                    sourceStream.close();
-                }
-                if(targetStream != null){
-                    targetStream.close();
-                }
+                SVNFileUtil.closeFile(sourceStream);
+                SVNFileUtil.closeFile(targetStream);
             }
         }else{
             myReporterContext.getEditor().textDeltaEnd(editPath);
@@ -1668,35 +1661,30 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
          * files don't differ, but to be absolute sure, we need to 
          * compare bytes. 
          */
-        File file1 = FSWriter.createUniqueTemporaryFile("source", ".tmp");
-        File file2 = FSWriter.createUniqueTemporaryFile("target", ".tmp");
-        OutputStream file1OS = SVNFileUtil.openFileForWriting(file1);
-        OutputStream file2OS = SVNFileUtil.openFileForWriting(file2);
-        FSReader.getFileContents(revNode1, file1OS, myReposRootDir);
-        FSReader.getFileContents(revNode2, file2OS, myReposRootDir);
-        SVNFileUtil.closeFile(file1OS);
-        SVNFileUtil.closeFile(file2OS);
-        InputStream file1IS = SVNFileUtil.openFileForReading(file1);
-        InputStream file2IS = SVNFileUtil.openFileForReading(file2);
-        int r1 = -1;
-        int r2 = -1;
-        while(true){
-            try{
+        InputStream file1IS = null;
+        InputStream file2IS = null;
+        try{
+            file1IS = FSInputStream.createStream(revNode1, myReposRootDir);
+            file2IS = FSInputStream.createStream(revNode2, myReposRootDir);
+            int r1 = -1;
+            int r2 = -1;
+            while(true){
                 r1 = file1IS.read();
                 r2 = file2IS.read();
-            }catch(IOException ioe){
-                SVNFileUtil.closeFile(file1IS);
-                SVNFileUtil.closeFile(file2IS);
-                SVNErrorManager.error("svn: Can't read temporary file: "+ioe.getMessage());
+                if(r1 != r2){
+                    SVNFileUtil.closeFile(file1IS);
+                    SVNFileUtil.closeFile(file2IS);
+                    return true;
+                }
+                if(r1 == -1){//we've finished - files do differ
+                    break;
+                }
             }
-            if(r1 != r2){
-                SVNFileUtil.closeFile(file1IS);
-                SVNFileUtil.closeFile(file2IS);
-                return true;
-            }
-            if(r1 == -1){
-                break;
-            }
+        }catch(IOException ioe){
+            SVNErrorManager.error("svn: Can't read temporary file: "+ioe.getMessage());
+        }finally{
+            SVNFileUtil.closeFile(file1IS);
+            SVNFileUtil.closeFile(file2IS);
         }
         return false;
     }

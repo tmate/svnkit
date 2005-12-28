@@ -22,6 +22,8 @@ import java.io.RandomAccessFile;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.OutputStream;
+import java.io.InputStream;
+import java.util.Date;
 
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNNodeKind;
@@ -31,13 +33,13 @@ import org.tmatesoft.svn.core.io.diff.SVNDiffInstruction;
 import org.tmatesoft.svn.core.io.diff.SVNDiffWindowApplyBaton;
 import org.tmatesoft.svn.core.io.diff.SVNDiffWindow;
 import org.tmatesoft.svn.core.io.diff.SVNDiffWindowBuilder;
-import org.tmatesoft.svn.core.io.diff.ISVNInputStream;
+import org.tmatesoft.svn.core.internal.util.SVNTimeUtil;
 
 /**
  * @version 1.0
  * @author  TMate Software Ltd.
  */
-public class FSInputStream implements ISVNInputStream {
+public class FSInputStream extends InputStream {
     /* The state of all prior delta representations. */
     private LinkedList myRepStateList = new LinkedList();
 
@@ -62,7 +64,9 @@ public class FSInputStream implements ISVNInputStream {
     private byte[] myBuffer;
     
     private int myBufPos = 0;
-    
+    //TODO
+    private OutputStream testLogOS;
+    //TODO
     private FSInputStream(FSRepresentation representation, File reposRootDir) throws SVNException {
         myChunkIndex = 0;
         isChecksumFinalized = false;
@@ -75,9 +79,18 @@ public class FSInputStream implements ISVNInputStream {
             SVNErrorManager.error(nsae.getMessage());
         }
         FSRepresentationState.buildRepresentationList(representation, myRepStateList, reposRootDir);
+        //TODO
+        int i = 0;
+        File log = new File("testLog.txt"); 
+        while(log.exists()){
+            log = new File("testLog." + i + ".txt");
+            i++;
+        }
+        testLogOS = SVNFileUtil.openFileForWriting(log);
+        //TODO
     }
     
-    public static ISVNInputStream createStream(FSRevisionNode fileNode, File reposRootDir) throws SVNException {
+    public static InputStream createStream(FSRevisionNode fileNode, File reposRootDir) throws SVNException {
         if(fileNode == null){
             return new FSEmptyInputStream();
         }
@@ -90,9 +103,44 @@ public class FSInputStream implements ISVNInputStream {
         }
         return new FSInputStream(representation, reposRootDir);
     }
+
+    public static InputStream createStream(FSRepresentation rep, File reposRootDir) throws SVNException {
+        if(rep == null){
+            return new FSEmptyInputStream();
+        }
+        return new FSInputStream(rep, reposRootDir);
+    }
     
-    public int read(byte[] buf) throws SVNException {
-        return readContents(buf);
+    public int read(byte[] buf) throws IOException {
+        try{
+        //TODO: test
+            String st = SVNTimeUtil.formatDate(new Date(System.currentTimeMillis()));
+            st = "(" + st + ") Started reading next chunk\n";
+            testLogOS.write(st.getBytes());
+        //TODO
+            int r = readContents(buf); 
+        //TODO: test
+            st = SVNTimeUtil.formatDate(new Date(System.currentTimeMillis()));
+            st = "(" + st + ") Stopped read next chunk of size " + r + "\n";
+            testLogOS.write(st.getBytes());
+        //TODO
+
+            return r == 0 ? -1 : r;
+
+        }catch(SVNException svne){
+            throw new IOException("svn: Failed to read file text, details follow:" + SVNFileUtil.getNativeEOLMarker() + svne.getMessage());
+        }
+    }
+    
+    public int read() throws IOException {
+        byte[] buf = new byte[1];
+        int r = 0;
+        try{
+            r = readContents(buf);
+        }catch(SVNException svne){
+            throw new IOException("svn: Failed to read file text, details follow:" + SVNFileUtil.getNativeEOLMarker() + svne.getMessage());
+        }
+        return r == 0 ? -1 : buf[0];
     }
     
     private int readContents(byte[] buf) throws SVNException {
@@ -183,8 +231,25 @@ public class FSInputStream implements ISVNInputStream {
         ByteArrayOutputStream target = new ByteArrayOutputStream();
         ByteArrayOutputStream data = new ByteArrayOutputStream();
         ByteArrayInputStream source = null;
+        //TODO:
+        String st = "    RS start index: " + startIndex + "\n";
+        try{
+            testLogOS.write(st.getBytes());
+            st = "    Chunk index: " + myChunkIndex + "\n";
+            testLogOS.write(st.getBytes());
+        }catch(IOException ioe){
+        }
+        //TODO:
         for(ListIterator states = myRepStateList.listIterator(startIndex + 1); states.hasPrevious();){
             FSRepresentationState state = (FSRepresentationState)states.previous();
+            //TODO:
+            try{
+                st = "        cur state chunk index: " + state.chunkIndex + "\n";
+                testLogOS.write(st.getBytes());
+            }catch(IOException ioe){
+            }
+            //TODO:
+
             data.reset();
             SVNDiffWindow window = null;
             try{
@@ -243,7 +308,7 @@ public class FSInputStream implements ISVNInputStream {
         myDiffWindowBuilder.reset(SVNDiffWindowBuilder.OFFSET);
         myDiffWindowBuilder.accept(file);
         SVNDiffWindow window = myDiffWindowBuilder.getDiffWindow();
-        long len = window.getInstructionsLength() + window.getNewDataLength();
+        long len = window.getNewDataLength();
         long curPos = file.getFilePointer();
         file.seek(curPos + len);
     }
@@ -254,11 +319,18 @@ public class FSInputStream implements ISVNInputStream {
             SVNFileUtil.closeFile(state.file);
             states.remove();
         }
+        //TODO
+            SVNFileUtil.closeFile(testLogOS);
+        //TODO
     }
     
-    public static class FSEmptyInputStream implements ISVNInputStream {
-        public int read(byte[] buf) throws SVNException {
-            return 0;
+    private static class FSEmptyInputStream extends InputStream {
+        public int read(byte[] buf) {
+            return -1;
+        }
+
+        public int read(){
+            return -1;
         }
         
         public void close() {
