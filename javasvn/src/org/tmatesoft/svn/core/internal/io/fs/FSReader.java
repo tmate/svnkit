@@ -20,7 +20,6 @@ import org.tmatesoft.svn.core.internal.util.SVNTimeUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.internal.wc.SVNProperties;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
-import org.tmatesoft.svn.core.io.diff.ISVNInputStream;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -45,7 +44,7 @@ import java.security.NoSuchAlgorithmException;
 public class FSReader {
     
     public static void getFileContents(FSRevisionNode revNode, OutputStream contents, File reposRootDir) throws SVNException {
-        ISVNInputStream fileStream = null;
+        InputStream fileStream = null;
         try{
             fileStream = FSInputStream.createStream(revNode, reposRootDir);
             /* Read and write chunks until we get a short read, indicating the
@@ -65,9 +64,7 @@ public class FSReader {
         }catch(IOException ioe){
             SVNErrorManager.error(ioe.getMessage());
         }finally{
-            if(fileStream != null){
-                fileStream.close();
-            }
+            SVNFileUtil.closeFile(fileStream);
         }
     }
 

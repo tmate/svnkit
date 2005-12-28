@@ -770,6 +770,27 @@ public class SVNFileUtil {
         }
         return null;
     }
+    
+    public static RandomAccessFile openRAFileForWriting(File file, boolean append) throws SVNException {
+        if (file == null) {
+            return null;
+        }
+        if (!file.getParentFile().exists()) {
+            file.getParentFile().mkdirs();
+        }
+        RandomAccessFile raFile = null;
+        try{
+            raFile = new RandomAccessFile(file, "rw");
+            if(append){
+                raFile.seek(raFile.length());
+            }
+        } catch (FileNotFoundException e) {
+            SVNErrorManager.error("svn: Can not write to '" + file + "': " + e.getMessage());
+        }catch(IOException ioe){
+            SVNErrorManager.error("svn: Can not set position pointer in file '" + file.getAbsolutePath() + "': " + ioe.getMessage());
+        }
+        return raFile;
+    }
 
     public static InputStream openFileForReading(File file) throws SVNException {
         if (file == null) {

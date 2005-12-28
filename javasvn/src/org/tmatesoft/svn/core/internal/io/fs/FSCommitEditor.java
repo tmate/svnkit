@@ -39,7 +39,6 @@ import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
  * @author  TMate Software Ltd.
  */
 public class FSCommitEditor implements ISVNEditor {
-    private ISVNWorkspaceMediator myMediator;
     private Map myLockTokens;
     private String myAuthor;
     private String myBasePath;
@@ -53,8 +52,7 @@ public class FSCommitEditor implements ISVNEditor {
     private FSRepository myRepository;
     private Stack myDirsStack;
     
-    public FSCommitEditor(String path, String logMessage, String userName, Map lockTokens, boolean keepLocks, ISVNWorkspaceMediator mediator, FSTransactionInfo txn, FSRepository repository){
-        myMediator = mediator;
+    public FSCommitEditor(String path, String logMessage, String userName, Map lockTokens, boolean keepLocks, FSTransactionInfo txn, FSRepository repository){
         myLockTokens = lockTokens;
         myAuthor = userName;
         myBasePath = path;
@@ -678,9 +676,9 @@ public class FSCommitEditor implements ISVNEditor {
             }
         }
         /* Make a readable "source" stream out of the current contents of
-         * ROOT/PATH; obviously, this must be done in the context of a db_txn.
-         * The stream is returned in tb->source_stream. */
-
+         * root/path.
+         */
+        
     }
     
     /* Make the node referred to by parentPath mutable, if it isn't
