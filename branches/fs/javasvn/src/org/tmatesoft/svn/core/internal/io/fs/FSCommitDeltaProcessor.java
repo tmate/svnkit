@@ -25,7 +25,7 @@ import org.tmatesoft.svn.core.io.diff.SVNDiffWindowApplyBaton;
  * @version 1.0
  * @author  TMate Software Ltd.
  */
-public class FSCommitDeltaProcessor extends OutputStream{
+public class FSCommitDeltaProcessor extends FSBufferStream{
     private InputStream mySourceStream;
     
     private OutputStream myTargetStream;
@@ -34,16 +34,11 @@ public class FSCommitDeltaProcessor extends OutputStream{
     
     private SVNDiffWindow myCurrentWindow;
     
-    private byte[] myBuffer;
-    
-    private int myBufferLength;
-    
     public FSCommitDeltaProcessor(InputStream sourceStream, OutputStream targetStream){
         super();
         mySourceStream = sourceStream;
         myTargetStream = targetStream;
         myApplyBaton = SVNDiffWindowApplyBaton.create(mySourceStream, myTargetStream, null);
-        myBufferLength = 0;
     }
     
     public OutputStream handleDiffWindow(SVNDiffWindow window){
@@ -52,39 +47,12 @@ public class FSCommitDeltaProcessor extends OutputStream{
         return this;
     }
     
-    public void write(int b) throws IOException{
-        byte[] result = new byte[myBufferLength + 1];
-        if(myBufferLength > 0){
-            System.arraycopy(myBuffer, 0, result, 0, myBufferLength);
-        }
-        result[myBufferLength] = (byte)b;
-        myBuffer = result;
-        myBufferLength++;
-    }
-    
-    public void write(byte[] b) throws IOException{
-        byte[] result = new byte[myBufferLength + b.length];
-        if(myBufferLength > 0){
-            System.arraycopy(myBuffer, 0, result, 0, myBufferLength);
-        }
-        System.arraycopy(b, 0, result, myBufferLength, b.length);
-        myBuffer = result;
-        myBufferLength += b.length;
-    }
-    
-    public void write(byte[] b, int off, int len) throws IOException{
-        byte[] result = new byte[myBufferLength + len];
-        if(myBufferLength > 0){
-            System.arraycopy(myBuffer, 0, result, 0, myBufferLength);
-        }
-        System.arraycopy(b, off, result, myBufferLength, len);
-        myBuffer = result;
-        myBufferLength += len;
-    }
-    
     public void close() throws IOException {
+        super.close();
         try{
-            myCurrentWindow.apply(myApplyBaton, new ByteArrayInputStream(myBuffer == null ? new byte[0] : myBuffer));
+            myCurrentWindow.apply(myApplyBaton, new ByteArrayInputStream(super.myBuffer == null ? new byte[0] : super.myBuffer));
+            super.myBufferLength = 0;
+            super.myBuffer = null;
         }catch(SVNException svne){
             throw new IOException(svne.getMessage());
         }

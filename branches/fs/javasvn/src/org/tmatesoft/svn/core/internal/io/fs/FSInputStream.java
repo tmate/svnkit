@@ -23,7 +23,6 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.OutputStream;
 import java.io.InputStream;
-import java.util.Date;
 
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNNodeKind;
@@ -33,7 +32,6 @@ import org.tmatesoft.svn.core.io.diff.SVNDiffInstruction;
 import org.tmatesoft.svn.core.io.diff.SVNDiffWindowApplyBaton;
 import org.tmatesoft.svn.core.io.diff.SVNDiffWindow;
 import org.tmatesoft.svn.core.io.diff.SVNDiffWindowBuilder;
-import org.tmatesoft.svn.core.internal.util.SVNTimeUtil;
 
 /**
  * @version 1.0
@@ -64,9 +62,7 @@ public class FSInputStream extends InputStream {
     private byte[] myBuffer;
     
     private int myBufPos = 0;
-    //TODO
-    private OutputStream testLogOS;
-    //TODO
+
     private FSInputStream(FSRepresentation representation, File reposRootDir) throws SVNException {
         myChunkIndex = 0;
         isChecksumFinalized = false;
@@ -79,15 +75,6 @@ public class FSInputStream extends InputStream {
             SVNErrorManager.error(nsae.getMessage());
         }
         FSRepresentationState.buildRepresentationList(representation, myRepStateList, reposRootDir);
-        //TODO
-        int i = 0;
-        File log = new File("testLog.txt"); 
-        while(log.exists()){
-            log = new File("testLog." + i + ".txt");
-            i++;
-        }
-        testLogOS = SVNFileUtil.openFileForWriting(log);
-        //TODO
     }
     
     public static InputStream createStream(FSRevisionNode fileNode, File reposRootDir) throws SVNException {
@@ -113,20 +100,8 @@ public class FSInputStream extends InputStream {
     
     public int read(byte[] buf) throws IOException {
         try{
-        //TODO: test
-            String st = SVNTimeUtil.formatDate(new Date(System.currentTimeMillis()));
-            st = "(" + st + ") Started reading next chunk\n";
-            testLogOS.write(st.getBytes());
-        //TODO
             int r = readContents(buf); 
-        //TODO: test
-            st = SVNTimeUtil.formatDate(new Date(System.currentTimeMillis()));
-            st = "(" + st + ") Stopped read next chunk of size " + r + "\n";
-            testLogOS.write(st.getBytes());
-        //TODO
-
             return r == 0 ? -1 : r;
-
         }catch(SVNException svne){
             throw new IOException("svn: Failed to read file text, details follow:" + SVNFileUtil.getNativeEOLMarker() + svne.getMessage());
         }
@@ -231,25 +206,8 @@ public class FSInputStream extends InputStream {
         ByteArrayOutputStream target = new ByteArrayOutputStream();
         ByteArrayOutputStream data = new ByteArrayOutputStream();
         ByteArrayInputStream source = null;
-        //TODO:
-        String st = "    RS start index: " + startIndex + "\n";
-        try{
-            testLogOS.write(st.getBytes());
-            st = "    Chunk index: " + myChunkIndex + "\n";
-            testLogOS.write(st.getBytes());
-        }catch(IOException ioe){
-        }
-        //TODO:
         for(ListIterator states = myRepStateList.listIterator(startIndex + 1); states.hasPrevious();){
             FSRepresentationState state = (FSRepresentationState)states.previous();
-            //TODO:
-            try{
-                st = "        cur state chunk index: " + state.chunkIndex + "\n";
-                testLogOS.write(st.getBytes());
-            }catch(IOException ioe){
-            }
-            //TODO:
-
             data.reset();
             SVNDiffWindow window = null;
             try{
@@ -319,9 +277,6 @@ public class FSInputStream extends InputStream {
             SVNFileUtil.closeFile(state.file);
             states.remove();
         }
-        //TODO
-            SVNFileUtil.closeFile(testLogOS);
-        //TODO
     }
     
     private static class FSEmptyInputStream extends InputStream {

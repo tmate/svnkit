@@ -363,6 +363,42 @@ public class SVNDiffWindowBuilder {
         }
         os.write(bos.toByteArray());
     }
+
+    public static void save(SVNDiffWindow window, boolean saveHeader, RandomAccessFile file) throws IOException {
+        if (saveHeader) {
+            file.write(HEADER_BYTES);
+        } 
+        if (window.getInstructionsCount() == 0) {
+            return;
+        }
+        ByteArrayOutputStream bos = new ByteArrayOutputStream();
+        for(int i = 0; i < window.getInstructionsCount(); i++) {
+            SVNDiffInstruction instruction = window.getInstructionAt(i);
+            byte first = (byte) (instruction.type << 6);
+            if (instruction.length <= 0x3f && instruction.length > 0) {
+                // single-byte lenght;
+                first |= (instruction.length & 0x3f);
+                bos.write(first & 0xff);
+            } else {
+                bos.write(first & 0xff);
+                writeInt(bos, instruction.length);
+            }
+            if (instruction.type == 0 || instruction.type == 1) {
+                writeInt(bos, instruction.offset);
+            }
+        }
+
+        long[] offsets = new long[5];
+        offsets[0] = window.getSourceViewOffset();
+        offsets[1] = window.getSourceViewLength();
+        offsets[2] = window.getTargetViewLength();
+        offsets[3] = bos.size();
+        offsets[4] = window.getNewDataLength();
+        for(int i = 0; i < offsets.length; i++) {
+            writeInt(file, offsets[i]);
+        }
+        file.write(bos.toByteArray());
+    }
     
     public static SVNDiffWindow createReplacementDiffWindow(long dataLength) {
         if (dataLength == 0) {
@@ -422,6 +458,26 @@ public class SVNDiffWindowBuilder {
         byte[] bytes = bos.toByteArray();
         for(int j = bytes.length - 1; j  >= 0; j--) {
             os.write(bytes[j]);
+        }
+    }
+
+    private static void writeInt(RandomAccessFile file, long i) throws IOException {
+        if (i == 0) {
+            file.write(0);
+            return;
+        }
+        ByteArrayOutputStream bos = new ByteArrayOutputStream();
+        while(i > 0) {
+            byte b = (byte) (i & 0x7f);
+            i = i >> 7;
+            if (bos.size() > 0) {
+                b |= 0x80;
+            }
+            bos.write(b);            
+        } 
+        byte[] bytes = bos.toByteArray();
+        for(int j = bytes.length - 1; j  >= 0; j--) {
+            file.write(bytes[j]);
         }
     }
 	
