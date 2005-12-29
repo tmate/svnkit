@@ -93,4 +93,29 @@ public class SVNAllDeltaGenerator implements ISVNDeltaGenerator {
             SVNFileUtil.closeFile(is);
         }
     }
+    
+    //use for only not large window (100K) 
+    public SVNDiffWindow generateNextDiffWindow(ISVNRAData workFile, ISVNRAData baseFile, long sourceViewOffset, OutputStream newDataOS) throws SVNException{
+        long length = workFile.length();
+        if (length == 0) {
+            SVNDiffWindow window = SVNDiffWindowBuilder.createReplacementDiffWindow(length);
+            SVNFileUtil.closeFile(newDataOS);
+            return window;
+        }
+        int maxWindowLenght = 1024*100; // 100K
+        SVNDiffWindow window = SVNDiffWindowBuilder.createReplacementDiffWindow(length);
+        InputStream is = null;
+        try {
+            is = workFile.readAll();
+            byte[] newDataBuffer = new byte[maxWindowLenght];
+            is.read(newDataBuffer, 0, (int) window.getNewDataLength());
+            newDataOS.write(newDataBuffer, 0, (int) window.getNewDataLength());
+        } catch (IOException e) {
+            SVNErrorManager.error(e.getMessage());
+        }finally {
+            SVNFileUtil.closeFile(newDataOS);
+            SVNFileUtil.closeFile(is);
+        }
+        return window;
+    }    
 }

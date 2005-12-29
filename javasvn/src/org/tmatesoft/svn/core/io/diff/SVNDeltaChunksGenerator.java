@@ -14,6 +14,7 @@ package org.tmatesoft.svn.core.io.diff;
 import java.io.File;
 import java.io.InputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 
 import org.tmatesoft.svn.core.io.ISVNEditor;
 import org.tmatesoft.svn.core.SVNException;
@@ -39,32 +40,56 @@ public class SVNDeltaChunksGenerator {
     
     private byte[] myTargetBuf = new byte[SVN_DELTA_WINDOW_SIZE];
     
-    private long myPos;
+    private long mySourceOffset;
 
     private ISVNDeltaGenerator myDeltaGenerator;
+    
+    private boolean isSourceDone;
+    
+    private int myTargetLength;
+    
+    private int mySourceLength;
+    
+    private ISVNDiffWindowHandler myHandler;
     
     public SVNDeltaChunksGenerator(InputStream sourceStream, InputStream targetStream, ISVNEditor consumer, String path, File tmpDir) {
         mySourceStream = sourceStream;
         myTargetStream = targetStream;
         myConsumer = consumer;
         myTargetPath = path;
-        myPos = 0;
+        mySourceOffset = 0;
+        isSourceDone = false;
         myDeltaGenerator = new SVNSequenceDeltaGenerator(tmpDir);
+    }
+
+    public SVNDeltaChunksGenerator(InputStream sourceStream, ISVNDiffWindowHandler handler, File tmpDir) {
+        mySourceStream = sourceStream;
+        mySourceOffset = 0;
+        isSourceDone = false;
+        myTargetLength = 0;
+        mySourceLength = 0;
+        myDeltaGenerator = new SVNSequenceDeltaGenerator(tmpDir);
+        myHandler = handler;
     }
     
     public void sendWindows() throws SVNException {
         //runs loop until target runs out of text 
-        while(generateNextWindow()){
+        while(generateNextWindowFromStreams()){
             ;
         }
     }
-    
-    private boolean generateNextWindow() throws SVNException {
+
+    private boolean generateNextWindowFromStreams() throws SVNException {
         int sourceLength = 0;
         int targetLength = 0;
         try{
-            /* Read the source stream. */
-            sourceLength = mySourceStream.read(mySourceBuf);
+            if(!isSourceDone){
+                /* Read the source stream. */
+                sourceLength = mySourceStream.read(mySourceBuf);
+                if(sourceLength < SVN_DELTA_WINDOW_SIZE){
+                    isSourceDone = true;
+                }
+            }
             /* Read the target stream. */
             targetLength = myTargetStream.read(myTargetBuf);
         }catch(IOException ioe){
@@ -72,14 +97,54 @@ public class SVNDeltaChunksGenerator {
         }
         sourceLength = sourceLength == -1 ? 0 : sourceLength;
         targetLength = targetLength == -1 ? 0 : targetLength;
-        myPos += sourceLength;
+        mySourceOffset += sourceLength;
         if(targetLength == 0){
             myConsumer.textDeltaEnd(myTargetPath);
             return false;
         }
         ISVNRAData sourceData = new SVNRABufferData(mySourceBuf, sourceLength);
         ISVNRAData targetData = new SVNRABufferData(myTargetBuf, targetLength);
-        myDeltaGenerator.generateNextDiffWindow(myTargetPath, myConsumer, targetData, sourceData, myPos - sourceLength);
+        myDeltaGenerator.generateNextDiffWindow(myTargetPath, myConsumer, targetData, sourceData, mySourceOffset - sourceLength);
         return true;
+    }
+    
+    public void makeDiffWindowFromData(byte[] data, int dataLength) throws IOException, SVNException {
+        if(data == null){
+            return;
+        }
+        while(dataLength > 0){
+            /* Make sure we're all full up on source data, if possible. */
+            if(mySourceLength == 0 && !isSourceDone){
+                mySourceLength = mySourceStream.read(mySourceBuf);
+                if(mySourceLength < SVN_DELTA_WINDOW_SIZE){
+                    isSourceDone = true;
+                }
+            }
+            /* Copy in the target data, up to SVN_DELTA_WINDOW_SIZE. */
+            int chunkLength = SVN_DELTA_WINDOW_SIZE - myTargetLength;
+            if(chunkLength > dataLength){
+                chunkLength = dataLength;
+            }
+            System.arraycopy(data, 0, myTargetBuf, myTargetLength, chunkLength);
+            dataLength -= chunkLength;
+            myTargetLength += chunkLength;
+            /* If we're full of target data, compute and fire off a window. */
+            if(myTargetLength == SVN_DELTA_WINDOW_SIZE){
+                flushNextWindow();
+                mySourceOffset += mySourceLength;
+                mySourceLength = 0;
+                myTargetLength = 0;
+            }
+        }
+    }
+    
+    public void flushNextWindow() throws SVNException {
+        if(myTargetLength > 0){
+            ISVNRAData sourceData = new SVNRABufferData(mySourceBuf, mySourceLength);
+            ISVNRAData targetData = new SVNRABufferData(myTargetBuf, myTargetLength);
+            OutputStream newData = myHandler.getNewDataStream();
+            SVNDiffWindow window = myDeltaGenerator.generateNextDiffWindow(targetData, sourceData, mySourceOffset, newData);
+            myHandler.handleDiffWindow(window);
+        }
     }
 }

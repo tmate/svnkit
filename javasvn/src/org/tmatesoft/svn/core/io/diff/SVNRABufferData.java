@@ -35,7 +35,9 @@ public class SVNRABufferData implements ISVNRAData {
      * @throws SVNException
      */
     public InputStream readAll() throws SVNException {
-        return new ByteArrayInputStream(myBuffer);
+        byte[] buf = new byte[myLength];
+        System.arraycopy(myBuffer, 0, buf, 0, myLength);
+        return new LocalInputStream(buf);
     }
     
     /**

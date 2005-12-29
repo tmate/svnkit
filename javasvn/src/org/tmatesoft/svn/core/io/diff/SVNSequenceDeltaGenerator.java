@@ -130,13 +130,58 @@ public class SVNSequenceDeltaGenerator implements ISVNDeltaGenerator {
             final long targetLength = workLines.getLineCount() > 0 ? workLines.getLine(workLines.getLineCount() - 1).getTo() + 1 : 0;
             final long newDataLength = determineNewDataLength(newDatas);
             final SVNDiffInstruction[] instructionsArray = (SVNDiffInstruction[])instructions.toArray(new SVNDiffInstruction[instructions.size()]);
-            final OutputStream stream = consumer.textDeltaChunk(commitPath, new SVNDiffWindow(sourceViewOffset, sourceLength, targetLength, instructionsArray, newDataLength));
-            sendData(newDatas, stream);
-            stream.close();
+            OutputStream stream = null;
+            try{
+                stream = consumer.textDeltaChunk(commitPath, new SVNDiffWindow(sourceViewOffset, sourceLength, targetLength, instructionsArray, newDataLength));
+                sendData(newDatas, stream);
+            }finally{
+                SVNFileUtil.closeFile(stream);
+            }
         }
         finally {
             result.close();
         }
+    }
+
+    public SVNDiffWindow generateNextDiffWindow(ISVNRAData workFile, ISVNRAData baseFile, long sourceViewOffset, OutputStream newDataOS) throws SVNException {
+        try {
+            if (!canProcess(workFile, baseFile)) {
+                return ALL_DELTA_GENERATOR.generateNextDiffWindow(workFile, baseFile, sourceViewOffset, newDataOS);
+            }
+            return doGenerateNextDiffWindow(workFile, baseFile, sourceViewOffset, newDataOS, memoryThreshold, fileSegmentSize, searchDepthExponent, tempDirectory);
+        }catch (IOException ex) {
+            throw new SVNException(ex);
+        }finally{
+            SVNFileUtil.closeFile(newDataOS);
+        }
+    }
+
+    private static SVNDiffWindow doGenerateNextDiffWindow(ISVNRAData workFile, ISVNRAData baseFile, long sourceViewOffset, OutputStream newDataOS, int memoryTreshold, int fileSegmentSize, double searchDepthExponent, File tempDirectory) throws IOException, SVNException {
+        final QSequenceLineResult result;
+        SVNDiffWindow window = null;
+        try {
+            result = QSequenceLineMedia.createBlocks(new SVNSequenceLineRAData(baseFile), new SVNSequenceLineRAData(workFile), null, memoryTreshold, fileSegmentSize, searchDepthExponent, tempDirectory);
+        }catch (QSequenceException ex) {
+            throw new SVNException(ex);
+        }
+        try {
+            final List instructions = new ArrayList();
+            final List newDatas = new ArrayList();
+            createInstructions(result, instructions, newDatas);
+
+            final QSequenceLineCache baseLines = result.getLeftCache();
+            final QSequenceLineCache workLines = result.getRightCache();
+            final long sourceLength = baseLines.getLineCount() > 0 ? baseLines.getLine(baseLines.getLineCount() - 1).getTo() + 1 : 0;
+            final long targetLength = workLines.getLineCount() > 0 ? workLines.getLine(workLines.getLineCount() - 1).getTo() + 1 : 0;
+            final long newDataLength = determineNewDataLength(newDatas);
+            final SVNDiffInstruction[] instructionsArray = (SVNDiffInstruction[])instructions.toArray(new SVNDiffInstruction[instructions.size()]);
+            window = new SVNDiffWindow(sourceViewOffset, sourceLength, targetLength, instructionsArray, newDataLength);
+            sendData(newDatas, newDataOS);
+        }finally {
+            SVNFileUtil.closeFile(newDataOS);
+            result.close();
+        }
+        return window;
     }
 
     private static boolean canProcess(ISVNRAData workFile, ISVNRAData baseFile) throws SVNException {
