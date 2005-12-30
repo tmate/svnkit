@@ -13,6 +13,7 @@ package org.tmatesoft.svn.core.internal.io.fs;
 
 import java.io.OutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.Map;
 import java.util.Collection;
 import java.util.LinkedList;
@@ -51,6 +52,8 @@ public class FSCommitEditor implements ISVNEditor {
     private FSRevisionNodePool myRevNodesPool;
     private FSRepository myRepository;
     private Stack myDirsStack;
+    private FSOutputStream myTargetStream;
+    private FSCommitDeltaProcessor myDeltaProcessor;
     
     public FSCommitEditor(String path, String logMessage, String userName, Map lockTokens, boolean keepLocks, FSTransactionInfo txn, FSRepository repository){
         myLockTokens = lockTokens;
@@ -653,7 +656,7 @@ public class FSCommitEditor implements ISVNEditor {
          * want this to return an error if the node for which we are searching 
          * doesn't exist. 
          */
-        DirBaton parentBaton = (DirBaton)myDirsStack.peek();
+        String txnId = myTxnRoot.getTxnId();
         String fullPath = SVNPathUtil.concatToAbs(myBasePath, path);
         FSParentPath parentPath = myRevNodesPool.getParentPath(myTxnRoot, fullPath, true, myReposRootDir);
         /* Check (non-recursively) to see if path is locked; if so, check
@@ -678,7 +681,20 @@ public class FSCommitEditor implements ISVNEditor {
         /* Make a readable "source" stream out of the current contents of
          * root/path.
          */
-        
+        InputStream sourceStream = null;
+        OutputStream targetStream = null;
+        try{
+            sourceStream = FSInputStream.createStream(node, myReposRootDir);
+            targetStream = FSOutputStream.createStream(node, txnId, myReposRootDir);
+            myDeltaProcessor = new FSCommitDeltaProcessor(sourceStream, targetStream);
+        }catch(SVNException svne){
+            SVNFileUtil.closeFile(sourceStream);
+            throw svne;
+        }finally{
+            myTargetStream = (FSOutputStream)targetStream;
+        }
+        /* Make a record of this modification in the changes table. */
+        addChange(txnId, fullPath, node.getId(), FSPathChangeKind.FS_PATH_CHANGE_MODIFY, true, false, FSConstants.SVN_INVALID_REVNUM, null);
     }
     
     /* Make the node referred to by parentPath mutable, if it isn't
@@ -785,6 +801,9 @@ public class FSCommitEditor implements ISVNEditor {
     }
 
     public void abortEdit() throws SVNException {
+        if(myTargetStream != null){
+            myTargetStream.closeStreams();
+        }
         if(myTxn == null || !isTxnOwner){
             myRepository.closeRepository();
             return;
