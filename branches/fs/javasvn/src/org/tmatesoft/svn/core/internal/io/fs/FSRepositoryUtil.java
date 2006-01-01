@@ -104,16 +104,7 @@ public class FSRepositoryUtil {
         /* If forProperties is true - compares property keys.
          * Otherwise compares contents keys. 
          */
-        return compareRepresentations(forProperties ? revNode1.getPropsRepresentation() : revNode1.getTextRepresentation(), forProperties ? revNode2.getPropsRepresentation() : revNode2.getTextRepresentation());
-    }
-    
-    private static boolean compareRepresentations(FSRepresentation r1, FSRepresentation r2){
-        if(r1 == r2){
-            return true;
-        }else if(r1 == null){
-            return false;
-        }
-        return r1.equals(r2);
+        return FSRepresentation.compareRepresentations(forProperties ? revNode1.getPropsRepresentation() : revNode1.getTextRepresentation(), forProperties ? revNode2.getPropsRepresentation() : revNode2.getTextRepresentation());
     }
     
     public static File getDigestFileFromRepositoryPath(String repositoryPath, File reposRootDir) throws SVNException {

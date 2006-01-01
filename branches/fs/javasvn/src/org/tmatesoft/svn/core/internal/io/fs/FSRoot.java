@@ -46,7 +46,7 @@ public class FSRoot {
         myRevision = revision;
         myRootRevNode = root;
         myIsTxnRoot = false;
-        myTxnId = null;
+        myTxnId = FSID.ID_INAPPLICABLE;
         myTxnFlags = 0;
         myCopyfromCache = new HashMap();
     }
@@ -66,10 +66,6 @@ public class FSRoot {
     
     public long getRevision() {
         return myRevision;
-    }
-
-    public void setRevision(long revision) {
-        myRevision = revision;
     }
 
     public FSRevisionNode getRootRevisionNode() {
@@ -92,10 +88,6 @@ public class FSRoot {
         return myTxnId;
     }
 
-    public void setTxnId(String txnId) {
-        myTxnId = txnId;
-    }
-    
     public Map getCopyfromCache(){
     	return myCopyfromCache;
     }

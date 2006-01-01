@@ -87,6 +87,15 @@ public class FSRepresentation {
     public String getHexDigest(){
         return myHexDigest;
     }
+
+    public static boolean compareRepresentations(FSRepresentation r1, FSRepresentation r2){
+        if(r1 == r2){
+            return true;
+        }else if(r1 == null){
+            return false;
+        }
+        return r1.equals(r2);
+    }
     
     public boolean equals(Object obj){
         if (obj == null || obj.getClass() != FSRepresentation.class) {

@@ -315,7 +315,7 @@ public class FSReader {
 
     private static FSTransaction fetchTxn(String txnId, File reposRootDir) throws SVNException {
         Map txnProps = FSRepositoryUtil.getTransactionProperties(reposRootDir, txnId);
-        FSID rootId = FSID.createTxnId("0", "0", txnId);
+        FSID rootId = FSID.createTxnId(Integer.toString(0), Integer.toString(0), txnId);
         FSRevisionNode revNode = getRevNodeFromID(reposRootDir, rootId);
         return new FSTransaction(FSTransactionKind.TXN_KIND_NORMAL, revNode.getId(), revNode.getPredecessorId(), null, txnProps);
     }
@@ -549,6 +549,18 @@ public class FSReader {
         return new FSEntry(id, type, name);
     }
 
+    public static FSRevisionNode getTxnRootNode(String txnId, File reposRootDir) throws SVNException {
+        FSTransaction txn = getTxn(txnId, reposRootDir);
+        FSRevisionNode txnRootNode = getRevNodeFromID(reposRootDir, txn.getRootId()); 
+        return txnRootNode;
+    }
+
+    public static FSRevisionNode getTxnBaseRootNode(String txnId, File reposRootDir) throws SVNException {
+        FSTransaction txn = getTxn(txnId, reposRootDir);
+        FSRevisionNode txnBaseNode = getRevNodeFromID(reposRootDir, txn.getBaseId()); 
+        return txnBaseNode;
+    }
+    
     public static FSRevisionNode getRootRevNode(File reposRootDir, long revision) throws SVNException {
         FSID id = new FSID(FSID.ID_INAPPLICABLE, FSID.ID_INAPPLICABLE, FSID.ID_INAPPLICABLE, revision, getRootOffset(reposRootDir, revision));
         return getRevNodeFromID(reposRootDir, id);

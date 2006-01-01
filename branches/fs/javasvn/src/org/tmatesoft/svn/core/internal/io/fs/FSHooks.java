@@ -161,12 +161,14 @@ public class FSHooks {
             SVNErrorManager.error("svn: Can't run '" + hook.getAbsolutePath() + "' hook process");
         }
         if(stdInValue != null){
-            OutputStream os = hookProcess.getOutputStream();
+            OutputStream osToStdIn = hookProcess.getOutputStream();
             try{
-                os.write(stdInValue.getBytes());
+                osToStdIn.write(stdInValue.getBytes());
             }catch(IOException ioe){
                 SVNErrorManager.error("svn: Failed to run '" + hook.getAbsolutePath() + "' hook" + SVNFileUtil.getNativeEOLMarker() + 
                                        "svn: Can't set process '" + hook.getAbsolutePath() + "' child input: " + ioe.getMessage());
+            }finally{
+                SVNFileUtil.closeFile(osToStdIn);
             }
         }
         int rc = -1;
