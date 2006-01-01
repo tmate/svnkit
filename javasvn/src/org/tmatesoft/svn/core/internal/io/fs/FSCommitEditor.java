@@ -191,76 +191,11 @@ public class FSCommitEditor implements ISVNEditor {
         }
         /* Make the parent directory mutable, and do the deletion.  */
         makePathMutable(root, parentPath.getParent(), path);
-        deleteEntry(parentPath.getParent().getRevNode(), parentPath.getNameEntry(), txnId);
+        FSWriter.deleteEntry(parentPath.getParent().getRevNode(), parentPath.getNameEntry(), txnId, myReposRootDir);
         /* Remove this node and any children from the path cache. */
         root.removeRevNodeFromCache(parentPath.getAbsPath());
         /* Make a record of this modification in the changes table. */
         addChange(txnId, path, parentPath.getRevNode().getId(), FSPathChangeKind.FS_PATH_CHANGE_DELETE, false, false, FSConstants.SVN_INVALID_REVNUM, null);
-    }
-    
-    /* Delete the directory entry named entryName from parent. parent must be 
-     * mutable. entryName must be a single path component. Throws an exception if there is no 
-     * entry entryName in parent.  
-     */
-    private void deleteEntry(FSRevisionNode parent, String entryName, String txnId) throws SVNException {
-        /* Make sure parent is a directory. */
-        if(parent.getType() != SVNNodeKind.DIR){
-            SVNErrorManager.error("Attempted to delete entry '" + entryName + "' from *non*-directory node");
-        }
-        /* Make sure parent is mutable. */
-        if(!parent.getId().isTxn()){
-            SVNErrorManager.error("Attempted to delete entry '" + entryName + "' from immutable directory node");
-        }
-        /* Make sure that entryName is a single path component. */
-        if(!SVNPathUtil.isSinglePathComponent(entryName)){
-            SVNErrorManager.error("Attempted to delete a node with an illegal name '" + entryName + "'");
-        }
-        /* Get a dirent hash for this directory. */
-        Map entries = FSReader.getDirEntries(parent, myReposRootDir);
-        /* Find name in the entries hash. */
-        FSEntry dirEntry = (FSEntry)entries.get(entryName);
-        /* If we never found id in entries (perhaps because there are no
-         * entries or maybe because just there's no such id in the existing 
-         * entries... it doesn't matter), throw an exception.  
-         */
-        if(dirEntry == null){
-            SVNErrorManager.error("Delete failed--directory has no entry '" + entryName + "'");
-        }
-        /* Use the id to get the entry's node.  */
-        /* TODO: Well, I don't understand this place - why svn devs try to get 
-         * the node revision here, - just to act only as a sanity check or what?
-         * The read out node-rev is not used then. The node is got then in 
-         * ...delete_if_mutable. So, that is already a check, but when it's really 
-         * needed.   
-         */
-        FSReader.getRevNodeFromID(myReposRootDir, dirEntry.getId());
-        /* If mutable, remove it and any mutable children from fs. */
-        deleteEntryIfMutable(dirEntry.getId(), txnId);
-        /* Remove this entry from its parent's entries list. */
-        FSWriter.setEntry(parent, entryName, null, SVNNodeKind.UNKNOWN, txnId, myReposRootDir);
-    }
-    
-    private void deleteEntryIfMutable(FSID id, String txnId) throws SVNException {
-        /* Get the node. */
-        FSRevisionNode node = FSReader.getRevNodeFromID(myReposRootDir, id);
-        /* If immutable, do nothing and return immediately. */
-        if(!node.getId().isTxn()){
-            return;
-        }
-        /* Else it's mutable.  Recurse on directories... */
-        if(node.getType() == SVNNodeKind.DIR){
-            /* Loop over hash entries */
-            Map entries = FSReader.getDirEntries(node, myReposRootDir);
-            for(Iterator names = entries.keySet().iterator(); names.hasNext();){
-                String name = (String)names.next();
-                FSEntry entry = (FSEntry)entries.get(name);
-                deleteEntryIfMutable(entry.getId(), txnId);
-            }
-        }
-        /* ... then delete the node itself, after deleting any mutable
-         * representations and strings it points to. 
-         */
-        FSWriter.removeRevisionNode(id, myReposRootDir);
     }
     
     public void absentDir(String path) throws SVNException {
@@ -782,10 +717,11 @@ public class FSCommitEditor implements ISVNEditor {
     }
     
     public OutputStream textDeltaChunk(String path, SVNDiffWindow diffWindow) throws SVNException {
-        return null;
+        return myDeltaProcessor.handleDiffWindow(diffWindow);
     }
 
     public void textDeltaEnd(String path) throws SVNException {
+        myDeltaProcessor.onTextDeltaEnd();
     }
 
     public void changeFileProperty(String path, String name, String value) throws SVNException {
@@ -794,12 +730,315 @@ public class FSCommitEditor implements ISVNEditor {
     }
 
     public void closeFile(String path, String textChecksum) throws SVNException {
+        if(textChecksum != null){
+            String fullPath = SVNPathUtil.concatToAbs(myBasePath, path);
+            FSRevisionNode revNode = myRevNodesPool.getRevisionNode(myTxnRoot, fullPath, myReposRootDir);
+            if(revNode.getTextRepresentation() != null && !textChecksum.equals(revNode.getTextRepresentation().getHexDigest())){
+                SVNErrorManager.error("Checksum mismatch for resulting fulltext" + SVNFileUtil.getNativeEOLMarker() + "(" + fullPath + "):" + SVNFileUtil.getNativeEOLMarker() + "   expected checksum:  " + textChecksum + SVNFileUtil.getNativeEOLMarker() + "   actual checksum:    " + revNode.getTextRepresentation().getHexDigest());
+            }
+        }
     }
 
     public SVNCommitInfo closeEdit() throws SVNException {
+        long newRevision = FSConstants.SVN_INVALID_REVNUM;
+        /* If no transaction has been created (i.e. if openRoot() wasn't
+         * called before closeEdit()), abort the operation here with an
+         * error. 
+         */
+        if(myTxn == null){
+            SVNErrorManager.error("No valid transaction supplied to closeEdit()");
+        }
+        /* Commit. */
+
         return null;
     }
 
+    public long commitTxn(FSTransactionInfo txn) throws SVNException {
+        /* Run pre-commit hooks. */
+        FSHooks.runPreCommitHook(myReposRootDir, txn.getTxnId());
+        
+        /* Commit. */
+        /* How do commits work in Subversion?
+        *
+        * When you're ready to commit, here's what you have:
+        *
+        *    1. A transaction, with a mutable tree hanging off it.
+        *    2. A base revision, against which a txn tree was made.
+        *    3. A latest revision, which may be newer than the base rev.
+        *
+        * The problem is that if latest != base, then one can't simply
+        * attach the txn root as the root of the new revision, because that
+        * would lose all the changes between base and latest.  It is also
+        * not acceptable to insist that base == latest; in a busy
+        * repository, commits happen too fast to insist that everyone keep
+        * their entire tree up-to-date at all times.  Non-overlapping
+        * changes should not interfere with each other.
+        *
+        * The solution is to merge the changes between base and latest into
+        * the txn tree [see the method merge()].  The txn tree is the
+        * only one of the three trees that is mutable, so it has to be the
+        * one to adjust.
+        *
+        * You might have to adjust it more than once, if a new latest
+        * revision gets committed while you were merging in the previous
+        * one.  For example:
+        *
+        *    1. Jane starts txn T, based at revision 6.
+        *    2. Someone commits (or already committed) revision 7.
+        *    3. Jane's starts merging the changes between 6 and 7 into T.
+        *    4. Meanwhile, someone commits revision 8.
+        *    5. Jane finishes the 6-->7 merge.  T could now be committed
+        *       against a latest revision of 7, if only that were still the
+        *       latest.  Unfortunately, 8 is now the latest, so... 
+        *    6. Jane starts merging the changes between 7 and 8 into T.
+        *    7. Meanwhile, no one commits any new revisions.  Whew.
+        *    8. Jane commits T, creating revision 9, whose tree is exactly
+        *       T's tree, except immutable now.
+        *
+        * Lather, rinse, repeat.
+        */
+        /* Initialize output params. */
+        long newRevision = FSConstants.SVN_INVALID_REVNUM;
+        while(true){
+            /* Get the *current* youngest revision, in one short-lived
+             * transaction.  (We don't want the revisions table
+             * locked while we do the main merge.)  We call it "youngish"
+             * because new revisions might get committed after we've
+             * obtained it. 
+             */
+            long youngishRev = myRepository.getYoungestRev(myReposRootDir);
+            FSRoot youngishRoot = new FSRoot(youngishRev, null);
+            /* Get the node for the youngest revision, also in one
+             * transaction.  Later we'll use it as the source
+             * argument to a merge, and if the merge succeeds, this youngest
+             * root node will become the new base root for the svn txn that
+             * was the target of the merge (but note that the youngest rev
+             * may have changed by then). 
+             */
+            FSRevisionNode youngishRootNode = myRevNodesPool.getRevisionNode(youngishRoot, "/", myReposRootDir);
+            /* Try to merge.  If the merge succeeds, the base root node of
+             * target's txn will become the same as youngishRootNode, so
+             * any future merges will only be between that node and whatever
+             * the root node of the youngest rev is by then. 
+             */ 
+            mergeChanges(null, youngishRootNode, txn);
+            txn.setBaseRevision(youngishRev);
+            /* Try to commit. */
+
+        }
+
+        
+        /* Run post-commit hooks. */
+        FSHooks.runPostCommitHook(myReposRootDir, newRevision);
+        //TODO: replace with returning a real revision
+        return -1;
+    }
+
+    /* Merge changes between an ancestor and source node into
+     * txn.  The ancestor is either ancestorNode, or if
+     * that is null, txn's base node.
+
+     * If the merge is successful, txn's base will become
+     * sourceNode, and its root node will have a new ID, a
+     * successor of sourceNode. 
+     */
+    private void mergeChanges(FSRevisionNode ancestorNode, FSRevisionNode sourceNode, FSTransactionInfo txn) throws SVNException {
+        String txnId = txn.getTxnId();
+        FSRevisionNode txnRootNode = FSReader.getTxnRootNode(txnId, myReposRootDir);
+        if(ancestorNode == null){
+            ancestorNode = FSReader.getTxnBaseRootNode(txnId, myReposRootDir);
+        }
+        if(txnRootNode.getId().equals(ancestorNode.getId())){
+            /* If no changes have been made in txn since its current base,
+             * then it can't conflict with any changes since that base.  So
+             * we just set *both* its base and root to source, making txn
+             * in effect a repeat of source. 
+             * This would, of course, be a mighty silly thing
+             * for the caller to do, and we might want to consider whether
+             * this response is really appropriate. 
+             */
+            SVNErrorManager.error("FATAL error: no changes it transaction to commit");
+        }else{
+            merge("/", txnRootNode, sourceNode, ancestorNode, txnId);
+        }
+    }
+    
+    private void merge(String targetPath, FSRevisionNode target, FSRevisionNode source, FSRevisionNode ancestor, String txnId) throws SVNException {
+        FSID sourceId = source.getId();
+        FSID targetId = target.getId();
+        FSID ancestorId = ancestor.getId();
+        /* It's improper to call this routine with ancestor == target. */
+        if(ancestorId.equals(targetId)){
+            SVNErrorManager.error("Bad merge; target '" + targetPath + "' has id '" + targetId + "', same as ancestor");
+        }
+        /* Base cases:
+         * Either no change made in source, or same change as made in target.
+         * Both mean nothing to merge here.
+         */
+        if(ancestorId.equals(sourceId) || sourceId.equals(targetId)){
+            return;
+        }
+        /* Else proceed, knowing all three are distinct node revisions.
+        *
+        * How to merge from this point: 
+        *
+        * if (not all 3 are directories)
+        *   {
+        *     early exit with conflict;
+        *   }
+        *
+        * // Property changes may only be made to up-to-date
+        * // directories, because once the client commits the prop
+        * // change, it bumps the directory's revision, and therefore
+        * // must be able to depend on there being no other changes to
+        * // that directory in the repository.
+        * if (target's property list differs from ancestor's)
+        *    conflict;
+        *
+        * For each entry NAME in the directory ANCESTOR:
+        *
+        *   Let ANCESTOR-ENTRY, SOURCE-ENTRY, and TARGET-ENTRY be the IDs of
+        *   the name within ANCESTOR, SOURCE, and TARGET respectively.
+        *   (Possibly null if NAME does not exist in SOURCE or TARGET.)
+        *
+        *   If ANCESTOR-ENTRY == SOURCE-ENTRY, then:
+        *     No changes were made to this entry while the transaction was in
+        *     progress, so do nothing to the target.
+        *
+        *   Else if ANCESTOR-ENTRY == TARGET-ENTRY, then:
+        *     A change was made to this entry while the transaction was in
+        *     process, but the transaction did not touch this entry.  Replace
+        *     TARGET-ENTRY with SOURCE-ENTRY.
+        *
+        *   Else:
+        *     Changes were made to this entry both within the transaction and
+        *     to the repository while the transaction was in progress.  They
+        *     must be merged or declared to be in conflict.
+        *
+        *     If SOURCE-ENTRY and TARGET-ENTRY are both null, that's a
+        *     double delete; flag a conflict.
+        *
+        *     If any of the three entries is of type file, declare a conflict.
+        *
+        *     If either SOURCE-ENTRY or TARGET-ENTRY is not a direct
+        *     modification of ANCESTOR-ENTRY (determine by comparing the
+        *     node-id fields), declare a conflict.  A replacement is
+        *     incompatible with a modification or other replacement--even
+        *     an identical replacement.
+        *
+        *     Direct modifications were made to the directory ANCESTOR-ENTRY
+        *     in both SOURCE and TARGET.  Recursively merge these
+        *     modifications.
+        *
+        * For each leftover entry NAME in the directory SOURCE:
+        *
+        *   If NAME exists in TARGET, declare a conflict.  Even if SOURCE and
+        *   TARGET are adding exactly the same thing, two additions are not
+        *   auto-mergeable with each other.
+        *
+        *   Add NAME to TARGET with the entry from SOURCE.
+        *
+        * Now that we are done merging the changes from SOURCE into the
+        * directory TARGET, update TARGET's predecessor to be SOURCE.
+        */
+        if(source.getType() != SVNNodeKind.DIR || target.getType() != SVNNodeKind.DIR || ancestor.getType() != SVNNodeKind.DIR){
+            SVNErrorManager.error("Conflict at '" + targetPath + "'");
+        }
+        /* Possible early merge failure: if target and ancestor have
+         * different property lists, then the merge should fail.
+         * Propchanges can *only* be committed on an up-to-date directory.
+         */
+        if(!FSRepresentation.compareRepresentations(target.getPropsRepresentation(), ancestor.getPropsRepresentation())){
+            SVNErrorManager.error("Conflict at '" + targetPath + "'");
+        }
+        Map sourceEntries = FSReader.getDirEntries(source, myReposRootDir);
+        Map targetEntries = FSReader.getDirEntries(target, myReposRootDir);
+        Map ancestorEntries = FSReader.getDirEntries(ancestor, myReposRootDir);
+        /* for each entry in ancestorEntries... */
+        for(Iterator ancestorEntryNames = ancestorEntries.keySet().iterator(); ancestorEntryNames.hasNext();){
+            String ancestorEntryName = (String)ancestorEntryNames.next();
+            FSEntry ancestorEntry = (FSEntry)ancestorEntries.get(ancestorEntryName);
+            FSEntry sourceEntry = (FSEntry)sourceEntries.get(ancestorEntryName);
+            FSEntry targetEntry = (FSEntry)targetEntries.get(ancestorEntryName);
+            if(sourceEntry != null && ancestorEntry.getId().equals(sourceEntry.getId())){
+                /* No changes were made to this entry while the transaction was
+                 * in progress, so do nothing to the target. 
+                 */
+            }else if(targetEntry != null && ancestorEntry.getId().equals(targetEntry.getId())){
+                /* A change was made to this entry while the transaction was in
+                 * process, but the transaction did not touch this entry. 
+                 */
+                if(sourceEntry != null){
+                    FSWriter.setEntry(target, ancestorEntryName, sourceEntry.getId(), sourceEntry.getType(), txnId, myReposRootDir);
+                }else{
+                    FSWriter.deleteEntry(target, ancestorEntryName, txnId, myReposRootDir);
+                }
+            }else{
+                /* Changes were made to this entry both within the transaction
+                 * and to the repository while the transaction was in progress.
+                 * They must be merged or declared to be in conflict. 
+                 */
+                /* If SOURCE-ENTRY and TARGET-ENTRY are both null, that's a
+                 * double delete; flag a conflict. 
+                 */
+                if(sourceEntry == null || targetEntry == null){
+                    SVNErrorManager.error("Conflict at '" + SVNPathUtil.concatToAbs(targetPath, ancestorEntryName) + "'");
+                }
+                /* If any of the three entries is of type file, flag a conflict. */
+                if(sourceEntry.getType() == SVNNodeKind.FILE || targetEntry.getType() == SVNNodeKind.FILE || ancestorEntry.getType() == SVNNodeKind.FILE){
+                    SVNErrorManager.error("Conflict at '" + SVNPathUtil.concatToAbs(targetPath, ancestorEntryName) + "'");
+                }
+                /* If either SOURCE-ENTRY or TARGET-ENTRY is not a direct
+                 * modification of ANCESTOR-ENTRY, declare a conflict. 
+                 */
+                if(!sourceEntry.getId().getNodeID().equals(ancestorEntry.getId().getNodeID()) ||
+                   !sourceEntry.getId().getCopyID().equals(ancestorEntry.getId().getCopyID()) ||
+                   !targetEntry.getId().getNodeID().equals(ancestorEntry.getId().getNodeID()) ||
+                   !targetEntry.getId().getCopyID().equals(ancestorEntry.getId().getCopyID())){
+                    SVNErrorManager.error("Conflict at '" + SVNPathUtil.concatToAbs(targetPath, ancestorEntryName) + "'");
+                }
+                /* Direct modifications were made to the directory
+                 * ANCESTOR-ENTRY in both SOURCE and TARGET.  Recursively
+                 * merge these modifications. 
+                 */
+                FSRevisionNode sourceEntryNode = FSReader.getRevNodeFromID(myReposRootDir, sourceEntry.getId());
+                FSRevisionNode targetEntryNode = FSReader.getRevNodeFromID(myReposRootDir, targetEntry.getId());
+                FSRevisionNode ancestorEntryNode = FSReader.getRevNodeFromID(myReposRootDir, ancestorEntry.getId());
+                String childTargetPath = SVNPathUtil.concatToAbs(targetPath, targetEntry.getName());
+                merge(childTargetPath, targetEntryNode, sourceEntryNode, ancestorEntryNode, txnId);
+            }
+            /* We've taken care of any possible implications entry could have.
+             * Remove it from sourceEntries, so it's easy later to loop
+             * over all the source entries that didn't exist in
+             * ancestorEntries. 
+             */
+            sourceEntries.remove(ancestorEntryName);
+        }
+        /* For each entry in source but not in ancestor */
+        for(Iterator sourceEntryNames = sourceEntries.keySet().iterator(); sourceEntryNames.hasNext();){
+            String sourceEntryName = (String)sourceEntryNames.next();
+            FSEntry sourceEntry = (FSEntry)sourceEntries.get(sourceEntryName);
+            FSEntry targetEntry = (FSEntry)targetEntries.get(sourceEntryName);
+            /* If NAME exists in TARGET, declare a conflict. */
+            if(targetEntry != null){
+                SVNErrorManager.error("Conflict at '" + SVNPathUtil.concatToAbs(targetPath, targetEntry.getName()) + "'");
+            }
+            FSWriter.setEntry(target, sourceEntry.getName(), sourceEntry.getId(), sourceEntry.getType(), txnId, myReposRootDir);
+        }
+        long sourceCount = source.getCount();
+        updateAncestry(sourceId, targetId, targetPath, sourceCount);
+    }
+    
+    private void updateAncestry(FSID sourceId, FSID targetId, String targetPath, long sourcePredecessorCount) throws SVNException {
+        if(!targetId.isTxn()){
+            SVNErrorManager.error("Unexpected immutable node at '" + targetPath + "'");
+        }
+        FSRevisionNode revNode = FSReader.getRevNodeFromID(myReposRootDir, targetId);
+        revNode.setPredecessorId(sourceId);
+        revNode.setCount(sourcePredecessorCount != -1 ? sourcePredecessorCount + 1 : sourcePredecessorCount);
+        FSWriter.putTxnRevisionNode(targetId, revNode, myReposRootDir);
+    }
+    
     public void abortEdit() throws SVNException {
         if(myTargetStream != null){
             myTargetStream.closeStreams();

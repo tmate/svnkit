@@ -42,7 +42,6 @@ public class FSCommitDeltaProcessor extends FSBufferStream{
     }
     
     public OutputStream handleDiffWindow(SVNDiffWindow window){
-        //super.reset();
         myCurrentWindow = window;
         return this;
     }

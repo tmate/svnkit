@@ -65,9 +65,7 @@ public abstract class FSRevisionNodePool {
             }
             return root.getRootRevisionNode();
         }
-        FSTransaction txn = FSReader.getTxn(root.getTxnId(), reposRootDir);
-        FSRevisionNode txnRootRevNode = FSReader.getRevNodeFromID(reposRootDir, txn.getRootId()); 
-        return txnRootRevNode;
+        return FSReader.getTxnRootNode(root.getTxnId(), reposRootDir);
     }
 
     private FSParentPath openPath(FSRoot root, String path, boolean isLastComponentOptional, String txnId, File reposRootDir)throws SVNException{     
