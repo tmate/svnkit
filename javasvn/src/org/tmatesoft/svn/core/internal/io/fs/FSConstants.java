@@ -64,6 +64,7 @@ public class FSConstants {
     public static final String SVN_REPOS_UUID_FILE = "uuid";
     public static final String SVN_REPOS_REVPROPS_DIR = "revprops";
     public static final String SVN_REPOS_REVS_DIR = "revs";
+    public static final String SVN_REPOS_WRITE_LOCK_FILE = "write-lock";
 
     //the following are keys that appear in digest lock file
     public static final String PATH_LOCK_KEY = "path";
@@ -120,8 +121,6 @@ public class FSConstants {
 
     // uuid format - 36 symbols
     public static final int SVN_UUID_FILE_LENGTH = 36;
-    // if > max svn 1.2 stops working
-    public static final int SVN_UUID_FILE_MAX_LENGTH = SVN_UUID_FILE_LENGTH + 1;
     
     /* Number of characters from the head of a digest file name used to
      * calculate a subdirectory in which to drop that file. 

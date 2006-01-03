@@ -167,14 +167,12 @@ public class FSRepositoryUtil {
 
     public static String getRepositoryUUID(File reposRootDir) throws SVNException {
         File uuidFile = getRepositoryUUIDFile(reposRootDir);
-        String uuidLine = FSReader.readSingleLine(uuidFile);
-
-        if (uuidLine == null) {
+        String uuidLine = FSReader.readSingleLine(uuidFile, FSConstants.SVN_UUID_FILE_LENGTH + 2);
+        if (uuidLine == null || uuidLine.length() < FSConstants.SVN_UUID_FILE_LENGTH) {
             SVNErrorManager.error("svn: Can't read file '" + uuidFile.getAbsolutePath() + "': End of file found");
         }
-
-        if (uuidLine.length() > FSConstants.SVN_UUID_FILE_MAX_LENGTH) {
-            SVNErrorManager.error("svn: Can't read length line in file '" + uuidFile.getAbsolutePath() + "'");
+        if (uuidLine.length() > FSConstants.SVN_UUID_FILE_LENGTH) {
+            SVNErrorManager.error("svn: UUID length is more than 36 symbols in '" + uuidFile.getAbsolutePath() + "'");
         }
         return uuidLine;
     }
@@ -227,13 +225,10 @@ public class FSRepositoryUtil {
         if(!formatFile.exists() && !formatFileMustExist){
             return defaultValue;
         }
-        
-        String firstLine = FSReader.readSingleLine(formatFile);
-
-        if (firstLine == null) {
+        String firstLine = FSReader.readSingleLine(formatFile, 80);
+        if (firstLine == null || firstLine.length() == 0) {
             SVNErrorManager.error("svn: Can't read file '" + formatFile.getAbsolutePath() + "': End of file found");
         }
-
         // checking for non-digits
         for (int i = 0; i < firstLine.length(); i++) {
             if (!Character.isDigit(firstLine.charAt(i))) {
@@ -245,20 +240,21 @@ public class FSRepositoryUtil {
     
     public static void checkFSType(File reposRootDir) throws SVNException {
         File fsTypeFile = getFSTypeFile(reposRootDir);
-
-        String fsType = FSReader.readSingleLine(fsTypeFile);
-
-        if (fsType == null) {
+        String fsType = FSReader.readSingleLine(fsTypeFile, 128);
+        if (fsType == null || fsType.length() == 0) {
             SVNErrorManager.error("svn: Can't read file '" + fsTypeFile.getAbsolutePath() + "': End of file found");
         }
-
         if (!fsType.equals(FSConstants.SVN_REPOS_FSFS_FORMAT)) {
-            SVNErrorManager.error("svn: Unknown FS type '" + fsType + "'");
+            SVNErrorManager.error("svn: Unsupported FS type '" + fsType + "'");
         }
     }
     
     public static File getFSCurrentFile(File reposRootDir) {
         return new File(getRepositoryDBDir(reposRootDir), FSConstants.SVN_REPOS_DB_CURRENT_FILE);
+    }
+
+    public static File getWriteLockFile(File reposRootDir) {
+        return new File(getRepositoryDBDir(reposRootDir), FSConstants.SVN_REPOS_WRITE_LOCK_FILE);
     }
 
     public static File getDBLockFile(File reposRootDir) {
