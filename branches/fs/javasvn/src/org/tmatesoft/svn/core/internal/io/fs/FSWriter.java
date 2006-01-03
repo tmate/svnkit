@@ -39,6 +39,9 @@ import org.tmatesoft.svn.core.SVNProperty;
  * @author  TMate Software Ltd.
  */
 public class FSWriter {
+    public static void writeFinalRevision() throws SVNException {
+        
+    }
     
     public static void removeRevisionNode(FSID id, File reposRootDir) throws SVNException {
         /* Fetch the node. */

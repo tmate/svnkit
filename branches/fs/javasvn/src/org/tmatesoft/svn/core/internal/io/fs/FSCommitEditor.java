@@ -11,15 +11,20 @@
  */
 package org.tmatesoft.svn.core.internal.io.fs;
 
+import java.io.FileNotFoundException;
 import java.io.OutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.RandomAccessFile;
 import java.util.Map;
 import java.util.Collection;
 import java.util.LinkedList;
 import java.util.Iterator;
 import java.util.Stack;
 import java.io.File;
+import java.nio.channels.FileChannel;
+import java.nio.channels.FileLock;
+import java.util.Arrays;
 
 import org.tmatesoft.svn.core.SVNCommitInfo;
 import org.tmatesoft.svn.core.SVNURL;
@@ -28,18 +33,21 @@ import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNRevisionProperty;
 import org.tmatesoft.svn.core.SVNProperty;
 import org.tmatesoft.svn.core.io.ISVNEditor;
-import org.tmatesoft.svn.core.io.ISVNWorkspaceMediator;
 import org.tmatesoft.svn.core.io.diff.SVNDiffWindow;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
 import org.tmatesoft.svn.core.internal.util.SVNEncodingUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
+import org.tmatesoft.svn.core.internal.wc.SVNFileType;
 
 /**
  * @version 1.0
  * @author  TMate Software Ltd.
  */
 public class FSCommitEditor implements ISVNEditor {
+    public static final Object ourThreadsLock = new Object();
+    private RandomAccessFile myWriteLockFile;
+    private FileLock myWriteLock;
     private Map myLockTokens;
     private String myAuthor;
     private String myBasePath;
@@ -752,12 +760,22 @@ public class FSCommitEditor implements ISVNEditor {
 
         return null;
     }
-
-    public long commitTxn(FSTransactionInfo txn) throws SVNException {
+    
+    private long finalizeCommit(FSTransactionInfo txn) throws SVNException {
         /* Run pre-commit hooks. */
         FSHooks.runPreCommitHook(myReposRootDir, txn.getTxnId());
-        
         /* Commit. */
+        long newRevision = commitTxn(txn);
+        /* Run post-commit hooks. */
+        try{
+            FSHooks.runPostCommitHook(myReposRootDir, newRevision);
+        }catch(SVNException svne){
+            //
+        }
+        return newRevision;
+    }
+    
+    private long commitTxn(FSTransactionInfo txn) throws SVNException {
         /* How do commits work in Subversion?
         *
         * When you're ready to commit, here's what you have:
@@ -824,16 +842,116 @@ public class FSCommitEditor implements ISVNEditor {
             mergeChanges(null, youngishRootNode, txn);
             txn.setBaseRevision(youngishRev);
             /* Try to commit. */
-
+            Object[] commitResults = null;
+            synchronized(ourThreadsLock){
+                commitResults = commit(newRevision, txn);
+            }
+            boolean isTxnOutOfDate = ((Boolean)commitResults[0]).booleanValue();
+            if(isTxnOutOfDate){
+                /* Did someone else finish committing a new revision while we
+                 * were in mid-merge or mid-commit?  If so, we'll need to
+                 * loop again to merge the new changes in, then try to
+                 * commit again.  Or if that's not what happened, then just
+                 * return the error. 
+                 */
+                long youngestRev = myRepository.getYoungestRev(myReposRootDir);
+                if(youngishRev == youngestRev){
+                    SVNErrorManager.error("Transaction out of date");
+                }
+            }else{
+                /* Set the return value */
+                newRevision = ((Long)commitResults[1]).longValue();
+                return newRevision;
+            }
         }
-
-        
-        /* Run post-commit hooks. */
-        FSHooks.runPostCommitHook(myReposRootDir, newRevision);
-        //TODO: replace with returning a real revision
-        return -1;
     }
-
+    
+    /*
+     * Return values: 
+     * Object[0] - Boolean - that says if a txn is out-of-date: true - out-of-date, 
+     * false - normal
+     * Object[1] - Long - a new revision
+     */
+    private Object[] commit(long newRevision, FSTransactionInfo txn) throws SVNException {
+        getWriteLock();
+        Object[] results = new Object[2];
+        results[1] = new Long(newRevision);
+        /* Get the current youngest revision. */
+        long oldRev = myRepository.getYoungestRev(myReposRootDir);
+        /* Check to make sure this transaction is based off the most recent
+         * revision. 
+         */
+        if(txn.getBaseRevision() != oldRev){
+            results[0] = new Boolean(true);
+            return results;
+        }
+        /* Locks may have been added (or stolen) between the calling of
+         * previous methods and commitTxn(), so we need
+         * to re-examine every changed-path in the txn and re-verify all
+         * discovered locks. 
+         */
+        verifyLocks(txn.getTxnId());
+        /* Get the next node-id and copy-id to use. */
+        String[] ids = FSReader.readNextIds(txn.getTxnId(), myReposRootDir);
+        String startNodeId = ids[0];
+        String startCopyId = ids[1];
+        /* We are going to be one better than this puny old revision. */
+        newRevision = oldRev + 1;
+//        File protoFile = FSRepositoryUtil.getTxnRevFile(txn.getTxnId(), myReposRootDir);
+        RandomAccessFile protoFile = null;
+        try{
+            protoFile = SVNFileUtil.openRAFileForWriting(FSRepositoryUtil.getTxnRevFile(txn.getTxnId(), myReposRootDir), true);
+            /* Write out all the node-revisions and directory contents. */
+            FSID rootId = FSID.createTxnId("0", "0", txn.getTxnId());
+        }finally{
+            SVNFileUtil.closeFile(protoFile);
+        }
+        
+        //TODO: realease write lock
+        return null;
+    }
+    
+    private void verifyLocks(String txnId) throws SVNException {
+        /* Fetch the changes for this transaction. */
+        Map changes = FSReader.fetchTxnChanges(null, txnId, null, myReposRootDir);
+        /* Make an array of the changed paths, and sort them depth-first-ily.  */
+        Object[] changedPaths = changes.keySet().toArray();
+        Arrays.sort(changedPaths);
+        /* Now, traverse the array of changed paths, verify locks. Note
+         * that if we need to do a recursive verification a path, we'll skip
+         * over children of that path when we get to them. 
+         */
+        String lastRecursedPath = null;
+        for(int i = 0; i < changedPaths.length; i++){
+            String changedPath = (String)changedPaths[i];
+            boolean recurse = true;
+            /* If this path has already been verified as part of a recursive
+             * check of one of its parents, no need to do it again.  
+             */
+            if(lastRecursedPath != null && SVNPathUtil.pathIsChild(lastRecursedPath, changedPath) != null){
+                continue;
+            }
+            /* Fetch the change associated with our path.  */
+            FSPathChange change = (FSPathChange)changes.get(changedPath);
+            /* What does it mean to succeed at lock verification for a given
+             * path?  For an existing file or directory getting modified
+             * (text, props), it means we hold the lock on the file or
+             * directory.  For paths being added or removed, we need to hold
+             * the locks for that path and any children of that path.
+             */
+            if(change.getChangeKind() == FSPathChangeKind.FS_PATH_CHANGE_MODIFY){
+                recurse = false;
+            }
+            FSReader.allowLockedOperation(changedPath, myAuthor, myLockTokens.values(), recurse, true, myReposRootDir);
+            /* If we just did a recursive check, remember the path we
+             * checked (so children can be skipped).  
+             */
+            if(recurse){
+                lastRecursedPath = changedPath;
+            }
+        }
+    }
+    
     /* Merge changes between an ancestor and source node into
      * txn.  The ancestor is either ancestorNode, or if
      * that is null, txn's base node.
@@ -857,7 +975,7 @@ public class FSCommitEditor implements ISVNEditor {
              * for the caller to do, and we might want to consider whether
              * this response is really appropriate. 
              */
-            SVNErrorManager.error("FATAL error: no changes it transaction to commit");
+            SVNErrorManager.error("FATAL error: no changes in transaction to commit");
         }else{
             merge("/", txnRootNode, sourceNode, ancestorNode, txnId);
         }
@@ -1039,10 +1157,50 @@ public class FSCommitEditor implements ISVNEditor {
         FSWriter.putTxnRevisionNode(targetId, revNode, myReposRootDir);
     }
     
+    //gets exclusive lock on a write-lock file
+    private void getWriteLock() throws SVNException {
+        /* svn 1.1.1 and earlier deferred lock file creation to the first
+         * commit.  So in case the repository was created by an earlier
+         * version of svn, check the lock file here. 
+         */
+        File writeLockFile = FSRepositoryUtil.getWriteLockFile(myReposRootDir);
+        SVNFileType type = SVNFileType.getType(writeLockFile);
+        if(type == SVNFileType.UNKNOWN || type == SVNFileType.NONE){
+            SVNFileUtil.createEmptyFile(writeLockFile);
+        }
+        try {
+            myWriteLockFile = new RandomAccessFile(writeLockFile, "rw");
+        } catch (FileNotFoundException fnfe) {
+            SVNFileUtil.closeFile(myWriteLockFile);
+            SVNErrorManager.error("svn: Error opening db lockfile" + SVNFileUtil.getNativeEOLMarker() + "svn: Can't open file '" + writeLockFile.getAbsolutePath() + "': " + fnfe.getMessage());
+        }
+        try {
+            myWriteLock = myWriteLockFile.getChannel().lock(0, Long.MAX_VALUE, false);
+        } catch (IOException ioe) {
+            releaseWriteLock();
+            SVNErrorManager.error("svn: Error opening db lockfile" + SVNFileUtil.getNativeEOLMarker() + "svn: Can't get exclusive lock on file '" + writeLockFile.getAbsolutePath() + "': "
+                    + ioe.getMessage());
+        }
+    }
+
+    private void releaseWriteLock() {
+        if (myWriteLock != null) {
+            try {
+                myWriteLock.release();
+            } catch (IOException ioex) {
+                //
+            }
+            myWriteLock = null; 
+        }
+        SVNFileUtil.closeFile(myWriteLockFile);
+        myWriteLockFile = null;
+    }
+    
     public void abortEdit() throws SVNException {
         if(myTargetStream != null){
             myTargetStream.closeStreams();
         }
+        releaseWriteLock();
         if(myTxn == null || !isTxnOwner){
             myRepository.closeRepository();
             return;

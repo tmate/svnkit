@@ -13,8 +13,6 @@ package org.tmatesoft.svn.core.internal.io.fs;
 
 import java.io.IOException;
 import java.io.FileInputStream;
-import java.nio.channels.FileChannel;
-import java.nio.channels.FileLock;
 import java.io.RandomAccessFile;
 import java.io.FileNotFoundException;
 import java.io.OutputStream;
@@ -63,10 +61,8 @@ import org.tmatesoft.svn.core.io.SVNLocationEntry;
  */
 public class FSRepository extends SVNRepository implements ISVNReporter {
 
-    private FileLock myDBSharedLock;
     private File myReposRootDir;
     // db.lock file representation for synchronizing
-    private RandomAccessFile myDBLockFile;
     private FSReporterContext myReporterContext;// for reporter
     private FSRevisionNodePool myRevNodesPool;
     
@@ -81,55 +77,6 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
             openRepository();
         } finally {
             closeRepository();
-        }
-    }
-
-    private void lockDBFile(File reposRootDir) throws SVNException {
-        // 1. open db.lock for shared reading (?? just like in the svn code)
-        File dbLockFile = FSRepositoryUtil.getDBLockFile(reposRootDir);
-
-        if (!dbLockFile.exists()) {
-            SVNErrorManager.error("svn: Error opening db lockfile" + SVNFileUtil.getNativeEOLMarker() + "svn: Can't open file '" + dbLockFile.getAbsolutePath() + "'");
-        }
-
-        myDBLockFile = null;
-        try {
-            myDBLockFile = new RandomAccessFile(dbLockFile, "r");
-        } catch (FileNotFoundException fnfe) {
-            SVNFileUtil.closeFile(myDBLockFile);
-            SVNErrorManager.error("svn: Error opening db lockfile" + SVNFileUtil.getNativeEOLMarker() + "svn: Can't open file '" + dbLockFile.getAbsolutePath() + "': " + fnfe.getMessage());
-        }
-
-        // 2. lock db.lock blocking, not exclusively
-        FileChannel fch = myDBLockFile.getChannel();
-        try {
-            myDBSharedLock = fch.lock(0, Long.MAX_VALUE, true);
-        } catch (IOException ioe) {
-            SVNFileUtil.closeFile(myDBLockFile);
-            if (myDBSharedLock != null) {
-                try {
-                    myDBSharedLock.release();
-                } catch (IOException ioex) {
-                    //
-                }
-            }
-            SVNErrorManager.error("svn: Error opening db lockfile" + SVNFileUtil.getNativeEOLMarker() + "svn: Can't get shared lock on file '" + dbLockFile.getAbsolutePath() + "': "
-                    + ioe.getMessage());
-        }
-    }
-
-    private void unlockDBFile() throws SVNException {
-        // 1. release the shared lock
-        if (myDBSharedLock != null) {
-            try {
-                myDBSharedLock.release();
-            } catch (IOException ioe) {
-                File dbLockFile = FSRepositoryUtil.getDBLockFile(myReposRootDir);
-                SVNErrorManager.error("svn: Can't unlock file '" + dbLockFile.getAbsoluteFile() + "': " + ioe.getMessage());
-            } finally {
-                // 2. close 'db.lock' file
-                SVNFileUtil.closeFile(myDBLockFile);
-            }
         }
     }
 
@@ -155,21 +102,14 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
             SVNErrorManager.error(errorMessage + eol + svne.getMessage());
         }
 
-        // 3. Lock 'db.lock' file non-exclusively, blocking, for reading only
-        try {
-            lockDBFile(myReposRootDir);
-        } catch (SVNException svne) {
-            SVNErrorManager.error(errorMessage + eol + svne.getMessage());
-        }
-
-        // 4. Check FS type for 'fsfs'
+        // 3. Check FS type for 'fsfs'
         try {
             FSRepositoryUtil.checkFSType(myReposRootDir);
         } catch (SVNException svne) {
             SVNErrorManager.error(errorMessage + eol + svne.getMessage());
         }
 
-        // 5. Attempt to open the 'current' file of this repository
+        // 4. Attempt to open the 'current' file of this repository
         File dbCurrentFile = FSRepositoryUtil.getFSCurrentFile(myReposRootDir);
         FileInputStream fis = null;
         try {
@@ -181,7 +121,7 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
         }
 
         /*
-         * 6. Check the FS format number (db/format). Treat an absent format
+         * 5. Check the FS format number (db/format). Treat an absent format
          * file as format 1. Do not try to create the format file on the fly,
          * because the repository might be read-only for us, or we might have a
          * umask such that even if we did create the format file, subsequent
@@ -195,7 +135,7 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
             SVNErrorManager.error(errorMessage + eol + svne.getMessage());
         }
 
-        // 7. Read and cache repository UUID
+        // 6. Read and cache repository UUID
         String uuid = null;
         try {
             uuid = FSRepositoryUtil.getRepositoryUUID(myReposRootDir);
@@ -207,7 +147,6 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
             rootDir = myReposRootDir.getCanonicalPath();
         } catch (IOException ioe) {
             SVNErrorManager.error("Can not convert path '" + myReposRootDir.getAbsolutePath() + "' to a canonical form");
-            //rootDir = myReposRootDir.getAbsolutePath();
         }
         rootDir = rootDir.replace(File.separatorChar, '/');
         if (!rootDir.startsWith("/")) {
@@ -216,13 +155,9 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
         setRepositoryCredentials(uuid, SVNURL.parseURIEncoded(getLocation().getProtocol() + "://" + rootDir));
     }
 
-    void closeRepository() throws SVNException {
-        try {
-            unlockDBFile();
-            myRevNodesPool.clearAllCaches();
-        } finally {
-            unlock();
-        }
+    void closeRepository() {
+        myRevNodesPool.clearAllCaches();
+        unlock();
     }
 
     public File getRepositoryRootDir() {
@@ -231,7 +166,7 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
 
     long getYoungestRev(File reposRootDir) throws SVNException {
         File dbCurrentFile = FSRepositoryUtil.getFSCurrentFile(reposRootDir);
-        String firstLine = FSReader.readSingleLine(dbCurrentFile);
+        String firstLine = FSReader.readSingleLine(dbCurrentFile, 80);
         if (firstLine == null) {
             SVNErrorManager.error("svn: Can't read file '" + dbCurrentFile.getAbsolutePath() + "': End of file found");
         }
@@ -832,191 +767,16 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
     private Map getFSpathChanged(FSRoot root)throws SVNException{   
         Map changedPaths = new HashMap();
         if(root.isTxnRoot() == true){
-            File txnFile = new File(myReposRootDir.getAbsoluteFile() + 
-                    FSConstants.SVN_REPOS_TXNS_DIR + root.getTxnId() + 
-                    FSConstants.TXN_PATH_EXT + 
-                    FSConstants.TXN_PATH_CHANGES);
-            ArrayList fetchArr = fetchAllChanges(changedPaths, txnFile, false, 0, root.getCopyfromCache());
-            root.setCopyfromCache((Map)fetchArr.get(1));
-            return (Map)fetchArr.get(0);
+            File txnFile = FSRepositoryUtil.getTxnChangesFile(root.getTxnId(), myReposRootDir);
+            Object[] result = FSReader.fetchAllChanges(changedPaths, txnFile, false, 0, root.getCopyfromCache());
+            root.setCopyfromCache((Map)result[1]);
+            return (Map)result[0];
     	}           
         long changeOffset = FSReader.getChangesOffset(myReposRootDir, root.getRevision());
-        ArrayList fetchArr = fetchAllChanges(changedPaths, new File(myReposRootDir.getAbsoluteFile() + "/" + FSConstants.SVN_REPOS_REVS_DIR + "/" + root.getRevision()), true, changeOffset, root.getCopyfromCache());    
-        root.setCopyfromCache((Map)fetchArr.get(1));
-        return (Map)fetchArr.get(0);    	
-    }
-    
-    /*Return ArrayList consist of two Maps:
-     * ArrayList[0]: pathChanged Map
-     * ArrayList[1]: copyfromCache Map*/    
-    private static ArrayList fetchAllChanges(Map changedPaths, File revFile, boolean prefolded, long offsetToFirstChanges, Map mapCopyfrom)throws SVNException{        
-        InputStream inputStream = SVNFileUtil.openFileForReading(revFile);
-        if (inputStream == null) {
-            SVNErrorManager.error("svn: Can't open file '" + revFile.getAbsolutePath() + "'");
-        }        
-        RandomAccessFile raReader = SVNFileUtil.openRAFileForReading(revFile);
-        
-        Map internalMapChangedPath = changedPaths != null ? changedPaths : new HashMap();  
-        Map internalMapCopyfrom = mapCopyfrom != null ? mapCopyfrom : new HashMap();
-        FSChange change = FSReader.readChanges(revFile, raReader, offsetToFirstChanges, true);        
-        while(change != null){
-            ArrayList retArr = foldChange(internalMapChangedPath, change, internalMapCopyfrom);
-            internalMapChangedPath = (Map)retArr.get(0);
-            internalMapCopyfrom = (Map)retArr.get(1);
-            
-            if( ( FSPathChangeKind.FS_PATH_CHANGE_DELETE.equals(change.getKind()) || 
-                    FSPathChangeKind.FS_PATH_CHANGE_REPLACE.equals(change.getKind()) ) && 
-                    prefolded == false){
-                                
-                Collection keySet = internalMapChangedPath.keySet();
-                Iterator curIter = keySet.iterator();
-                while(curIter.hasNext()){
-                    String hashKeyPath = (String)curIter.next();
-                    /*If we come across our own path, ignore it*/                    
-                    if(change.getPath().equals(hashKeyPath)){
-                        continue;
-                    }
-                    /*If we come across a child of our path, remove it*/
-                    if(SVNPathUtil.pathIsChild(change.getPath(), hashKeyPath) != null){
-                        internalMapChangedPath.remove(hashKeyPath);
-                    }
-                }
-            }
-            change = FSReader.readChanges(revFile, raReader, 0, false);
-        }
-        try{
-            inputStream.close();
-        }catch(IOException ex){
-            SVNErrorManager.error("Can't close InputStream for '" + revFile.getAbsolutePath() + "' file" );
-        }
-        
-        ArrayList retArr = new ArrayList(0);
-        retArr.add(internalMapChangedPath);
-        retArr.add(internalMapCopyfrom);
-        
-        return retArr;        
-    }
-    
-    /* Merge the internal-use-only FSChange into a hash of FSPathChanges, 
-     * collapsing multiple changes into a single summarising change per path.  
-     * Also keep copyfromCache (here it is a parameter Map mapCopyfrom) up to date with new adds and replaces */
-    private static ArrayList foldChange(Map mapChanges, FSChange change, Map mapCopyfrom)throws SVNException{
-        if(mapChanges == null || change == null){
-            return null;            
-        }
-        Map internalMapChanges = mapChanges != null ? mapChanges : new HashMap();
-        Map internalMapCopyfrom = new HashMap(mapCopyfrom);
-        FSPathChange oldChange = null;
-        FSPathChange newChange = null;
-        SVNLocationEntry copyfromEntry = null;
-        String copyfromPath = null;
-        String path = null;
-        
-        if((oldChange = (FSPathChange)internalMapChanges.get(change.getPath())) != null){
-            /* Get the existing copyfrom entry for this path. */
-            copyfromEntry = (SVNLocationEntry)internalMapCopyfrom.get(change.getPath());
-            if(copyfromEntry != null){
-                copyfromPath = change.getPath();
-            }
-            path = change.getPath();
-            /* Sanity check:  only allow NULL node revision ID in the `reset' case. */
-            if((change.getNodeRevID() == null) && 
-                    (FSPathChangeKind.FS_PATH_CHANGE_RESET.equals(change.getKind()) == false)){
-                SVNErrorManager.error("Missing required node revision ID");
-            }
-            /* Sanity check: we should be talking about the same node
-            revision ID as our last change except where the last change
-            was a deletion*/
-            if((change.getNodeRevID() != null) && 
-                    (oldChange.getRevNodeId().equals(change.getNodeRevID()) == false) && 
-                    (oldChange.getChangeKind().equals(FSPathChangeKind.FS_PATH_CHANGE_DELETE) == false)){
-                SVNErrorManager.error("Invalid change ordering: new node revision ID without delete");
-            }
-            /* Sanity check: an add, replacement, or reset must be the first
-            thing to follow a deletion*/            
-            if(FSPathChangeKind.FS_PATH_CHANGE_DELETE.equals(oldChange.getChangeKind()) && 
-                    false == ( FSPathChangeKind.FS_PATH_CHANGE_REPLACE.equals(change.getKind()) || 
-                               FSPathChangeKind.FS_PATH_CHANGE_RESET.equals(change.getKind()) ||
-                               FSPathChangeKind.FS_PATH_CHANGE_ADD.equals(change.getKind())) ){
-                SVNErrorManager.error("Invalid change ordering: non-add change on deleted path");
-            }    
-            /*Merging the changes*/
-            switch(change.getKind().intValue()){
-                case 0 /*FSPathChangeKind.FS_PATH_CHANGE_MODIFY*/ :
-                    if(change.getTextModi()){
-                        oldChange.setTextModified(true);
-                    }
-                    if(change.getPropModi()){
-                        oldChange.setPropertiesModified(true);
-                    }
-                    break;
-                case 1 /*FSPathChangeKind.FS_PATH_CHANGE_ADD*/ :
-                case 3 /*FSPathChangeKind.FS_PATH_CHANGE_REPLACE*/ :
-                    /*An add at this point must be following a previous delete,
-                    so treat it just like a replace*/        
-                    oldChange.setChangeKind(FSPathChangeKind.FS_PATH_CHANGE_REPLACE);
-                    oldChange.setRevNodeId(new FSID(change.getNodeRevID()));
-                    oldChange.setTextModified(change.getTextModi());
-                    oldChange.setPropertiesModified(change.getPropModi());
-                    if(change.getCopyfromEntry().getRevision() == FSConstants.SVN_INVALID_REVNUM){
-                        copyfromEntry = new SVNLocationEntry(FSConstants.SVN_INVALID_REVNUM, "");
-                    }else{
-                        copyfromEntry = new SVNLocationEntry(change.getCopyfromEntry().getRevision(), change.getCopyfromEntry().getPath());
-                    }
-                    break;
-                case 2 /*FSPathChangeKind FS_PATH_CHANGE_DELETE*/:
-                    if(FSPathChangeKind.FS_PATH_CHANGE_ADD.equals(oldChange.getChangeKind())){
-                        /*If the path was introduced in this transaction via an
-                        add, and we are deleting it, just remove the path altogether*/
-                        oldChange = null;
-                        internalMapChanges.remove(change.getPath());
-                    }else{
-                        /* A deletion overrules all previous changes. */
-                        oldChange.setChangeKind(FSPathChangeKind.FS_PATH_CHANGE_DELETE);
-                        oldChange.setPropertiesModified(change.getPropModi());
-                        oldChange.setTextModified(change.getTextModi());
-                    }
-                    copyfromEntry = null;
-                    internalMapCopyfrom.remove(change.getPath());
-                    break;                    
-                case 4 : /*FSPathChangeKind.FS_PATH_CHANGE_RESET*/
-                    //A reset here will simply remove the path change from the hash
-                    oldChange = null;
-                    copyfromEntry = null;
-                    internalMapChanges.remove(change.getPath());
-                    internalMapCopyfrom.remove(change.getPath());
-                    break;
-            }
-            newChange = oldChange;
-        }else{
-            newChange = new FSPathChange(new FSID(change.getNodeRevID()), change.getKind(), change.getTextModi(), change.getPropModi());
-            if(change.getCopyfromEntry().getRevision() != FSConstants.SVN_INVALID_REVNUM){
-                copyfromEntry = change.getCopyfromEntry();
-            }else{
-                copyfromEntry = new SVNLocationEntry(FSConstants.SVN_INVALID_REVNUM, "");
-            }
-            path = new String(change.getPath());
-        }
-        /*If passed value is null, we remove previous entry from hash (if it is there), otherwise nothing happend*/
-        if(newChange == null){
-            internalMapChanges.put(path, newChange);            
-        }else{
-            internalMapChanges.remove(path);
-        }
-        
-        if(copyfromPath == null){
-            copyfromPath = copyfromEntry != null ? new String(path) : path;
-        }
-        if(copyfromEntry == null){
-            internalMapCopyfrom.remove(copyfromPath);
-        }else{
-            internalMapCopyfrom.put(copyfromPath, new SVNLocationEntry(copyfromEntry.getRevision(), copyfromEntry.getPath()));            
-        }      
-        
-        ArrayList arr = new ArrayList(0);
-        arr.add(internalMapChanges);
-        arr.add(internalMapCopyfrom);
-        return arr;
+        File revFile = FSRepositoryUtil.getRevisionFile(myReposRootDir, root.getRevision());
+        Object[] result = FSReader.fetchAllChanges(changedPaths, revFile, true, changeOffset, root.getCopyfromCache());    
+        root.setCopyfromCache((Map)result[1]);
+        return (Map)result[0];    	
     }
     
     private class LogPathInfo{
