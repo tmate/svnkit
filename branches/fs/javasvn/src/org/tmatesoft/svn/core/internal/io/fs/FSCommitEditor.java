@@ -897,16 +897,25 @@ public class FSCommitEditor implements ISVNEditor {
         String startCopyId = ids[1];
         /* We are going to be one better than this puny old revision. */
         newRevision = oldRev + 1;
-//        File protoFile = FSRepositoryUtil.getTxnRevFile(txn.getTxnId(), myReposRootDir);
         RandomAccessFile protoFile = null;
+        FSID newRootId = null;
         try{
             protoFile = SVNFileUtil.openRAFileForWriting(FSRepositoryUtil.getTxnRevFile(txn.getTxnId(), myReposRootDir), true);
             /* Write out all the node-revisions and directory contents. */
             FSID rootId = FSID.createTxnId("0", "0", txn.getTxnId());
+            newRootId = FSWriter.writeFinalRevision(newRootId, protoFile, newRevision, rootId, startNodeId, startCopyId, myReposRootDir);
+            /* Write the changed-path information. */
+            long changedPathOffset = FSWriter.writeFinalChangedPathInfo(protoFile, txn.getTxnId(), myReposRootDir);
+            /* Write the final line. */
+            String offsetsLine = "\n" + newRootId.getOffset() + " " + changedPathOffset + "\n";
+            protoFile.write(offsetsLine.getBytes());
+        }catch(IOException ioe){
+            SVNErrorManager.error(ioe.getMessage());
         }finally{
             SVNFileUtil.closeFile(protoFile);
         }
-        
+        /* Remove any temporary txn props representing 'flags'. */
+
         //TODO: realease write lock
         return null;
     }

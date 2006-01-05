@@ -87,6 +87,7 @@ public class FSConstants {
     public static final String HEADER_COPYROOT = "copyroot";
     public static final String REP_DELTA = "DELTA";
     public static final String REP_PLAIN = "PLAIN";
+    public static final String REP_TRAILER = "ENDREP";
     public static final int MD5_DIGESTSIZE = 16;
     /* The alphanumeric keys passed in and out of nextKey()
      * are guaranteed never to be longer than this many bytes.

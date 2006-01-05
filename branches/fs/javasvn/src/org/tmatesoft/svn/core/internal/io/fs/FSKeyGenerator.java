@@ -70,4 +70,37 @@ public class FSKeyGenerator {
         }
         return new String(nextKey, 0, nextKeyLength);
     }
+    
+    public static String addKeys(String key1, String key2){
+        int i1 = key1.length() - 1;
+        int i2 = key2.length() - 1;
+        int i3 = 0;
+        int carry = 0;
+        int val;
+        char[] buf = new char[FSConstants.MAX_KEY_SIZE + 2];
+        while(i1 >= 0 || i2 >= 0 || carry > 0){
+            val = carry;
+            if(i1 >= 0){
+                val += key1.charAt(i1) <= '9' ? key1.charAt(i1) - '0' : key1.charAt(i1) - 'a' + 10;
+            }
+            if(i2 >= 0){
+                val += key2.charAt(i2) <= '9' ? key2.charAt(i2) - '0' : key2.charAt(i2) - 'a' + 10;
+            }
+            carry = val / 36;
+            val = val % 36;
+            buf[i3++] = val <= 9 ? (char)('0' + val) : (char)(val - 10 + 'a');
+            if(i1 >= 0){
+                --i1;
+            }
+            if(i2 >= 0){
+                --i2;
+            }
+        }
+        /* Now reverse the resulting string. */
+        StringBuffer result = new StringBuffer();
+        for(int i = 0; i < i3; i++){
+            result.append(buf[i3 - i - 1]);
+        }
+        return result.toString();
+    }
 }
