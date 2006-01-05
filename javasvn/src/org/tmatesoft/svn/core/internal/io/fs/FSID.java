@@ -46,6 +46,10 @@ public class FSID {
     public static FSID createTxnId(String nodeId, String copyId, String txnId){
         return new FSID(nodeId, txnId, copyId, FSConstants.SVN_INVALID_REVNUM, -1);
     }
+
+    public static FSID createRevId(String nodeId, String copyId, long revision, long offset){
+        return new FSID(nodeId, null, copyId, revision, offset);
+    }
     
     public FSID(String nodeId, String txnId, String copyId, long revision, long offset){
         myNodeID = (nodeId == null) ? ID_INAPPLICABLE :  nodeId;

@@ -16,12 +16,15 @@ import java.io.IOException;
 import java.io.FileOutputStream;
 import java.io.FileNotFoundException;
 import java.io.OutputStream;
+import java.io.RandomAccessFile; 
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.Date;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNLock;
@@ -39,8 +42,143 @@ import org.tmatesoft.svn.core.SVNProperty;
  * @author  TMate Software Ltd.
  */
 public class FSWriter {
-    public static void writeFinalRevision() throws SVNException {
-        
+    /* Write the changed path info from transaction to the permanent rev-file. 
+     * Returns offset in the file of the beginning of this information. 
+     */
+    public static long writeFinalChangedPathInfo(final RandomAccessFile protoFile, String txnId, File reposRootDir) throws SVNException, IOException {
+        long offset = protoFile.getFilePointer();
+        Map copyfromCache = new HashMap();
+        Map changedPaths = FSReader.fetchTxnChanges(null, txnId, copyfromCache, reposRootDir);
+        /* Iterate through the changed paths one at a time, and convert the
+         * temporary node-id into a permanent one for each change entry. 
+         */
+        for(Iterator paths = changedPaths.keySet().iterator(); paths.hasNext();){
+            String path = (String)paths.next();
+            FSPathChange change = (FSPathChange)changedPaths.get(path);
+            FSID id = change.getRevNodeId();
+            /* If this was a delete of a mutable node, then it is OK to
+             * leave the change entry pointing to the non-existant temporary
+             * node, since it will never be used. 
+             */
+            if(change.getChangeKind() != FSPathChangeKind.FS_PATH_CHANGE_DELETE && !id.isTxn()){
+                FSRevisionNode revNode = FSReader.getRevNodeFromID(reposRootDir, id);
+                /* noderev has the permanent node-id at this point, so we just
+                 * substitute it for the temporary one. 
+                 */
+                change.setRevNodeId(revNode.getId());
+            }
+            /* Find the cached copyfrom information. */
+            String copyfrom = (String)copyfromCache.get(path);
+            /* Write out the new entry into the final rev-file. */
+            OutputStream protoFileAdapter = new OutputStream(){
+                public void write(int b) throws IOException{
+                    protoFile.write(b);
+                }
+            };
+            writeChangeEntry(protoFileAdapter, path, change, copyfrom);
+        }
+        return offset;
+    }
+    
+    /* Copy a node-revision specified by id from a transaction into the prototype
+     * file (that will be a permanent rev-file). If this is a directory, all
+     * children are copied as well. startNodeId and startCopyId are the first 
+     * available node and copy ids.
+     */
+    public static FSID writeFinalRevision(FSID newId, final RandomAccessFile protoFile, long revision, FSID id, String startNodeId, String startCopyId, File reposRootDir) throws SVNException, IOException {
+        newId = null;
+        /* Check to see if this is a transaction node. */
+        if(!id.isTxn()){
+            return newId;
+        }
+        FSRevisionNode revNode = FSReader.getRevNodeFromID(reposRootDir, id);
+        if(revNode.getType() == SVNNodeKind.DIR){
+            /* This is a directory.  Write out all the children first. */
+            Map namesToEntries = FSReader.getDirEntries(revNode, reposRootDir);
+            for(Iterator entries = namesToEntries.values().iterator(); entries.hasNext();){
+                FSEntry dirEntry = (FSEntry)entries.next();
+                newId = writeFinalRevision(newId, protoFile, revision, dirEntry.getId(), startNodeId, startCopyId, reposRootDir);
+                if(newId != null && newId.getRevision() == revision){
+                    dirEntry.setId(new FSID(newId));
+                }
+            }
+            if(revNode.getTextRepresentation() != null && revNode.getTextRepresentation().isTxn()){
+                /* Write out the contents of this directory as a text rep. */
+                Map unparsedEntries = FSRepositoryUtil.unparseDirEntries(namesToEntries);
+                FSRepresentation textRep = revNode.getTextRepresentation(); 
+                textRep.setTxnId(FSID.ID_INAPPLICABLE);
+                textRep.setRevision(revision);
+                try{
+                    textRep.setOffset(protoFile.getFilePointer());
+                    final MessageDigest checksum = MessageDigest.getInstance("MD5");
+                    long size = HashRepresentationWriter.writeHashRepresentation(unparsedEntries, protoFile, checksum);
+                    String hexDigest = SVNFileUtil.toHexDigest(checksum);
+                    textRep.setSize(size);
+                    textRep.setHexDigest(hexDigest);
+                    textRep.setExpandedSize(textRep.getSize());
+                }catch(NoSuchAlgorithmException nae){
+                    SVNErrorManager.error(nae.getMessage());
+                }
+            }
+        }else{
+            /* This is a file.  We should make sure the data rep, if it
+             * exists in a "this" state, gets rewritten to our new revision
+             * num. 
+             */
+            if(revNode.getTextRepresentation() != null && revNode.getTextRepresentation().isTxn()){
+               FSRepresentation textRep = revNode.getTextRepresentation();
+               textRep.setTxnId(FSID.ID_INAPPLICABLE);
+               textRep.setRevision(revision);
+            }
+        }
+        /* Fix up the property reps. */
+        if(revNode.getPropsRepresentation() != null && revNode.getPropsRepresentation().isTxn()){
+            Map props = FSReader.getProperties(revNode, reposRootDir);
+            FSRepresentation propsRep = revNode.getPropsRepresentation();
+            try{
+                propsRep.setOffset(protoFile.getFilePointer());
+                final MessageDigest checksum = MessageDigest.getInstance("MD5");
+                long size = HashRepresentationWriter.writeHashRepresentation(props, protoFile, checksum);
+                String hexDigest = SVNFileUtil.toHexDigest(checksum);
+                propsRep.setSize(size);
+                propsRep.setHexDigest(hexDigest);
+                propsRep.setTxnId(FSID.ID_INAPPLICABLE);
+                propsRep.setRevision(revision);
+            }catch(NoSuchAlgorithmException nae){
+                SVNErrorManager.error(nae.getMessage());
+            }
+        }
+        /* Convert our temporary ID into a permanent revision one. */
+        long myOffset = protoFile.getFilePointer();
+        String myNodeId = null;
+        String nodeId = revNode.getId().getNodeID();
+        if(nodeId.startsWith("_")){
+            myNodeId = FSKeyGenerator.addKeys(startNodeId, nodeId.substring(1));
+        }else{
+            myNodeId = nodeId;
+        }
+        String myCopyId = null;
+        String copyId = revNode.getId().getCopyID();
+        if(copyId.startsWith("_")){
+            myCopyId = FSKeyGenerator.addKeys(startCopyId, copyId.substring(1));
+        }else{
+            myCopyId = copyId;
+        }
+        if(revNode.getCopyRootRevision() == FSConstants.SVN_INVALID_REVNUM){
+            revNode.setCopyRootRevision(revision);
+        }
+        newId = FSID.createRevId(myNodeId, myCopyId, revision, myOffset);
+        revNode.setId(newId);
+        /* Write out our new node-revision. */
+        OutputStream protoFileAdapter = new OutputStream(){
+            public void write(int b) throws IOException{
+                protoFile.write(b);
+            }
+        };
+        writeTxnNodeRevision(protoFileAdapter, revNode);
+        putTxnRevisionNode(id, revNode, reposRootDir);
+        /* Return our ID that references the revision file. */
+        return newId;
     }
     
     public static void removeRevisionNode(FSID id, File reposRootDir) throws SVNException {
@@ -579,5 +717,34 @@ public class FSWriter {
             }
         }
         return null;
+    }
+    private static class HashRepresentationWriter extends OutputStream{
+        long mySize = 0;
+        MessageDigest myChecksum;
+        RandomAccessFile myProtoFile;
+
+        public HashRepresentationWriter(RandomAccessFile protoFile, MessageDigest digest){
+            super();
+            myChecksum = digest;
+            myProtoFile = protoFile;
+        }
+        
+        public void write(int b) throws IOException{
+            myProtoFile.write(b);
+            if(myChecksum != null){
+                myChecksum.update((byte)b);
+            }
+            mySize++;
+        }
+        
+        public static long writeHashRepresentation(Map hashContents, RandomAccessFile protoFile, MessageDigest digest) throws IOException, SVNException {
+            HashRepresentationWriter targetFile = new HashRepresentationWriter(protoFile, digest);
+            String header = FSConstants.REP_PLAIN + "\n";
+            protoFile.write(header.getBytes());
+            SVNProperties.setProperties(hashContents, targetFile, SVNProperties.SVN_HASH_TERMINATOR);
+            String trailer = FSConstants.REP_TRAILER + "\n";
+            protoFile.write(trailer.getBytes());
+            return targetFile.mySize;
+        }
     }
 }
