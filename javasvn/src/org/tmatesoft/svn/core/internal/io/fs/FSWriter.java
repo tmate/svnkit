@@ -42,6 +42,97 @@ import org.tmatesoft.svn.core.SVNProperty;
  * @author  TMate Software Ltd.
  */
 public class FSWriter {
+    /* TODO: later when we merge this branch with the trunk version (with error 
+     * codes support) we need to edit this code to distinguish between those 
+     * exceptions that concern unlock errors and those that don't. 
+     */
+    public static void unlockPath(String path, String token, String username, boolean breakLock, File reposRootDir) throws SVNException {
+        /* Setup an array of paths in anticipation of the ra layers handling
+         * multiple locks in one request (1.3 most likely).  This is only
+         * used by FSHooks.runPost[Unl/L]ockHook(). 
+         */
+        String[] paths = {path};
+        if(!breakLock && username == null){
+            SVNErrorManager.error("Cannot unlock path '" + path + "', no authenticated username available");
+        }
+        /* Run pre-unlock hook.  This could throw error, preventing
+         * unlock() from happening. 
+         */
+        FSHooks.runPreUnlockHook(reposRootDir, path, username);
+        /* Unlock. */
+        doUnlock(path, token, username, breakLock, reposRootDir);
+        /* Run post-unlock hook. */
+        try{
+            FSHooks.runPostUnlockHook(reposRootDir, paths, username);
+        }catch(SVNException svne){
+            SVNErrorManager.error("Unlock succeeded, but post-unlock hook failed: " + svne.getMessage());
+        }
+    }
+    
+    public static void doUnlock(String path, String token, String username, boolean breakLock, File reposRootDir) throws SVNException {
+        path = SVNPathUtil.canonicalizeAbsPath(path);
+        FSWriteLock writeLock = FSWriteLock.getWriteLock(reposRootDir);
+        synchronized(writeLock){//multi-threaded synchronization within the JVM 
+            try{
+                writeLock.lock();//multi-processed synchronization
+                unlock(path, token, username, breakLock, reposRootDir);
+            }finally{
+                writeLock.unlock();
+                FSWriteLock.realease(writeLock);//release the lock
+            }
+        }
+    }
+    
+    private static void unlock(String path, String token, String username, boolean breakLock, File reposRootDir) throws SVNException {
+        SVNLock lock = FSReader.getLock(path, true, reposRootDir);
+        if(lock == null){
+            SVNErrorManager.error("No lock on path '" + path + "' in filesystem '" + reposRootDir.getAbsolutePath() + "'");
+        }
+        /* Unless breaking the lock, we do some checks. */
+        if(!breakLock){
+            /* Sanity check:  the incoming token should match lock.getID(). */
+            if(!token.equals(lock.getID())){
+                SVNErrorManager.error("No lock on path '" + lock.getPath() + "' in filesystem '" + reposRootDir.getAbsolutePath() + "'");
+            }
+            /* There better be a username provided. */
+            if(username == null || "".equals(username)){
+                SVNErrorManager.error("No username is currently associated with filesystem '" + reposRootDir.getAbsolutePath() + "'");
+            }
+            /* And that username better be the same as the lock's owner. */
+            if(!username.equals(lock.getOwner())){
+                SVNErrorManager.error("User '" + username + "' is trying to use a lock owned by '" + lock.getOwner() + "' in filesystem '" + reposRootDir.getAbsolutePath() + "'");
+            }
+        }
+        /* Remove lock and lock token files. */
+        deleteLock(lock, reposRootDir);
+    }
+    
+    /* Update the current file to hold the correct next node and copy ids
+     * from transaction. The current revision is set to newRevision. 
+     */
+    public static void writeFinalCurrentFile(String txnId, long newRevision, String startNodeId, String startCopyId, File reposRootDir) throws SVNException, IOException {
+        /* To find the next available ids, we add the id that used to be in
+         * the current file, to the next ids from the transaction file. 
+         */
+        String[] txnIds = FSReader.readNextIds(txnId, reposRootDir);
+        String txnNodeId = txnIds[0];
+        String txnCopyId = txnIds[1];
+        String newNodeId = FSKeyGenerator.addKeys(startNodeId, txnNodeId);
+        String newCopyId = FSKeyGenerator.addKeys(startCopyId, txnCopyId);
+        /* Now we can just write out this line. */
+        String line = newRevision + " " + newNodeId + " " + newCopyId + "\n";
+        File currentFile = FSRepositoryUtil.getFSCurrentFile(reposRootDir);
+        File tmpCurrentFile = SVNFileUtil.createUniqueFile(currentFile.getParentFile(), currentFile.getName(), ".tmp");
+        OutputStream currentOS = null;
+        try{
+            currentOS = SVNFileUtil.openFileForWriting(tmpCurrentFile);
+            currentOS.write(line.getBytes());
+        }finally{
+            SVNFileUtil.closeFile(currentOS);
+        }
+        SVNFileUtil.rename(tmpCurrentFile, currentFile);
+    }
+    
     /* Write the changed path info from transaction to the permanent rev-file. 
      * Returns offset in the file of the beginning of this information. 
      */
@@ -556,7 +647,7 @@ public class FSWriter {
         String childToKill = null;
         Collection children = new ArrayList();;
         while(true){
-            FSReader.fetchLock(null, reposPath, children, reposRootDir);
+            FSReader.fetchLockFromDigestFile(null, reposPath, children, reposRootDir);
             if(childToKill != null){
                 children.remove(childToKill);
             }
