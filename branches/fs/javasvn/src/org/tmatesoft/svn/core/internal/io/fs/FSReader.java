@@ -346,7 +346,7 @@ public class FSReader {
             walkDigestFiles(FSRepositoryUtil.getDigestFileFromRepositoryPath(path, reposRootDir), handler, haveWriteLock, reposRootDir);
         }else{
             /* Discover and verify any lock attached to the path. */
-            SVNLock lock = getLock(path, haveWriteLock, null, reposRootDir);
+            SVNLock lock = getLock(path, haveWriteLock, reposRootDir);
             if(lock != null){
                 verifyLock(lock, lockTokens, username);
             }
@@ -361,7 +361,7 @@ public class FSReader {
     private static void walkDigestFiles(File digestFile, IFSLockHandler getLocksHandler, boolean haveWriteLock, File reposRootDir) throws SVNException {
         Collection children = new LinkedList();
         /* First, send up any locks in the current path. */
-        SVNLock lock = fetchLock(digestFile, null, children, reposRootDir);
+        SVNLock lock = fetchLockFromDigestFile(digestFile, null, children, reposRootDir);
         if(lock != null){
             Date current = new Date(System.currentTimeMillis());
             /* Don't report an expired lock. */
@@ -401,8 +401,11 @@ public class FSReader {
         SVNErrorManager.error("Cannot verify lock on path '" + lock.getPath() + "'; no matching lock-token available");
     }
     
-    public static SVNLock getLock(String repositoryPath, boolean haveWriteLock, Collection children, File reposRootDir) throws SVNException {
-        SVNLock lock = fetchLock(null, repositoryPath, children, reposRootDir);
+    public static SVNLock getLock(String repositoryPath, boolean haveWriteLock, File reposRootDir) throws SVNException {
+        SVNLock lock = fetchLockFromDigestFile(null, repositoryPath, null, reposRootDir);
+        /* TODO later replace this with an exception with an appropriate error code
+         * like NO_SUCH_LOCK
+         */
         if(lock == null){
             return null;
         }
@@ -420,7 +423,7 @@ public class FSReader {
         return lock;
     }
     
-    public static SVNLock fetchLock(File digestFile, String repositoryPath, Collection children, File reposRootDir) throws SVNException {
+    public static SVNLock fetchLockFromDigestFile(File digestFile, String repositoryPath, Collection children, File reposRootDir) throws SVNException {
         File digestLockFile = digestFile == null ? FSRepositoryUtil.getDigestFileFromRepositoryPath(repositoryPath, reposRootDir) : digestFile;
         SVNProperties props = new SVNProperties(digestLockFile, null);
         Map lockProps = null;
@@ -1364,7 +1367,7 @@ public class FSReader {
     public static ArrayList walkDigestFiles(File digestFile, File reposRootDir, ArrayList lockArray)throws SVNException{        
         Collection children = new LinkedList();
         lockArray = lockArray == null ? new ArrayList(0) : lockArray;        
-        SVNLock currentLock = FSReader.fetchLock(digestFile, reposRootDir.getAbsolutePath(), children, reposRootDir);        
+        SVNLock currentLock = FSReader.fetchLockFromDigestFile(digestFile, reposRootDir.getAbsolutePath(), children, reposRootDir);        
         if(currentLock != null){
             Date currentDate = new Date(System.currentTimeMillis());
             if(currentLock.getExpirationDate() == null || currentDate.compareTo(currentLock.getExpirationDate()) > 0){
@@ -1381,5 +1384,21 @@ public class FSReader {
             lockArray = walkDigestFiles(childDigestFile, reposRootDir, lockArray);
         }                
         return lockArray;
+    }
+
+    public static long getYoungestRevision(File reposRootDir) throws SVNException {
+        File dbCurrentFile = FSRepositoryUtil.getFSCurrentFile(reposRootDir);
+        String firstLine = readSingleLine(dbCurrentFile, 80);
+        if (firstLine == null) {
+            SVNErrorManager.error("svn: Can't read file '" + dbCurrentFile.getAbsolutePath() + "': End of file found");
+        }
+        String splittedLine[] = firstLine.split(" ");
+        long latestRev = -1;
+        try {
+            latestRev = Long.parseLong(splittedLine[0]);
+        } catch (NumberFormatException nfe) {
+            SVNErrorManager.error("svn: Can't parse revision number in file '" + dbCurrentFile.getAbsolutePath() + "'");
+        }
+        return latestRev;
     }
 }

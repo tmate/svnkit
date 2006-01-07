@@ -13,7 +13,6 @@ package org.tmatesoft.svn.core.internal.io.fs;
 
 import java.io.IOException;
 import java.io.FileInputStream;
-import java.io.RandomAccessFile;
 import java.io.FileNotFoundException;
 import java.io.OutputStream;
 import java.io.InputStream;
@@ -164,36 +163,18 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
         return myReposRootDir;
     }
 
-    long getYoungestRev(File reposRootDir) throws SVNException {
-        File dbCurrentFile = FSRepositoryUtil.getFSCurrentFile(reposRootDir);
-        String firstLine = FSReader.readSingleLine(dbCurrentFile, 80);
-        if (firstLine == null) {
-            SVNErrorManager.error("svn: Can't read file '" + dbCurrentFile.getAbsolutePath() + "': End of file found");
-        }
-        String splittedLine[] = firstLine.split(" ");
-        long latestRev = -1;
-        try {
-            latestRev = Long.parseLong(splittedLine[0]);
-        } catch (NumberFormatException nfe) {
-            // svn 1.2 will not report an error if there are no any digit bytes
-            // but we decided to introduce this restriction
-            SVNErrorManager.error("svn: Can't parse revision number in file '" + dbCurrentFile.getAbsolutePath() + "'");
-        }
-        return latestRev;
-    }
-    
     File getReposRootDir(){
         return myReposRootDir;
     }
-    /*TODO delete 'public' since there were no such word before testing*/
-    public FSRevisionNodePool getRevisionNodePool(){
+    
+    FSRevisionNodePool getRevisionNodePool(){
         return myRevNodesPool;
     }
     
     public long getLatestRevision() throws SVNException {
         try {
             openRepository();
-            return getYoungestRev(myReposRootDir);
+            return FSReader.getYoungestRevision(myReposRootDir);
         } finally {
             closeRepository();
         }
@@ -214,7 +195,7 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
     }
 
     private long getDatedRev(File reposRootDir, Date date) throws SVNException {
-        long latestRev = getYoungestRev(reposRootDir);
+        long latestRev = FSReader.getYoungestRevision(reposRootDir);
         long topRev = latestRev;
         long botRev = 0;
         long midRev;
@@ -317,7 +298,7 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
         try {
             openRepository();
             if (!SVNRepository.isValidRevision(revision)) {
-                revision = getYoungestRev(myReposRootDir);
+                revision = FSReader.getYoungestRevision(myReposRootDir);
             }
             path = path == null ? "" : path;
             String repositoryPath = getRepositoryPath(path);
@@ -336,7 +317,7 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
         try {
             openRepository();
             if (!SVNRepository.isValidRevision(revision)) {
-                revision = getYoungestRev(myReposRootDir);
+                revision = FSReader.getYoungestRevision(myReposRootDir);
             }
             path = path == null ? "" : path;
             String repositoryPath = getRepositoryPath(path);
@@ -440,7 +421,7 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
         try {
             openRepository();
             if (!SVNRepository.isValidRevision(revision)) {
-                revision = getYoungestRev(myReposRootDir);
+                revision = FSReader.getYoungestRevision(myReposRootDir);
             }
             path = path == null ? "" : path;
             String repositoryPath = getRepositoryPath(path);
@@ -465,7 +446,7 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
         try {
             openRepository();
             if (!SVNRepository.isValidRevision(revision)) {
-                revision = getYoungestRev(myReposRootDir);
+                revision = FSReader.getYoungestRevision(myReposRootDir);
             }
             path = path == null ? "" : path;
             String repositoryPath = getRepositoryPath(path);
@@ -575,7 +556,7 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
         			absPaths.add(SVNPathUtil.concatToAbs("", targetPaths[count]));
         		}
         	}
-        	long headRevision = getYoungestRev(myReposRootDir);
+        	long headRevision = FSReader.getYoungestRevision(myReposRootDir);
         	long histStart = startRevision;
         	long histEnd = endRevision;
         	if(SVNRepository.isInvalidRevision(startRevision)){
@@ -1026,7 +1007,7 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
     private void makeReporterContext(long targetRevision, File reportFile, String target, SVNURL switchURL, boolean recursive, boolean ignoreAncestry, boolean textDeltas, ISVNEditor editor) throws SVNException{
         target = target == null ? "" : target;
         if (!isValidRevision(targetRevision)) {
-            targetRevision = getYoungestRev(myReposRootDir);
+            targetRevision = FSReader.getYoungestRevision(myReposRootDir);
         }
         /* If switchURL was provided, validate it and convert it into a
          * regular filesystem path. 
@@ -1069,9 +1050,8 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
             closeRepository();
             throw svne;
         }
-        //TODO: create and return an FSCommitEditor instance
-        //TODO: to delete when finished!
-        return null;
+        FSCommitEditor commitEditor = new FSCommitEditor(getRepositoryPath(""), logMessage, System.getProperty("user.name"), locks, keepLocks, null, this);
+        return commitEditor;
     }
 
     public SVNLock getLock(String path) throws SVNException {
@@ -1082,7 +1062,7 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
             SVNErrorManager.error("Bad path for lock");
         }
         String reposPath = SVNPathUtil.canonicalizeAbsPath(path);
-        SVNLock lock = FSReader.getLock(reposPath, false, null, myReposRootDir);        
+        SVNLock lock = FSReader.getLock(reposPath, false, myReposRootDir);        
         return lock;
     }    
     
@@ -1675,7 +1655,7 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
         }
         /* Update lock properties. */
         if(lockToken != null){
-            SVNLock lock = FSReader.getLock(targetPath, false, null, myReposRootDir);
+            SVNLock lock = FSReader.getLock(targetPath, false, myReposRootDir);
             /* Delete a defunct lock. */
             if(lock == null || !lockToken.equals(lock.getID())){
                 changeProperty(editPath, SVNProperty.LOCK_TOKEN, null, isDir);
