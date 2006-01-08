@@ -135,4 +135,10 @@ public class FSConstants {
     public static final String FLAG_FALSE = "false";
     
     public static final int SVN_STREAM_CHUNK_SIZE = 102400;
+    
+    /*used for constructing lock token*/
+    public static final String SVN_OPAQUE_LOCK_TOKEN = "opaquelocktoken:";
+    
+    /*determines dir for locks*/
+    public static final String LOCK_ROOT_DIR = "locks";
 }

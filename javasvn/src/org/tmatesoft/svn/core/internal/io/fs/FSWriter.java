@@ -809,6 +809,44 @@ public class FSWriter {
         }
         return null;
     }
+//<<<<<<< .mine
+    public static void setLock(File reposRootDir, SVNLock lock)throws SVNException{
+        if(reposRootDir == null){
+            SVNErrorManager.error("File object was not instantiated yet");
+        }
+        if(lock == null){
+            SVNErrorManager.error("try to make an unexisting lock");
+        }
+        String lastChild = "";
+        String thisPath = lock.getPath();
+        while(true){
+            String digestPath = FSRepositoryUtil.getDigestPathFromPath(reposRootDir, thisPath);
+            String[] strArr = SVNPathUtil.extractParentAndChild(digestPath);            
+            String digestFileComponent = strArr[1];
+            Collection children = new ArrayList();
+            SVNLock thisLock = FSReader.fetchLockFromDigestFile(new File(digestPath), lock.getPath(), children, reposRootDir);
+            if(lock != null){
+                thisLock = lock;
+                lock = null;
+                lastChild = digestFileComponent;
+            }else{
+                /* If we already have an entry for this path, we're done. */
+                if(children.contains(lastChild)){
+                    return;
+                }
+                /*otherwise add path into collection*/
+                children.add(lastChild);                
+            }           
+            FSWriter.writeDigestLockFile(thisLock, children, digestPath, reposRootDir);
+            if(thisPath.length() == 1 && thisPath.equals("/")){
+                return;
+            }
+            /*TODO ???possible problems with SVNPathUtil.svnPathDirName*/
+            thisPath = SVNPathUtil.svnPathDirName(thisPath);
+        }
+    }
+
+//=======
     private static class HashRepresentationWriter extends OutputStream{
         long mySize = 0;
         MessageDigest myChecksum;
@@ -838,4 +876,5 @@ public class FSWriter {
             return targetFile.mySize;
         }
     }
+//>>>>>>> .r1939
 }
