@@ -38,6 +38,8 @@ import java.util.ArrayList;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 
+import java.rmi.server.UID;
+
 public class FSReader {
     /* Read the 'current' file. 
      * String[0] - current node-id
@@ -66,9 +68,9 @@ public class FSReader {
         return changedPaths;
     }
     
-    /* Return ArrayList consist of two Maps:
-     * ArrayList[0]: pathChanged Map
-     * ArrayList[1]: copyfromCache Map*/    
+    /* Return Object[] consist of two Maps:
+     * Object[0]: pathChanged Map
+     * Object[1]: copyfromCache Map*/    
     public static Object[] fetchAllChanges(Map changedPaths, File changesFile, boolean prefolded, long offsetToFirstChanges, Map mapCopyfrom)throws SVNException{        
         InputStream inputStream = SVNFileUtil.openFileForReading(changesFile);
         if (inputStream == null) {
@@ -1385,6 +1387,15 @@ public class FSReader {
         }                
         return lockArray;
     }
+    
+    public static String generateLockToken(File reposRootDir)throws SVNException{
+        if(reposRootDir == null || reposRootDir.getAbsolutePath() == null){
+            SVNErrorManager.error("File object was not opened yet");           
+        }
+        UID forToken = new UID();        
+        return FSConstants.SVN_OPAQUE_LOCK_TOKEN + forToken.toString();
+    }    
+
 
     public static long getYoungestRevision(File reposRootDir) throws SVNException {
         File dbCurrentFile = FSRepositoryUtil.getFSCurrentFile(reposRootDir);

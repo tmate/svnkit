@@ -131,6 +131,17 @@ public class FSRepositoryUtil {
         return SVNFileUtil.toHexDigest(digestFromPath); 
     }
     
+    /*Constuct digest in hex on path*/
+    public static String getDigestPathFromPath(File reposRootDir, String path)throws SVNException{
+        String digest = FSRepositoryUtil.getDigestFromRepositoryPath(path);
+        char[] digestSubdirChars = new char[FSConstants.DIGEST_SUBDIR_LEN];
+        for(int count = 0; count < FSConstants.DIGEST_SUBDIR_LEN; count++){
+            digestSubdirChars[count] = digest.charAt(count);
+        }
+        String digestSubdirString = new String(digestSubdirChars);
+        return reposRootDir.getAbsolutePath() + "/" + FSConstants.LOCK_ROOT_DIR + "/" + digestSubdirString + "/" + digest;
+    }
+    
     public static Map getMetaProps(File reposRootDir, long revision, FSRepository repository) throws SVNException {
         Map metaProps = new HashMap();
         Map revProps = null;
