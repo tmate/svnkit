@@ -42,7 +42,11 @@ public class FSRoot {
     //only for transactions 
     private Map myRevNodesCache;
     
-    public FSRoot(long revision, FSRevisionNode root) {
+    public static FSRoot createRevisionRoot(long revision, FSRevisionNode root) {
+        return new FSRoot(revision, root);
+    }
+    
+    private FSRoot(long revision, FSRevisionNode root) {
         myRevision = revision;
         myRootRevNode = root;
         myIsTxnRoot = false;
@@ -51,8 +55,12 @@ public class FSRoot {
         myCopyfromCache = new HashMap();
     }
 
-    public FSRoot(String id, int flags) {
-        myTxnId = id;
+    public static FSRoot createTransactionRoot(String txnId, int flags){
+        return new FSRoot(txnId, flags);
+    }
+    
+    private FSRoot(String txnId, int flags) {
+        myTxnId = txnId;
         myTxnFlags = flags;
         myIsTxnRoot = true;
         myRevision = FSConstants.SVN_INVALID_REVNUM;

@@ -100,7 +100,7 @@ public class FSOutputStream extends FSBufferStream implements ISVNDiffWindowHand
             offset = targetFile.getFilePointer();
             /* Get the base for this delta. */
             FSRepresentation baseRep = chooseDeltaBase(revNode, reposRootDir);
-            sourceStream = FSInputStream.createStream(baseRep, reposRootDir);
+            sourceStream = FSInputStream.createDeltaStream(baseRep, reposRootDir);
             /* Write out the rep header. */
             String header;
             if(baseRep != null){

@@ -55,6 +55,9 @@ public class FSInputStream extends InputStream {
     private long myLength;
     private long myOffset;
     
+    /* The plaintext state, if there is a plaintext. */
+    private FSRepresentationState mySourceState;
+    
     private SVNDiffWindowBuilder myDiffWindowBuilder = SVNDiffWindowBuilder.newInstance();
     
     private MessageDigest myDigest;
@@ -62,7 +65,7 @@ public class FSInputStream extends InputStream {
     private byte[] myBuffer;
     
     private int myBufPos = 0;
-
+    
     private FSInputStream(FSRepresentation representation, File reposRootDir) throws SVNException {
         myChunkIndex = 0;
         isChecksumFinalized = false;
@@ -74,28 +77,47 @@ public class FSInputStream extends InputStream {
         } catch (NoSuchAlgorithmException nsae) {
             SVNErrorManager.error(nsae.getMessage());
         }
-        FSRepresentationState.buildRepresentationList(representation, myRepStateList, reposRootDir);
+        try{
+            mySourceState = FSRepresentationState.buildRepresentationList(representation, myRepStateList, reposRootDir);
+        }catch(SVNException svne){
+            /* Something terrible has happened while building rep list, 
+             * need to close any files still opened 
+             */
+            close();
+            throw svne;
+        }
     }
     
-    public static InputStream createStream(FSRevisionNode fileNode, File reposRootDir) throws SVNException {
+    public static InputStream createDeltaStream(FSRevisionNode fileNode, File reposRootDir) throws SVNException {
         if(fileNode == null){
-            return new FSEmptyInputStream();
-        }
-        if (fileNode.getType() != SVNNodeKind.FILE) {
+            return SVNFileUtil.DUMMY_IN;
+        }else if (fileNode.getType() != SVNNodeKind.FILE) {
             SVNErrorManager.error("svn: Attempted to get textual contents of a *non*-file node");
         }
         FSRepresentation representation = fileNode.getTextRepresentation(); 
         if(representation == null){
-            return new FSEmptyInputStream(); 
+            return SVNFileUtil.DUMMY_IN; 
         }
         return new FSInputStream(representation, reposRootDir);
     }
 
-    public static InputStream createStream(FSRepresentation rep, File reposRootDir) throws SVNException {
-        if(rep == null){
-            return new FSEmptyInputStream();
+    public static InputStream createDeltaStream(FSRepresentation fileRep, File reposRootDir) throws SVNException {
+        if(fileRep == null){
+            return SVNFileUtil.DUMMY_IN;
         }
-        return new FSInputStream(rep, reposRootDir);
+        return new FSInputStream(fileRep, reposRootDir);
+    }
+
+    //to read plain text
+    public static InputStream createPlainStream(FSRepresentation representation, File reposRootDir) throws SVNException {
+//        if (dirNode == null || dirNode.getType() != SVNNodeKind.DIR) {
+//            SVNErrorManager.error("svn: Can't get entries of non-directory");
+//        }
+//        FSRepresentation representation = dirNode.getTextRepresentation(); 
+        if(representation == null){
+            return SVNFileUtil.DUMMY_IN; 
+        }
+        return new FSInputStream(representation, reposRootDir);
     }
     
     public int read(byte[] buf) throws IOException {
@@ -103,7 +125,7 @@ public class FSInputStream extends InputStream {
             int r = readContents(buf); 
             return r == 0 ? -1 : r;
         }catch(SVNException svne){
-            throw new IOException("svn: Failed to read file text, details follow:" + SVNFileUtil.getNativeEOLMarker() + svne.getMessage());
+            throw new IOException(svne.getMessage());
         }
     }
     
@@ -113,7 +135,7 @@ public class FSInputStream extends InputStream {
         try{
             r = readContents(buf);
         }catch(SVNException svne){
-            throw new IOException("svn: Failed to read file text, details follow:" + SVNFileUtil.getNativeEOLMarker() + svne.getMessage());
+            throw new IOException(svne.getMessage());
         }
         return r == 0 ? -1 : buf[0];
     }
@@ -145,6 +167,20 @@ public class FSInputStream extends InputStream {
     private int getContents(byte[] buffer) throws SVNException {
         int remaining = buffer.length;
         int targetPos = 0;
+        /* Special case for when there are no delta reps, only a plain
+         * text. 
+         */
+        if(myRepStateList.isEmpty()){
+            int copyLength = remaining > mySourceState.end - mySourceState.offset ? (int)(mySourceState.end - mySourceState.offset) : remaining;
+            int r = copyLength;
+            try{
+                r = mySourceState.file.read(buffer, 0, copyLength);
+            }catch(IOException ioe){
+                SVNErrorManager.error(ioe.getMessage());
+            }
+            mySourceState.offset += r;
+            return r;
+        }
         while(remaining > 0){
             if(myBuffer != null){
                 //copy bytes to buffer and mobe the bufPos pointer
@@ -165,9 +201,6 @@ public class FSInputStream extends InputStream {
                     myBufPos = 0;
                 }
             }else{
-                if(myRepStateList.isEmpty()){
-                    break;
-                }
                 FSRepresentationState resultState = (FSRepresentationState)myRepStateList.getFirst();
                 if(resultState.offset == resultState.end){
                     break;
@@ -277,18 +310,8 @@ public class FSInputStream extends InputStream {
             SVNFileUtil.closeFile(state.file);
             states.remove();
         }
-    }
-    
-    private static class FSEmptyInputStream extends InputStream {
-        public int read(byte[] buf) {
-            return -1;
-        }
-
-        public int read(){
-            return -1;
-        }
-        
-        public void close() {
+        if(mySourceState != null){
+            SVNFileUtil.closeFile(mySourceState.file);
         }
     }
 }

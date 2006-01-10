@@ -21,12 +21,9 @@ import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.internal.wc.SVNProperties;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.io.RandomAccessFile;
-import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.util.Date;
 import java.util.LinkedList;
@@ -35,8 +32,6 @@ import java.util.Map;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.ArrayList;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 
 import java.rmi.server.UID;
 
@@ -239,29 +234,16 @@ public class FSReader {
         return arr;
     }
     
-    public static void getFileContents(FSRevisionNode revNode, OutputStream contents, File reposRootDir) throws SVNException {
-        InputStream fileStream = null;
-        try{
-            fileStream = FSInputStream.createStream(revNode, reposRootDir);
-            /* Read and write chunks until we get a short read, indicating the
-             * end of the stream.  (We can't get a short write without an
-             * associated error.) 
-             */
-            while(true){
-                byte[] buffer = new byte[FSConstants.SVN_STREAM_CHUNK_SIZE];
-                int length = fileStream.read(buffer);
-                if(length > 0){
-                    contents.write(buffer, 0, length);
-                }
-                if(length != FSConstants.SVN_STREAM_CHUNK_SIZE){
-                    break;
-                }
+    public static InputStream getFileContentsInputStream(FSRoot root, String path, FSRevisionNodePool pool, File reposRootDir) throws SVNException {
+        FSRevisionNode fileNode = pool.getRevisionNode(root, path, reposRootDir);
+        if(fileNode == null){
+            if(root.isTxnRoot()){
+                SVNErrorManager.error("File not found: transaction '" + root.getTxnId() + "', path '" + path + "'");
+            }else{
+                SVNErrorManager.error("File not found: revision " + root.getRevision() + ", path '" + path + "'");
             }
-        }catch(IOException ioe){
-            SVNErrorManager.error(ioe.getMessage());
-        }finally{
-            SVNFileUtil.closeFile(fileStream);
         }
+        return FSInputStream.createDeltaStream(fileNode, reposRootDir);
     }
 
     /* Given a representation 'rep', open the correct file and seek to the 
@@ -611,7 +593,7 @@ public class FSReader {
             InputStream is = null;
             FSRepresentation textRepresent = revNode.getTextRepresentation(); 
             try {
-                is = readPlainRepresentation(textRepresent, reposRootDir);
+                is = FSInputStream.createPlainStream(textRepresent, reposRootDir);//readPlainRepresentation(textRepresent, reposRootDir);
                 Map rawEntries = SVNProperties.asMap(null, is, false, SVNProperties.SVN_HASH_TERMINATOR);
                 return parsePlainRepresentation(rawEntries);
             } catch (IOException ioe) {
@@ -644,7 +626,7 @@ public class FSReader {
             InputStream is = null;
             FSRepresentation propsRepresent = revNode.getPropsRepresentation();
             try {
-                is = readPlainRepresentation(propsRepresent, reposRootDir);
+                is = FSInputStream.createPlainStream(propsRepresent, reposRootDir);//readPlainRepresentation(propsRepresent, reposRootDir);
                 properties = SVNProperties.asMap(properties, is, false, SVNProperties.SVN_HASH_TERMINATOR);
                 //parsePlainRepresentation(rawEntries, true);
             } catch (IOException ioe) {
@@ -658,53 +640,6 @@ public class FSReader {
             }
         }
         return properties;//no properties? return an empty map 
-    }
-
-    public static InputStream readPlainRepresentation(FSRepresentation representation, File reposRootDir) throws SVNException {
-        File revFile = FSRepositoryUtil.getRevisionFile(reposRootDir, representation.getRevision());
-        InputStream is = null;
-        try {
-            is = SVNFileUtil.openFileForReading(revFile);
-
-            try {
-                readBytesFromStream(new Long(representation.getOffset()).intValue(), is, null);
-            } catch (IOException ioe) {
-                SVNErrorManager.error("svn: Can't set position pointer in file '" + revFile + "': " + ioe.getMessage());
-            }
-            String header = null;
-            try {
-                header = readSingleLine(is, 160);
-            } catch (IOException ioe) {
-                SVNErrorManager.error("svn: Can't read file '" + revFile.getAbsolutePath() + "': " + ioe.getMessage());
-            }
-
-            if (!FSConstants.REP_PLAIN.equals(header)) {
-                SVNErrorManager.error("svn: Malformed representation header in revision file '" + revFile.getAbsolutePath() + "'");
-            }
-
-            MessageDigest digest = null;
-            try {
-                digest = MessageDigest.getInstance("MD5");
-            } catch (NoSuchAlgorithmException nsae) {
-                SVNErrorManager.error("svn: Can't check the digest in revision file '" + revFile.getAbsolutePath() + "': " + nsae.getMessage());
-            }
-            ByteArrayOutputStream os = new ByteArrayOutputStream();
-            try {
-                readBytesFromStream(representation.getSize(), is, os);
-            } catch (IOException ioe) {
-                SVNErrorManager.error("svn: Can't read representation in revision file '" + revFile.getAbsolutePath() + "': " + ioe.getMessage());
-            }
-            byte[] bytes = os.toByteArray();
-            digest.update(bytes);
-            // Compare read and expected checksums
-            if (!MessageDigest.isEqual(SVNFileUtil.fromHexDigest(representation.getHexDigest()), digest.digest())) {
-                SVNErrorManager.error("svn: Checksum mismatch while reading representation:" + SVNFileUtil.getNativeEOLMarker() + "   expected:  " + representation.getHexDigest()
-                        + SVNFileUtil.getNativeEOLMarker() + "     actual:  " + SVNFileUtil.toHexDigest(digest));
-            }
-            return new ByteArrayInputStream(bytes);
-        } finally {
-            SVNFileUtil.closeFile(is);
-        }
     }
 
     /*
@@ -947,10 +882,6 @@ public class FSReader {
             return;
         }
         String[] offsets = representation.split(" ");
-        if (offsets == null || offsets.length == 0 || offsets.length < 5) {
-            throw new SVNException();
-        }
-
         long rev = -1;
         try {
             rev = Long.parseLong(offsets[0]);
@@ -970,6 +901,9 @@ public class FSReader {
             if(!isData || revNode.getType() == SVNNodeKind.DIR){
                 return;
             }
+        }
+        if (offsets == null || offsets.length == 0 || offsets.length < 5) {
+            throw new SVNException();
         }
         long offset = -1;
         try {
@@ -1092,25 +1026,6 @@ public class FSReader {
         return result;
     }
 
-    private static long readBytesFromStream(long bytesToRead, InputStream is, OutputStream os) throws IOException {
-        if (is == null) {
-            return -1;
-        }
-        if (os != null) {
-            long bytesRead = 0;
-            while (bytesRead != bytesToRead) {
-                int b = is.read();
-                if (b == -1) {
-                    break;
-                }
-                os.write(b);
-                bytesRead++;
-            }
-            return bytesRead;
-        }
-        return (int) is.skip(bytesToRead);
-    }
-
     /* limitBytes MUST NOT be 0! it defines the maximum number of bytes 
      * that should be read (not counting EOL)
      */ 
@@ -1168,7 +1083,7 @@ public class FSReader {
         //been met
         for(int i = 0; i < limit; i++){
             r = is.read();
-            if(r == '\n' || r == -1){
+            if(r == '\n' || r == '\r' || r == -1){
                 return lineBuffer.toString();
             }
             lineBuffer.append((char)r);
@@ -1290,26 +1205,10 @@ public class FSReader {
         }
         
         String changesKindStr = piecesOfLine[1];
-        FSPathChangeKind changesKind = null;
-        if(changesKindStr.equals(new String(FSConstants.ACTION_MODIFY))){
-            changesKind.equals(FSPathChangeKind.FS_PATH_CHANGE_MODIFY);
-        }
-        else if(changesKindStr.equals(new String(FSConstants.ACTION_ADD))){
-            changesKind.equals(FSPathChangeKind.FS_PATH_CHANGE_ADD);
-        }
-        else if(changesKindStr.equals(new String(FSConstants.ACTION_DELETE))){
-            changesKind.equals(FSPathChangeKind.FS_PATH_CHANGE_DELETE);
-        }
-        else if(changesKindStr.equals(new String(FSConstants.ACTION_REPLACE))){
-            changesKind.equals(FSPathChangeKind.FS_PATH_CHANGE_REPLACE);
-        }
-        else if(changesKindStr.equals(new String(FSConstants.ACTION_RESET))){
-            changesKind.equals(FSPathChangeKind.FS_PATH_CHANGE_RESET);
-        }
-        else{
+        FSPathChangeKind changesKind = (FSPathChangeKind)FSConstants.ACTIONS_TO_CHANGE_KINDS.get(changesKindStr);
+        if(changesKind == null){
             SVNErrorManager.error("Invalid change kind in rev file");
         }
-        
         if(piecesOfLine.length < 3 || piecesOfLine[2] == null){
             SVNErrorManager.error("Invalid changes line in rev-file");
         }        

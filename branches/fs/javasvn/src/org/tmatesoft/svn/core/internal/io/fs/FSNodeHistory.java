@@ -148,7 +148,7 @@ public class FSNodeHistory
     	//Construct a ROOT for the current revision
     	FSRevisionNode root = FSReader.getRootRevNode(reposRootDir, revision);
     	//Open path/revision and get all necessary info: node-id, ...
-    	FSParentPath parentPath = revNodesPool.getParentPath(new FSRoot(root.getId().getRevision(), root), path, true, reposRootDir);
+    	FSParentPath parentPath = revNodesPool.getParentPath(FSRoot.createRevisionRoot(root.getId().getRevision(), root), path, true, reposRootDir);
     	FSRevisionNode revNode = parentPath.getRevNode();
     	commitEntry = new SVNLocationEntry(revNode.getId().getRevision(), revNode.getCreatedPath()); 
     	//The Subversion filesystem is written in such a way that a given
