@@ -461,6 +461,7 @@ public class FSWriter {
             copyId = oldId.getCopyID();
         }
         FSID id = FSID.createTxnId(oldId.getNodeID(), copyId, txnId);
+        newRevNode.setId(id);
         if(newRevNode.getCopyRootPath() == null){
             newRevNode.setCopyRootPath(newRevNode.getCopyFromPath());
             newRevNode.setCopyRootRevision(newRevNode.getId().getRevision());
@@ -562,7 +563,7 @@ public class FSWriter {
             String propsRepresentation = FSConstants.HEADER_PROPS + ": " + (FSID.isTxn(revNode.getPropsRepresentation().getTxnId()) ? "-1" : revNode.getPropsRepresentation().toString()) + "\n";
             revNodeFile.write(propsRepresentation.getBytes());
         }
-        String cpath = FSConstants.HEADER_COUNT + ": " + revNode.getCount() + "\n";
+        String cpath = FSConstants.HEADER_CPATH + ": " + revNode.getCreatedPath() + "\n";
         revNodeFile.write(cpath.getBytes());
         if(revNode.getCopyFromPath() != null){
             String copyFromPath = FSConstants.HEADER_COPYFROM + ": " + revNode.getCopyFromRevision() + " " + revNode.getCopyFromPath() + "\n";
@@ -579,7 +580,7 @@ public class FSWriter {
      * string into the changes file.
      */
     public static void writeChangeEntry(OutputStream changesFile, String path, FSPathChange pathChange, String copyfrom) throws SVNException, IOException {
-        String changeString = (String)FSConstants.CHANGE_KINDS_TO_ACTIONS.get(pathChange.getChangeKind());
+        String changeString = pathChange.getChangeKind().toString();
         if(changeString == null){
             SVNErrorManager.error("Invalid change type");
         }

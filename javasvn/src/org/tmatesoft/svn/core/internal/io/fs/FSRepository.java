@@ -19,7 +19,6 @@ import java.io.InputStream;
 import java.io.File;
 import java.io.RandomAccessFile;
 import java.nio.channels.FileChannel;
-import java.nio.channels.FileLock;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -306,14 +305,14 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
             }
             path = path == null ? "" : path;
             String repositoryPath = getRepositoryPath(path);
-            return checkNodeKind(repositoryPath, null, revision);
+            return checkNodeKind(repositoryPath, FSRoot.createRevisionRoot(revision, null));
         } finally {
             closeRepository();
         }
     }
 
-    SVNNodeKind checkNodeKind(String repositoryPath, FSRoot root, long revision) throws SVNException {
-        FSRevisionNode revNode = root == null ? myRevNodesPool.getRevisionNode(revision, repositoryPath, myReposRootDir) : myRevNodesPool.getRevisionNode(root, repositoryPath, myReposRootDir);
+    SVNNodeKind checkNodeKind(String repositoryPath, FSRoot root) throws SVNException {
+        FSRevisionNode revNode = myRevNodesPool.getRevisionNode(root, repositoryPath, myReposRootDir);
         return revNode == null ? SVNNodeKind.NONE : revNode.getType();
     }
 
@@ -325,15 +324,30 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
             }
             path = path == null ? "" : path;
             String repositoryPath = getRepositoryPath(path);
-            FSRevisionNode revNode = myRevNodesPool.getRevisionNode(revision, repositoryPath, myReposRootDir);
-            if (revNode == null) {
-                SVNErrorManager.error("svn: Attempted to open non-existent child node '" + path + "'");
-            } else if (revNode.getType() != SVNNodeKind.FILE) {
-                SVNErrorManager.error("svn: Path at '" + path + "' is not a file, but " + revNode.getType());
+            InputStream fileStream = null;
+            try{
+                fileStream = FSReader.getFileContentsInputStream(FSRoot.createRevisionRoot(revision, null), repositoryPath, myRevNodesPool, myReposRootDir);
+                /* Read and write chunks until we get a short read, indicating the
+                 * end of the stream.  (We can't get a short write without an
+                 * associated error.) 
+                 */
+                while(true){
+                    byte[] buffer = new byte[FSConstants.SVN_STREAM_CHUNK_SIZE];
+                    int length = fileStream.read(buffer);
+                    if(length > 0){
+                        contents.write(buffer, 0, length);
+                    }
+                    if(length != FSConstants.SVN_STREAM_CHUNK_SIZE){
+                        break;
+                    }
+                }
+            }catch(IOException ioe){
+                SVNErrorManager.error(ioe.getMessage());
+            }finally{
+                SVNFileUtil.closeFile(fileStream);
             }
-            FSReader.getFileContents(revNode, contents, myReposRootDir);
             if (properties != null) {
-                properties.putAll(collectProperties(revNode, myReposRootDir));
+                properties.putAll(collectProperties(myRevNodesPool.getRevisionNode(revision, repositoryPath, myReposRootDir), myReposRootDir));
             }
             return revision;
         } finally {
@@ -689,7 +703,7 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
         */
     	if(revNum > 0 && discoverChangedPath == true){
     		FSRevisionNode newRoot = FSReader.getRootRevNode(myReposRootDir, revNum);
-    		changedPaths = detectChanged(new FSRoot(revNum, newRoot));
+    		changedPaths = detectChanged(FSRoot.createRevisionRoot(revNum, newRoot));
     	}
         if(discoverChangedPath == false){
             changedPaths = null;
@@ -942,7 +956,7 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
             	//root = myRevNodesPool.getRootRevisionNode(revisions[count], myReposRootDir);            	
             	//kind = checkPath(myReposRootDir, root, path);            	
             	///!!!!!not completely clear what revision should be used
-            	kind = this.checkNodeKind(path, new FSRoot(root.getId().getRevision(), root), root.getId().getRevision());
+            	kind = this.checkNodeKind(path, FSRoot.createRevisionRoot(root.getId().getRevision(), root));
             	if(kind == SVNNodeKind.NONE){
             		break;
             	}
@@ -1435,8 +1449,10 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
         /* Compare the files' property lists.  */
         diffProplists(sourceRevision, sourcePath, editPath, targetPath, lockToken, false);
         String sourceHexDigest = null;
+        FSRoot sourceRoot = null;
         if(sourcePath != null){
-            FSRevisionNode sourceRoot = myRevNodesPool.getRootRevisionNode(sourceRevision, myReposRootDir);//FSReader.getRootRevNode(myReposRootDir, sourceRevision);
+            FSRevisionNode sourceRootNode = myRevNodesPool.getRootRevisionNode(sourceRevision, myReposRootDir);//FSReader.getRootRevNode(myReposRootDir, sourceRevision);
+            sourceRoot = FSRoot.createRevisionRoot(sourceRevision, sourceRootNode);
             /* Is this delta calculation worth our time?  If we are ignoring
              * ancestry, then our editor implementor isn't concerned by the
              * theoretical differences between "has contents which have not
@@ -1446,14 +1462,14 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
              */
             boolean changed = false;
             if(myReporterContext.isIgnoreAncestry()){
-                changed = checkFilesDifferent(sourceRoot, sourcePath, myReporterContext.getTargetRoot(), targetPath); 
+                changed = checkFilesDifferent(FSRoot.createRevisionRoot(sourceRevision, sourceRootNode), sourcePath, FSRoot.createRevisionRoot(myReporterContext.getTargetRevision(),myReporterContext.getTargetRoot()), targetPath); 
             }else{
-                changed = areFileContentsChanged(sourceRoot, sourcePath, myReporterContext.getTargetRoot(), targetPath);
+                changed = areFileContentsChanged(FSRoot.createRevisionRoot(sourceRevision, sourceRootNode), sourcePath, FSRoot.createRevisionRoot(myReporterContext.getTargetRevision(), myReporterContext.getTargetRoot()), targetPath);
             }
             if(!changed){
                 return;
             }
-            FSRevisionNode sourceNode = myRevNodesPool.getRevisionNode(sourceRoot, sourcePath, myReposRootDir);
+            FSRevisionNode sourceNode = myRevNodesPool.getRevisionNode(sourceRootNode, sourcePath, myReposRootDir);
             sourceHexDigest = FSRepositoryUtil.getFileChecksum(sourceNode);
         }
         /* Sends the delta stream if desired, or just calls 
@@ -1461,13 +1477,17 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
          */
         myReporterContext.getEditor().applyTextDelta(editPath, sourceHexDigest);
         if(myReporterContext.isSendTextDeltas()){
-            FSRevisionNode sourceNode = myRevNodesPool.getRevisionNode(sourceRevision, sourcePath, myReposRootDir);
-            FSRevisionNode targetNode = myRevNodesPool.getRevisionNode(myReporterContext.getTargetRoot(), targetPath, myReposRootDir);
+//            FSRevisionNode sourceNode = myRevNodesPool.getRevisionNode(sourceRevision, sourcePath, myReposRootDir);
+//            FSRevisionNode targetNode = myRevNodesPool.getRevisionNode(myReporterContext.getTargetRoot(), targetPath, myReposRootDir);
             InputStream sourceStream = null;
             InputStream targetStream = null;
             try{
-                sourceStream = FSInputStream.createStream(sourceNode, myReposRootDir);
-                targetStream = FSInputStream.createStream(targetNode, myReposRootDir);
+                if(sourceRoot != null && sourcePath != null){
+                    sourceStream = FSReader.getFileContentsInputStream(sourceRoot, sourcePath, myRevNodesPool, myReposRootDir);//FSInputStream.createDeltaStream(sourceNode, myReposRootDir);
+                }else{
+                    sourceStream = FSInputStream.createDeltaStream((FSRevisionNode)null, myReposRootDir);
+                }
+                targetStream = FSReader.getFileContentsInputStream(FSRoot.createRevisionRoot(myReporterContext.getTargetRevision(), myReporterContext.getTargetRoot()), targetPath, myRevNodesPool, myReposRootDir);//FSInputStream.createDeltaStream(targetNode, myReposRootDir);
                 SVNDeltaChunksGenerator deltaGenerator = new SVNDeltaChunksGenerator(sourceStream, targetStream, myReporterContext.getEditor(), editPath, FSWriter.getTmpDir());
                 deltaGenerator.sendWindows();
             }finally{
@@ -1483,7 +1503,7 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
      * Returns true - if files are really different, their contents are
      * different. Otherwise return false - they are the same file 
      */
-    private boolean checkFilesDifferent(FSRevisionNode root1, String path1, FSRevisionNode root2, String path2) throws SVNException {
+    private boolean checkFilesDifferent(FSRoot root1, String path1, FSRoot root2, String path2) throws SVNException {
         boolean changed = areFileContentsChanged(root1, path1, root2, path2);
         /* If the filesystem claims the things haven't changed, then 
          * they haven't changed. 
@@ -1514,8 +1534,8 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
         InputStream file1IS = null;
         InputStream file2IS = null;
         try{
-            file1IS = FSInputStream.createStream(revNode1, myReposRootDir);
-            file2IS = FSInputStream.createStream(revNode2, myReposRootDir);
+            file1IS = FSReader.getFileContentsInputStream(root1, path1, myRevNodesPool, myReposRootDir);//FSInputStream.createDeltaStream(revNode1, myReposRootDir);
+            file2IS = FSReader.getFileContentsInputStream(root2, path2, myRevNodesPool, myReposRootDir);//FSInputStream.createDeltaStream(revNode2, myReposRootDir);
             int r1 = -1;
             int r2 = -1;
             while(true){
@@ -1550,14 +1570,14 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
     /*
      * Returns true if nodes' representations are different.
      */
-    private boolean areFileContentsChanged(FSRevisionNode root1, String path1, FSRevisionNode root2, String path2) throws SVNException {
+    private boolean areFileContentsChanged(FSRoot root1, String path1, FSRoot root2, String path2) throws SVNException {
         /* Is there a need to check here that both roots 
          *  Check that both paths are files. 
          */
-        if(checkNodeKind(path1, new FSRoot(root1.getId().getRevision(), root1), -1) != SVNNodeKind.FILE){
+        if(checkNodeKind(path1, root1) != SVNNodeKind.FILE){
             SVNErrorManager.error("svn: '" + path1 + "' is not a file");
         }
-        if(checkNodeKind(path2, new FSRoot(root2.getId().getRevision(), root2), -1) != SVNNodeKind.FILE){
+        if(checkNodeKind(path2, root2) != SVNNodeKind.FILE){
             SVNErrorManager.error("svn: '" + path2 + "' is not a file");
         }
         FSRevisionNode revNode1 = myRevNodesPool.getRevisionNode(root1, path1, myReposRootDir);
@@ -1932,7 +1952,7 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
     /* Discover the copy ancestry of PATH under ROOT.  Return a relevant
      * ancestor/revision combination in PATH(SVNLocationEntry) and REVISON(SVNLocationEntry)*/
     private static SVNLocationEntry copiedFrom(File reposRootDir, FSRevisionNode root, String path, FSRevisionNodePool revNodesPool)throws SVNException{
-    	FSRevisionNode node = revNodesPool.getRevisionNode(new FSRoot(root.getId().getRevision(), root), path, reposRootDir);
+    	FSRevisionNode node = revNodesPool.getRevisionNode(FSRoot.createRevisionRoot(root.getId().getRevision(), root), path, reposRootDir);
     	return new SVNLocationEntry(node.getCopyFromRevision(), node.getCopyFromPath());
     }
     
@@ -1941,7 +1961,7 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
     	if(path == null){
     		return null;
     	}    	
-        FSParentPath parentPath = myRevNodesPool.getParentPath(new FSRoot(root.getId().getRevision(), root), path, true, reposRootDir); //FSParentPath.openParentPath(reposRootDir, root, path, 0, null);
+        FSParentPath parentPath = myRevNodesPool.getParentPath(FSRoot.createRevisionRoot(root.getId().getRevision(), root), path, true, reposRootDir); //FSParentPath.openParentPath(reposRootDir, root, path, 0, null);
     	
        /* Find the youngest copyroot in the path of this node-rev, which
         * will indicate the target of the innermost copy affecting the node-rev*/    	    	

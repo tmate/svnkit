@@ -20,20 +20,23 @@ package org.tmatesoft.svn.core.internal.io.fs;
  */
 public class FSPathChangeKind {
     /* default value */
-    public static final FSPathChangeKind FS_PATH_CHANGE_MODIFY = new FSPathChangeKind(0); 
+    public static final FSPathChangeKind FS_PATH_CHANGE_MODIFY = new FSPathChangeKind(0, FSConstants.ACTION_MODIFY); 
     /* path added in txn */
-    public static final FSPathChangeKind FS_PATH_CHANGE_ADD = new FSPathChangeKind(1); 
+    public static final FSPathChangeKind FS_PATH_CHANGE_ADD = new FSPathChangeKind(1, FSConstants.ACTION_ADD); 
     /* path removed in txn */
-    public static final FSPathChangeKind FS_PATH_CHANGE_DELETE = new FSPathChangeKind(2); 
+    public static final FSPathChangeKind FS_PATH_CHANGE_DELETE = new FSPathChangeKind(2, FSConstants.ACTION_DELETE); 
     /* path removed and re-added in txn */
-    public static final FSPathChangeKind FS_PATH_CHANGE_REPLACE = new FSPathChangeKind(3); 
+    public static final FSPathChangeKind FS_PATH_CHANGE_REPLACE = new FSPathChangeKind(3, FSConstants.ACTION_REPLACE); 
     /* ignore all previous change items for path (internal-use only) */
-    public static final FSPathChangeKind FS_PATH_CHANGE_RESET = new FSPathChangeKind(4); 
+    public static final FSPathChangeKind FS_PATH_CHANGE_RESET = new FSPathChangeKind(4, FSConstants.ACTION_RESET); 
 
     private int myID;
-
-    private FSPathChangeKind(int id) {
+    
+    private String myName;
+    
+    private FSPathChangeKind(int id, String name) {
         myID = id;
+        myName = name;
     }
     public boolean equals(Object o){
         if (o == null || o.getClass() != FSPathChangeKind.class) {
@@ -44,5 +47,9 @@ public class FSPathChangeKind {
     
     public int intValue(){
         return myID;
+    }
+    
+    public String toString(){
+        return myName;
     }
 }

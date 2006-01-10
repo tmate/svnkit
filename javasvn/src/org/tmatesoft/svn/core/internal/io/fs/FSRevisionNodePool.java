@@ -68,7 +68,7 @@ public abstract class FSRevisionNodePool {
         return FSReader.getTxnRootNode(root.getTxnId(), reposRootDir);
     }
 
-    private FSParentPath openPath(FSRoot root, String path, boolean isLastComponentOptional, String txnId, File reposRootDir)throws SVNException{     
+    private FSParentPath openPath(FSRoot root, String path, boolean isLastComponentOptional, String txnId, File reposRootDir) throws SVNException{     
     	String canonPath = SVNPathUtil.canonicalizeAbsPath(path);
         FSRevisionNode here = getRootNode(root, reposRootDir);;
         String pathSoFar = "/";
@@ -91,7 +91,12 @@ public abstract class FSRevisionNodePool {
             if(entry == null || "".equals(entry)){
                 child = here;
             }else{
-                child = this.getRevisionNode(root.getRootRevisionNode(), pathSoFar, reposRootDir);
+                FSRevisionNode cachedRevNode = fetchRevisionNode(root, pathSoFar, reposRootDir); 
+                if(cachedRevNode != null){
+                    child = cachedRevNode;
+                }else{
+                    child = FSReader.getChildDirNode(entry, here, reposRootDir);
+                }
                 if(child == null){
                     /* If this was the last path component, and the caller
                      * said it was optional, then don't return an error;
@@ -102,13 +107,25 @@ public abstract class FSRevisionNodePool {
                     }
                     /*node not found*/
                     return null;
+                    /* TODO When we get errorcodes support merged this return should
+                     * be replaced for something like (with appropriate errors)
+                    if(root.isTxnRoot()){
+                        SVNErrorManager.error("File not found: transaction '" + root.getTxnId() + "', path '" + path + "'");
+                    }else{
+                        SVNErrorManager.error("File not found: revision " + root.getRevision() + ", path '" + path + "'");
+                    }
+                    */
                 }   
                 parentPath.setParentPath(child, entry, new FSParentPath(parentPath));
                 SVNLocationEntry copyInherEntry = null;
-                if(txnId != null){
+                if(txnId != null && txnId != FSID.ID_INAPPLICABLE){
                     copyInherEntry = FSParentPath.getCopyInheritance(reposRootDir, parentPath, txnId);
                     parentPath.setCopyStyle((int)copyInherEntry.getRevision());
                     parentPath.setCopySrcPath(copyInherEntry.getPath());
+                }
+                /* Cache the node we found (if it wasn't already cached). */
+                if(cachedRevNode == null){
+                    cacheRevisionNode(root, pathSoFar, child);
                 }
             }       
             if(next == null || "".equals(next)){

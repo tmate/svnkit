@@ -125,8 +125,8 @@ public class FSParentPath
      */
     public String getAbsPath(){
         String pathSoFar = "/";
-        if(getParent() != null){
-            pathSoFar = getAbsPath();
+        if(parent != null){
+            pathSoFar = parent.getAbsPath();
         }
         return getNameEntry() != null ? SVNPathUtil.concatToAbs(pathSoFar, getNameEntry()) : pathSoFar;    
     }

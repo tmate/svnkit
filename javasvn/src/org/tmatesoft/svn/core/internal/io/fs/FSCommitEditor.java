@@ -107,7 +107,7 @@ public class FSCommitEditor implements ISVNEditor {
         if(txnProps.get(SVNProperty.TXN_CHECK_LOCKS) != null){
             flags |= FSConstants.SVN_FS_TXN_CHECK_LOCKS;
         }
-        myTxnRoot = new FSRoot(myTxn.getTxnId(), flags);
+        myTxnRoot = FSRoot.createTransactionRoot(myTxn.getTxnId(), flags);
         DirBaton dirBaton = new DirBaton(revision, myBasePath, false);  
         myDirsStack.push(dirBaton);
     }
@@ -138,7 +138,7 @@ public class FSCommitEditor implements ISVNEditor {
         /* Check path in our transaction.  If it does not exist,
          * return a 'Path not present' error. 
          */
-        SVNNodeKind kind = myRepository.checkNodeKind(fullPath, myTxnRoot, -1);
+        SVNNodeKind kind = myRepository.checkNodeKind(fullPath, myTxnRoot);
         if(kind == SVNNodeKind.NONE){
             SVNErrorManager.error("Path '" + path + "' not present");
         }
@@ -150,7 +150,7 @@ public class FSCommitEditor implements ISVNEditor {
     public void deleteEntry(String path, long revision) throws SVNException {
         String fullPath = SVNPathUtil.concatToAbs(myBasePath, path); 
         /* Check path in our transaction.  */
-        SVNNodeKind kind = myRepository.checkNodeKind(fullPath, myTxnRoot, -1);
+        SVNNodeKind kind = myRepository.checkNodeKind(fullPath, myTxnRoot);
         /* If path doesn't exist in the txn, that's fine (merge
          * allows this). 
          */
@@ -220,7 +220,7 @@ public class FSCommitEditor implements ISVNEditor {
              * thing might have been copied in as well), else return an
              * out-of-dateness error. 
              */
-            SVNNodeKind kind = myRepository.checkNodeKind(fullPath, myTxnRoot, -1);
+            SVNNodeKind kind = myRepository.checkNodeKind(fullPath, myTxnRoot);
             if(kind != SVNNodeKind.NONE && !parentBaton.isCopied()){
                 SVNErrorManager.error("Out of date: '" + fullPath + "' in transaction '" + myTxnRoot.getTxnId() + "'");
             }
@@ -228,7 +228,7 @@ public class FSCommitEditor implements ISVNEditor {
             /* Now use the copyFromPath as an absolute path within the
              * repository to make the copy from. 
              */      
-            FSRoot copyRoot = new FSRoot(copyFromRevision, myRevNodesPool.getRootRevisionNode(copyFromRevision, myReposRootDir));
+            FSRoot copyRoot = FSRoot.createRevisionRoot(copyFromRevision, myRevNodesPool.getRootRevisionNode(copyFromRevision, myReposRootDir));
             makeCopy(copyRoot, copyFromPath, myTxnRoot, fullPath, true);
             isCopied = true;
         }else{
@@ -528,7 +528,7 @@ public class FSCommitEditor implements ISVNEditor {
              * thing might have been copied in as well), else return an
              * out-of-dateness error. 
              */
-            SVNNodeKind kind = myRepository.checkNodeKind(fullPath, myTxnRoot, -1);
+            SVNNodeKind kind = myRepository.checkNodeKind(fullPath, myTxnRoot);
             if(kind != SVNNodeKind.NONE && !parentBaton.isCopied()){
                 SVNErrorManager.error("Out of date: '" + fullPath + "' in transaction '" + myTxnRoot.getTxnId() + "'");
             }
@@ -536,7 +536,7 @@ public class FSCommitEditor implements ISVNEditor {
             /* Now use the copyFromPath as an absolute path within the
              * repository to make the copy from. 
              */      
-            FSRoot copyRoot = new FSRoot(copyFromRevision, myRevNodesPool.getRootRevisionNode(copyFromRevision, myReposRootDir));
+            FSRoot copyRoot = FSRoot.createRevisionRoot(copyFromRevision, myRevNodesPool.getRootRevisionNode(copyFromRevision, myReposRootDir));
             makeCopy(copyRoot, copyFromPath, myTxnRoot, fullPath, true);
         }else{
             /* No ancestry given, just make a new, empty file.  Note that we
@@ -619,7 +619,7 @@ public class FSCommitEditor implements ISVNEditor {
         InputStream sourceStream = null;
         OutputStream targetStream = null;
         try{
-            sourceStream = FSInputStream.createStream(node, myReposRootDir);
+            sourceStream = FSInputStream.createDeltaStream(node, myReposRootDir);
             targetStream = FSOutputStream.createStream(node, txnId, myReposRootDir);
             myDeltaProcessor = new FSCommitDeltaProcessor(sourceStream, targetStream);
         }catch(SVNException svne){
@@ -844,7 +844,7 @@ public class FSCommitEditor implements ISVNEditor {
              * obtained it. 
              */
             long youngishRev = FSReader.getYoungestRevision(myReposRootDir);
-            FSRoot youngishRoot = new FSRoot(youngishRev, null);
+            FSRoot youngishRoot = FSRoot.createRevisionRoot(youngishRev, null);
             /* Get the node for the youngest revision, also in one
              * transaction.  Later we'll use it as the source
              * argument to a merge, and if the merge succeeds, this youngest

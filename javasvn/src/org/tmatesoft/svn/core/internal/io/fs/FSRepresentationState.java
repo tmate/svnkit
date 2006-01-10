@@ -54,11 +54,11 @@ public class FSRepresentationState {
 
     /* Build an array of FSRepresentationState objects in 'result' giving the delta
      * reps from firstRep to a self-compressed rep. 
-     * NOTE: This list is not used for PLAIN text reading in JavaSVN. Intended only
-     * for reading file deltas.
+     * NOTE: result list must not be null! If it's a PLAIN text returns a rep state 
+     * we find at the end of the chain, or to null if the final delta representation 
+     * is self-compressed. 
      */
-    public static LinkedList buildRepresentationList(FSRepresentation firstRep, LinkedList result, File reposRootDir) throws SVNException {
-        result = result == null ? new LinkedList() : result;
+    public static FSRepresentationState buildRepresentationList(FSRepresentation firstRep, LinkedList result, File reposRootDir) throws SVNException {
         RandomAccessFile file = null;
         FSRepresentation rep = new FSRepresentation(firstRep);
         try{
@@ -73,7 +73,7 @@ public class FSRepresentationState {
                 repState.end = repState.start + rep.getSize();
                 if(!repArgs.isDelta){
                     /* This is a plaintext, so just return the current repState. */
-                    return result;
+                    return repState;
                 }
                 /* We are dealing with a delta, find out what version. */
                 byte[] buffer = new byte[4];
@@ -87,7 +87,7 @@ public class FSRepresentationState {
                 /* Push this rep onto the list.  If it's self-compressed, we're done. */
                 result.addLast(repState);
                 if(repArgs.isDeltaVsEmpty){
-                    return result;
+                    return null;
                 }
                 rep.setRevision(repArgs.myBaseRevision);
                 rep.setOffset(repArgs.myBaseOffset);

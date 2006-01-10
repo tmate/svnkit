@@ -41,15 +41,14 @@ public class FSConstants {
     public static final String ACTION_DELETE = "delete";
     public static final String ACTION_REPLACE = "replace";
     public static final String ACTION_RESET = "reset";
-    public static final Map CHANGE_KINDS_TO_ACTIONS = new HashMap();
+    public static final Map ACTIONS_TO_CHANGE_KINDS = new HashMap();
     static {
-        CHANGE_KINDS_TO_ACTIONS.put(FSPathChangeKind.FS_PATH_CHANGE_MODIFY, ACTION_MODIFY);
-        CHANGE_KINDS_TO_ACTIONS.put(FSPathChangeKind.FS_PATH_CHANGE_ADD, ACTION_ADD);
-        CHANGE_KINDS_TO_ACTIONS.put(FSPathChangeKind.FS_PATH_CHANGE_DELETE, ACTION_DELETE);
-        CHANGE_KINDS_TO_ACTIONS.put(FSPathChangeKind.FS_PATH_CHANGE_REPLACE, ACTION_REPLACE);
-        CHANGE_KINDS_TO_ACTIONS.put(FSPathChangeKind.FS_PATH_CHANGE_RESET, ACTION_RESET);
+        ACTIONS_TO_CHANGE_KINDS.put(ACTION_MODIFY, FSPathChangeKind.FS_PATH_CHANGE_MODIFY);
+        ACTIONS_TO_CHANGE_KINDS.put(ACTION_ADD, FSPathChangeKind.FS_PATH_CHANGE_ADD);
+        ACTIONS_TO_CHANGE_KINDS.put(ACTION_DELETE, FSPathChangeKind.FS_PATH_CHANGE_DELETE);
+        ACTIONS_TO_CHANGE_KINDS.put(ACTION_REPLACE, FSPathChangeKind.FS_PATH_CHANGE_REPLACE);
+        ACTIONS_TO_CHANGE_KINDS.put(ACTION_RESET, FSPathChangeKind.FS_PATH_CHANGE_RESET);
     }
-    
     public static final String SVN_REPOS_DB_LOCKFILE = "db.lock";
     public static final String SVN_REPOS_DB_LOGS_LOCKFILE = "db-logs.lock";
     public static final String SVN_REPOS_CONF_SVNSERVE_CONF_FILE = "svnserve.conf";
