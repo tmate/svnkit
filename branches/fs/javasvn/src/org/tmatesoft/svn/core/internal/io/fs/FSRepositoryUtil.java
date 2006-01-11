@@ -344,6 +344,14 @@ public class FSRepositoryUtil {
         return revFile;
     }
 
+    public static File getNewRevisionFile(File reposRootDir, long revision) throws SVNException {
+        File revFile = new File(getRevisionsDir(reposRootDir), String.valueOf(revision));
+        if (revFile.exists()) {
+            SVNErrorManager.error("svn: revision " + revision + " already exists");
+        }
+        return revFile;
+    }
+
     public static File getRepositoryFormatFile(File reposRootDir) {
         return new File(reposRootDir, FSConstants.SVN_REPOS_FORMAT_FILE);
     }

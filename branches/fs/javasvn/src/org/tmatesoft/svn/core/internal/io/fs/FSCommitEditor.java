@@ -663,11 +663,10 @@ public class FSCommitEditor implements ISVNEditor {
                 case FSParentPath.COPY_ID_INHERIT_SELF:
                     break;
                 case FSParentPath.COPY_ID_INHERIT_UNKNOWN:
-                    //well, svn aborts here, should we do the same?
                     /* uh-oh -- somebody didn't calculate copy-ID
                      * inheritance data. 
                      */                    
-                    SVNErrorManager.error("FATAL error: can not make path mutable");;
+                    SVNErrorManager.error("FATAL error: can not make path '" + errorPath + "' mutable");
             }
             /* Determine what copyroot our new child node should use. */
             String copyRootPath = parentPath.getRevNode().getCopyRootPath();
@@ -917,7 +916,7 @@ public class FSCommitEditor implements ISVNEditor {
          */
         verifyLocks(txn.getTxnId());
         /* Get the next node-id and copy-id to use. */
-        String[] ids = FSReader.readNextIds(txn.getTxnId(), myReposRootDir);
+        String[] ids = FSReader.getNextRevisionIds(myReposRootDir);
         String startNodeId = ids[0];
         String startCopyId = ids[1];
         /* We are going to be one better than this puny old revision. */
@@ -951,7 +950,7 @@ public class FSCommitEditor implements ISVNEditor {
             }
         }
         /* Move the finished rev file into place. */
-        File dstRevFile = FSRepositoryUtil.getRevisionFile(myReposRootDir, newRevision); 
+        File dstRevFile = FSRepositoryUtil.getNewRevisionFile(myReposRootDir, newRevision); 
         SVNFileUtil.rename(revisionPrototypeFile, dstRevFile);
         /* Move the revprops file into place. */
         File txnPropsFile = FSRepositoryUtil.getTxnPropsFile(txn.getTxnId(), myReposRootDir);
