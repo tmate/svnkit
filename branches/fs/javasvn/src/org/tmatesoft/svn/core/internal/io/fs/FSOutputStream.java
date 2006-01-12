@@ -59,8 +59,11 @@ public class FSOutputStream extends FSBufferStream implements ISVNDiffWindowHand
     
     private MessageDigest myDigest;
     
-    private FSOutputStream(FSRevisionNode revNode, RandomAccessFile file, InputStream source, long deltaStart, long repSize, long repOffset) throws SVNException {
+    private File myReposRootDir;
+    
+    private FSOutputStream(FSRevisionNode revNode, RandomAccessFile file, InputStream source, long deltaStart, long repSize, long repOffset, File reposRootDir) throws SVNException {
         super();
+        myReposRootDir = reposRootDir;
         myTargetFile = file;
         mySource = source;
         myDeltaStart = deltaStart;
@@ -111,7 +114,7 @@ public class FSOutputStream extends FSBufferStream implements ISVNDiffWindowHand
             targetFile.write(header.getBytes());
             /* Now determine the offset of the actual svndiff data. */
             deltaStart = targetFile.getFilePointer();
-            return new FSOutputStream(revNode, targetFile, sourceStream, deltaStart, 0, offset);
+            return new FSOutputStream(revNode, targetFile, sourceStream, deltaStart, 0, offset, reposRootDir);
         }catch(IOException ioe){
             SVNFileUtil.closeFile(targetFile);
             SVNFileUtil.closeFile(sourceStream);
@@ -217,6 +220,8 @@ public class FSOutputStream extends FSBufferStream implements ISVNDiffWindowHand
             /* Write out their cosmetic end marker. */
             myTargetFile.write("ENDREP\n".getBytes());
             myRevNode.setTextRepresentation(rep);
+            /* Write out the new node-rev information. */
+            FSWriter.putTxnRevisionNode(myRevNode.getId(), myRevNode, myReposRootDir);
         }catch(SVNException svne){
             throw new IOException(svne.getMessage());
         }finally{

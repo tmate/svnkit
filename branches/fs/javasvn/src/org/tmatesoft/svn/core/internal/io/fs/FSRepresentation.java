@@ -22,7 +22,7 @@ public class FSRepresentation {
     private long mySize;
     private long myExpandedSize;
     private String myHexDigest;
-    private String myTxnId;
+    private String myTxnId = FSID.ID_INAPPLICABLE;
     
     public FSRepresentation(long revision, long offset, long size, long expandedSize, String hexDigest){
         myRevision = revision;
@@ -38,6 +38,7 @@ public class FSRepresentation {
         mySize = representation.getSize();
         myExpandedSize = representation.getExpandedSize();
         myHexDigest = representation.getHexDigest();
+        myTxnId = representation.myTxnId != null ? representation.myTxnId : myTxnId;
     }
 
     public FSRepresentation(){

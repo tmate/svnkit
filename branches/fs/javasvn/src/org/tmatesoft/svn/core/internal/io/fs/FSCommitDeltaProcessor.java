@@ -34,26 +34,35 @@ public class FSCommitDeltaProcessor extends FSBufferStream{
     
     private SVNDiffWindow myCurrentWindow;
     
+    private boolean isClosed;
+    
     public FSCommitDeltaProcessor(InputStream sourceStream, OutputStream targetStream){
         super();
         mySourceStream = sourceStream;
         myTargetStream = targetStream;
         myApplyBaton = SVNDiffWindowApplyBaton.create(mySourceStream, myTargetStream, null);
+        isClosed = true;
     }
     
     public OutputStream handleDiffWindow(SVNDiffWindow window){
         myCurrentWindow = window;
+        isClosed = false;
         return this;
     }
     
     public void close() throws IOException {
-        super.close();
-        try{
-            myCurrentWindow.apply(myApplyBaton, new ByteArrayInputStream(super.myBuffer == null ? new byte[0] : super.myBuffer));
-            super.myBufferLength = 0;
-            super.myBuffer = null;
-        }catch(SVNException svne){
-            throw new IOException(svne.getMessage());
+        if(!isClosed){
+            super.close();
+            if(!(super.myBufferLength == 0 && myCurrentWindow.getTargetViewLength() == 0)){
+                try{
+                    myCurrentWindow.apply(myApplyBaton, new ByteArrayInputStream(super.myBuffer == null ? new byte[0] : super.myBuffer));
+                    super.myBufferLength = 0;
+                    super.myBuffer = null;
+                }catch(SVNException svne){
+                    throw new IOException(svne.getMessage());
+                }
+            }
+            isClosed = true;
         }
     }
     

@@ -36,6 +36,7 @@ import org.tmatesoft.svn.core.internal.util.SVNTimeUtil;
 import org.tmatesoft.svn.core.internal.util.SVNEncodingUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
+import org.tmatesoft.svn.core.io.SVNLocationEntry;
 
 /**
  * @version 1.0
@@ -416,12 +417,12 @@ public class FSCommitEditor implements ISVNEditor {
         OutputStream changesFile = null;
         try{
             changesFile = SVNFileUtil.openFileForWriting(FSRepositoryUtil.getTxnChangesFile(txnId, myReposRootDir), true);
-            String copyfrom = "";
+            SVNLocationEntry copyfromEntry = null;
             if(FSRepository.isValidRevision(copyFromRevision)){
-                copyfrom = copyFromRevision + " " + copyFromPath;
+                copyfromEntry = new SVNLocationEntry(copyFromRevision, copyFromPath);
             }
             FSPathChange pathChange = new FSPathChange(id, changeKind, textModified, propsModified);
-            FSWriter.writeChangeEntry(changesFile, path, pathChange, copyfrom);
+            FSWriter.writeChangeEntry(changesFile, path, pathChange, copyfromEntry);
         }catch(IOException ioe){
             SVNErrorManager.error("svn: Can't write to '" + FSRepositoryUtil.getTxnChangesFile(txnId, myReposRootDir).getAbsolutePath() + "': " + ioe.getMessage());
         }finally{
