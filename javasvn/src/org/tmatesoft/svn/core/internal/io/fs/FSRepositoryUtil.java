@@ -134,12 +134,8 @@ public class FSRepositoryUtil {
     /*Constuct digest in hex on path*/
     public static String getDigestPathFromPath(File reposRootDir, String path)throws SVNException{
         String digest = FSRepositoryUtil.getDigestFromRepositoryPath(path);
-        char[] digestSubdirChars = new char[FSConstants.DIGEST_SUBDIR_LEN];
-        for(int count = 0; count < FSConstants.DIGEST_SUBDIR_LEN; count++){
-            digestSubdirChars[count] = digest.charAt(count);
-        }
-        String digestSubdirString = new String(digestSubdirChars);
-        return reposRootDir.getAbsolutePath() + "/" + FSConstants.LOCK_ROOT_DIR + "/" + digestSubdirString + "/" + digest;
+        File dbLockDigestFile = new File(new File(FSRepositoryUtil.getDBLocksDir(reposRootDir), digest.substring(0, FSConstants.DIGEST_SUBDIR_LEN)), digest);
+        return dbLockDigestFile.getAbsolutePath();
     }
     
     public static Map getMetaProps(File reposRootDir, long revision, FSRepository repository) throws SVNException {
@@ -362,6 +358,5 @@ public class FSRepositoryUtil {
 
     public static File getRepositoryDBDir(File reposRootDir) {
         return new File(reposRootDir, FSConstants.SVN_REPOS_DB_DIR);
-    }
-    
+    }   
 }

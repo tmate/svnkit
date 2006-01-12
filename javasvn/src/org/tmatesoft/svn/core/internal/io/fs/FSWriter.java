@@ -26,8 +26,10 @@ import java.util.Date;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 
+import org.tmatesoft.svn.core.ISVNLogEntryHandler;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNLock;
+import org.tmatesoft.svn.core.SVNLogEntry;
 import org.tmatesoft.svn.core.SVNNodeKind;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
@@ -810,26 +812,28 @@ public class FSWriter {
         }
         return null;
     }
-//<<<<<<< .mine
     public static void setLock(File reposRootDir, SVNLock lock)throws SVNException{
         if(reposRootDir == null){
             SVNErrorManager.error("File object was not instantiated yet");
         }
         if(lock == null){
-            SVNErrorManager.error("try to make an unexisting lock");
+            SVNErrorManager.error("Attempt to make an invalid lock");
         }
         String lastChild = "";
         String thisPath = lock.getPath();
-        while(true){
+        while(true){            
             String digestPath = FSRepositoryUtil.getDigestPathFromPath(reposRootDir, thisPath);
-            String[] strArr = SVNPathUtil.extractParentAndChild(digestPath);            
-            String digestFileComponent = strArr[1];
+            /*for Win*/
+            String[] splitDigestPath = digestPath.split("\\\\");
+            String newDigestFileComponent = splitDigestPath[splitDigestPath.length-1];
+            //String[] strArr = SVNPathUtil.extractParentAndChild(digestPath);            
+            //String digestFileComponent = strArr[1];
             Collection children = new ArrayList();
-            SVNLock thisLock = FSReader.fetchLockFromDigestFile(new File(digestPath), lock.getPath(), children, reposRootDir);
+            SVNLock thisLock = FSReader.fetchLockFromDigestFile(new File(digestPath), thisPath, children, reposRootDir);
             if(lock != null){
                 thisLock = lock;
                 lock = null;
-                lastChild = digestFileComponent;
+                lastChild = /*digestFileComponent*/newDigestFileComponent;
             }else{
                 /* If we already have an entry for this path, we're done. */
                 if(children.contains(lastChild)){
@@ -843,11 +847,47 @@ public class FSWriter {
                 return;
             }
             /*TODO ???possible problems with SVNPathUtil.svnPathDirName*/
-            thisPath = SVNPathUtil.svnPathDirName(thisPath);
+            String[] splitThisPath = thisPath.split("/");
+            StringBuffer newThisPath = new StringBuffer();
+            int count = 0;
+            do{
+                newThisPath.append("/");
+                newThisPath.append(splitThisPath[count]);
+                count++;
+            }while(count < splitThisPath.length-1);
+            thisPath = new String(newThisPath);
+            //thisPath = SVNPathUtil.svnPathDirName(thisPath);
         }
     }
 
-//=======
+    /* Pass history information about REV to handler.
+     *  FS is used with REV to fetch the interesting history information,
+     *  such as author, date, etc.
+     *  The detectChanged() function if DISCOVER_CHANGED_PATHS is TRUE.
+     *  If handler == null, no entry will be handled
+     */
+     public static void sendChangeRev(File reposRootDir, FSRevisionNodePool revNodesPool, long revNum, boolean discoverChangedPath, ISVNLogEntryHandler handler)throws SVNException{      
+        Map rProps = FSRepositoryUtil.getRevisionProperties(reposRootDir, revNum);
+        Map changedPaths = null;
+        String author = (String)rProps.get(SVNRevisionProperty.AUTHOR);     
+         Date date = SVNTimeUtil.parseDate((String)rProps.get(SVNRevisionProperty.DATE));
+        String message = (String)rProps.get(SVNRevisionProperty.LOG);
+        
+           /* Discover changed paths if the user requested them
+         * or if we need to check that they are readable
+         */
+        if(revNum > 0 && discoverChangedPath == true){
+            FSRevisionNode newRoot = FSReader.getRootRevNode(reposRootDir, revNum);
+            changedPaths = FSReader.detectChanged(reposRootDir, revNodesPool, FSRoot.createRevisionRoot(revNum, newRoot));
+        }
+         if(discoverChangedPath == false){
+             changedPaths = null;
+         }
+         if(handler != null){
+             handler.handleLogEntry(new SVNLogEntry(changedPaths, revNum, author, date, message));
+         }
+     }
+     
     private static class HashRepresentationWriter extends OutputStream{
         long mySize = 0;
         MessageDigest myChecksum;
@@ -877,5 +917,4 @@ public class FSWriter {
             return targetFile.mySize;
         }
     }
-//>>>>>>> .r1939
 }

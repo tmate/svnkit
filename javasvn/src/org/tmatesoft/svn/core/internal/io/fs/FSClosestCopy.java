@@ -14,10 +14,10 @@ package org.tmatesoft.svn.core.internal.io.fs;
  */
 public class FSClosestCopy{
 	//revision node
-	FSRevisionNode revNode;
+	private FSRevisionNode revNode;
 	
 	//path 
-	String path;
+    private String path;
 	
 	//constructors
 	public FSClosestCopy(){		
@@ -25,12 +25,8 @@ public class FSClosestCopy{
 	public FSClosestCopy(FSRevisionNode newRevNode, String newPath){
 		revNode = newRevNode;
 		path = newPath;
-	}	
-	public FSClosestCopy(FSClosestCopy newCloseCopy){
-		revNode = newCloseCopy.getRevisionNode();
-		path = newCloseCopy.getPath();
 	}
-	
+    
 	//accessors
 	public FSRevisionNode getRevisionNode(){
 		return revNode;

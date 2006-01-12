@@ -21,26 +21,29 @@ import org.tmatesoft.svn.core.io.*;
  */
 public class FSParentPath
 {	
-	//A node along the path.  This could be the final node, one of its
-    //parents, or the root.  Every parent path ends with an element for
-    //the root directory
+   /* A node along the path.  This could be the final node, one of its
+    * parents, or the root.  Every parent path ends with an element for
+    * the root directory
+    * */
 	FSRevisionNode revNode;
 	
-	//The name NODE has in its parent directory.  This is zero for the
-    //root directory, which (obviously) has no name in its parent
+	/* The name NODE has in its parent directory.  This is zero for the
+     * root directory, which (obviously) has no name in its parent
+     * */
 	String nameEntry;
 	
-	//The parent of NODE, or zero if NODE is the root directory
+	/* The parent of NODE, or zero if NODE is the root directory*/
 	FSParentPath parent;
 	
-	//The copy ID inheritence style
+	/* The copy ID inheritence style*/
 	int copyStyle;
 	
-	//If copy ID inheritence style is copy_id_inherit_new, this is the
-    //path which should be implicitly copied; otherwise, this is NULL
+	/* If copy ID inheritence style is copy_id_inherit_new, this is the
+     * path which should be implicitly copied; otherwise, this is NULL
+     * */
 	String copySrcPath;
 
-	//constructors
+	/*constructors*/
 	public FSParentPath(){		
 	}
 	

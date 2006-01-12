@@ -62,14 +62,14 @@ public class FSWriteLock {
             /* svn 1.1.1 and earlier deferred lock file creation to the first
              * commit.  So in case the repository was created by an earlier
              * version of svn, check the lock file here. 
-             */
+             */            
             File writeLockFile = FSRepositoryUtil.getWriteLockFile(myReposRootDir);
             SVNFileType type = SVNFileType.getType(writeLockFile);
             if(type == SVNFileType.UNKNOWN || type == SVNFileType.NONE){
                 SVNFileUtil.createEmptyFile(writeLockFile);
             }
             myLockFile = new RandomAccessFile(writeLockFile, "rw");
-            myLock = myLockFile.getChannel().lock(0, Long.MAX_VALUE, false);
+            myLock = myLockFile.getChannel().lock(0, Long.MAX_VALUE, false);            
         }catch(IOException ioe){
             unlock();
             SVNErrorManager.error("Can't get exclusive write lock to the repository '" + myReposRootPath + "': " + ioe.getMessage());
