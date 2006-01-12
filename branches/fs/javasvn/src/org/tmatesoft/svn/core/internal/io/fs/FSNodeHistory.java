@@ -58,16 +58,14 @@ public class FSNodeHistory
 	}
 	//methods connected to history entity
 	
-	//Find the youngest copyroot for path PARENT_PATH or its parents in
-	//filesystem FS, and store the copyroot in *REV_P and *PATH_P.
+	//Find the youngest copyroot for path PARENT_PATH or its parents
 	public static SVNLocationEntry findYoungestCopyroot(File reposRootDir, FSParentPath parPath)throws SVNException{		
-		SVNLocationEntry parentEntry = null;
-		SVNLocationEntry myEntry = null;		
+		SVNLocationEntry parentEntry = null;		
 		
 		if(parPath.getParent() != null){
 			parentEntry = FSNodeHistory.findYoungestCopyroot(reposRootDir, parPath.getParent());
 		}
-		myEntry = new SVNLocationEntry(parPath.getRevNode().getCopyRootRevision(), parPath.getRevNode().getCopyRootPath()); 
+        SVNLocationEntry myEntry = new SVNLocationEntry(parPath.getRevNode().getCopyRootRevision(), parPath.getRevNode().getCopyRootPath()); 
 		if(parentEntry != null){
 			if(myEntry.getRevision() >= parentEntry.getRevision()){
 				return myEntry;
@@ -78,15 +76,21 @@ public class FSNodeHistory
 	}
 	
     public static boolean checkAncestryOfPegPath(File reposRootDir, String fsPath, long pegRev, long futureRev, FSRevisionNodePool revNodesPool)throws SVNException{
-   		String localFsPath = null;
-   		if(fsPath == null){
-   			SVNErrorManager.error("invalid path in repository");
-   		}else{
-   			localFsPath = new String(fsPath);
-   		}
+        if(reposRootDir == null){
+            SVNErrorManager.error("File object was not initialized yet");
+        }
+        fsPath = fsPath == null ? new String("") : fsPath;
+        long youngestRev = FSReader.getYoungestRevision(reposRootDir);
+        if(FSRepository.isInvalidRevision(pegRev) || pegRev > youngestRev){
+            return false;
+        }
+        if(FSRepository.isInvalidRevision(futureRev) || futureRev > youngestRev){
+            return false;
+        }
    		FSRevisionNode root = FSReader.getRootRevNode(reposRootDir, futureRev);
-   		FSNodeHistory history = getNodeHistory(reposRootDir, root, localFsPath);    	
-   		localFsPath = null;
+        FSNodeHistory history = null;
+        history = getNodeHistory(reposRootDir, root, fsPath);
+        fsPath = null;
    		SVNLocationEntry currentHistory = null;
    		while(true){  
    			history = history.fsHistoryPrev(reposRootDir, true, revNodesPool);    			
@@ -94,38 +98,42 @@ public class FSNodeHistory
    				break;    			
    			}
    			currentHistory = new SVNLocationEntry(history.getHistoryEntry().getRevision(), history.getHistoryEntry().getPath()); 		
-   			if(localFsPath == null){
-   				localFsPath = new String(currentHistory.getPath());
+   			if(fsPath == null){
+   				fsPath = new String(currentHistory.getPath());
    			}
    			if(currentHistory.getRevision() <= pegRev){
    				break;    				
    			}
    		}
-   		return (history != null && (localFsPath.compareTo(currentHistory.getPath()) == 0));
+   		return (history != null && (fsPath.compareTo(currentHistory.getPath()) == 0));
     }
     
     //Retrun FSNodeHistory as an opaque node history object which represents
-    //PATH under ROOT. ROOT must be a revision root    
+    //PATH under ROOT. ROOT must be a revision root  
+    /*TODO update method for using it with transaction*/
     public static FSNodeHistory getNodeHistory(File reposRootDir, FSRevisionNode root, String path)throws SVNException{
     	if(root == null){
     		SVNErrorManager.error("invalid node root of repository");
     	}
+        FSRoot rootNode = FSRoot.createRevisionRoot(root.getId().getRevision(), root);
+        if(rootNode.isTxnRoot()){
+            SVNErrorManager.error("Object is not a revision root");
+        }        
         /*And we require that the path exist in the root*/
-    	SVNNodeKind kind = FSRepository.checkPath(reposRootDir, root, path);;    	
+    	SVNNodeKind kind = FSRepository.checkPath(reposRootDir, rootNode.getRootRevisionNode(), path);;    	
     	if(kind == SVNNodeKind.NONE){
-    		SVNErrorManager.error("File not found: revision " + root.getId().getRevision() + " path " + path);
-    	}
-    	
-    	return new FSNodeHistory(new SVNLocationEntry(root.getId().getRevision(), path), 
+    		SVNErrorManager.error("File not found: revision " + rootNode.getRootRevisionNode().getId().getRevision() + " path " + path);
+    	}    	
+    	return new FSNodeHistory(new SVNLocationEntry(rootNode.getRootRevisionNode().getId().getRevision(), path), 
     			false, new SVNLocationEntry(FSConstants.SVN_INVALID_REVNUM, null));
     }
     	
     private FSNodeHistory historyPrev(File reposRootDir, /*FSNodeHistory hist,*/ boolean crossCopies, FSRevisionNodePool revNodesPool)throws SVNException{
-    	if(revNodesPool == null){
-    		SVNErrorManager.error("invalid revision node pool");
-    	}
-    	if(reposRootDir == null){
-    		SVNErrorManager.error("invalid root directory of repository");
+        if(reposRootDir == null){
+            SVNErrorManager.error("File object was not instantiated yet");
+        }
+        if(revNodesPool == null){
+    		SVNErrorManager.error("Revision node pool was not initialized yet");
     	}
     	String path = historyEntry.getPath();//String path = hist.getHistoryEntry().getPath();
     	SVNLocationEntry commitEntry;
@@ -146,10 +154,19 @@ public class FSNodeHistory
     		revision = searchResumeEntry.getRevision();//revision = hist.getSearchResumeEntry().getRevision();
     	}
     	//Construct a ROOT for the current revision
-    	FSRevisionNode root = FSReader.getRootRevNode(reposRootDir, revision);
+    	FSRevisionNode root = revNodesPool.getRootRevisionNode(revision, reposRootDir);/*FSReader.getRootRevNode(reposRootDir, revision);*/
+        if(root == null){
+            SVNErrorManager.error("Can't get root node for '" + revision + "' revision");
+        }
     	//Open path/revision and get all necessary info: node-id, ...
     	FSParentPath parentPath = revNodesPool.getParentPath(FSRoot.createRevisionRoot(root.getId().getRevision(), root), path, true, reposRootDir);
+        if(parentPath == null){
+            SVNErrorManager.error("Path '" + path + "' at '" + root.getId().getRevision() + "' revision not found");
+        }
     	FSRevisionNode revNode = parentPath.getRevNode();
+        if(revNode == null){
+            SVNErrorManager.error("Invalid rev-node in parent path. Path: '" +path+ "' revision: '"+root.getId().getRevision()+"'");
+        }
     	commitEntry = new SVNLocationEntry(revNode.getId().getRevision(), revNode.getCreatedPath()); 
     	//The Subversion filesystem is written in such a way that a given
         //line of history may have at most one interesting history point
@@ -178,16 +195,15 @@ public class FSNodeHistory
     	}
 		//Find the youngest copyroot in the path of this node, including itself
     	SVNLocationEntry copyrootEntry = FSNodeHistory.findYoungestCopyroot(reposRootDir, parentPath);
-		if(copyrootEntry == null){
-			//just for error diagnosting
-			SVNErrorManager.error("No youngest copyroot");
-		}
 		SVNLocationEntry srcEntry = new SVNLocationEntry(FSConstants.SVN_INVALID_REVNUM, null);
 		long dstRev = FSConstants.SVN_INVALID_REVNUM;
 		if(copyrootEntry.getRevision() > commitEntry.getRevision()){
-			FSRevisionNode copyrootRoot = FSReader.getRootRevNode(reposRootDir, copyrootEntry.getRevision());
-			revNode = FSReader.getRevisionNode(reposRootDir, copyrootEntry.getPath(), copyrootRoot, 0);
-		  /* If our current path was the very destination of the copy,
+            FSRevisionNode copyrootRoot = revNodesPool.getRootRevisionNode(copyrootEntry.getRevision(), reposRootDir);
+//			FSRevisionNode copyrootRoot = FSReader.getRootRevNode(reposRootDir, copyrootEntry.getRevision());
+            revNode = revNodesPool.getRevisionNode(copyrootRoot, copyrootEntry.getPath(), reposRootDir);
+//			revNode = FSReader.getRevisionNode(reposRootDir, copyrootEntry.getPath(), copyrootRoot, 0);
+            String copyDst = revNode.getCreatedPath();
+          /* If our current path was the very destination of the copy,
 	         then our new current path will be the copy source.  If our
 	         current path was instead the *child* of the destination of
 	         the copy, then figure out its previous location by taking its
@@ -195,10 +211,9 @@ public class FSNodeHistory
 	         the copy source.  Finally, if our current path doesn't meet
 	         one of these other criteria ... ### for now just fallback to
 	         the old copy hunt algorithm. 
-	       */
-			String copyDst = revNode.getCreatedPath();
+	       */			
 			String reminder = new String();
-			if(path.compareTo(copyDst) == 0){
+			if(path.equals(copyDst)){
 				reminder = "/";
 			}else{
 				reminder = SVNPathUtil.pathIsChild(copyDst, path);
@@ -232,7 +247,7 @@ public class FSNodeHistory
     
     public FSNodeHistory fsHistoryPrev(File reposRootDir, boolean crossCopies, FSRevisionNodePool revNodesPool)throws SVNException{    
     	//if("/".compareTo(hist.getHistoryEntry().getPath()) == 0){
-    	if("/".compareTo(historyEntry.getPath()) == 0){
+    	if("/".equals(historyEntry.getPath())){
     		//if(hist.getInterest() == false){
     		if(isInteresting == false){
     			return new FSNodeHistory(new SVNLocationEntry(/*hist.getHistoryEntry().getRevision()*/historyEntry.getRevision(), "/"), true,
@@ -244,11 +259,7 @@ public class FSNodeHistory
     	}else{
     		FSNodeHistory prevHist = this;
     		while(true){
-    			try{
-    				prevHist = prevHist.historyPrev(reposRootDir, /*prevHist,*/ crossCopies, revNodesPool);
-    			}catch(SVNException ex){
-    				SVNErrorManager.error("can't get predecessor of history object");
-    			}
+    		    prevHist = prevHist.historyPrev(reposRootDir, crossCopies, revNodesPool);
     			if(prevHist == null){
     				return null;
     			}

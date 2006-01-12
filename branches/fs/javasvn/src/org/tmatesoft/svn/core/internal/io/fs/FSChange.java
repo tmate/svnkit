@@ -41,11 +41,11 @@ public class FSChange {
         return myFSPathChange.getChangeKind();
     }    
     
-    public boolean getTextModi(){
+    public boolean getTextModification(){
         return myFSPathChange.isTextModified;
     }
     
-    public boolean getPropModi(){
+    public boolean getPropModification(){
         return myFSPathChange.arePropertiesModified;
     }
     

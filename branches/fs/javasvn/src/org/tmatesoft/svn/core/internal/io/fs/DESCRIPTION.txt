@@ -157,4 +157,23 @@ no longer be changed), and txn roots (mutable, that are being changing as commit
 runs). There are methods that should work for both kinds of roots (like openPath()). 
 So, FSRoot is an abstraction that allows to realize such methods.
  
+18)FSChange - a class contains information about changes (modification, add, 
+replace, reset, delete) made on specified 'path' in repository.
+
+19)FSClosestCopy - a class simply represents information returning after invoking 
+closestCopy method. An information consists of 'path' and 'revision node'.
+
+20)FSLogChangedPath - a class represents a path that changed for log entry. 
+It consists of action made on path, path itself and revision (as SVNLocationEntry).
+
+21)FSNodeHistory - a class represents an opaque history object. It contains following information:
+'path' with secified 'revision' (this is history of path), search resume path with revision and flag 
+indicating an interest for this object, the flag is set after invoking fsHistoryPrev() function.
+
+22)FSParentPath -  a class representing linked list of the path from a node up to a root
+directory. 
+
+23)FSPathChange - a class representing change descriptor with appropriate information: change 
+action (modification, add, delete, reset, replace), info about text and property modifications.
+
 

@@ -17,8 +17,6 @@ import java.io.FileNotFoundException;
 import java.io.OutputStream;
 import java.io.InputStream;
 import java.io.File;
-import java.io.RandomAccessFile;
-import java.nio.channels.FileChannel;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -36,8 +34,6 @@ import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNLock;
 import org.tmatesoft.svn.core.SVNNodeKind;
 import org.tmatesoft.svn.core.SVNURL;
-import org.tmatesoft.svn.core.SVNLogEntry;
-import org.tmatesoft.svn.core.internal.wc.SVNFileType;
 import org.tmatesoft.svn.core.io.SVNFileRevision;
 import org.tmatesoft.svn.core.io.ISVNEditor;
 import org.tmatesoft.svn.core.io.ISVNReporter;
@@ -483,118 +479,133 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
         }
     }
 
+    /* Note: if you don't want to handle found revisions, path null into 'handler' argument
+     * Note: file must exist in earliest revision passed as 'startRevision' or 'endRevision' argument
+     * Note: the earliest revision may be either startRevision or endRevision, they will be handled from the oldest first changed to the earliest
+     * Important: All handles made on file which exists at earliest revision passed*/    
     public int getFileRevisions(String path, long startRevision, long endRevision, ISVNFileRevisionHandler handler) throws SVNException {
-		int counter = 0;
-    	try{
+		try{
     		openRepository();
-    		path = path == null ? "" : path;
-    		String repositoryPath = super.getRepositoryPath(path);    		
-            String parentPath = SVNPathUtil.removeTail(repositoryPath);
-            //suppose parentPath to be full path of repository's file at local machine
-            ArrayList fileRevs = new ArrayList(0);
-            ArrayList revNums = new ArrayList(0);
-            ArrayList revPaths = new ArrayList(0);
-            FSRevisionNode root = FSReader.getRootRevNode(myReposRootDir, endRevision);
-            SVNNodeKind kind = this.checkPath(parentPath, endRevision);
-            if(kind != SVNNodeKind.FILE){
-            	SVNErrorManager.error(parentPath + " is not a file");
+            if(path == null){
+                SVNErrorManager.error("Invalid examined path");
             }
-            FSNodeHistory history = FSNodeHistory.getNodeHistory(myReposRootDir, root, parentPath);
+            long youngestRev = FSReader.getYoungestRevision(myReposRootDir);
+            if(FSRepository.isInvalidRevision(startRevision)){
+                startRevision = youngestRev;
+            }
+            if(startRevision > youngestRev){
+                SVNErrorManager.error("No revision #" + startRevision + " in repository");
+            }
+            if(FSRepository.isInvalidRevision(endRevision)){
+                endRevision = youngestRev;
+            }
+            if(endRevision > youngestRev){
+                SVNErrorManager.error("No revision #" + endRevision + " in repository");
+            }
+            long trueStart = FSConstants.SVN_INVALID_REVNUM;
+            long trueEnd = FSConstants.SVN_INVALID_REVNUM;
+            if(startRevision > endRevision){
+                trueStart = endRevision;
+                trueEnd = startRevision; 
+            }else{        
+                trueStart = startRevision;
+                trueEnd = endRevision;
+            }            
+            String absolutePath = getRepositoryPath(path);
+            
+            ArrayList locationEntryArray = new ArrayList(0);
+            ArrayList fileRevs = new ArrayList(0);
+
+            FSRevisionNode root = myRevNodesPool.getRootRevisionNode(trueEnd, myReposRootDir);
+            SVNNodeKind kind = FSRepository.checkPath(myReposRootDir, root, absolutePath);
+            if(kind == SVNNodeKind.NONE){
+                SVNErrorManager.error("Path '"+absolutePath+"' is not found at '"+trueEnd+"' revision");
+            }
+            if(kind != SVNNodeKind.FILE){
+            	SVNErrorManager.error(absolutePath + " is not a file");
+            }
+            FSNodeHistory history = FSNodeHistory.getNodeHistory(myReposRootDir, root, absolutePath);
+
             //get revisions we are interested in
             while(true){
-            	history = history.fsHistoryPrev(myReposRootDir, /*history,*/ true, myRevNodesPool);            	
+            	history = history.fsHistoryPrev(myReposRootDir, true, myRevNodesPool);            	
             	if(history == null){
             		break;
             	}
-            	SVNLocationEntry revEntry = history.getHistoryEntry();
-            	revNums.add(new Long(revEntry.getRevision()));
-            	revPaths.add(revEntry.getPath());
-            	if(revEntry.getRevision() <= startRevision){
+            	//SVNLocationEntry revEntry = history.getHistoryEntry();
+                long histRev = history.getHistoryEntry().getRevision();
+                String histPath = history.getHistoryEntry().getPath();
+            	
+                locationEntryArray.add(new SVNLocationEntry(histRev, histPath));
+           	
+                if(histRev <= trueStart){
             		break;
             	}
             }
             //this time there must be at least one revision
-            if(revNums.size() <= 0){
+            if(locationEntryArray.size() <= 0){
             	//it is used for debugging only, svn's string is assert()
             	SVNErrorManager.error("No elements in revision numbers array");
             }
-            for(int count = revNums.size(); count > 0; count--){
-                Map lastProps = new HashMap();
-                //FSRevisionNode lastRoot = null;
-                //String lastPath = null;
-            	long rev = ((Long)revNums.get(count-1)).longValue();
-            	String revPath = (String)revPaths.get(count-1);
-            	//Get revision properties
+            Map lastProps = new HashMap();
+            for(int count = locationEntryArray.size(); count > 0; count--){                
+                long rev = ((SVNLocationEntry)locationEntryArray.get(count-1)).getRevision();
+                String revPath = ((SVNLocationEntry)locationEntryArray.get(count-1)).getPath();
             	Map revProps = FSRepositoryUtil.getRevisionProperties(myReposRootDir, rev);
-                //Open the revision root
-            	root = FSReader.getRootRevNode(myReposRootDir, rev);
+                root = myRevNodesPool.getRootRevisionNode(rev, myReposRootDir);
             	//Get the file's properties for this revision and compute the diffs
-            	FSRevisionNode revNode = FSReader.getRevisionNode(myReposRootDir, revPath, root, 0);
+                FSRevisionNode revNode = myRevNodesPool.getRevisionNode(root, revPath, myReposRootDir);
             	Map props = FSReader.getProperties(revNode, myReposRootDir);
             	Map propDiffs = FSRepositoryUtil.getPropsDiffs(props, lastProps);
-                //Check if the contents changed. */
-                //Special case: In the first revision, we always provide a delta. */
-            	//boolean contentsChanged = false;
-            	//if(lastRoot != null){
-            	//	contentsChanged = areFileContentsChanged(lastRoot, lastPath, root, revPath);
-            	//}else{
-            	//	contentsChanged = true;
-            	//}
-            	//We have all we need just add it to array            	            	
-            	fileRevs.add(new SVNFileRevision(revPath, rev, revProps, propDiffs));
-            	
-            	//there is functionality provide sending delta, if user wants
-            	//but c-code of svn never execute this piece if code
-            	
-                //Remember root, path and props for next iteration        	
-            	//lastRoot = root;
-            	//lastPath = revPath;
+
+                fileRevs.add(new SVNFileRevision(revPath, rev, revProps, propDiffs));
             	lastProps = props;
             }
             //invoke handler
+            int counter = 0;
+            int reallyHandled = 0;
             for(counter = 0; counter < fileRevs.size(); counter++){
-            	handler.handleFileRevision((SVNFileRevision)fileRevs.get(counter));
+                if(handler != null){
+                    handler.handleFileRevision((SVNFileRevision)fileRevs.get(counter));
+                    reallyHandled++;
+                }
             }
-    	}catch(SVNException ex){
-    		SVNErrorManager.error(null);
+            return reallyHandled;
     	}
         finally{
             closeRepository();
-        }
-        return counter;
+        }        
     }
 
-    /*TODO check the correctness of existing code*/
+    /* Note: If targetPaths has one or more elements, 
+     * all of them must be valid at earliest revision passed as startRevision or endRevision,
+     * otherwise SVNException is thrown*/
     public long log(String[] targetPaths, long startRevision, long endRevision, boolean discoverChangedPath, boolean strictNode, long limit, ISVNLogEntryHandler handler) throws SVNException {
     	try{
     		openRepository();
-        	ArrayList absPaths = new ArrayList(0);
-        	if(targetPaths != null){
-        		for(int count = 0; count < targetPaths.length; count++){
-        			absPaths.add(SVNPathUtil.concatToAbs("", targetPaths[count]));
-        		}
-        	}
-        	long headRevision = FSReader.getYoungestRevision(myReposRootDir);
-        	long histStart = startRevision;
-        	long histEnd = endRevision;
-        	if(SVNRepository.isInvalidRevision(startRevision)){
-        		startRevision = headRevision;
-        	}
-        	if(SVNRepository.isInvalidRevision(endRevision)){
-        		endRevision = headRevision;
-        	}
-        	//Check that revisions are sane before ever invoking receiver
-        	if(startRevision > headRevision){
-        		SVNErrorManager.error("No such revision " + new Long(startRevision));
-        	}
-        	if(endRevision > headRevision){
-        		SVNErrorManager.error("No such revision" + new Long(endRevision));
-        	}
+        	long youngestRev = FSReader.getYoungestRevision(myReposRootDir);
+            if(FSRepository.isInvalidRevision(startRevision)){
+                startRevision = youngestRev;
+            }
+            if(startRevision > youngestRev){
+                SVNErrorManager.error("No revision #" + startRevision + " in repository");
+            }
+            if(FSRepository.isInvalidRevision(endRevision)){
+                endRevision = youngestRev;
+            }
+            if(endRevision > youngestRev){
+                SVNErrorManager.error("No revision #" + endRevision + " in repository");
+            }
+            long histStart = FSConstants.SVN_INVALID_REVNUM;
+            long histEnd = FSConstants.SVN_INVALID_REVNUM;            
         	//Get an ordered copy of the start and end
         	if(startRevision > endRevision){
-        		histStart = startRevision;
-        		histEnd = endRevision;
-        	}        	
+        		histStart = endRevision;
+        		histEnd = startRevision;
+        	}else{            
+        	    histStart = startRevision;
+                histEnd = endRevision;
+            }
        	    
         	/* If paths were specified, then we only really care about revisions
             *  in which those paths were changed.  So we ask the filesystem for
@@ -608,57 +619,85 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
             *  only about answering that question, and we already know the
             *  answer ... well, you get the picture.*/
         	long sendCount = 0;
-        	if(absPaths == null || (absPaths.size() == 1 && "".equals(absPaths.get(0)))){
+        	if(targetPaths == null || (targetPaths.length == 1 && "".equals(targetPaths[0]))){
         		sendCount = histEnd - histStart + 1;
         		if(limit != 0 && sendCount > limit){
         			sendCount = limit;
         		}
-        		for(int count = 0; count < sendCount; count++){
+                int count = 0;
+                int reallyHandled = 0;
+        		for(count = 0; count < sendCount; count++){
         			long rev = histStart + count;
         			if(startRevision > endRevision){
-        				rev = histEnd + count;
-        			}        			
-        			sendChangeRev(rev, discoverChangedPath, handler);
+        				rev = histEnd - count;
+        			}        		
+                    if(handler != null){
+                        FSWriter.sendChangeRev(myReposRootDir, myRevNodesPool, rev, discoverChangedPath, handler);
+                        reallyHandled++;
+                    }
         		}
+                return reallyHandled;
         	}
+            /*make all coming path absolute*/
+            ArrayList absPaths = null;
+            if(targetPaths != null){
+                absPaths = new ArrayList(0);
+                for(int count = 0; count < targetPaths.length; count++){
+                    absPaths.add(getRepositoryPath(targetPaths[count]));
+                }
+            }
         	ArrayList histories = new ArrayList(0);
         	for(int count = 0; count < absPaths.size(); count++){
         		String thisPath = (String)absPaths.get(count);
         		FSRevisionNode root = myRevNodesPool.getRootRevisionNode(histEnd, myReposRootDir);        		
-        		LogPathInfo info = new LogPathInfo(root, thisPath, FSNodeHistory.getNodeHistory(myReposRootDir, root, thisPath), FSConstants.SVN_INVALID_REVNUM);
+        		FSNodeHistory hist = null;
+        		/*if there is no path at specified root, SVNException is thrown*/
+                hist = FSNodeHistory.getNodeHistory(myReposRootDir, root, thisPath);
+                LogPathInfo info = new LogPathInfo(hist);
         		info.pickUpNextHistory(myReposRootDir, strictNode, histStart);
         		histories.add(info);
         	}
-        	/*TODO check correctness of following code*/
-        	/*!!!!svn implementation is not good desision*/
         	boolean anyHistLeft = true;
         	ArrayList revsArr = null;
+            boolean firstCycleIteration = false;
         	for(long current = histEnd; current >= histStart && anyHistLeft; ){        		
-        		long tempRev = FSConstants.SVN_INVALID_REVNUM;
+        		long nextRev = FSConstants.SVN_INVALID_REVNUM;
         		boolean changed = false;
         		anyHistLeft = false;
-        		for(int count = 0; count < histories.size(); count++){        			
-        			LogPathInfo info = ((LogPathInfo)histories.get(count));
-        			if(info.getHistory() == null){
-        				continue;
-        			}
-        			if(info.getHistoryRevision() > tempRev){
-        				tempRev = info.getHistoryRevision();        				
-        			}        			
-        		}        		
-        		current = tempRev;
+                /*calculating next value for 'current'*/
+                /*first iteration must be with histEnd value*/
+                if(firstCycleIteration){
+                    for(int count = 0; count < histories.size(); count++){        			
+        			    LogPathInfo info = ((LogPathInfo)histories.get(count));
+        			    if(info.getHistory() == null){
+        			        continue;
+        			    }
+        			    if(info.getHistoryRevision() > nextRev){
+        			        nextRev = info.getHistoryRevision();        				
+        			    }        			
+        		    }
+                    current = nextRev;
+                }       
+                firstCycleIteration = true;
+                boolean changedFlag = false;
         		for(int count = 0; count < histories.size(); count++){
         			LogPathInfo info = ((LogPathInfo)histories.get(count));
         	        /* Check history for this path in current rev. */
-        			changed = info.checkHistory(myReposRootDir, current, strictNode, histStart);
-        			if(info.getHistory() == null){
+                    changed = info.checkHistory(myReposRootDir, current, strictNode, histStart);
+                    if(changed){
+                        changedFlag = true; 
+                    }
+        			if(info.getHistory() != null){
         				anyHistLeft = true;
         			}
         		}
-        		if(changed == true){
-        			if(startRevision > endRevision){        				
-        				sendChangeRev(current, discoverChangedPath, handler);
-        				if(limit != 0 && ++sendCount >= limit){
+        		if(changedFlag == true){
+        			if(startRevision > endRevision){ 
+                        if(handler != null){
+                            FSWriter.sendChangeRev(myReposRootDir, myRevNodesPool, current, discoverChangedPath, handler);
+                            sendCount++;
+                        }
+        				if(limit != 0 && sendCount >= limit){
         					break;
         				}
         			}else
@@ -670,206 +709,93 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
         			}
         		}
         	}
-        	if(revsArr != null){
-        		for(int count = 0; count < revsArr.size(); count++){        			
-        			sendChangeRev(((Long)revsArr.get(revsArr.size() - count - 1)).longValue(), discoverChangedPath, handler);
+            int count = 0;
+            int reallyHandled = 0;
+        	if(revsArr != null){                
+        		for(count = 0; count < revsArr.size(); count++){
+                    if(handler != null){
+                        FSWriter.sendChangeRev(myReposRootDir, myRevNodesPool, ((Long)revsArr.get(revsArr.size() - count - 1)).longValue(), discoverChangedPath, handler);
+                        reallyHandled++;
+                    }
         			if(limit != 0 && count + 1 >= limit){
         				break;
         			}
         		}
+                return reallyHandled;
         	}
-    	}catch(SVNException ex){
-    		SVNErrorManager.error(null);
+            return sendCount;            
     	}finally{
     		closeRepository();
-    	}    	   	
-        return 0;
-    }
-    
-    /* Pass history information about REV to RECEIVER.
-    * FS is used with REV to fetch the interesting history information,
-    * such as author, date, etc.
-    * The detectChanged() function if DISCOVER_CHANGED_PATHS is TRUE.  See it for details.
-    */
-    private void sendChangeRev(long revNum, boolean discoverChangedPath, ISVNLogEntryHandler handler)throws SVNException{    	
-    	Map rProps = FSRepositoryUtil.getRevisionProperties(myReposRootDir, revNum);
-    	Map changedPaths = null;
-    	String author = (String)rProps.get(SVNRevisionProperty.AUTHOR);
-    	Date date = (Date)rProps.get(SVNRevisionProperty.DATE);
-    	String message = (String)rProps.get(SVNRevisionProperty.LOG);
-    	
-   	   /* Discover changed paths if the user requested them
-        * or if we need to check that they are readable
-        */
-    	if(revNum > 0 && discoverChangedPath == true){
-    		FSRevisionNode newRoot = FSReader.getRootRevNode(myReposRootDir, revNum);
-    		changedPaths = detectChanged(FSRoot.createRevisionRoot(revNum, newRoot));
     	}
-        if(discoverChangedPath == false){
-            changedPaths = null;
-        }
-    	handler.handleLogEntry(new SVNLogEntry(changedPaths, revNum, author, date, message));
-    }
-    
-    /* Store as keys in returned Map the paths of all node in ROOT that show a
-     * significant change.  "Significant" means that the text or
-     * properties of the node were changed, or that the node was added or
-     * deleted.
-     * Keys are String paths and values are FSLogChangedPath.
-     */
-    private Map detectChanged(FSRoot root)throws SVNException{
-        Map returnChanged = new HashMap();
-        Map changes = getFSpathChanged(root);        
-        if(changes.size() == 0){
-            return changes;
-        }
-        Set hashKeys = changes.keySet();
-        Iterator chgIter = hashKeys.iterator();
-        while(chgIter.hasNext()){
-            char action;
-            String hashPathKey = (String)chgIter.next();
-            FSPathChange change = (FSPathChange)changes.get(hashPathKey);
-            String path = hashPathKey;                      
-            
-            switch(change.getChangeKind().intValue()){
-                case 4 /*FS_PATH_CHANGE_RESET*/:
-                continue;
-                case 1 /*FS_PATH_CHANGE_ADD*/:
-                    action = 'A';
-                    break;
-                case 2 /*FS_PATH_CHANGE_DELETE*/:
-                    action = 'D';
-                    break;
-                case 3 /*FS_PATH_CHANGE_REPLACE*/:
-                    action = 'R';
-                    break;
-                case 0 /*FS_PATH_CHANGE_MODIFY*/:
-                default:
-                    action = 'M';
-                    break;                    
-            }
-            FSLogChangedPath itemCopyfrom = new FSLogChangedPath(action, new SVNLocationEntry(FSConstants.SVN_INVALID_REVNUM, null));
-            if(action == 'A' || action == 'R'){                                
-                SVNLocationEntry copyfromEntry = copiedFrom(myReposRootDir, root.getRootRevisionNode(), path, myRevNodesPool);
-                if(copyfromEntry.getPath() != null && FSRepository.isValidRevision(copyfromEntry.getRevision())){
-                    itemCopyfrom = new FSLogChangedPath(action, copyfromEntry);
-                }                
-            }
-            returnChanged.put(path, itemCopyfrom);
-        }
-        return returnChanged;
-    }
-   
-    /* Return MAP with hash containing descriptions of the paths changed under ROOT. 
-     * The hash is keyed with String paths and has FSPathChange values
-     */    
-    private Map getFSpathChanged(FSRoot root)throws SVNException{   
-        Map changedPaths = new HashMap();
-        if(root.isTxnRoot() == true){
-            File txnFile = FSRepositoryUtil.getTxnChangesFile(root.getTxnId(), myReposRootDir);
-            Object[] result = FSReader.fetchAllChanges(changedPaths, txnFile, false, 0, root.getCopyfromCache());
-            root.setCopyfromCache((Map)result[1]);
-            return (Map)result[0];
-    	}           
-        long changeOffset = FSReader.getChangesOffset(myReposRootDir, root.getRevision());
-        File revFile = FSRepositoryUtil.getRevisionFile(myReposRootDir, root.getRevision());
-        Object[] result = FSReader.fetchAllChanges(changedPaths, revFile, true, changeOffset, root.getCopyfromCache());    
-        root.setCopyfromCache((Map)result[1]);
-        return (Map)result[0];    	
-    }
-    
+    }    
     private class LogPathInfo{
-    	private FSRevisionNode root;
-    	private String path;
+    	//private FSRevisionNode root;
+    	//private String path;
     	private FSNodeHistory hist;
-    	private long historyRev;
+    	//private long historyRev;
     	
-    	private LogPathInfo(FSRevisionNode newRoot, String newPath, FSNodeHistory newHist, long newHistoryRev){
-    		root = newRoot;
-    		path = newPath;
+    	private LogPathInfo(/*FSRevisionNode newRoot, String newPath,*/ FSNodeHistory newHist/*, long newHistoryRev*/){
+    		//root = newRoot;
+    		//path = newPath;
     		hist = newHist;
-    		historyRev = newHistoryRev;
+    		//historyRev = newHistoryRev;
     	}
-/*    	private void setRoot(FSRevisionNode newRoot){
-    		root = newRoot;
-    	}
-    	private void setPath(String newPath){
-    		path = newPath;    		
-    	}
-    	private void setHistory(FSNodeHistory newHist){
-    		hist = newHist;
-    	}
-    	private void setRevision(long newRev){
-    		historyRev = newRev;
-    	}
-*/  	private FSNodeHistory getHistory(){
+        private FSNodeHistory getHistory(){
     		return hist;
     	}
     	private long getHistoryRevision(){
-    		return historyRev;
+    		return hist == null ? FSConstants.SVN_INVALID_REVNUM : hist.getHistoryEntry().getRevision();
     	}
-    	/*Set hist field of the class to next history for the path
-    	 * If no more history is available or the history revision is less
-    	 * than (earlier) than START, or the history is not available due
-    	 * to authorization, then HIST is set to NULL.
-    	 *
-    	 * A STRICT value of FALSE will indicate to follow history across copied
-    	 * paths.
-    	 */
     	private void pickUpNextHistory(File reposRootDir, boolean strict, long start)throws SVNException{
+            if(hist == null){
+                return;
+            }
     		FSNodeHistory tempHist = hist.fsHistoryPrev(reposRootDir, strict ? true : false, myRevNodesPool);
     		if(tempHist == null){
     			hist = null;
     			return;
     		}
    			hist = tempHist;
-    		path = hist.getHistoryEntry().getPath();
-    		historyRev = hist.getHistoryEntry().getRevision();
-    		if(historyRev < start){
+//    		path = hist.getHistoryEntry().getPath();
+//    		historyRev = hist.getHistoryEntry().getRevision();
+    		if(hist.getHistoryEntry().getRevision() < start){
     			hist = null;
     			return;
     		}
     		return;
     	}
-    	/* Set HIST to the next history for the path *if* there is history
-    	 * available and HISTORY_REV is equal to or greater than CURRENT.
-    	 */
     	private boolean checkHistory(File reposRootDir, long currRev, boolean strict, long start)throws SVNException{
     		if(hist == null){
     			return false;
     		}
-    		if(historyRev < currRev){
+    		if(hist.getHistoryEntry().getRevision() < currRev){
     			return false;
     		}
     		this.pickUpNextHistory(reposRootDir, strict, start);
     		return true;
-    	}
-    }    
-
+    	}        
+    }
     public int getLocations(String pathCame, long pegRevision, long[] revisions, ISVNLocationEntryHandler handler) throws SVNException {
     	try{
     		openRepository();
-    		String localPathCame = null;
-    		if(pathCame == null){
-    			pathCame = new String("");
-    		}else{
-    			localPathCame = new String(pathCame);
-    		}    		
+            if(pathCame == null){
+                SVNErrorManager.error("Path to be checked is invalid");
+            }            
     		if(revisions == null){
-    			revisions = new long[1];
-    			revisions[0] = pegRevision;
-    		}    	
-    		if(handler == null){
-    			SVNErrorManager.error("invalid ISVNLocationEntryHandler");
+                SVNErrorManager.error("Invalid massive of revisions where path is to be checked");
     		}
+            FSRevisionNode rootPegRev = myRevNodesPool.getRootRevisionNode(pegRevision, myReposRootDir);
+            SVNNodeKind kindPathCame = checkNodeKind(pathCame, FSRoot.createRevisionRoot(pegRevision, rootPegRev));
+            if(kindPathCame == SVNNodeKind.NONE){
+                SVNErrorManager.error("Path '" + pathCame + "' not found in peg revision " + pegRevision);
+            }
+            
             ArrayList locationEntries = new ArrayList(0);            
             long[] locationRevs = new long[revisions.length];
             long revision;
             FSRevisionNode root = null;
             	
-    		//String repositoryPath = super.getRepositoryPath(localPathCame);
-            //String parentPath = SVNPathUtil.removeTail(repositoryPath);
-            String parentPath = super.getRepositoryPath(localPathCame);
+            String parentPath = super.getRepositoryPath(pathCame);
             
             //check if parentPath is really absolute path relatively to repository
             if(parentPath.charAt(0) != '/'){
@@ -883,21 +809,25 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
            	//Ignore revisions R that are younger than the pegRevisions where
             //path@pegRevision is not an ancestor of path@R.
             int count = 0;
-            for(count=0; count<locationRevs.length && locationRevs[count]>pegRevision; ++count){
-            	if(true == FSNodeHistory.checkAncestryOfPegPath(myReposRootDir, parentPath, pegRevision, locationRevs[count], myRevNodesPool)){
+            boolean resultAncestry = false;
+            for(count=0; count<locationRevs.length && locationRevs[count]>pegRevision; ++count){                
+                try{
+                    resultAncestry = FSNodeHistory.checkAncestryOfPegPath(myReposRootDir, parentPath, pegRevision, locationRevs[count], myRevNodesPool);
+                }catch(SVNException ex){
+                    /*TODO determine exception for FSFileNotFoundInSpecifiedRevisionException*/
+                    continue;
+                }
+            	if(true == resultAncestry){
             		break;
             	}
             }
             if(count >= locationRevs.length){
-            	revision = pegRevision;
-            }else{
-            	revision = locationRevs[count];
-            }    
+            	return 0;
+            }
+            revision = resultAncestry ? locationRevs[count] : pegRevision;                
             
             String path = parentPath;            	
             while(count < revisions.length){
-            	FSRevisionNode croot = null;            	  		
-            	long crev = FSConstants.SVN_INVALID_REVNUM;    		
             	//Find the target of the innermost copy relevant to path@revision.
            	    //The copy may be of path itself, or of a parent directory.            	
            		root = FSReader.getRootRevNode(myReposRootDir, revision);
@@ -905,22 +835,24 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
            		if(tempClCopy == null){
            			break;
            		}
-           		if( null == (croot = tempClCopy.getRevisionNode()) ){
+                FSRevisionNode croot = tempClCopy.getRevisionNode();
+           		if(croot == null){
            			break;
            		}
            		String cpath = tempClCopy.getPath();
 
            		//Assign the current path to all younger revisions until we reach
            		//the copy target rev
-            	crev = croot.getId().isTxn() ? FSConstants.SVN_INVALID_REVNUM : croot.getId().getRevision();
+                long crev = croot.getId().isTxn() ? FSConstants.SVN_INVALID_REVNUM : croot.getId().getRevision();
             	while((count < revisions.length) && (locationRevs[count] >= crev)){
             		locationEntries.add(new SVNLocationEntry(locationRevs[count], path));
             		++count;
             	}
             	// Follow the copy to its source.  Ignore all revs between the
                 // copy target rev and the copy source rev (non-inclusive).
-            	SVNLocationEntry sEntry = copiedFrom(myReposRootDir, croot, cpath, myRevNodesPool);
-           		while((count < revisions.length) && locationRevs[count] > sEntry.getRevision() ){
+            	SVNLocationEntry sEntry = FSReader.copiedFrom(myReposRootDir, croot, cpath, myRevNodesPool);
+                /*!!here is inconsitance with code of svn: they write locationRevs[count] > sEntry.getRevision()*/
+           		while((count < revisions.length) && locationRevs[count] >= sEntry.getRevision() ){
            			++count;
            		}
            	    /* Ultimately, it's not the path of the closest copy's source
@@ -937,7 +869,7 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
                    the copy source path tells us that our path was located at
                    "/trunk/foo/bar" before the copy.
                 */
-            	String reminder = (path.compareTo(cpath) == 0) ? new String("") : new String(SVNPathUtil.pathIsChild(cpath, path));
+            	String reminder = path.equals(cpath) ? new String("") : new String(SVNPathUtil.pathIsChild(cpath, path));
             	path = SVNPathUtil.concatToAbs(sEntry.getPath(), reminder);    		
             	revision = sEntry.getRevision();
             }
@@ -952,10 +884,7 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
        		while(count < revisions.length){
             	SVNNodeKind kind = null;    		
 
-            	root = FSReader.getRootRevNode(myReposRootDir, revisions[count]);
-            	//root = myRevNodesPool.getRootRevisionNode(revisions[count], myReposRootDir);            	
-            	//kind = checkPath(myReposRootDir, root, path);            	
-            	///!!!!!not completely clear what revision should be used
+            	root = FSReader.getRootRevNode(myReposRootDir, locationRevs[count]);
             	kind = this.checkNodeKind(path, FSRoot.createRevisionRoot(root.getId().getRevision(), root));
             	if(kind == SVNNodeKind.NONE){
             		break;
@@ -969,7 +898,10 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
             }       		
             for(count = 0; count < locationEntries.size(); count++)
             {
-            	handler.handleLocationEntry((SVNLocationEntry)locationEntries.get(count));
+                /*sure we have handler*/
+                if(handler != null){
+                    handler.handleLocationEntry((SVNLocationEntry)locationEntries.get(count));
+                }
             }
             return count;
     	}finally{
@@ -1099,7 +1031,7 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
             SVNErrorManager.error("Filesystem object was not created yet");
         }
         if(path == null){
-            SVNErrorManager.error("Bad path for lock");
+            SVNErrorManager.error("Invalid path to be tested for lock");
         }
         String reposPath = SVNPathUtil.canonicalizeAbsPath(path);
         SVNLock lock = FSReader.getLock(reposPath, false, myReposRootDir);        
@@ -1111,7 +1043,7 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
             SVNErrorManager.error("Filesystem object was not created yet");
         }
         if(path == null){
-            SVNErrorManager.error("Bad path for locks");
+            SVNErrorManager.error("Invalid path to be tested for locks");
         }
         String reposPath = SVNPathUtil.canonicalizeAbsPath(path);
         String digestPath = FSRepositoryUtil.getDigestFromRepositoryPath(reposPath);
@@ -1127,62 +1059,45 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
         return retLocks;
     }
 
+    /*under testing*/
     public void lock(Map pathsToRevisions, String comment, boolean force, ISVNLockHandler handler) throws SVNException {
         if(myReposRootDir == null || myReposRootDir.getAbsolutePath() == null){
             SVNErrorManager.error("File object was not created yet");
         }
         if(pathsToRevisions == null || pathsToRevisions.isEmpty()){
             return;
-        }
+        }        
         /*The cycle below is used to find each path came to function*/
         Set keyPathsSet = pathsToRevisions.keySet();
         Iterator keyIter = keyPathsSet.iterator();
         while(keyIter.hasNext()){
             String keyPath = (String)keyIter.next();
-            Long revVal = (Long)pathsToRevisions.get(keyPath);
-            /*TODO construct SVNLock correctly*/
+            Long revVal = (Long)pathsToRevisions.get(keyPath);            
             String absLockPath = SVNPathUtil.canonicalizeAbsPath(keyPath);            
             SVNLock lockToBeMade = new SVNLock(absLockPath, /*ID*/FSReader.generateLockToken(myReposRootDir), System.getProperty("user.name")/*owner*/, comment, new Date(System.currentTimeMillis()), null/*expiration Date*/);
             /*make operation on every path to locked and invoke path to be locked*/
-            lockHandlerImplement(lockToBeMade, myReposRootDir, revVal.longValue(), force);
+            FSWriteLock writeLock = FSWriteLock.getWriteLock(myReposRootDir);
+            synchronized(writeLock){ 
+                try{
+                    writeLock.lock();
+                    lockHandlerImplement(lockToBeMade, myReposRootDir, revVal.longValue(), force, myRevNodesPool);
+                }finally{
+                    writeLock.unlock();
+                    FSWriteLock.realease(writeLock);
+                }
+            }            
         }
     }    
     
-    private static void lockHandlerImplement(SVNLock lock, File reposRootDir, long currentRev, boolean force)throws SVNException{
+    private static void lockHandlerImplement(SVNLock lock, File reposRootDir, long currentRev, boolean force, FSRevisionNodePool revNodesPool)throws SVNException{
         if(reposRootDir == null){
             SVNErrorManager.error("File object was not initialized yet");
         }
         if(lock == null){
             return;
-        }
-        String lockFileName = SVNPathUtil.append(reposRootDir.getAbsolutePath(), FSConstants.SVN_REPOS_WRITE_LOCK_FILE);
-        File lockFile = new File(lockFileName);        
-        SVNFileType lockType = SVNFileType.getType(lockFile);
-        if(lockType == SVNFileType.UNKNOWN || lockType == SVNFileType.NONE){
-            try{
-                lockFile.createNewFile();                
-            }
-            catch(IOException ex){
-                SVNErrorManager.error("Unable create lock file '" + lockFileName + "'");
-            }            
-        }
-        /*creating lock on file*/
-        RandomAccessFile raf = null;
-        try{
-            raf = new RandomAccessFile(lockFile, "rw");
-        }catch(FileNotFoundException ex){
-            SVNErrorManager.error("File '"+lockFileName+"' not found");            
-        }
-        FileChannel fileChan = raf.getChannel();
-        
-        try{
-            fileChan.lock();
-        }catch(IOException ex){
-            SVNErrorManager.error("Can't make lock on '"+lockFileName+"' file");
         }        
-        /*making important actions*/
-        long youngestRev = 0;/*TODO use function from other class getYoungestRev(reposRootDir);*/
-        FSRevisionNode root = FSReader.getRootRevNode(reposRootDir, youngestRev);
+        long youngestRev = FSReader.getYoungestRevision(reposRootDir);
+        FSRevisionNode root = revNodesPool.getRootRevisionNode(youngestRev, reposRootDir);
         SVNNodeKind kind = FSRepository.checkPath(reposRootDir, root, lock.getPath());
         if(kind == SVNNodeKind.DIR){
             SVNErrorManager.error("Can't make on lock on directory");            
@@ -1194,7 +1109,7 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
             SVNErrorManager.error("No user attached to the lock");
         }
         if(FSRepository.isValidRevision(currentRev)){
-            FSRevisionNode node = FSReader.getRevisionNode(reposRootDir, lock.getPath(), root, FSConstants.SVN_INVALID_REVNUM);
+            FSRevisionNode node = revNodesPool.getRevisionNode(root, lock.getPath(), reposRootDir);
             long createdRev = node.getId().getRevision();
             if(!FSRepository.isValidRevision(createdRev)){
                 SVNErrorManager.error("Path '"+lock.getPath()+"' doesn't exist in HEAD revision");
@@ -1206,7 +1121,7 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
         SVNLock existingLock = FSReader.getLock(lock.getPath(), true, reposRootDir);
         if(existingLock != null){
             if(!force){
-                SVNErrorManager.error("Path '"+existingLock.getPath()+"' is already locked by user '"+existingLock.getOwner());
+                SVNErrorManager.error("Path '"+existingLock.getPath()+"' is already locked by user '"+existingLock.getOwner() + "'");
             }else{
                 FSWriter.deleteLock(existingLock, reposRootDir);
             }
@@ -1218,12 +1133,6 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
             newLock = new SVNLock(lock.getPath(), lock.getID(), lock.getOwner(), lock.getComment(), lock.getCreationDate(), lock.getExpirationDate());
         }
         FSWriter.setLock(reposRootDir, newLock);
-        /*releasing lock on file*/
-        try{
-            raf.close();/*when file closed, lock is destroyed*/
-        }catch(IOException ex){
-            SVNErrorManager.error("Error releasing lock");
-        }
     }   
 
     public void unlock(Map pathToTokens, boolean force, ISVNLockHandler handler) throws SVNException {
@@ -1947,26 +1856,25 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
             return SVNNodeKind.NONE;
         }
     	return node.getType();
-    }
-    
-    /* Discover the copy ancestry of PATH under ROOT.  Return a relevant
-     * ancestor/revision combination in PATH(SVNLocationEntry) and REVISON(SVNLocationEntry)*/
-    private static SVNLocationEntry copiedFrom(File reposRootDir, FSRevisionNode root, String path, FSRevisionNodePool revNodesPool)throws SVNException{
-    	FSRevisionNode node = revNodesPool.getRevisionNode(FSRoot.createRevisionRoot(root.getId().getRevision(), root), path, reposRootDir);
-    	return new SVNLocationEntry(node.getCopyFromRevision(), node.getCopyFromPath());
-    }
-    
+    }    
     public FSClosestCopy closestCopy(File reposRootDir, FSRevisionNode root, String path)throws SVNException{
-    	/* check coming path */    	
+    	if(reposRootDir == null){
+            SVNErrorManager.error("File object was not instantiated yet");
+        }
+        if(root == null){
+            SVNErrorManager.error("Invalid root object");
+        }
     	if(path == null){
     		return null;
     	}    	
-        FSParentPath parentPath = myRevNodesPool.getParentPath(FSRoot.createRevisionRoot(root.getId().getRevision(), root), path, true, reposRootDir); //FSParentPath.openParentPath(reposRootDir, root, path, 0, null);
-    	
+        FSParentPath parentPath = myRevNodesPool.getParentPath(FSRoot.createRevisionRoot(root.getId().getRevision(), root), path, true, reposRootDir);
+        if(parentPath == null){
+            return null;
+        }    	
        /* Find the youngest copyroot in the path of this node-rev, which
         * will indicate the target of the innermost copy affecting the node-rev*/    	    	
     	SVNLocationEntry copyDstEntry = FSNodeHistory.findYoungestCopyroot(reposRootDir, parentPath);
-    	if(copyDstEntry == null || copyDstEntry.getRevision() == FSConstants.SVN_INVALID_REVNUM){
+    	if(copyDstEntry == null || copyDstEntry.getRevision() == 0){
     		/*There are no copies affecting this node-rev or copyRoot wasn't find*/
     		return null;
     	}
@@ -1977,7 +1885,6 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
         FSRevisionNode copyDstRoot = FSReader.getRootRevNode(reposRootDir, copyDstEntry.getRevision());
     	SVNNodeKind kind = FSRepository.checkPath(reposRootDir, copyDstRoot, path);
     	if(kind == SVNNodeKind.NONE){
-    		//return new FSClosestCopy(null, null);
             return null;
     	}
    		FSRevisionNode curRev = FSReader.getRevisionNode(reposRootDir, path, copyDstRoot, 0);

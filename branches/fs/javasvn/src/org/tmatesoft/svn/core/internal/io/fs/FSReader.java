@@ -32,7 +32,7 @@ import java.util.Map;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.ArrayList;
-
+import java.util.Set;
 import java.rmi.server.UID;
 
 public class FSReader {
@@ -67,45 +67,45 @@ public class FSReader {
     
     /* Return Object[] consist of two Maps:
      * Object[0]: pathChanged Map
-     * Object[1]: copyfromCache Map
-     */    
-    public static Object[] fetchAllChanges(Map changedPaths, File changesFile, boolean prefolded, long offsetToFirstChanges, Map copyfromCache)throws SVNException{        
-        RandomAccessFile changesReader = null; 
-        try{    
-            changesReader = SVNFileUtil.openRAFileForReading(changesFile);
-            changedPaths = changedPaths != null ? changedPaths : new HashMap();  
-            copyfromCache = copyfromCache != null ? copyfromCache : new HashMap();
-            FSChange change = FSReader.readChanges(changesFile, changesReader, offsetToFirstChanges, true);        
-            while(change != null){
-                ArrayList retArr = foldChange(changedPaths, change, copyfromCache);
-                changedPaths = (Map)retArr.get(0);
-                copyfromCache = (Map)retArr.get(1);
-                if( ( FSPathChangeKind.FS_PATH_CHANGE_DELETE.equals(change.getKind()) || 
-                        FSPathChangeKind.FS_PATH_CHANGE_REPLACE.equals(change.getKind()) ) && 
-                        prefolded == false){
-                                    
-                    Collection keySet = changedPaths.keySet();
-                    Iterator curIter = keySet.iterator();
-                    while(curIter.hasNext()){
-                        String hashKeyPath = (String)curIter.next();
-                        /*If we come across our own path, ignore it*/                    
-                        if(change.getPath().equals(hashKeyPath)){
-                            continue;
-                        }
-                        /*If we come across a child of our path, remove it*/
-                        if(SVNPathUtil.pathIsChild(change.getPath(), hashKeyPath) != null){
-                            changedPaths.remove(hashKeyPath);
-                        }
+     * Object[1]: copyfromCache Map*/    
+    public static Object[] fetchAllChanges(Map changedPaths, File changesFile, boolean prefolded, long offsetToFirstChanges, Map mapCopyfrom)throws SVNException{        
+        RandomAccessFile raReader = SVNFileUtil.openRAFileForReading(changesFile);
+        try{
+        changedPaths = changedPaths != null ? changedPaths : new HashMap();  
+        mapCopyfrom = mapCopyfrom != null ? mapCopyfrom : new HashMap();
+        OffsetContainerClass offset = new OffsetContainerClass(offsetToFirstChanges);
+        FSChange change = FSReader.readChanges(changesFile, raReader, offset, true);        
+        while(change != null){
+            ArrayList retArr = foldChange(changedPaths, change, mapCopyfrom);
+            changedPaths = (Map)retArr.get(0);
+            mapCopyfrom = (Map)retArr.get(1);
+            
+            if( ( FSPathChangeKind.FS_PATH_CHANGE_DELETE.equals(change.getKind()) || 
+                    FSPathChangeKind.FS_PATH_CHANGE_REPLACE.equals(change.getKind()) ) && 
+                    prefolded == false){                                
+                Collection keySet = changedPaths.keySet();
+                Iterator curIter = keySet.iterator();
+                while(curIter.hasNext()){
+                    String hashKeyPath = (String)curIter.next();
+                    //If we come across our own path, ignore it                    
+                    if(change.getPath().equals(hashKeyPath)){
+                        continue;
                     }
-                }
-                change = FSReader.readChanges(changesFile, changesReader, 0, false);
+                    //If we come across a child of our path, remove it
+                    if(SVNPathUtil.pathIsChild(change.getPath(), hashKeyPath) != null){
+                        changedPaths.remove(hashKeyPath);
+                    }
+                }                
             }
-        }finally{
-            SVNFileUtil.closeFile(changesReader);
+            change = FSReader.readChanges(changesFile, raReader, offset, false);
         }
+        }finally{
+            SVNFileUtil.closeFile(raReader);
+        }
+
         Object[] result = new Object[2];
         result[0] = changedPaths;
-        result[1] = copyfromCache;
+        result[1] = mapCopyfrom;
         return result;        
     }
     
@@ -113,27 +113,23 @@ public class FSReader {
      * collapsing multiple changes into a single summarising change per path.  
      * Also keep copyfromCache (here it is a parameter Map mapCopyfrom) up to date with new adds and replaces */
     private static ArrayList foldChange(Map mapChanges, FSChange change, Map mapCopyfrom)throws SVNException{
-        if(mapChanges == null || change == null){
+        if(change == null){
             return null;            
         }
-        Map internalMapChanges = mapChanges != null ? mapChanges : new HashMap();
-        Map internalMapCopyfrom = new HashMap(mapCopyfrom);
-        FSPathChange oldChange = null;
+        mapChanges = mapChanges != null ? mapChanges : new HashMap();
+        mapCopyfrom = mapCopyfrom != null ? mapCopyfrom : new HashMap();
         FSPathChange newChange = null;
         SVNLocationEntry copyfromEntry = null;
-        String copyfromPath = null;
         String path = null;
         
-        if((oldChange = (FSPathChange)internalMapChanges.get(change.getPath())) != null){
+        FSPathChange oldChange = (FSPathChange)mapChanges.get(change.getPath());
+        if(oldChange != null){
             /* Get the existing copyfrom entry for this path. */
-            copyfromEntry = (SVNLocationEntry)internalMapCopyfrom.get(change.getPath());
-            if(copyfromEntry != null){
-                copyfromPath = change.getPath();
-            }
+            copyfromEntry = (SVNLocationEntry)mapCopyfrom.get(change.getPath());
             path = change.getPath();
-            /* Sanity check:  only allow NULL node revision ID in the `reset' case. */
+            /* Sanity check:  only allow NULL node revision ID in the 'reset' case. */
             if((change.getNodeRevID() == null) && 
-                    (FSPathChangeKind.FS_PATH_CHANGE_RESET.equals(change.getKind()) == false)){
+                    (FSPathChangeKind.FS_PATH_CHANGE_RESET != change.getKind())){
                 SVNErrorManager.error("Missing required node revision ID");
             }
             /* Sanity check: we should be talking about the same node
@@ -141,24 +137,24 @@ public class FSReader {
             was a deletion*/
             if((change.getNodeRevID() != null) && 
                     (oldChange.getRevNodeId().equals(change.getNodeRevID()) == false) && 
-                    (oldChange.getChangeKind().equals(FSPathChangeKind.FS_PATH_CHANGE_DELETE) == false)){
+                    (oldChange.getChangeKind() != FSPathChangeKind.FS_PATH_CHANGE_DELETE)){
                 SVNErrorManager.error("Invalid change ordering: new node revision ID without delete");
             }
             /* Sanity check: an add, replacement, or reset must be the first
             thing to follow a deletion*/            
-            if(FSPathChangeKind.FS_PATH_CHANGE_DELETE.equals(oldChange.getChangeKind()) && 
-                    false == ( FSPathChangeKind.FS_PATH_CHANGE_REPLACE.equals(change.getKind()) || 
-                               FSPathChangeKind.FS_PATH_CHANGE_RESET.equals(change.getKind()) ||
-                               FSPathChangeKind.FS_PATH_CHANGE_ADD.equals(change.getKind())) ){
+            if(FSPathChangeKind.FS_PATH_CHANGE_DELETE == oldChange.getChangeKind() && 
+                    !( FSPathChangeKind.FS_PATH_CHANGE_REPLACE == change.getKind() || 
+                       FSPathChangeKind.FS_PATH_CHANGE_RESET == change.getKind()   ||
+                       FSPathChangeKind.FS_PATH_CHANGE_ADD == change.getKind()) ){
                 SVNErrorManager.error("Invalid change ordering: non-add change on deleted path");
             }    
             /*Merging the changes*/
             switch(change.getKind().intValue()){
                 case 0 /*FSPathChangeKind.FS_PATH_CHANGE_MODIFY*/ :
-                    if(change.getTextModi()){
+                    if(change.getTextModification()){
                         oldChange.setTextModified(true);
                     }
-                    if(change.getPropModi()){
+                    if(change.getPropModification()){
                         oldChange.setPropertiesModified(true);
                     }
                     break;
@@ -168,9 +164,9 @@ public class FSReader {
                     so treat it just like a replace*/        
                     oldChange.setChangeKind(FSPathChangeKind.FS_PATH_CHANGE_REPLACE);
                     oldChange.setRevNodeId(new FSID(change.getNodeRevID()));
-                    oldChange.setTextModified(change.getTextModi());
-                    oldChange.setPropertiesModified(change.getPropModi());
-                    if(change.getCopyfromEntry().getRevision() == FSConstants.SVN_INVALID_REVNUM){
+                    oldChange.setTextModified(change.getTextModification());
+                    oldChange.setPropertiesModified(change.getPropModification());
+                    if(change.getCopyfromEntry() == null){
                         copyfromEntry = new SVNLocationEntry(FSConstants.SVN_INVALID_REVNUM, "");
                     }else{
                         copyfromEntry = new SVNLocationEntry(change.getCopyfromEntry().getRevision(), change.getCopyfromEntry().getPath());
@@ -181,53 +177,46 @@ public class FSReader {
                         /*If the path was introduced in this transaction via an
                         add, and we are deleting it, just remove the path altogether*/
                         oldChange = null;
-                        internalMapChanges.remove(change.getPath());
+                        mapChanges.remove(change.getPath());
                     }else{
                         /* A deletion overrules all previous changes. */
                         oldChange.setChangeKind(FSPathChangeKind.FS_PATH_CHANGE_DELETE);
-                        oldChange.setPropertiesModified(change.getPropModi());
-                        oldChange.setTextModified(change.getTextModi());
+                        oldChange.setPropertiesModified(change.getPropModification());
+                        oldChange.setTextModified(change.getTextModification());
                     }
                     copyfromEntry = null;
-                    internalMapCopyfrom.remove(change.getPath());
+                    mapCopyfrom.remove(change.getPath());
                     break;                    
                 case 4 : /*FSPathChangeKind.FS_PATH_CHANGE_RESET*/
                     //A reset here will simply remove the path change from the hash
                     oldChange = null;
                     copyfromEntry = null;
-                    internalMapChanges.remove(change.getPath());
-                    internalMapCopyfrom.remove(change.getPath());
+                    mapChanges.remove(change.getPath());
+                    mapCopyfrom.remove(change.getPath());
                     break;
             }
             newChange = oldChange;
         }else{
-            newChange = new FSPathChange(new FSID(change.getNodeRevID()), change.getKind(), change.getTextModi(), change.getPropModi());
+            newChange = new FSPathChange(new FSID(change.getNodeRevID()), change.getKind(), change.getTextModification(), change.getPropModification());
             if(change.getCopyfromEntry().getRevision() != FSConstants.SVN_INVALID_REVNUM){
                 copyfromEntry = change.getCopyfromEntry();
             }else{
                 copyfromEntry = new SVNLocationEntry(FSConstants.SVN_INVALID_REVNUM, "");
             }
-            path = new String(change.getPath());
+            path = change.getPath();
         }
-        /*If passed value is null, we remove previous entry from hash (if it is there), otherwise nothing happend*/
-        if(newChange == null){
-            internalMapChanges.put(path, newChange);            
-        }else{
-            internalMapChanges.remove(path);
-        }
-        
-        if(copyfromPath == null){
-            copyfromPath = copyfromEntry != null ? new String(path) : path;
-        }
+        /* Add (or update) this path. */
+        mapChanges.put(path, newChange);        
+  
         if(copyfromEntry == null){
-            internalMapCopyfrom.remove(copyfromPath);
+            mapCopyfrom.put(path, null);
         }else{
-            internalMapCopyfrom.put(copyfromPath, new SVNLocationEntry(copyfromEntry.getRevision(), copyfromEntry.getPath()));            
+            mapCopyfrom.put(path, new SVNLocationEntry(copyfromEntry.getRevision(), copyfromEntry.getPath()));            
         }      
         
         ArrayList arr = new ArrayList(0);
-        arr.add(internalMapChanges);
-        arr.add(internalMapCopyfrom);
+        arr.add(mapChanges);
+        arr.add(mapCopyfrom);
         return arr;
     }
     
@@ -427,8 +416,9 @@ public class FSReader {
             }
             String davComment = (String)lockProps.get(FSConstants.IS_DAV_COMMENT_LOCK_KEY);
             //? how about it? what is to do with this flag? add it to SVNLock?
+            //dav comment is not used in file:/// protocol
             if(davComment == null){
-                SVNErrorManager.error("svn: Corrupt lockfile for path '" + lockPath + "' in filesystem '" + FSRepositoryUtil.getRepositoryDBDir(reposRootDir).getAbsolutePath() + "'");
+                //SVNErrorManager.error("svn: Corrupt lockfile for path '" + lockPath + "' in filesystem '" + FSRepositoryUtil.getRepositoryDBDir(reposRootDir).getAbsolutePath() + "'");
             }
             
             String creationTime = (String)lockProps.get(FSConstants.CREATION_DATE_LOCK_KEY);
@@ -1181,10 +1171,27 @@ public class FSReader {
         return -1;
     }
   
-    /* Read changes from revision file, RandomAccessFile reader must be already opened*/
-    public static FSChange readChanges(File readRevisionFile, RandomAccessFile raReader, long offsetToChanges, boolean isFirstInvocationForThisRevisionFile)throws SVNException{
-        /* noo affset */
-        String line = FSReader.readNextLine(readRevisionFile, raReader, offsetToChanges, isFirstInvocationForThisRevisionFile, 4096);
+    private static class OffsetContainerClass{
+        private long offset;
+        OffsetContainerClass(long newOffset){
+            offset = newOffset;
+        }
+        public void setOffset(long newOffset){
+            offset = newOffset;
+        }
+        public long getOffset(){
+            return offset;
+        }
+    }
+    
+    /* Read changes from revision file, RandomAccessFile reader must be already opened.
+     * OffsetContainerClass before invoking 'readChanges' method contains offset to changes, after invoking 
+     * 'readChanges' contains offset to next changes (if file has them) in raFile */
+    public static FSChange readChanges(File readRevisionFile, RandomAccessFile raReader, OffsetContainerClass offset, boolean isFirstInvocationForThisRevisionFile)throws SVNException{
+        
+        String line = FSReader.readNextLine(readRevisionFile, raReader, offset.getOffset(), isFirstInvocationForThisRevisionFile, 4096);
+        offset.setOffset(offset.getOffset()+line.length()+1);
+
         if(line.length() == 0){
             return null;
         }        
@@ -1212,7 +1219,7 @@ public class FSReader {
         boolean textModeBool = false;
         if(textModeStr.equals(FSConstants.FLAG_TRUE)){
             textModeBool = true;
-        } else if(textModeStr.equals(FSConstants.FLAG_FALSE)){
+        }else if(textModeStr.equals(FSConstants.FLAG_FALSE)){
             textModeBool = false;
         } else{
             SVNErrorManager.error("Invalid text-mod flag in rev-file");
@@ -1224,7 +1231,7 @@ public class FSReader {
         boolean propModeBool = false;
         if(propModeStr.equals(new String(FSConstants.FLAG_TRUE))){
             propModeBool = true;
-        } else if(propModeStr.equals(new String(FSConstants.FLAG_FALSE))){
+        }else if(propModeStr.equals(new String(FSConstants.FLAG_FALSE))){
             propModeBool = false;
         } else{
             SVNErrorManager.error("Invalid prop-mod flag in rev-file");
@@ -1233,24 +1240,28 @@ public class FSReader {
             SVNErrorManager.error("Invalid changes line in rev-file");
         }
         String pathStr = piecesOfLine[4];
-        /* Read the next line, the copyfrom line. */
-        String nextLine = FSReader.readNextLine(readRevisionFile, raReader, 0, false, 4096);        
+
+        //offsetToChanges = new Long(offsetToChanges.longValue()+line.length()+1);
+        String nextLine = FSReader.readNextLine(readRevisionFile, raReader, offset.getOffset(), isFirstInvocationForThisRevisionFile, 4096);
+        offset.setOffset(offset.getOffset()+nextLine.length()+1);
+
         SVNLocationEntry copyfromEntry = null;
         if(nextLine.length() == 0){
             copyfromEntry = new SVNLocationEntry(FSConstants.SVN_INVALID_REVNUM, null);
         }else{
-            String [] piesesOfNextLine = nextLine.split(" ");
-            if(piesesOfNextLine == null){
+            String [] piecesOfNextLine = nextLine.split(" ");
+            if(piecesOfNextLine == null){
                 SVNErrorManager.error("Invalid changes line in rev-file");
             }
-            if(piesesOfNextLine.length < 1 || piesesOfNextLine[0] == null){
+            if(piecesOfNextLine.length < 1 || piecesOfNextLine[0] == null){
                 SVNErrorManager.error("Invalid changes line in rev-file");
             }
-            if(piesesOfNextLine.length < 2 || piesesOfNextLine[1] == null){
+            if(piecesOfNextLine.length < 2 || piecesOfNextLine[1] == null){
                 SVNErrorManager.error("Invalid changes line in rev-file");
             }
-            copyfromEntry = new SVNLocationEntry(Long.parseLong(piesesOfNextLine[0]), piesesOfNextLine[1]);
+            copyfromEntry = new SVNLocationEntry(Long.parseLong(piecesOfNextLine[0]), piecesOfNextLine[1]);
         }
+        //offsetToChanges = new Long(offsetToChanges.longValue()+nextLine.length()+1);
         return new FSChange(new String(pathStr), new FSID(nodeRevID), changesKind, textModeBool, propModeBool, copyfromEntry);
     }
     
@@ -1299,5 +1310,77 @@ public class FSReader {
             SVNErrorManager.error("svn: Can't parse revision number in file '" + dbCurrentFile.getAbsolutePath() + "'");
         }
         return latestRev;
+    }
+    
+    /* Store as keys in returned Map the paths of all node in ROOT that show a
+     * significant change.  "Significant" means that the text or
+     * properties of the node were changed, or that the node was added or
+     * deleted.
+     * Keys are String paths and values are FSLogChangedPath.
+     */
+    public static Map detectChanged(File reposRootDir, FSRevisionNodePool revNodesPool, FSRoot root)throws SVNException{
+        Map returnChanged = new HashMap();
+        Map changes = FSReader.getFSpathChanged(reposRootDir, root);        
+        if(changes.size() == 0){
+            return changes;
+        }
+        Set hashKeys = changes.keySet();
+        Iterator chgIter = hashKeys.iterator();
+        while(chgIter.hasNext()){
+            char action;
+            String hashPathKey = (String)chgIter.next();
+            FSPathChange change = (FSPathChange)changes.get(hashPathKey);
+            String path = hashPathKey;                      
+            
+            switch(change.getChangeKind().intValue()){
+                case 4 /*FS_PATH_CHANGE_RESET*/:
+                continue;
+                case 1 /*FS_PATH_CHANGE_ADD*/:
+                    action = 'A';
+                    break;
+                case 2 /*FS_PATH_CHANGE_DELETE*/:
+                    action = 'D';
+                    break;
+                case 3 /*FS_PATH_CHANGE_REPLACE*/:
+                    action = 'R';
+                    break;
+                case 0 /*FS_PATH_CHANGE_MODIFY*/:
+                default:
+                    action = 'M';
+                    break;                    
+            }
+            FSLogChangedPath itemCopyfrom = new FSLogChangedPath(action, new SVNLocationEntry(FSConstants.SVN_INVALID_REVNUM, null));
+            if(action == 'A' || action == 'R'){                                
+                SVNLocationEntry copyfromEntry = FSReader.copiedFrom(reposRootDir, root.getRootRevisionNode(), path, revNodesPool);
+                if(copyfromEntry.getPath() != null && FSRepository.isValidRevision(copyfromEntry.getRevision())){
+                    itemCopyfrom = new FSLogChangedPath(action, copyfromEntry);
+                }                
+            }
+            returnChanged.put(path, itemCopyfrom);
+        }
+        return returnChanged;
+    }
+    /* Return MAP with hash containing descriptions of the paths changed under ROOT. 
+     * The hash is keyed with String paths and has FSPathChange values
+     */    
+    private static Map getFSpathChanged(File reposRootDir, FSRoot root)throws SVNException{   
+        Map changedPaths = new HashMap();
+        if(root.isTxnRoot() == true){
+            File txnFile = FSRepositoryUtil.getTxnChangesFile(root.getTxnId(), reposRootDir);
+            Object[] result = FSReader.fetchAllChanges(changedPaths, txnFile, false, 0, root.getCopyfromCache());
+            root.setCopyfromCache((Map)result[1]);
+            return (Map)result[0];
+        }           
+        long changeOffset = FSReader.getChangesOffset(reposRootDir, root.getRevision());
+        File revFile = FSRepositoryUtil.getRevisionFile(reposRootDir, root.getRevision());
+        Object[] result = FSReader.fetchAllChanges(changedPaths, revFile, true, changeOffset, root.getCopyfromCache());    
+        root.setCopyfromCache((Map)result[1]);
+        return (Map)result[0];      
+    }
+    /* Discover the copy ancestry of PATH under ROOT.  Return a relevant
+     * ancestor/revision combination in PATH(SVNLocationEntry) and REVISON(SVNLocationEntry)*/
+    public static SVNLocationEntry copiedFrom(File reposRootDir, FSRevisionNode root, String path, FSRevisionNodePool revNodesPool)throws SVNException{
+        FSRevisionNode node = revNodesPool.getRevisionNode(FSRoot.createRevisionRoot(root.getId().getRevision(), root), path, reposRootDir);
+        return new SVNLocationEntry(node.getCopyFromRevision(), node.getCopyFromPath());
     }
 }
