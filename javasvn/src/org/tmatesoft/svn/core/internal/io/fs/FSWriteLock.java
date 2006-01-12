@@ -69,7 +69,7 @@ public class FSWriteLock {
                 SVNFileUtil.createEmptyFile(writeLockFile);
             }
             myLockFile = new RandomAccessFile(writeLockFile, "rw");
-            myLock = myLockFile.getChannel().lock(0, Long.MAX_VALUE, false);            
+            myLock = myLockFile.getChannel().lock();            
         }catch(IOException ioe){
             unlock();
             SVNErrorManager.error("Can't get exclusive write lock to the repository '" + myReposRootPath + "': " + ioe.getMessage());

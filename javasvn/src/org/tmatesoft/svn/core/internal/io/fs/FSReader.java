@@ -71,34 +71,34 @@ public class FSReader {
     public static Object[] fetchAllChanges(Map changedPaths, File changesFile, boolean prefolded, long offsetToFirstChanges, Map mapCopyfrom)throws SVNException{        
         RandomAccessFile raReader = SVNFileUtil.openRAFileForReading(changesFile);
         try{
-        changedPaths = changedPaths != null ? changedPaths : new HashMap();  
-        mapCopyfrom = mapCopyfrom != null ? mapCopyfrom : new HashMap();
-        OffsetContainerClass offset = new OffsetContainerClass(offsetToFirstChanges);
-        FSChange change = FSReader.readChanges(changesFile, raReader, offset, true);        
-        while(change != null){
-            ArrayList retArr = foldChange(changedPaths, change, mapCopyfrom);
-            changedPaths = (Map)retArr.get(0);
-            mapCopyfrom = (Map)retArr.get(1);
-            
-            if( ( FSPathChangeKind.FS_PATH_CHANGE_DELETE.equals(change.getKind()) || 
-                    FSPathChangeKind.FS_PATH_CHANGE_REPLACE.equals(change.getKind()) ) && 
-                    prefolded == false){                                
-                Collection keySet = changedPaths.keySet();
-                Iterator curIter = keySet.iterator();
-                while(curIter.hasNext()){
-                    String hashKeyPath = (String)curIter.next();
-                    //If we come across our own path, ignore it                    
-                    if(change.getPath().equals(hashKeyPath)){
-                        continue;
-                    }
-                    //If we come across a child of our path, remove it
-                    if(SVNPathUtil.pathIsChild(change.getPath(), hashKeyPath) != null){
-                        changedPaths.remove(hashKeyPath);
-                    }
-                }                
+            changedPaths = changedPaths != null ? changedPaths : new HashMap();  
+            mapCopyfrom = mapCopyfrom != null ? mapCopyfrom : new HashMap();
+            OffsetContainerClass offset = new OffsetContainerClass(offsetToFirstChanges);
+            FSChange change = FSReader.readChanges(changesFile, raReader, offset, true);        
+            while(change != null){
+                ArrayList retArr = foldChange(changedPaths, change, mapCopyfrom);
+                changedPaths = (Map)retArr.get(0);
+                mapCopyfrom = (Map)retArr.get(1);
+                
+                if( ( FSPathChangeKind.FS_PATH_CHANGE_DELETE.equals(change.getKind()) || 
+                        FSPathChangeKind.FS_PATH_CHANGE_REPLACE.equals(change.getKind()) ) && 
+                        prefolded == false){                                
+                    Collection keySet = changedPaths.keySet();
+                    Iterator curIter = keySet.iterator();
+                    while(curIter.hasNext()){
+                        String hashKeyPath = (String)curIter.next();
+                        //If we come across our own path, ignore it                    
+                        if(change.getPath().equals(hashKeyPath)){
+                            continue;
+                        }
+                        //If we come across a child of our path, remove it
+                        if(SVNPathUtil.pathIsChild(change.getPath(), hashKeyPath) != null){
+                            changedPaths.remove(hashKeyPath);
+                        }
+                    }                
+                }
+                change = FSReader.readChanges(changesFile, raReader, offset, false);
             }
-            change = FSReader.readChanges(changesFile, raReader, offset, false);
-        }
         }finally{
             SVNFileUtil.closeFile(raReader);
         }
@@ -415,12 +415,9 @@ public class FSReader {
                 SVNErrorManager.error("svn: Corrupt lockfile for path '" + lockPath + "' in filesystem '" + FSRepositoryUtil.getRepositoryDBDir(reposRootDir).getAbsolutePath() + "'");
             }
             String davComment = (String)lockProps.get(FSConstants.IS_DAV_COMMENT_LOCK_KEY);
-            //? how about it? what is to do with this flag? add it to SVNLock?
-            //dav comment is not used in file:/// protocol
             if(davComment == null){
-                //SVNErrorManager.error("svn: Corrupt lockfile for path '" + lockPath + "' in filesystem '" + FSRepositoryUtil.getRepositoryDBDir(reposRootDir).getAbsolutePath() + "'");
+                SVNErrorManager.error("svn: Corrupt lockfile for path '" + lockPath + "' in filesystem '" + FSRepositoryUtil.getRepositoryDBDir(reposRootDir).getAbsolutePath() + "'");
             }
-            
             String creationTime = (String)lockProps.get(FSConstants.CREATION_DATE_LOCK_KEY);
             if(creationTime == null){
                 SVNErrorManager.error("svn: Corrupt lockfile for path '" + lockPath + "' in filesystem '" + FSRepositoryUtil.getRepositoryDBDir(reposRootDir).getAbsolutePath() + "'");
@@ -854,7 +851,7 @@ public class FSReader {
             } catch (NumberFormatException nfe) {
                 return null;
             }
-            return new FSID(nodeId, FSID.ID_INAPPLICABLE, copyId, rev, offset);
+            return FSID.createRevId(nodeId, copyId, rev, offset);
         }else if(idParts[2].charAt(0) == 't'){
             /* This is a transaction type ID */
             String txnId = idParts[2].substring(1);
@@ -868,6 +865,7 @@ public class FSReader {
         if (revNode == null) {
             return;
         }
+        FSRepresentation rep = new FSRepresentation();
         String[] offsets = representation.split(" ");
         long rev = -1;
         try {
@@ -875,14 +873,13 @@ public class FSReader {
         } catch (NumberFormatException nfe) {
             throw new SVNException();
         }
-        if(FSRepository.isInvalidRevision(rev)){
-            FSRepresentation represent = new FSRepresentation();
-            represent.setRevision(rev);
-            represent.setTxnId(revNode.getId().getTxnID());
+        rep.setRevision(rev);
+        if(FSRepository.isInvalidRevision(rep.getRevision())){
+            rep.setTxnId(revNode.getId().getTxnID());
             if(isData){
-                revNode.setTextRepresentation(represent);
+                revNode.setTextRepresentation(rep);
             }else{
-                revNode.setPropsRepresentation(represent);
+                revNode.setPropsRepresentation(rep);
             }
             //is it a mutable representation?
             if(!isData || revNode.getType() == SVNNodeKind.DIR){
@@ -901,7 +898,7 @@ public class FSReader {
         } catch (NumberFormatException nfe) {
             throw new SVNException();
         }
-
+        rep.setOffset(offset);
         long size = -1;
         try {
             size = Long.parseLong(offsets[2]);
@@ -911,7 +908,7 @@ public class FSReader {
         } catch (NumberFormatException nfe) {
             throw new SVNException();
         }
-
+        rep.setSize(size);
         long expandedSize = -1;
         try {
             expandedSize = Long.parseLong(offsets[3]);
@@ -921,17 +918,16 @@ public class FSReader {
         } catch (NumberFormatException nfe) {
             throw new SVNException();
         }
-
+        rep.setExpandedSize(expandedSize);
         String hexDigest = offsets[4];
         if (hexDigest.length() != 2 * FSConstants.MD5_DIGESTSIZE || SVNFileUtil.fromHexDigest(hexDigest) == null) {
             throw new SVNException();
         }
-        FSRepresentation represnt = new FSRepresentation(rev, offset, size, expandedSize, hexDigest);
-
+        rep.setHexDigest(hexDigest);
         if (isData) {
-            revNode.setTextRepresentation(represnt);
+            revNode.setTextRepresentation(rep);
         } else {
-            revNode.setPropsRepresentation(represnt);
+            revNode.setPropsRepresentation(rep);
         }
     }
 

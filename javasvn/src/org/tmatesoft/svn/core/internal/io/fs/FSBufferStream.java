@@ -40,6 +40,9 @@ public class FSBufferStream extends OutputStream {
     }
     
     public void write(byte[] b) throws IOException{
+        if(b == null){
+            return;
+        }
         byte[] result = new byte[myBufferLength + b.length];
         if(myBufferLength > 0){
             System.arraycopy(myBuffer, 0, result, 0, myBufferLength);
@@ -50,6 +53,9 @@ public class FSBufferStream extends OutputStream {
     }
     
     public void write(byte[] b, int off, int len) throws IOException{
+        if(b == null){
+            return;
+        }
         byte[] result = new byte[myBufferLength + len];
         if(myBufferLength > 0){
             System.arraycopy(myBuffer, 0, result, 0, myBufferLength);

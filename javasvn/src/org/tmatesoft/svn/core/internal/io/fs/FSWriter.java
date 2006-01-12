@@ -38,6 +38,7 @@ import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
 import org.tmatesoft.svn.core.internal.util.SVNTimeUtil;
 import org.tmatesoft.svn.core.SVNRevisionProperty;
 import org.tmatesoft.svn.core.SVNProperty;
+import org.tmatesoft.svn.core.io.SVNLocationEntry;
 
 /**
  * @version 1.0
@@ -161,14 +162,14 @@ public class FSWriter {
                 change.setRevNodeId(revNode.getId());
             }
             /* Find the cached copyfrom information. */
-            String copyfrom = (String)copyfromCache.get(path);
+            SVNLocationEntry copyfromEntry = (SVNLocationEntry)copyfromCache.get(path);
             /* Write out the new entry into the final rev-file. */
             OutputStream protoFileAdapter = new OutputStream(){
                 public void write(int b) throws IOException{
                     protoFile.write(b);
                 }
             };
-            writeChangeEntry(protoFileAdapter, path, change, copyfrom);
+            writeChangeEntry(protoFileAdapter, path, change, copyfromEntry);
         }
         return offset;
     }
@@ -348,16 +349,14 @@ public class FSWriter {
         FSRepresentation textRep = parentRevNode.getTextRepresentation();
         File childrenFile = FSRepositoryUtil.getTxnRevNodeChildrenFile(parentRevNode.getId(), reposRootDir);
         OutputStream dst = null;
-        File tmpFile = null;
         try{
-            tmpFile = SVNFileUtil.createUniqueFile(childrenFile.getParentFile(), childrenFile.getName(), ".tmp");
             if(textRep == null || !textRep.isTxn()){
                 /* Before we can modify the directory, we need to dump its old
                  * contents into a mutable representation file. 
                  */
                 Map entries = FSReader.getDirEntries(parentRevNode, reposRootDir);
                 Map unparsedEntries = FSRepositoryUtil.unparseDirEntries(entries);
-                dst = SVNFileUtil.openFileForWriting(tmpFile);
+                dst = SVNFileUtil.openFileForWriting(childrenFile);
                 SVNProperties.setProperties(unparsedEntries, dst, SVNProperties.SVN_HASH_TERMINATOR);
                 /* Mark the node-rev's data rep as mutable. */
                 textRep = new FSRepresentation();
@@ -367,7 +366,7 @@ public class FSWriter {
                 putTxnRevisionNode(parentRevNode.getId(), parentRevNode, reposRootDir);
             }else{
                 /* The directory rep is already mutable, so just open it for append. */
-                dst = SVNFileUtil.openFileForWriting(tmpFile, true);
+                dst = SVNFileUtil.openFileForWriting(childrenFile, true);
             }
             /* Make a note if we have this directory cached. */
             Map dirContents = parentRevNode.getDirContents();
@@ -388,11 +387,8 @@ public class FSWriter {
         }finally{
             SVNFileUtil.closeFile(dst);            
         }
-        if (tmpFile != null) {
-            SVNFileUtil.rename(tmpFile, childrenFile);
-            SVNFileUtil.setReadonly(childrenFile, true);
-        }
     }
+
     /* Delete the directory entry named entryName from parent. parent must be 
      * mutable. entryName must be a single path component. Throws an exception if there is no 
      * entry entryName in parent.  
@@ -581,7 +577,7 @@ public class FSWriter {
     /* Write a single change entry - path, path change info, and copyfrom
      * string into the changes file.
      */
-    public static void writeChangeEntry(OutputStream changesFile, String path, FSPathChange pathChange, String copyfrom) throws SVNException, IOException {
+    public static void writeChangeEntry(OutputStream changesFile, String path, FSPathChange pathChange, SVNLocationEntry copyfromEntry) throws SVNException, IOException {
         String changeString = pathChange.getChangeKind().toString();
         if(changeString == null){
             SVNErrorManager.error("Invalid change type");
@@ -594,8 +590,9 @@ public class FSWriter {
         }
         String output = idString + " " + changeString + " " + SVNProperty.toString(pathChange.isTextModified()) + " " + SVNProperty.toString(pathChange.arePropertiesModified()) + " " + path + "\n"; 
         changesFile.write(output.getBytes());
-        if(copyfrom != null){
-            changesFile.write(copyfrom.getBytes());
+        if(copyfromEntry != null){
+            String copyfromLine = copyfromEntry.getRevision() + " " + copyfromEntry.getPath();
+            changesFile.write(copyfromLine.getBytes());
         }
         changesFile.write("\n".getBytes());
     }
@@ -788,7 +785,7 @@ public class FSWriter {
         FileOutputStream fos = null;
         for(int i = 0; i < 2; i++){
             try{
-                tmpFile = File.createTempFile("javasvn-test", ".tmp", i == 0 ? null : tmpDir);
+                tmpFile = File.createTempFile("javasvn-tempdir-test", ".tmp", i == 0 ? null : tmpDir);
                 fos = new FileOutputStream(tmpFile);
                 fos.write('!');
                 fos.close();

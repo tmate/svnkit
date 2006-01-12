@@ -116,6 +116,7 @@ public class SVNDeltaChunksGenerator {
             /* Make sure we're all full up on source data, if possible. */
             if(mySourceLength == 0 && !isSourceDone){
                 mySourceLength = mySourceStream.read(mySourceBuf);
+                mySourceLength = mySourceLength < 0 ? 0 : mySourceLength;
                 if(mySourceLength < SVN_DELTA_WINDOW_SIZE){
                     isSourceDone = true;
                 }
