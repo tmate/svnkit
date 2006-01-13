@@ -153,51 +153,42 @@ public class FSReader {
                 SVNErrorManager.error("Invalid change ordering: non-add change on deleted path");
             }    
             /*Merging the changes*/
-            switch(change.getKind().intValue()){
-                case 0 /*FSPathChangeKind.FS_PATH_CHANGE_MODIFY*/ :
-                    if(change.getTextModification()){
-                        oldChange.setTextModified(true);
-                    }
-                    if(change.getPropModification()){
-                        oldChange.setPropertiesModified(true);
-                    }
-                    break;
-                case 1 /*FSPathChangeKind.FS_PATH_CHANGE_ADD*/ :
-                case 3 /*FSPathChangeKind.FS_PATH_CHANGE_REPLACE*/ :
-                    /*An add at this point must be following a previous delete,
-                    so treat it just like a replace*/        
-                    oldChange.setChangeKind(FSPathChangeKind.FS_PATH_CHANGE_REPLACE);
-                    oldChange.setRevNodeId(new FSID(change.getNodeRevID()));
-                    oldChange.setTextModified(change.getTextModification());
-                    oldChange.setPropertiesModified(change.getPropModification());
-                    if(change.getCopyfromEntry() == null){
-                        copyfromEntry = null;
-                    }else{
-                        copyfromEntry = new SVNLocationEntry(change.getCopyfromEntry().getRevision(), change.getCopyfromEntry().getPath());
-                    }
-                    break;
-                case 2 /*FSPathChangeKind FS_PATH_CHANGE_DELETE*/:
-                    if(FSPathChangeKind.FS_PATH_CHANGE_ADD.equals(oldChange.getChangeKind())){
-                        /*If the path was introduced in this transaction via an
-                        add, and we are deleting it, just remove the path altogether*/
-                        oldChange = null;
-                        mapChanges.remove(change.getPath());
-                    }else{
-                        /* A deletion overrules all previous changes. */
-                        oldChange.setChangeKind(FSPathChangeKind.FS_PATH_CHANGE_DELETE);
-                        oldChange.setPropertiesModified(change.getPropModification());
-                        oldChange.setTextModified(change.getTextModification());
-                    }
+            if(FSPathChangeKind.FS_PATH_CHANGE_MODIFY.equals(change.getKind())){
+                if(change.getTextModification()){
+                    oldChange.setTextModified(true);
+                }
+                if(change.getPropModification()){
+                    oldChange.setPropertiesModified(true);
+                }                
+            }else if(FSPathChangeKind.FS_PATH_CHANGE_ADD.equals(change.getKind()) || FSPathChangeKind.FS_PATH_CHANGE_REPLACE.equals(change.getKind())){
+                oldChange.setChangeKind(FSPathChangeKind.FS_PATH_CHANGE_REPLACE);
+                oldChange.setRevNodeId(new FSID(change.getNodeRevID()));
+                oldChange.setTextModified(change.getTextModification());
+                oldChange.setPropertiesModified(change.getPropModification());
+                if(change.getCopyfromEntry() == null){
                     copyfromEntry = null;
-                    mapCopyfrom.remove(change.getPath());
-                    break;                    
-                case 4 : /*FSPathChangeKind.FS_PATH_CHANGE_RESET*/
-                    //A reset here will simply remove the path change from the hash
+                }else{
+                    copyfromEntry = new SVNLocationEntry(change.getCopyfromEntry().getRevision(), change.getCopyfromEntry().getPath());
+                }                
+            }else if(FSPathChangeKind.FS_PATH_CHANGE_DELETE.equals(change.getKind())){
+                if(FSPathChangeKind.FS_PATH_CHANGE_ADD.equals(oldChange.getChangeKind())){
+                    /*If the path was introduced in this transaction via an
+                    add, and we are deleting it, just remove the path altogether*/
                     oldChange = null;
-                    copyfromEntry = null;
                     mapChanges.remove(change.getPath());
-                    mapCopyfrom.remove(change.getPath());
-                    break;
+                }else{
+                    /* A deletion overrules all previous changes. */
+                    oldChange.setChangeKind(FSPathChangeKind.FS_PATH_CHANGE_DELETE);
+                    oldChange.setPropertiesModified(change.getPropModification());
+                    oldChange.setTextModified(change.getTextModification());
+                }
+                copyfromEntry = null;
+                mapCopyfrom.remove(change.getPath());
+            }else if(FSPathChangeKind.FS_PATH_CHANGE_RESET.equals(change.getKind())){
+                oldChange = null;
+                copyfromEntry = null;
+                mapChanges.remove(change.getPath());
+                mapCopyfrom.remove(change.getPath());                
             }
             newChange = oldChange;
         }else{
