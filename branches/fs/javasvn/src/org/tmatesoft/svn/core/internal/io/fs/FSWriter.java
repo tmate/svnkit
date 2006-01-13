@@ -86,6 +86,65 @@ public class FSWriter {
         }
     }
     
+    public static void doLock(SVNLock lockToBeMade, File reposRootDir, FSRevisionNodePool revNodesPool, boolean breakLock, long currentRev)throws SVNException{
+        FSWriteLock writeLock = FSWriteLock.getWriteLock(reposRootDir);
+        synchronized(writeLock){ 
+            try{
+                writeLock.lock();
+                processLocking(lockToBeMade, reposRootDir, currentRev, breakLock, revNodesPool);
+            }finally{
+                writeLock.unlock();
+                FSWriteLock.realease(writeLock);
+            }
+        }            
+
+    }    
+    private static void processLocking(SVNLock lock, File reposRootDir, long currentRev, boolean force, FSRevisionNodePool revNodesPool)throws SVNException{
+        if(reposRootDir == null){
+            SVNErrorManager.error("File object was not initialized yet");
+        }
+        if(lock == null){
+            return;
+        }        
+        long youngestRev = FSReader.getYoungestRevision(reposRootDir);
+        FSRevisionNode root = revNodesPool.getRootRevisionNode(youngestRev, reposRootDir);
+        SVNNodeKind kind = FSRepository.checkPath(reposRootDir, root, lock.getPath());
+        if(kind == SVNNodeKind.DIR){
+            SVNErrorManager.error("Can't make on lock on directory");            
+        }
+        else if(kind == SVNNodeKind.NONE){
+            SVNErrorManager.error("Path '"+lock.getPath()+"' doesn't exist in HEAD revision");
+        }        
+        if(lock.getOwner() == null){
+            SVNErrorManager.error("No user attached to the lock");
+        }
+        if(FSRepository.isValidRevision(currentRev)){
+            FSRevisionNode node = revNodesPool.getRevisionNode(root, lock.getPath(), reposRootDir);
+            long createdRev = node.getId().getRevision();
+            if(!FSRepository.isValidRevision(createdRev)){
+                SVNErrorManager.error("Path '"+lock.getPath()+"' doesn't exist in HEAD revision");
+            }
+            if(currentRev < createdRev){
+                SVNErrorManager.error("Lock failed: newer version of '"+lock.getPath()+"' exists");
+            }
+        }
+        SVNLock existingLock = FSReader.getLock(lock.getPath(), true, reposRootDir);
+        if(existingLock != null){
+            if(!force){
+                SVNErrorManager.error("Path '"+existingLock.getPath()+"' is already locked by user '"+existingLock.getOwner() + "'");
+            }else{
+                FSWriter.deleteLock(existingLock, reposRootDir);
+            }
+        }
+        SVNLock newLock = null;
+        if(lock.getID() == null){
+            newLock = new SVNLock(lock.getPath(), FSReader.generateLockToken(reposRootDir), lock.getOwner(), lock.getComment(), lock.getCreationDate(), lock.getExpirationDate());
+        }else{
+            newLock = new SVNLock(lock.getPath(), lock.getID(), lock.getOwner(), lock.getComment(), lock.getCreationDate(), lock.getExpirationDate());
+        }
+        FSWriter.setLock(reposRootDir, newLock);
+    }
+    
     private static void unlock(String path, String token, String username, boolean breakLock, File reposRootDir) throws SVNException {
         SVNLock lock = FSReader.getLock(path, true, reposRootDir);
         if(lock == null){
@@ -839,19 +898,22 @@ public class FSWriter {
                 /*otherwise add path into collection*/
                 children.add(lastChild);                
             }           
-            FSWriter.writeDigestLockFile(thisLock, children, digestPath, reposRootDir);
+            FSWriter.writeDigestLockFile(thisLock, children, thisPath, reposRootDir);
             if(thisPath.length() == 1 && thisPath.equals("/")){
                 return;
             }
-            /*TODO ???possible problems with SVNPathUtil.svnPathDirName*/
+            
             String[] splitThisPath = thisPath.split("/");
             StringBuffer newThisPath = new StringBuffer();
             int count = 0;
-            do{
+            do{               
+                newThisPath.append(splitThisPath[count]);                
                 newThisPath.append("/");
-                newThisPath.append(splitThisPath[count]);
                 count++;
             }while(count < splitThisPath.length-1);
+            if(count != 1){
+                newThisPath.deleteCharAt(newThisPath.length()-1);
+            }
             thisPath = new String(newThisPath);
             //thisPath = SVNPathUtil.svnPathDirName(thisPath);
         }

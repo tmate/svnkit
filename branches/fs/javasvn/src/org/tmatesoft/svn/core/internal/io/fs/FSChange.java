@@ -26,7 +26,7 @@ public class FSChange {
     public FSChange(String newPath, FSID newID, FSPathChangeKind newKind, boolean newTextMode, boolean newPropMode, SVNLocationEntry newCopyfromEntry){
         path = newPath;
         myFSPathChange = new FSPathChange(new FSID(newID), newKind, newTextMode, newPropMode);
-        copyfromEntry = new SVNLocationEntry(newCopyfromEntry.getRevision(), newCopyfromEntry.getPath());
+        copyfromEntry = newCopyfromEntry;
     }
     
     public String getPath(){

@@ -1059,7 +1059,7 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
         return retLocks;
     }
 
-    /*under testing*/
+    /*Note: if handler == null, it will never be invoking. Handling is invoked when setting lock is successfull*/
     public void lock(Map pathsToRevisions, String comment, boolean force, ISVNLockHandler handler) throws SVNException {
         if(myReposRootDir == null || myReposRootDir.getAbsolutePath() == null){
             SVNErrorManager.error("File object was not created yet");
@@ -1072,72 +1072,29 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
         Iterator keyIter = keyPathsSet.iterator();
         while(keyIter.hasNext()){
             String keyPath = (String)keyIter.next();
-            Long revVal = (Long)pathsToRevisions.get(keyPath);            
-            String absLockPath = SVNPathUtil.canonicalizeAbsPath(keyPath);            
-            SVNLock lockToBeMade = new SVNLock(absLockPath, /*ID*/FSReader.generateLockToken(myReposRootDir), System.getProperty("user.name")/*owner*/, comment, new Date(System.currentTimeMillis()), null/*expiration Date*/);
-            /*make operation on every path to locked and invoke path to be locked*/
-            FSWriteLock writeLock = FSWriteLock.getWriteLock(myReposRootDir);
-            synchronized(writeLock){ 
-                try{
-                    writeLock.lock();
-                    lockHandlerImplement(lockToBeMade, myReposRootDir, revVal.longValue(), force, myRevNodesPool);
-                }finally{
-                    writeLock.unlock();
-                    FSWriteLock.realease(writeLock);
-                }
+            Long revVal = (Long)pathsToRevisions.get(keyPath);
+            String absLockPath = SVNPathUtil.canonicalizeAbsPath(keyPath);
+            SVNLock lockToBeMade = new SVNLock(absLockPath, /*ID*/FSReader.generateLockToken(myReposRootDir), /*owner*/System.getProperty("user.name"), comment, new Date(System.currentTimeMillis()), null/*expiration Date*/);
+            FSWriter.doLock(lockToBeMade, myReposRootDir, myRevNodesPool, force, revVal.longValue());
+            if(handler != null){
+                handler.handleLock(keyPath, lockToBeMade, null);
             }            
         }
-    }    
-    
-    private static void lockHandlerImplement(SVNLock lock, File reposRootDir, long currentRev, boolean force, FSRevisionNodePool revNodesPool)throws SVNException{
-        if(reposRootDir == null){
-            SVNErrorManager.error("File object was not initialized yet");
-        }
-        if(lock == null){
-            return;
-        }        
-        long youngestRev = FSReader.getYoungestRevision(reposRootDir);
-        FSRevisionNode root = revNodesPool.getRootRevisionNode(youngestRev, reposRootDir);
-        SVNNodeKind kind = FSRepository.checkPath(reposRootDir, root, lock.getPath());
-        if(kind == SVNNodeKind.DIR){
-            SVNErrorManager.error("Can't make on lock on directory");            
-        }
-        else if(kind == SVNNodeKind.NONE){
-            SVNErrorManager.error("Path '"+lock.getPath()+"' doesn't exist in HEAD revision");
-        }        
-        if(lock.getOwner() == null){
-            SVNErrorManager.error("No user attached to the lock");
-        }
-        if(FSRepository.isValidRevision(currentRev)){
-            FSRevisionNode node = revNodesPool.getRevisionNode(root, lock.getPath(), reposRootDir);
-            long createdRev = node.getId().getRevision();
-            if(!FSRepository.isValidRevision(createdRev)){
-                SVNErrorManager.error("Path '"+lock.getPath()+"' doesn't exist in HEAD revision");
-            }
-            if(currentRev < createdRev){
-                SVNErrorManager.error("Lock failed: newer version of '"+lock.getPath()+"' exists");
-            }
-        }
-        SVNLock existingLock = FSReader.getLock(lock.getPath(), true, reposRootDir);
-        if(existingLock != null){
-            if(!force){
-                SVNErrorManager.error("Path '"+existingLock.getPath()+"' is already locked by user '"+existingLock.getOwner() + "'");
-            }else{
-                FSWriter.deleteLock(existingLock, reposRootDir);
-            }
-        }
-        SVNLock newLock = null;
-        if(lock.getID() == null){
-            newLock = new SVNLock(lock.getPath(), FSReader.generateLockToken(reposRootDir), lock.getOwner(), lock.getComment(), lock.getCreationDate(), lock.getExpirationDate());
-        }else{
-            newLock = new SVNLock(lock.getPath(), lock.getID(), lock.getOwner(), lock.getComment(), lock.getCreationDate(), lock.getExpirationDate());
-        }
-        FSWriter.setLock(reposRootDir, newLock);
     }   
 
     public void unlock(Map pathToTokens, boolean force, ISVNLockHandler handler) throws SVNException {
+        if(pathToTokens == null || pathToTokens.isEmpty()){
+            return;
+        }        
+        Set keySet = pathToTokens.keySet();
+        Iterator keyPathIter = keySet.iterator();
+        while(keyPathIter.hasNext()){
+            String keyPath = (String)keyPathIter.next();
+            String tokenVal = (String)pathToTokens.get(keyPath);
+            FSWriter.doUnlock(keyPath, tokenVal, System.getProperty("user.name"), force, myReposRootDir);
+        }
     }
-
+    
     public void closeSession() throws SVNException {
     }
 
