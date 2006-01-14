@@ -989,27 +989,40 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
         }
     }
 
+    /*TODO is there the difference between size of dir and size of file???*/
     public SVNDirEntry info(String path, long revision) throws SVNException {
         try{
             openRepository();
             if(path == null){
                 return null;
-            }if(FSRepository.isInvalidRevision(revision)){
-                revision = FSReader.getYoungestRevision(myReposRootDir);
+            }
+            path = SVNPathUtil.canonicalizeAbsPath(path);
+            long youngestRev = FSReader.getYoungestRevision(myReposRootDir);
+            if(FSRepository.isInvalidRevision(revision) || revision > youngestRev){
+                revision = youngestRev;
             }
             FSRevisionNode root = myRevNodesPool.getRootRevisionNode(revision, myReposRootDir);
             FSRevisionNode curRevNode = myRevNodesPool.getRevisionNode(root, path, myReposRootDir);
-            Map properties = FSReader.getProperties(curRevNode, myReposRootDir);
+            if(curRevNode == null){
+                SVNErrorManager.error("Path '" +path+ "' at revision '" +revision+ "' not found");
+            }
+            long createdRev = FSReader.getCreatedRevision(myReposRootDir, myRevNodesPool, path, revision);
+            Map createdRevProps = FSRepositoryUtil.getRevisionProperties(myReposRootDir, createdRev);
+            Map currentRevProps = FSRepositoryUtil.getRevisionProperties(myReposRootDir, revision);
             boolean hasProps = false;
             String lastAuthor = null;
             String commitMessage = null;
-            if(!properties.isEmpty()){
+            Date createdDate = null;            
+            long size = curRevNode.getTextRepresentation().getExpandedSize();
+            if(!currentRevProps.isEmpty()){
                 hasProps = true;
-            }else{
-                lastAuthor = (String)properties.get("author");
-                commitMessage = (String)properties.get("log");
+                lastAuthor = (String)currentRevProps.get(SVNRevisionProperty.AUTHOR);
+                commitMessage = (String)currentRevProps.get(SVNRevisionProperty.LOG);
             }
-            return new SVNDirEntry(path, curRevNode.getType(), 0/*size*/, hasProps, 0/*firsRevision*/,new Date()/*createdDate*/, lastAuthor, commitMessage);
+            if(!createdRevProps.isEmpty()){
+                createdDate = SVNTimeUtil.parseDate((String)createdRevProps.get(SVNRevisionProperty.DATE));
+            }
+            return new SVNDirEntry(path, curRevNode.getType(), size, hasProps, createdRev, createdDate, lastAuthor, commitMessage);
         }finally{
             closeRepository();
         }
