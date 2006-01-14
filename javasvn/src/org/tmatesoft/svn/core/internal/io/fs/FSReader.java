@@ -58,6 +58,37 @@ public class FSReader {
         return ids;
     }
     
+    public static long getCreatedRevision(File reposRootDir, FSRevisionNodePool revNodesPool, String path, long revision)throws SVNException{
+        if(path == null){
+            return FSConstants.SVN_INVALID_REVNUM;
+        }
+        path = SVNPathUtil.canonicalizeAbsPath(path);
+        long youngestRev = FSReader.getYoungestRevision(reposRootDir);
+        if(FSRepository.isInvalidRevision(revision) || revision > youngestRev){
+            revision = youngestRev; 
+        }
+        FSRevisionNode root = revNodesPool.getRootRevisionNode(revision, reposRootDir);
+        FSNodeHistory hist = null;
+        try{
+            hist = FSNodeHistory.getNodeHistory(reposRootDir, root, path);
+        }catch(SVNException ex){
+            /*if path is not found on specified revision*/
+            return FSConstants.SVN_INVALID_REVNUM;
+        }
+        long histRev = hist.getHistoryEntry().getRevision();
+        while(true){
+            hist = hist.fsHistoryPrev(reposRootDir, true, revNodesPool);
+            if(hist == null){
+                return histRev;
+            }
+            boolean ancestry = FSNodeHistory.checkAncestryOfPegPath(reposRootDir, path, hist.getHistoryEntry().getRevision(), revision, revNodesPool);
+            if(ancestry == false){
+                return histRev;
+            }
+            histRev = hist.getHistoryEntry().getRevision();
+        }
+    }                                       
+    
     public static Map fetchTxnChanges(Map changedPaths, String txnId, Map copyFromCache, File reposRootDir) throws SVNException {
         changedPaths = changedPaths == null ? new HashMap() : changedPaths;
         File changesFile = FSRepositoryUtil.getTxnChangesFile(txnId, reposRootDir);
