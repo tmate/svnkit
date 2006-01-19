@@ -68,9 +68,26 @@ public class PythonTests {
 
         String pythonTestsRoot = properties.getProperty("python.tests");
 		properties.setProperty("repository.root", new File(pythonTestsRoot).getAbsolutePath());
-		String url = "svn://localhost";
-		if (Boolean.TRUE.toString().equals(properties.getProperty("python.svn"))) {
-			try {
+        String path = new File(pythonTestsRoot).getAbsolutePath().replace(File.separatorChar, '/');
+        path = !path.startsWith("/") ? "/" + path : path;
+        String url = "file://" + path;
+        if (Boolean.TRUE.toString().equals(properties.getProperty("python.file"))) {
+            try {
+                for (int i = 0; i < ourLoggers.length; i++) {
+                    ourLoggers[i].startServer("local", url);
+                }
+                runPythonTests(properties, defaultTestSuite, url);
+            } catch (Throwable th) {
+                th.printStackTrace();
+            } finally {
+                for (int i = 0; i < ourLoggers.length; i++) {
+                    ourLoggers[i].endServer("local", url);
+                }
+            }
+        }
+        if (Boolean.TRUE.toString().equals(properties.getProperty("python.svn"))) {
+            url = "svn://localhost";
+            try {
 				startSVNServe(properties);
                 for (int i = 0; i < ourLoggers.length; i++) {
                     ourLoggers[i].startServer("svnserve", url);
