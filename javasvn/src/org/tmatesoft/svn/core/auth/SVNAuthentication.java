@@ -33,7 +33,6 @@ public class SVNAuthentication {
     
     private String myUserName;
     private boolean myIsStorageAllowed;
-    private String myKind;
     
     /**
      * Creates a username user credential object given a username. 
@@ -43,10 +42,9 @@ public class SVNAuthentication {
      *                          this credential is allowed to be stored in the 
      *                          global auth cache, otherwise not
      */
-    public SVNAuthentication(String kind, String userName, boolean storageAllowed) {
+    public SVNAuthentication(String userName, boolean storageAllowed) {
         myUserName = userName;
         myIsStorageAllowed = storageAllowed;
-        myKind = kind;
     }
     
     /**
@@ -66,10 +64,6 @@ public class SVNAuthentication {
      */
     public boolean isStorageAllowed() {
         return myIsStorageAllowed;
-    }
-    
-    public String getKind() {
-        return myKind;
     }
 
 }

@@ -73,8 +73,6 @@ public interface ISVNAuthenticationManager {
      * An ssl credential kind (<span class="javastring">"svn.ssl"</span>)
      */
     public static final String SSL = "svn.ssl";
-
-    public static final String USERNAME = "svn.username";
     
     /**
      * Sets a custom authentication provider that will provide user 
@@ -135,7 +133,7 @@ public interface ISVNAuthenticationManager {
      *     credential for the same realm.   
      * </ul>
      * 
-     * @param  kind              a credential kind ({@link #PASSWORD} or {@link #SSH} or {@link #USERNAME})
+     * @param  kind              a credential kind ({@link #PASSWORD} or {@link #SSH})
      * @param  realm             a repository authentication realm 
      * @param  url               a repository location that is to be accessed
      * @return                   the first try user credential
@@ -158,7 +156,7 @@ public interface ISVNAuthenticationManager {
      *     credential for the same realm.   
      * </ul>
      * 
-     * @param  kind              a credential kind ({@link #PASSWORD} or {@link #SSH} or {@link #USERNAME})
+     * @param  kind              a credential kind ({@link #PASSWORD} or {@link #SSH})
      * @param  realm             a repository authentication realm 
      * @param  url               a repository location that is to be accessed
      * @return                   the next try user credential
@@ -175,7 +173,7 @@ public interface ISVNAuthenticationManager {
      * @param accepted       <span class="javakeyword">true</span> if 
      *                       the credential was accepted by the server, 
      *                       otherwise <span class="javakeyword">false</span>
-     * @param kind           a credential kind ({@link #PASSWORD} or {@link #SSH} or {@link #USERNAME})
+     * @param kind           a credential kind ({@link #PASSWORD} or {@link #SSH})
      * @param realm          a repository authentication realm 
      * @param errorMessage   the reason of the authentication failure 
      * @param authentication a user credential to accept/drop

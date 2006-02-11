@@ -17,7 +17,7 @@ import java.io.ByteArrayInputStream;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.internal.io.dav.DAVElement;
 import org.tmatesoft.svn.core.internal.util.SVNBase64;
-import org.tmatesoft.svn.core.io.ISVNDeltaConsumer;
+import org.tmatesoft.svn.core.io.ISVNEditor;
 import org.tmatesoft.svn.core.io.diff.SVNDiffWindowBuilder;
 import org.xml.sax.SAXException;
 
@@ -40,7 +40,7 @@ public abstract class BasicDAVDeltaHandler extends BasicDAVHandler {
         myPreviousStream = null;
 
         if (!myIsDeltaProcessing) {
-            getDeltaConsumer().textDeltaEnd(getCurrentPath());
+            getEditor().textDeltaEnd(getCurrentPath());
         } else {
             myDiffBuilder.reset();
             myDeltaOutputStream.delete(0, myDeltaOutputStream.length());
@@ -104,7 +104,7 @@ public abstract class BasicDAVDeltaHandler extends BasicDAVHandler {
             myPreviousStream = new SequenceIntputStream(decoded, myPreviousStream);
             try {
                 while(true) {
-                    boolean needsMore = myDiffBuilder.accept(myPreviousStream, getDeltaConsumer(), getCurrentPath());
+                    boolean needsMore = myDiffBuilder.accept(myPreviousStream, getEditor(), getCurrentPath());
                     if (needsMore && myPreviousStream.available() > 0) {
                         continue;
                     }
@@ -122,7 +122,7 @@ public abstract class BasicDAVDeltaHandler extends BasicDAVHandler {
 
     protected abstract String getCurrentPath();
 
-    protected abstract ISVNDeltaConsumer getDeltaConsumer();
+    protected abstract ISVNEditor getEditor();
     
     private static class SequenceIntputStream extends ByteArrayInputStream {
         SequenceIntputStream(byte[] bytes, SequenceIntputStream previous) {

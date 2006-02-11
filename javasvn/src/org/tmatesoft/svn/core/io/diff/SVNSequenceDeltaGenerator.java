@@ -153,7 +153,7 @@ public class SVNSequenceDeltaGenerator implements ISVNDeltaGenerator {
 		}
 	}
 
-    private static boolean canProcess(ISVNRAData workFile, ISVNRAData baseFile) throws SVNException {
+	private static boolean canProcess(ISVNRAData workFile, ISVNRAData baseFile) throws SVNException {
 		InputStream is = workFile.read(0, Math.min(1024, workFile.length()));
 		try {
 			if (SVNFileUtil.detectMimeType(workFile.read(0, Math.min(workFile.length(), 1024))) != null) {

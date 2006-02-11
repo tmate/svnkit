@@ -69,5 +69,4 @@ public interface ISVNDeltaGenerator {
      * @throws SVNException    if an i/o error occurred
 	 */
     void generateDiffWindow(String commitPath, ISVNEditor consumer, ISVNRAData workFile, ISVNRAData baseFile) throws SVNException;
-    
 }
