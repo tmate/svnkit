@@ -36,8 +36,8 @@ public class SVNDiffWindowApplyBaton {
     OutputStream myTargetStream;
 
     long mySourceViewOffset;
-    int mySourceViewLength;
-    int myTargetViewSize;
+    long mySourceViewLength;
+    long myTargetViewSize;
 
     byte[] mySourceBuffer;
     byte[] myTargetBuffer;

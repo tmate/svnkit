@@ -68,7 +68,7 @@ public class SVNBasicClient implements ISVNEventHandler {
     private boolean myIsLeaveConflictsUnresolved;
 
     protected SVNBasicClient(final ISVNAuthenticationManager authManager, ISVNOptions options) {
-        this(new DefaultSVNRepositoryPool(authManager == null ? SVNWCUtil.createDefaultAuthenticationManager() : authManager, options, 
+        this(new DefaultSVNRepositoryPool(authManager == null ? SVNWCUtil.createDefaultAuthenticationManager() : authManager, 
                 true, DefaultSVNRepositoryPool.RUNTIME_POOL), options);
     }
 
@@ -499,7 +499,7 @@ public class SVNBasicClient implements ISVNEventHandler {
         String prevPath = null;
         SVNLogEntryPath logPath = (SVNLogEntryPath) logEntry.getChangedPaths().get(path);
         if (logPath != null) {
-            if (logPath.getType() != SVNLogEntryPath.TYPE_ADDED && logPath.getType() != SVNLogEntryPath.TYPE_REPLACED) {
+            if (logPath.getType() != 'A' && logPath.getType() != 'R') {
                 return logPath.getPath();
             }
             if (logPath.getCopyPath() != null) {

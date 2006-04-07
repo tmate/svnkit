@@ -59,7 +59,6 @@ public class DefaultSVNDiffGenerator implements ISVNDiffGenerator {
     private String myEncoding;
     private boolean myIsDiffDeleted;
     private File myBasePath;
-    private boolean myIsDiffUnversioned;
     
     /**
      * Constructs a <b>DefaultSVNDiffGenerator</b>.
@@ -338,13 +337,5 @@ public class DefaultSVNDiffGenerator implements ISVNDiffGenerator {
 
     public File createTempDirectory() throws SVNException {
         return SVNFileUtil.createTempDirectory("diff");
-    }
-
-    public boolean isDiffUnversioned() {
-        return myIsDiffUnversioned;
-    }
-
-    public void setDiffUnversioned(boolean diffUnversioned) {
-        myIsDiffUnversioned = diffUnversioned;
     }
 }

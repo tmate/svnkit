@@ -27,7 +27,6 @@ import org.tmatesoft.svn.core.internal.util.SVNBase64;
 import org.tmatesoft.svn.core.internal.util.SVNEncodingUtil;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
-import org.tmatesoft.svn.core.io.ISVNDeltaConsumer;
 import org.tmatesoft.svn.core.io.ISVNEditor;
 import org.tmatesoft.svn.core.io.ISVNReporter;
 import org.tmatesoft.svn.core.io.ISVNReporterBaton;
@@ -276,12 +275,10 @@ public class DAVEditorHandler extends BasicDAVDeltaHandler {
             }
             String value = cdata.toString();
             if ("base64".equals(myEncoding)) {
-                byte[] buffer = allocateBuffer(cdata.length());
-                int length = SVNBase64.base64ToByteArray(new StringBuffer(cdata.toString().trim()), buffer);
                 try {
-                    value = new String(buffer, 0, length, "UTF-8");
+                    value = new String(SVNBase64.base64ToByteArray(new StringBuffer(cdata.toString().trim()), null), "UTF-8");
                 } catch (UnsupportedEncodingException e) {
-                    value = new String(buffer, 0, length);
+                    value = new String(SVNBase64.base64ToByteArray(new StringBuffer(cdata.toString().trim()), null));
                 }                
             }
             if (myIsDirectory) {
@@ -300,7 +297,7 @@ public class DAVEditorHandler extends BasicDAVDeltaHandler {
         return myPath;
     }
     
-    protected ISVNDeltaConsumer getDeltaConsumer() {
+    protected ISVNEditor getEditor() {
         return myEditor;
     }
     

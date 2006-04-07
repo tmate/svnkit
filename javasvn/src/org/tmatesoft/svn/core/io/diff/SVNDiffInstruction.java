@@ -12,8 +12,6 @@
 
 package org.tmatesoft.svn.core.io.diff;
 
-import java.nio.ByteBuffer;
-
 
 /**
  * The <b>SVNDiffInstruction</b> class represents instructions used to
@@ -79,7 +77,7 @@ public class SVNDiffInstruction {
      *           the bytes are to be copied
      * @see      SVNDiffWindow
      */
-    public SVNDiffInstruction(int t, int l, int o) {
+    public SVNDiffInstruction(int t, long l, long o) {
         type = t;
         length = l;
         offset = o;        
@@ -103,7 +101,7 @@ public class SVNDiffInstruction {
     /**
      * A length bytes to copy.    
      */
-    public int length;
+    public long length;
     
     /**
      * An offset in the source from where the bytes
@@ -112,7 +110,7 @@ public class SVNDiffInstruction {
      * diff window) in the source/target stream (this can be a file, a buffer).
      *  
      */
-    public int offset;
+    public long offset;
     
     /**
      * Gives a string representation of this object.
@@ -135,67 +133,10 @@ public class SVNDiffInstruction {
         if (type == 0 || type == 1) {
             b.append(offset);
         } else {
-            b.append(offset);
+            b.append("x");
         }
         b.append(":");
         b.append(length);
         return b.toString();
-    }
-    
-    public void writeTo(ByteBuffer target) {
-        byte first = (byte) (type << 6);
-        if (length <= 0x3f && length > 0) {
-            // single-byte lenght;
-            first |= (length & 0x3f);
-            target.put((byte) (first & 0xff));
-        } else {
-            target.put((byte) (first & 0xff));
-            writeInt(target, length);
-        }
-        if (type == 0 || type == 1) {
-            writeInt(target, offset);
-        }
-    }
-
-    public static void writeInt(ByteBuffer os, int i) {
-        if (i == 0) {
-            os.put((byte) 0);
-            return;
-        }
-        // how many bytes there are:
-        int count = 1;
-        long v = i >> 7;
-        while(v > 0) {
-            v = v >> 7;
-            count++;
-        }
-        byte b;
-        int r;
-        while(--count >= 0) {
-            b = (byte) ((count > 0 ? 0x1 : 0x0) << 7);
-            r = ((byte) ((i >> 7 * count) & 0x7f)) | b;
-            os.put((byte) r);
-        }
-    }
-
-    public static void writeLong(ByteBuffer os, long i) {
-        if (i == 0) {
-            os.put((byte) 0);
-            return;
-        }
-        // how many bytes there are:
-        int count = 1;
-        long v = i >> 7;
-        while(v > 0) {
-            v = v >> 7;
-            count++;
-        }
-        byte b;
-        int r;
-        while(--count >= 0) {
-            b = (byte) ((count > 0 ? 0x1 : 0x0) << 7);
-            r = ((byte) ((i >> 7 * count) & 0x7f)) | b;
-            os.put((byte) r);
-        }
     }
 }

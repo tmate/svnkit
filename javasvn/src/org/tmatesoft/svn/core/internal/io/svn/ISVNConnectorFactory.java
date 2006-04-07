@@ -11,11 +11,6 @@
  */
 package org.tmatesoft.svn.core.internal.io.svn;
 
-import org.tmatesoft.svn.core.SVNErrorCode;
-import org.tmatesoft.svn.core.SVNErrorMessage;
-import org.tmatesoft.svn.core.SVNException;
-import org.tmatesoft.svn.core.SVNURL;
-import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.io.SVNRepository;
 
 /**
@@ -25,26 +20,14 @@ import org.tmatesoft.svn.core.io.SVNRepository;
 public interface ISVNConnectorFactory {
 
     public static final ISVNConnectorFactory DEFAULT = new ISVNConnectorFactory() {
-
-        public ISVNConnector createConnector(SVNRepository repository) throws SVNException {
-            SVNURL location = repository.getLocation();
-            if ("svn+ssh".equals(location.getProtocol())) {
+        public ISVNConnector createConnector(SVNRepository repository) {
+            if ("svn+ssh".equals(repository.getLocation().getProtocol())) {
                 return new SVNGanymedConnector();
-            } else if (location.getProtocol().startsWith("svn+")) {
-                String name = location.getProtocol().substring("svn+".length());
-                if (repository.getTunnelProvider() != null) {
-                    String tunnel = repository.getTunnelProvider().getTunnelDefinition(name);
-                    if (tunnel != null) {
-                        return new SVNTunnelConnector(name, tunnel);
-                    }
-                }
-                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.EXTERNAL_PROGRAM, "Cannot find tunnel specification for ''{0}''", name);
-                SVNErrorManager.error(err);
             }
             return new SVNPlainConnector();
         }
     };
 
-    public ISVNConnector createConnector(SVNRepository repository) throws SVNException;
+    public ISVNConnector createConnector(SVNRepository repository);
 
 }

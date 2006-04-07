@@ -23,6 +23,7 @@ import java.util.Map;
 import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNURL;
+import org.tmatesoft.svn.core.internal.util.IMeasurable;
 import org.tmatesoft.svn.util.Version;
 import org.xml.sax.helpers.DefaultHandler;
 
@@ -53,8 +54,6 @@ class HTTPRequest {
     private InputStream myRequestStream;
 
     private boolean myIsProxyAuthForced;
-
-    private boolean myIsKeepAlive;
 
     public HTTPRequest() {
     }
@@ -144,11 +143,10 @@ class HTTPRequest {
             length = myRequestBody.length;
         } else if (myRequestStream instanceof ByteArrayInputStream) {
             length = ((ByteArrayInputStream) myRequestStream).available();
-        } else if (header != null && header.containsKey("Content-Length")) {
-            length = Long.parseLong((String) header.get("Content-Length"));
-            header.remove("Content-Length");
+        } else if (myRequestStream instanceof IMeasurable) {
+            length = ((IMeasurable) myRequestStream).getLength();
         }
-        StringBuffer headerText = composeHTTPHeader(request, path, header, length, myIsKeepAlive);
+        StringBuffer headerText = composeHTTPHeader(request, path, header, length);
         myConnection.sendData(headerText.toString().getBytes());
         if (myRequestBody != null && length > 0) {
             myConnection.sendData(myRequestBody);
@@ -238,7 +236,7 @@ class HTTPRequest {
         return myErrorMessage;
     }
 
-    private StringBuffer composeHTTPHeader(String request, String path, Map header, long length, boolean keepAlive) {
+    private StringBuffer composeHTTPHeader(String request, String path, Map header, long length) {
         StringBuffer sb = new StringBuffer();
         sb.append(request);
         sb.append(' ');
@@ -268,12 +266,10 @@ class HTTPRequest {
         sb.append("User-Agent: ");
         sb.append(Version.getVersionString());
         sb.append(HTTPRequest.CRLF);
-        if (keepAlive) {
-            sb.append("Keep-Alive:");
-            sb.append(HTTPRequest.CRLF);
-            sb.append("Connection: TE, Keep-Alive");
-            sb.append(HTTPRequest.CRLF);
-        }
+        sb.append("Keep-Alive:");
+        sb.append(HTTPRequest.CRLF);
+        sb.append("Connection: TE, Keep-Alive");
+        sb.append(HTTPRequest.CRLF);
         sb.append("TE: trailers");
         sb.append(HTTPRequest.CRLF);
         if (myAuthentication != null) {
@@ -325,10 +321,6 @@ class HTTPRequest {
             System.arraycopy(contextObjects, 0, messageObjects, 0, contextObjects.length);
         }
         return SVNErrorMessage.create(errorCode, context + ": " + message + " ({" + index + "})", messageObjects);
-    }
-
-    public void setKeepAlive(boolean isKeepAlive) {
-        myIsKeepAlive = isKeepAlive;
     }
     
 }

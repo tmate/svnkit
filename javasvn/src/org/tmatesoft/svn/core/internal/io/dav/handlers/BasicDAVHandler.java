@@ -38,7 +38,6 @@ public abstract class BasicDAVHandler extends DefaultHandler {
     private Map myPrefixesMap;
     private StringBuffer myCDATA;
     private Stack myParent;
-    private byte[] myDeltaBuffer;
     
     protected BasicDAVHandler() {
         myPrefixesMap = new HashMap();        
@@ -126,13 +125,6 @@ public abstract class BasicDAVHandler extends DefaultHandler {
             qName = qName.substring(index + 1);
         }
         return DAVElement.getElement(prefix, qName);        
-    }
-    
-    protected byte[] allocateBuffer(int length) {
-        if (myDeltaBuffer == null || myDeltaBuffer.length < length) {
-            myDeltaBuffer = new byte[length*3/2];
-        }   
-        return myDeltaBuffer;
     }
 
 }

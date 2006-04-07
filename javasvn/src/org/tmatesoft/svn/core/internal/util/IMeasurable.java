@@ -9,16 +9,15 @@
  * newer version instead, at your option.
  * ====================================================================
  */
-package org.tmatesoft.svn.core.auth;
+package org.tmatesoft.svn.core.internal.util;
 
 
 /**
  * @version 1.0
  * @author  TMate Software Ltd.
  */
-public class SVNUserNameAuthentication extends SVNAuthentication {
+public interface IMeasurable {
+    
+    public long getLength();
 
-    public SVNUserNameAuthentication(String userName, boolean storageAllowed) {
-        super(ISVNAuthenticationManager.USERNAME, userName, storageAllowed);
-    }
 }

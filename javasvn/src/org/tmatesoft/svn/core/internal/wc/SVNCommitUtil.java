@@ -23,7 +23,6 @@ import java.util.StringTokenizer;
 import java.util.TreeMap;
 import java.util.TreeSet;
 
-import org.tmatesoft.svn.core.SVNCancelException;
 import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
@@ -33,10 +32,7 @@ import org.tmatesoft.svn.core.SVNURL;
 import org.tmatesoft.svn.core.internal.util.SVNEncodingUtil;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
 import org.tmatesoft.svn.core.io.ISVNEditor;
-import org.tmatesoft.svn.core.wc.ISVNCommitParameters;
-import org.tmatesoft.svn.core.wc.ISVNEventHandler;
 import org.tmatesoft.svn.core.wc.SVNCommitItem;
-import org.tmatesoft.svn.core.wc.SVNEvent;
 import org.tmatesoft.svn.core.wc.SVNRevision;
 import org.tmatesoft.svn.core.wc.SVNStatus;
 import org.tmatesoft.svn.core.wc.SVNStatusClient;
@@ -106,11 +102,10 @@ public class SVNCommitUtil {
         }
     }
 
-    public static SVNWCAccess createCommitWCAccess(File[] paths, boolean recursive, boolean force, Collection relativePaths, final SVNStatusClient statusClient) throws SVNException {
+    public static SVNWCAccess createCommitWCAccess(File[] paths, boolean recursive, boolean force, Collection relativePaths, SVNStatusClient statusClient) throws SVNException {
         File wcRoot = null;
         for (int i = 0; i < paths.length; i++) {
-            statusClient.checkCancelled();
-            File path = paths[i];            
+            File path = paths[i];
             File newWCRoot = SVNWCUtil.getWorkingCopyRoot(path, true);
             if (wcRoot != null && !wcRoot.equals(newWCRoot)) {
                 SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.UNSUPPORTED_FEATURE, "Commit targets should belong to the same working copy");
@@ -120,7 +115,6 @@ public class SVNCommitUtil {
         }
         String[] validatedPaths = new String[paths.length];
         for (int i = 0; i < paths.length; i++) {
-            statusClient.checkCancelled();
             File file = paths[i];
             validatedPaths[i] = SVNPathUtil.validateFilePath(file.getAbsolutePath());
         }
@@ -134,7 +128,6 @@ public class SVNCommitUtil {
         Collection dirsToLockRecursively = new TreeSet(); 
         boolean lockAll = false;
         if (relativePaths.isEmpty()) {
-            statusClient.checkCancelled();
             String target = getTargetName(baseDir);
             if (!"".equals(target)) {
                 // we will have to lock target as well, not only base dir.
@@ -157,7 +150,6 @@ public class SVNCommitUtil {
             baseDir = adjustRelativePaths(baseDir, relativePaths);
             // there are multiple paths.
             for (Iterator targets = relativePaths.iterator(); targets.hasNext();) {
-                statusClient.checkCancelled();
                 String targetPath = (String) targets.next();
                 File targetFile = new File(baseDir, targetPath);
                 String target = getTargetName(targetFile);
@@ -183,16 +175,8 @@ public class SVNCommitUtil {
         }
         SVNDirectory anchor = new SVNDirectory(null, "", baseDir);
         SVNWCAccess baseAccess = new SVNWCAccess(anchor, anchor, "");
-        baseAccess.setEventDispatcher(new ISVNEventHandler() {
-            public void handleEvent(SVNEvent event, double progress) throws SVNException {
-            }
-            public void checkCancelled() throws SVNCancelException {
-                statusClient.checkCancelled();
-            }
-        });
         if (!recursive && !force) {
             for (Iterator targets = relativePaths.iterator(); targets.hasNext();) {
-                statusClient.checkCancelled();
                 String targetPath = (String) targets.next();
                 File targetFile = new File(baseDir, targetPath);
                 if (SVNFileType.getType(targetFile) == SVNFileType.DIRECTORY) {
@@ -205,20 +189,17 @@ public class SVNCommitUtil {
             }
         }
         try {
-            statusClient.checkCancelled();
             if (lockAll) {
                 baseAccess.open(true, recursive);
             } else {
                 baseAccess.open(true, false);
                 removeRedundantPaths(dirsToLockRecursively, dirsToLock);
                 for (Iterator nonRecusivePaths = dirsToLock.iterator(); nonRecusivePaths.hasNext();) {
-                    statusClient.checkCancelled();
                     String path = (String) nonRecusivePaths.next();
                     File pathFile = new File(baseDir, path);
                     baseAccess.addDirectory(path, pathFile, false, true, true);
                 }
                 for (Iterator recusivePaths = dirsToLockRecursively.iterator(); recusivePaths.hasNext();) {
-                    statusClient.checkCancelled();
                     String path = (String) recusivePaths.next();
                     File pathFile = new File(baseDir, path);
                     baseAccess.addDirectory(path, pathFile, true, true, true);
@@ -229,7 +210,6 @@ public class SVNCommitUtil {
             if (!recursive && force) {
                 SVNDirectory[] lockedDirs = baseAccess.getAllDirectories();
                 for (int i = 0; i < lockedDirs.length; i++) {
-                    statusClient.checkCancelled();
                     SVNDirectory dir = lockedDirs[i];
                     SVNEntry rootEntry = dir.getEntries().getEntry("", true);
                     if (rootEntry.getCopyFromURL() != null) {
@@ -258,7 +238,6 @@ public class SVNCommitUtil {
     public static SVNWCAccess[] createCommitWCAccess2(File[] paths, boolean recursive, boolean force, Map relativePathsMap, SVNStatusClient statusClient) throws SVNException {
         Map rootsMap = new HashMap(); // wc root file -> paths to be committed (paths).
         for (int i = 0; i < paths.length; i++) {
-            statusClient.checkCancelled();
             File path = paths[i];
             File wcRoot = SVNWCUtil.getWorkingCopyRoot(path, true);
             if (!rootsMap.containsKey(wcRoot)) {
@@ -270,7 +249,6 @@ public class SVNCommitUtil {
         Collection result = new ArrayList();
         try {
             for (Iterator roots = rootsMap.keySet().iterator(); roots.hasNext();) {
-                statusClient.checkCancelled();
                 File root = (File) roots.next();
                 Collection filesList = (Collection) rootsMap.get(root);
                 File[] filesArray = (File[]) filesList.toArray(new File[filesList.size()]);
@@ -291,7 +269,7 @@ public class SVNCommitUtil {
 
     public static SVNCommitItem[] harvestCommitables(SVNWCAccess baseAccess,
             Collection paths, Map lockTokens, boolean justLocked,
-            boolean recursive, boolean force, ISVNCommitParameters params) throws SVNException {
+            boolean recursive, boolean force) throws SVNException {
         Map commitables = new TreeMap();
         Collection danglers = new HashSet();
         Iterator targets = paths.iterator();
@@ -299,7 +277,6 @@ public class SVNCommitUtil {
         boolean isRecursionForced = false;
 
         do {
-            baseAccess.checkCancelled();
             String target = targets.hasNext() ? (String) targets.next() : "";
             // get entry for target
             File targetFile = new File(baseAccess.getAnchor().getRoot(), target);
@@ -384,11 +361,10 @@ public class SVNCommitUtil {
                     recurse = true;
                 }
             }
-            harvestCommitables(commitables, dir, targetFile, null, entry, url, null, false, false, justLocked, lockTokens, recurse, isRecursionForced, params);
+            harvestCommitables(commitables, dir, targetFile, null, entry, url, null, false, false, justLocked, lockTokens, recurse, isRecursionForced);
         } while (targets.hasNext());
 
         for (Iterator ds = danglers.iterator(); ds.hasNext();) {
-            baseAccess.checkCancelled();
             File file = (File) ds.next();
             if (!commitables.containsKey(file)) {
                 SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ILLEGAL_TARGET, 
@@ -403,7 +379,6 @@ public class SVNCommitUtil {
             // that not only 'copied' but also has local mods (modified or deleted), remove those items?
             // or not?
             for (Iterator items = commitables.values().iterator(); items.hasNext();) {
-                baseAccess.checkCancelled();
                 SVNCommitItem item = (SVNCommitItem) items.next();
                 if (item.isDeleted()) {
                     // to detect deleted copied items.
@@ -491,7 +466,7 @@ public class SVNCommitUtil {
     public static void harvestCommitables(Map commitables, SVNDirectory dir,
             File path, SVNEntry parentEntry, SVNEntry entry, String url,
             String copyFromURL, boolean copyMode, boolean addsOnly,
-            boolean justLocked, Map lockTokens, boolean recursive, boolean forcedRecursion, ISVNCommitParameters params)
+            boolean justLocked, Map lockTokens, boolean recursive, boolean forcedRecursion)
             throws SVNException {
         if (commitables.containsKey(path)) {
             return;
@@ -548,18 +523,6 @@ public class SVNCommitUtil {
         }
         boolean commitDeletion = !addsOnly
                 && ((entry.isDeleted() && entry.getSchedule() == null) || entry.isScheduledForDeletion() || entry.isScheduledForReplacement());
-        if (!addsOnly && !commitDeletion && fileType == SVNFileType.NONE && params != null) {
-            ISVNCommitParameters.Action action = 
-                entry.getKind() == SVNNodeKind.DIR ? params.onMissingDirectory(path) : params.onMissingFile(path);
-            if (action == ISVNCommitParameters.ERROR) {
-                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_NOT_LOCKED, "Working copy file ''{0}'' is missing", path);
-                SVNErrorManager.error(err);
-            } else if (action == ISVNCommitParameters.DELETE) {
-                commitDeletion = true;
-                entry.scheduleForDeletion();
-                dir.getEntries().save(false);
-            }
-        }
         boolean commitAddition = false;
         boolean commitCopy = false;
         if (entry.isScheduledForAddition() || entry.isScheduledForReplacement()) {
@@ -660,9 +623,6 @@ public class SVNCommitUtil {
         if (entries != null && recursive && (commitAddition || !commitDeletion)) {
             // recurse.
             for (Iterator ents = entries.entries(copyMode); ents.hasNext();) {
-                if (dir != null && dir.getWCAccess() != null) {
-                    dir.getWCAccess().checkCancelled();
-                }
                 SVNEntry currentEntry = (SVNEntry) ents.next();
                 if ("".equals(currentEntry.getName())) {
                     continue;
@@ -693,34 +653,14 @@ public class SVNCommitUtil {
                             item.setPath(SVNPathUtil.append(dir.getPath(), currentEntry.getName()));
                             commitables.put(currentFile, item);
                             continue;
-                        } else if (currentType != SVNFileType.NONE) {
-                            // directory is not missing, but obstructed, 
-                            // or no special params are specified.
-                            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_NOT_LOCKED, "Working copy ''{0}'' is missing or not locked", currentFile);
-                            SVNErrorManager.error(err);
-                        } else { 
-                            ISVNCommitParameters.Action action = 
-                                params != null ? params.onMissingDirectory(dir.getFile(currentEntry.getName())) : ISVNCommitParameters.ERROR;
-                            if (action == ISVNCommitParameters.DELETE) {
-                                SVNCommitItem item = new SVNCommitItem(currentFile,
-                                        SVNURL.parseURIEncoded(currentURL), null, currentEntry.getKind(),
-                                        SVNRevision.UNDEFINED, false, true, false,
-                                        false, false, false);
-                                item.setPath(SVNPathUtil.append(dir.getPath(), currentEntry.getName()));
-                                commitables.put(currentFile, item);
-                                currentEntry.scheduleForDeletion();
-                                entries.save(false);
-                                continue;
-                            } else if (action != ISVNCommitParameters.SKIP) {
-                                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_NOT_LOCKED, "Working copy ''{0}'' is missing or not locked", currentFile);
-                                SVNErrorManager.error(err);
-                            }
                         }
+                        SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_NOT_LOCKED, "Working copy ''{0}'' is missing or not locked", currentFile);
+                        SVNErrorManager.error(err);
                     }
                 }
                 harvestCommitables(commitables, dir, currentFile, entry,
                         currentEntry, currentURL, currentCFURL, copyMode,
-                        addsOnly, justLocked, lockTokens, true, forcedRecursion, params);
+                        addsOnly, justLocked, lockTokens, true, forcedRecursion);
 
             }
         }

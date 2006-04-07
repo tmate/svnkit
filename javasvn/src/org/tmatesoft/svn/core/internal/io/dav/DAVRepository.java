@@ -449,7 +449,7 @@ class DAVRepository extends SVNRepository {
     public long log(String[] targetPaths, long startRevision, long endRevision,
             boolean changedPath, boolean strictNode, long limit, final ISVNLogEntryHandler handler) throws SVNException {
         if (targetPaths == null || targetPaths.length == 0) {
-            targetPaths = new String[]{""};
+            return 0;
         }
         DAVLogHandler davHandler = null;
         ISVNLogEntryHandler cachingHandler = new ISVNLogEntryHandler() {
@@ -694,7 +694,7 @@ class DAVRepository extends SVNRepository {
             if (th instanceof SVNException) {
                 throw (SVNException) th;
             } 
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.UNKNOWN, "can not get commit editor: ''{0}''", th.getLocalizedMessage());
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.UNKNOWN, "cannot get commit editor: ''{0}''", th.getLocalizedMessage());
             SVNErrorManager.error(err, th);
             return null;
         }

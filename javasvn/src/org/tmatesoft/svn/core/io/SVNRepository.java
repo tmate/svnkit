@@ -128,7 +128,6 @@ public abstract class SVNRepository {
     private Thread myLocker;
     private ISVNAuthenticationManager myAuthManager;
     private ISVNSession myOptions;
-    private ISVNTunnelProvider myTunnelProvider;
 
     protected SVNRepository(SVNURL location, ISVNSession options) {
         myLocation = location;
@@ -309,14 +308,6 @@ public abstract class SVNRepository {
      */
     public ISVNAuthenticationManager getAuthenticationManager() {
         return myAuthManager;
-    }
-    
-    public void setTunnelProvider(ISVNTunnelProvider tunnelProvider) {
-        myTunnelProvider = tunnelProvider;
-    }
-    
-    public ISVNTunnelProvider getTunnelProvider() {
-        return myTunnelProvider;
     }
     
     /**
@@ -786,7 +777,7 @@ public abstract class SVNRepository {
             public void openRevision(SVNFileRevision fileRevision) throws SVNException {
                 result.add(fileRevision);
             }
-            public void applyTextDelta(String path, String baseChecksum) throws SVNException {
+            public void applyTextDelta(String token) throws SVNException {
             }
             public OutputStream textDeltaChunk(String token, SVNDiffWindow diffWindow) throws SVNException {
                 return SVNFileUtil.DUMMY_OUT;
@@ -1646,9 +1637,9 @@ public abstract class SVNRepository {
      */
     public abstract void closeSession() throws SVNException;
     
-    public ISVNSession getOptions() {
+    protected ISVNSession getOptions() {
         if (myOptions == null) {
-            myOptions = ISVNSession.DEFAULT;
+            return ISVNSession.DEFAULT;
         }
         return myOptions;
     }

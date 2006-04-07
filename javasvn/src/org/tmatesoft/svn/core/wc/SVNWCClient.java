@@ -1953,20 +1953,21 @@ public class SVNWCClient extends SVNBasicClient {
         File file = dir.getFile(name);
         dir.add(name, false, false);
 
+        String mimeType;
         SVNProperties properties = dir.getProperties(name, false);
         if (SVNFileType.getType(file) == SVNFileType.SYMLINK) {
             properties.setPropertyValue(SVNProperty.SPECIAL, "*");
         } else {
             Map props = new HashMap();
-	        String mimeType = SVNFileUtil.detectMimeType(file);
-	        if (mimeType != null) {
-	            props.put(SVNProperty.MIME_TYPE, mimeType);
-	        }
             boolean executable;
             props = getOptions().applyAutoProperties(name, props);
-            if (props.get(SVNProperty.MIME_TYPE) == null && mimeType != null) {
-                props.put(SVNProperty.MIME_TYPE, mimeType);
-                props.remove(SVNProperty.EOL_STYLE);
+            mimeType = (String) props.get(SVNProperty.MIME_TYPE);
+            if (mimeType == null) {
+                mimeType = SVNFileUtil.detectMimeType(file);
+                if (mimeType != null) {
+                    props.put(SVNProperty.MIME_TYPE, mimeType);
+                    props.remove(SVNProperty.EOL_STYLE);
+                }
             }
             if (!props.containsKey(SVNProperty.EXECUTABLE)) {
                 executable = SVNFileUtil.isExecutable(file);
@@ -2231,8 +2232,7 @@ public class SVNWCClient extends SVNBasicClient {
             return value;
         }
         if (SVNProperty.isSVNProperty(name)) {
-            value = value.replaceAll("\r\n", "\n");
-            value = value.replace('\r', '\n');
+            value = SVNTranslator.convertEOLs(value);
         }
         if (!force && SVNProperty.EOL_STYLE.equals(name)) {
             value = value.trim();
