@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -14,6 +14,8 @@ package org.tmatesoft.svn.core.internal.io.dav;
 
 import java.util.HashMap;
 import java.util.Map;
+
+import org.tmatesoft.svn.core.internal.io.dav.http.XMLReader;
 
 
 /**
@@ -45,6 +47,7 @@ public class DAVElement {
     public static final String SVN_DAV_PROPERTY_NAMESPACE = "http://subversion.tigris.org/xmlns/dav/";
     public static final String SVN_CUSTOM_PROPERTY_NAMESPACE = "http://subversion.tigris.org/xmlns/custom/";
     public static final String SVN_SVN_PROPERTY_NAMESPACE = "http://subversion.tigris.org/xmlns/svn/";
+    public static final String SVN_APACHE_PROPERTY_NAMESPACE = "http://apache.org/dav/xmlns";
     
     public static final String SVN_DAV_ERROR_NAMESPACE = "svn:";
     public static final String DAV_NAMESPACE = "DAV:";

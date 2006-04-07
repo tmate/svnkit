@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -24,6 +24,7 @@ import org.tmatesoft.svn.core.SVNException;
  * Used to provide random access to files and buffers upon which
  * delta is generated. 
  * 
+ * @deprecated see {@link SVNDeltaGenerator}
  * @version 1.0
  * @author  TMate Software Ltd.
  * @see     SVNRAFileData

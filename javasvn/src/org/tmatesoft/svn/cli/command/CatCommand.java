@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -37,7 +37,12 @@ public class CatCommand extends SVNCommand {
         for (int index = 0; index < getCommandLine().getPathCount(); index++) {
             final String absolutePath = getCommandLine().getPathAt(index);
             SVNRevision pegRevision = getCommandLine().getPathPegRevision(index);
-            wcClient.doGetFileContents(new File(absolutePath), pegRevision, revision, true, out);
+            try {
+                wcClient.doGetFileContents(new File(absolutePath), pegRevision, revision, true, out);
+            } catch (SVNException e) {
+                String message = e.getMessage();
+                err.println(message);                
+            }
             out.flush();
         }
 
@@ -48,7 +53,12 @@ public class CatCommand extends SVNCommand {
         for (int index = 0; index < getCommandLine().getURLCount(); index++) {
             final String url = getCommandLine().getURL(index);
             SVNRevision pegRevision = getCommandLine().getPegRevision(index);
-            wcClient.doGetFileContents(SVNURL.parseURIEncoded(url), pegRevision, revision, true, out);
+            try {
+                wcClient.doGetFileContents(SVNURL.parseURIEncoded(url), pegRevision, revision, true, out);
+            } catch (SVNException e) {
+                String message = e.getMessage();
+                err.println(message);                
+            }
             out.flush();
         }
     }

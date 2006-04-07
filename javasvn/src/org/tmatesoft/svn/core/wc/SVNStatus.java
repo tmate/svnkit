@@ -1,22 +1,24 @@
 /*
  * ====================================================================
- * Copyright (c) 2004 TMate Software Ltd. All rights reserved.
- * 
- * This software is licensed as described in the file COPYING, which you should
- * have received as part of this distribution. The terms are also available at
- * http://tmate.org/svn/license.html. If newer versions of this license are
- * posted there, you may use a newer version instead, at your option.
+ * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ *
+ * This software is licensed as described in the file COPYING, which
+ * you should have received as part of this distribution.  The terms
+ * are also available at http://tmate.org/svn/license.html.
+ * If newer versions of this license are posted there, you may use a
+ * newer version instead, at your option.
  * ====================================================================
  */
 package org.tmatesoft.svn.core.wc;
 
-import org.tmatesoft.svn.core.SVNLock;
-import org.tmatesoft.svn.core.SVNNodeKind;
-import org.tmatesoft.svn.core.SVNURL;
-
 import java.io.File;
 import java.util.Date;
 import java.util.Map;
+
+import org.tmatesoft.svn.core.SVNLock;
+import org.tmatesoft.svn.core.SVNNodeKind;
+import org.tmatesoft.svn.core.SVNURL;
+import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 
 /**
  * The <b>SVNStatus</b> class is used to provide detailed status information for
@@ -115,8 +117,13 @@ public class SVNStatus {
     private SVNLock myRemoteLock;
     private SVNLock myLocalLock;
     private Map myEntryProperties;
-    private SVNRevision myRepositoryRevision;
-    private SVNURL myRepositoryURL;
+    private SVNRevision myRemoteRevision;
+    private SVNURL myRemoteURL;
+    private SVNNodeKind myRemoteKind;
+    private String myRemoteAuthor;
+    private Date myRemoteDate;
+    private Date myLocalContentsDate;
+    private Date myLocalPropertiesDate;
 
     /**
      * Constructs an <b>SVNStatus</b> object filling it with status information
@@ -211,7 +218,7 @@ public class SVNStatus {
      * @return  the item's URL as it's real repository location 
      */
     public SVNURL getRemoteURL() {
-        return myRepositoryURL;
+        return myRemoteURL;
     }
 
     /**
@@ -465,7 +472,45 @@ public class SVNStatus {
      *         unavailable
      */
     public SVNRevision getRemoteRevision() {
-        return myRepositoryRevision;
+        return myRemoteRevision;
+    }
+    
+    public SVNNodeKind getRemoteKind() {
+        return myRemoteKind;
+    }
+
+    public Date getRemoteDate() {
+        return myRemoteDate;
+    }
+    
+    public String getRemoteAuthor() {
+        return myRemoteAuthor;
+    }
+    
+    public Date getWorkingContentsDate() {
+        if (myLocalContentsDate == null) {
+            if (getFile() != null && getKind() == SVNNodeKind.FILE) {
+                myLocalContentsDate = new Date(getFile().lastModified());
+            } else {
+                myLocalContentsDate = new Date(0);
+            }
+        }
+        return myLocalContentsDate;
+    }
+
+    public Date getWorkingPropertiesDate() {
+        if (myLocalPropertiesDate == null) {
+            File propFile = null;
+            if (getFile() != null && getKind() == SVNNodeKind.DIR) {
+                propFile = new File(getFile().getAbsoluteFile().getParentFile(), SVNFileUtil.getAdminDirectoryName());
+                propFile = new File(propFile, "dir-props");
+            } else if (getFile() != null && getKind() == SVNNodeKind.FILE) {
+                propFile = new File(getFile().getAbsoluteFile().getParentFile(), SVNFileUtil.getAdminDirectoryName());
+                propFile = new File(propFile, "props/" + getFile().getName() + ".svn-work");
+            }
+            myLocalContentsDate = propFile != null ? new Date(propFile.lastModified()) : new Date(0);
+        }
+        return myLocalPropertiesDate;
     }
     
     /**
@@ -497,6 +542,7 @@ public class SVNStatus {
         }
         if (kind != null) {
             myKind = kind;
+            myRemoteKind = kind;
         }
     }
     
@@ -510,11 +556,17 @@ public class SVNStatus {
      * @param lock     item's lock in the repository
      * @param kind     item's node kind
      * @param revision item's latest revision when it was last committed
+     * @param date     last item's committed date 
+     * @param author   last item's committed author
      */
-    public void setRemoteStatus(SVNURL url, SVNStatusType contents, SVNStatusType props, SVNLock lock, SVNNodeKind kind, SVNRevision revision) {
+    public void setRemoteStatus(SVNURL url, SVNStatusType contents, SVNStatusType props, SVNLock lock, SVNNodeKind kind, SVNRevision revision,
+            Date date, String author) {
         setRemoteStatus(contents, props, lock, kind);
-        myRepositoryURL = url;
-        myRepositoryRevision = revision == null ? SVNRevision.UNDEFINED : revision;  
+        myRemoteURL = url;
+        myRemoteRevision = revision == null ? SVNRevision.UNDEFINED : revision;
+        myRemoteDate = date;
+        myRemoteAuthor = author;
+        myRemoteKind = kind;
     }
     
     /**
@@ -523,7 +575,7 @@ public class SVNStatus {
      * 
      * @param statusType status type of the item's contents
      */
-    public void setRemoteStatus(SVNStatusType statusType) {
-        setRemoteStatus(statusType, null, null, null);
+    public void setContentsStatus(SVNStatusType statusType) {
+        myContentsStatus = statusType;
     }
 }

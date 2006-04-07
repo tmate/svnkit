@@ -1,11 +1,12 @@
 /*
  * ====================================================================
- * Copyright (c) 2004 TMate Software Ltd. All rights reserved.
- * 
- * This software is licensed as described in the file COPYING, which you should
- * have received as part of this distribution. The terms are also available at
- * http://tmate.org/svn/license.html. If newer versions of this license are
- * posted there, you may use a newer version instead, at your option.
+ * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ *
+ * This software is licensed as described in the file COPYING, which
+ * you should have received as part of this distribution.  The terms
+ * are also available at http://tmate.org/svn/license.html.
+ * If newer versions of this license are posted there, you may use a
+ * newer version instead, at your option.
  * ====================================================================
  */
 
@@ -17,6 +18,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.RandomAccessFile;
 
+import org.tmatesoft.svn.core.SVNErrorCode;
+import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
@@ -25,6 +28,7 @@ import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
  * The <b>SVNRAFileData</b> class represents a random access data storage 
  * wrapper for files.
  * 
+ * @deprecated see {@link SVNDeltaGenerator}
  * @version 1.0
  * @author  TMate Software Ltd.
  */
@@ -58,7 +62,8 @@ public class SVNRAFileData implements ISVNRAData {
             getRAFile().seek(offset);
             read = getRAFile().read(resultingArray);
         } catch (IOException e) {
-            SVNErrorManager.error(e.getMessage());
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, e.getLocalizedMessage());
+            SVNErrorManager.error(err, e);
         } 
         for (int i = read; i < length; i++) {
             resultingArray[i] = resultingArray[i - read];
@@ -78,7 +83,8 @@ public class SVNRAFileData implements ISVNRAData {
                 getRAFile().write(bytes, 0, (int) length);
             }
         } catch (IOException e) {
-            SVNErrorManager.error(e.getMessage());
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, e.getLocalizedMessage());
+            SVNErrorManager.error(err, e);
         } 
     }
 

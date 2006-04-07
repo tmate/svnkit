@@ -1,11 +1,12 @@
 /*
  * ====================================================================
- * Copyright (c) 2004 TMate Software Ltd. All rights reserved.
- * 
- * This software is licensed as described in the file COPYING, which you should
- * have received as part of this distribution. The terms are also available at
- * http://tmate.org/svn/license.html. If newer versions of this license are
- * posted there, you may use a newer version instead, at your option.
+ * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ *
+ * This software is licensed as described in the file COPYING, which
+ * you should have received as part of this distribution.  The terms
+ * are also available at http://tmate.org/svn/license.html.
+ * If newer versions of this license are posted there, you may use a
+ * newer version instead, at your option.
  * ====================================================================
  */
 package org.tmatesoft.svn.core.internal.wc;
@@ -16,6 +17,8 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.tmatesoft.svn.core.SVNCommitInfo;
+import org.tmatesoft.svn.core.SVNErrorCode;
+import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNNodeKind;
 import org.tmatesoft.svn.core.SVNProperty;
@@ -23,6 +26,7 @@ import org.tmatesoft.svn.core.internal.util.SVNEncodingUtil;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
 import org.tmatesoft.svn.core.internal.util.SVNTimeUtil;
 import org.tmatesoft.svn.core.io.ISVNEditor;
+import org.tmatesoft.svn.core.io.diff.SVNDeltaProcessor;
 import org.tmatesoft.svn.core.io.diff.SVNDiffWindow;
 import org.tmatesoft.svn.core.wc.ISVNEventHandler;
 
@@ -74,13 +78,18 @@ public class SVNExportEditor implements ISVNEditor {
         if (dirType == SVNFileType.FILE || dirType == SVNFileType.SYMLINK) {
             // export is obstructed.
             if (!myIsForce) {
-                SVNErrorManager.error("svn: Failed to add directory '" + myCurrentDirectory + "': file of the same name already exists; use 'force' to overwrite existing file");
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_NOT_DIRECTORY, "''{0}'' exists and is not a directory", myCurrentDirectory);
+                SVNErrorManager.error(err);
             } else {
                 SVNFileUtil.deleteAll(myCurrentDirectory, myEventDispatcher);
             }
-        } else if (dirType == SVNFileType.NONE) {
+        } else if (dirType == SVNFileType.DIRECTORY && !myIsForce) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_OBSTRUCTED_UPDATE, "''{0}'' already exists", myCurrentDirectory);
+            SVNErrorManager.error(err);
+        } else if (dirType == SVNFileType.NONE) {        
             if (!myCurrentDirectory.mkdirs()) {
-                SVNErrorManager.error("svn: Failed to add directory '" + myCurrentDirectory + "'");
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_NOT_DIRECTORY, "Cannot create directory ''{0}''", myCurrentDirectory);
+                SVNErrorManager.error(err);
             }
         }
         myEventDispatcher.handleEvent(SVNEventFactory.createExportAddedEvent(
@@ -104,7 +113,8 @@ public class SVNExportEditor implements ISVNEditor {
         File file = new File(myRoot, path);
 
         if (!myIsForce && file.exists()) {
-            SVNErrorManager.error("svn: Failed to add file '" + file + "': file of the same name already exists; use 'force' to overwrite exsiting file");
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_OBSTRUCTED_UPDATE, "File ''{0}'' already exists", file);
+            SVNErrorManager.error(err);
         }
         myCurrentFile = file;
         myFileProperties = new HashMap();
@@ -116,31 +126,22 @@ public class SVNExportEditor implements ISVNEditor {
         myFileProperties.put(name, value);
     }
 
-    public void applyTextDelta(String commitPath, String baseChecksum)
-            throws SVNException {
+    public void applyTextDelta(String commitPath, String baseChecksum) throws SVNException {
+        myCurrentTmpFile = SVNFileUtil.createUniqueFile(myCurrentDirectory, myCurrentFile.getName(), ".tmp");
+        myDeltaProcessor.applyTextDelta(null, myCurrentTmpFile, true);
     }
 
     public OutputStream textDeltaChunk(String commitPath, SVNDiffWindow diffWindow) throws SVNException {
-        File tmpFile = SVNFileUtil.createUniqueFile(myCurrentDirectory,  myCurrentFile.getName(), ".tmp");
-        return myDeltaProcessor.textDeltaChunk(tmpFile, diffWindow);
+        return myDeltaProcessor.textDeltaChunk(diffWindow);
     }
     
     private String myChecksum;
 
     public void textDeltaEnd(String commitPath) throws SVNException {
-        // apply all deltas
-        File fakeBase = SVNFileUtil.createUniqueFile(myCurrentDirectory, myCurrentFile.getName(), ".tmp");
-        SVNFileUtil.createEmptyFile(fakeBase);
-        myCurrentTmpFile = SVNFileUtil.createUniqueFile(myCurrentDirectory, myCurrentFile.getName(), ".tmp");
-        try {
-            myChecksum = myDeltaProcessor.textDeltaEnd(fakeBase, myCurrentTmpFile, true);
-        } finally {
-            fakeBase.delete();
-        }
+        myChecksum = myDeltaProcessor.textDeltaEnd();
     }
 
     public void closeFile(String commitPath, String textChecksum) throws SVNException {
-        myDeltaProcessor.close();
         if (textChecksum == null) {
             textChecksum = (String) myFileProperties.get(SVNProperty.CHECKSUM);
         }
@@ -149,49 +150,46 @@ public class SVNExportEditor implements ISVNEditor {
         }
         String realChecksum = myChecksum != null ? myChecksum : SVNFileUtil.computeChecksum(myCurrentTmpFile);
         myChecksum = null;
-        if (textChecksum != null
-                && !textChecksum.equals(realChecksum)) {
-            SVNErrorManager.error("svn: Checksum differs, expected '" + textChecksum + "'; actual: '" + realChecksum + "'");
+        if (textChecksum != null && !textChecksum.equals(realChecksum)) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.CHECKSUM_MISMATCH, "Checksum mismatch for ''{0}''; expected: ''{1}'', actual: ''{2}''",
+                    new Object[] {myCurrentFile, textChecksum, realChecksum}); 
+            SVNErrorManager.error(err);
         }
         // retranslate.
         try {
-            String date = (String) myFileProperties
-                    .get(SVNProperty.COMMITTED_DATE);
-            String keywords = (String) myFileProperties
-                    .get(SVNProperty.KEYWORDS);
+            String date = (String) myFileProperties.get(SVNProperty.COMMITTED_DATE);
+            boolean special = myFileProperties.get(SVNProperty.SPECIAL) != null;
+            String keywords = (String) myFileProperties.get(SVNProperty.KEYWORDS);
             Map keywordsMap = null;
             if (keywords != null) {
                 String url = SVNPathUtil.append(myURL, SVNEncodingUtil.uriEncode(myCurrentPath));
                 url = SVNPathUtil.append(url, SVNEncodingUtil.uriEncode(myCurrentFile.getName()));
-                String author = (String) myFileProperties
-                        .get(SVNProperty.LAST_AUTHOR);
-                String revStr = (String) myFileProperties
-                        .get(SVNProperty.COMMITTED_REVISION);
-                keywordsMap = SVNTranslator.computeKeywords(keywords, url,
-                        author, date, revStr);
+                String author = (String) myFileProperties.get(SVNProperty.LAST_AUTHOR);
+                String revStr = (String) myFileProperties.get(SVNProperty.COMMITTED_REVISION);
+                keywordsMap = SVNTranslator.computeKeywords(keywords, url, author, date, revStr);
             }
-            String eolStyle = myEOLStyle != null ? myEOLStyle
-                    : (String) myFileProperties.get(SVNProperty.EOL_STYLE);
-            byte[] eolBytes = SVNTranslator.getWorkingEOL(eolStyle);
-            boolean special = myFileProperties.get(SVNProperty.SPECIAL) != null;
+            byte[] eolBytes = null;
+            if (SVNProperty.EOL_STYLE_NATIVE.equals(myFileProperties.get(SVNProperty.EOL_STYLE))) {
+                eolBytes = SVNTranslator.getWorkingEOL(myEOLStyle != null ? myEOLStyle : (String) myFileProperties.get(SVNProperty.EOL_STYLE));
+            } else if (myFileProperties.containsKey(SVNProperty.EOL_STYLE)) {
+                eolBytes = SVNTranslator.getWorkingEOL((String) myFileProperties.get(SVNProperty.EOL_STYLE));
+            }
+            if (eolBytes != null || (keywordsMap != null && !keywordsMap.isEmpty()) || special) {
+                SVNTranslator.translate(myCurrentTmpFile, myCurrentFile, eolBytes, keywordsMap, special, true);
+            } else {
+                SVNFileUtil.rename(myCurrentTmpFile, myCurrentFile);
+            }
             boolean executable = myFileProperties.get(SVNProperty.EXECUTABLE) != null;
-
-            SVNTranslator.translate(myCurrentTmpFile, myCurrentFile, eolBytes,
-                    keywordsMap, special, true);
             if (executable) {
                 SVNFileUtil.setExecutable(myCurrentFile, true);
             }
             if (!special && date != null) {
-                myCurrentFile.setLastModified(SVNTimeUtil.parseDate(date)
-                        .getTime());
+                myCurrentFile.setLastModified(SVNTimeUtil.parseDate(date).getTime());
             }
-            myEventDispatcher.handleEvent(SVNEventFactory
-                    .createExportAddedEvent(myRoot, myCurrentFile, SVNNodeKind.FILE),
-                    ISVNEventHandler.UNKNOWN);
+            myEventDispatcher.handleEvent(SVNEventFactory.createExportAddedEvent(myRoot, myCurrentFile, SVNNodeKind.FILE), ISVNEventHandler.UNKNOWN);
         } finally {
             myCurrentTmpFile.delete();
         }
-
     }
 
     public SVNCommitInfo closeEdit() throws SVNException {

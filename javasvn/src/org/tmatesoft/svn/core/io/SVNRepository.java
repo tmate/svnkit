@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -21,6 +21,8 @@ import java.util.Map;
 import org.tmatesoft.svn.core.ISVNDirEntryHandler;
 import org.tmatesoft.svn.core.ISVNLogEntryHandler;
 import org.tmatesoft.svn.core.SVNDirEntry;
+import org.tmatesoft.svn.core.SVNErrorCode;
+import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNLock;
 import org.tmatesoft.svn.core.SVNLogEntry;
@@ -187,22 +189,23 @@ public abstract class SVNRepository {
             if (url == null) {
                 return;
             } else if (!url.getProtocol().equals(myLocation.getProtocol())) {
-                SVNErrorManager.error("svn: SVNRepository.setLocation could not change connection protocol '" + myLocation.getProtocol() + "' to '" + url.getProtocol() + "';\n" +
-                        "svn: Create another SVNRepository instance instead");
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.RA_NOT_IMPLEMENTED, "SVNRepository URL could not be changed from ''{0}'' to ''{1}''; create new SVNRepository instance instead", new Object[] {myLocation, url});
+                SVNErrorManager.error(err);
             }
             
-            if (forceReconnect || myRepositoryRoot == null) {
+            if (forceReconnect) {
                 closeSession();
                 myRepositoryRoot = null;
                 myRepositoryUUID = null;
+            } else if (myRepositoryRoot == null) {
+                // no way to check whether repos is the same. just compare urls
+                if (!(url.toString().startsWith(myLocation.toString() + "/") || url.equals(getLocation()))) {
+                    closeSession();
+                    myRepositoryRoot = null;
+                    myRepositoryUUID = null;
+                }
             } else if (url.toString().startsWith(myRepositoryRoot.toString() + "/") || myRepositoryRoot.equals(url)) {
-                // just do nothing
-            } else if (url.getProtocol().equals(myRepositoryRoot.getProtocol()) && 
-                    url.getHost().equals(myRepositoryRoot.getHost()) &&
-                    url.getPort() == myRepositoryRoot.getPort()) {
-                closeSession();
-                myRepositoryRoot = null;
-                myRepositoryUUID = null;
+                // just do nothing, we are still below old root.
             } else {
                 closeSession();
                 myRepositoryRoot = null;
@@ -215,29 +218,37 @@ public abstract class SVNRepository {
     }
 
     /**
-     * Gets a cached repository's Universal Unique IDentifier (UUID). 
-     * According to uniqueness for different repositories UUID values 
-     * (36 character strings) are different. UUID is got and cached at 
-     * the time of the first successful repository access operation. 
-     * Before that it's <span class="javakeyword">null</span>.
-     * 
-     * @return 	the UUID of a repository 
+     * @return 	the UUID of a repository
+     * @deprecated use {@link #getRepositoryUUID(boolean) } instead 
      */
     public String getRepositoryUUID() {
+        try {
+            return getRepositoryUUID(false);
+        } catch (SVNException e) {
+        }
         return myRepositoryUUID;
     }
 
     /**
-     * Gets a cached repository's root directory location. The root directory
-     * is evaluated and cached at the time of the first successful repository
-     * access operation. Before that it's <span class="javakeyword">null</span>.
-     * If this driver object is switched to a different repository location during
-     * runtime (probably to an absolutely different repository, see {@link #setLocation(SVNURL, boolean) setLocation()}), 
-     * the root directory location may be changed. 
-     * <p>
-     * This method does not force this <b>SVNRepository</b> driver to
-     * test a connection.
-     * 
+     * Gets a repository's Universal Unique IDentifier (UUID). 
+     * According to uniqueness for different repositories UUID values 
+     * (36 character strings) are different. 
+     *  
+     * @param   forceConnection   if <span class="javakeyword">true</span> then forces
+     *                            this driver to test a connection - try to access a 
+     *                            repository 
+     * @return  the UUID of a repository
+     * @throws SVNException
+     */
+    public String getRepositoryUUID(boolean forceConnection) throws SVNException {
+        if (forceConnection && myRepositoryUUID == null) {
+            testConnection();
+        }
+        return myRepositoryUUID;
+    }
+
+
+    /**
      * @return 	the repository root directory location url
      * @see     #getRepositoryRoot(boolean)
      * 
@@ -253,9 +264,7 @@ public abstract class SVNRepository {
     }
     
     /**
-     * Gets a cached repository's root directory location. The root directory
-     * is evaluated and cached at the time of the first successful repository
-     * access operation. Before that it's <span class="javakeyword">null</span>.
+     * Gets a repository's root directory location. 
      * If this driver object is switched to a different repository location during
      * runtime (probably to an absolutely different repository, see {@link #setLocation(SVNURL, boolean) setLocation()}), 
      * the root directory location may be changed. 
@@ -309,7 +318,7 @@ public abstract class SVNRepository {
      * 					(UUID) 
      * @param rootURL	the repository's root directory location
      * @see 			#getRepositoryRoot(boolean)
-     * @see 			#getRepositoryUUID()
+     * @see 			#getRepositoryUUID(boolean)
      */
     protected void setRepositoryCredentials(String uuid, SVNURL rootURL) {
         if (uuid != null && rootURL != null) {
@@ -525,12 +534,11 @@ public abstract class SVNRepository {
 	 * been invoked at least once.
 	 * 
 	 * <p>
-	 * In a series of calls to {@link ISVNFileRevisionHandler#openRevision(SVNFileRevision)
-	 * handler.handleFileRevision()}, the file contents for the first interesting 
-	 * revision will be provided as a text delta against the empty file.  In the 
-	 * following calls, the delta will be against the fulltext contents for the 
-	 * previous call.
-	 * 
+	 * For the first interesting revision the file contents  
+     * will be provided to the <code>handler</code> as a text delta against an empty file.  
+     * For the following revisions, the delta will be against the fulltext contents of the 
+     * previous revision.
+     * 
 	 * <p>
      * <b>NOTES:</b> 
      * <ul>
@@ -1063,9 +1071,8 @@ public abstract class SVNRepository {
 	 * @param  targetRevision   a revision number of the entry located at the 
      *                          specified <code>url</code>; defaults to the
      *                          latest revision (HEAD) if this arg is invalid
-     * @param  revision 		a revision number of the entry located at the 
-     *                          specified <code>url</code>; defaults to the
-     *                          latest revision (HEAD) if this arg is invalid
+     * @param  revision         a revision number of the repository location to which 
+     *                          this driver object is set
 	 * @param  target 			a target entry name (optional)
 	 * @param  ignoreAncestry 	if <span class="javakeyword">true</span> then
      *                          the ancestry of the two entries to be diffed is 
@@ -1133,9 +1140,8 @@ public abstract class SVNRepository {
      * 
      * @param  url              a repository location of the entry against which 
      *                          differences are calculated 
-     * @param  revision         a revision number of the entry located at the 
-     *                          specified <code>url</code>; defaults to the
-     *                          latest revision (HEAD) if this arg is invalid
+     * @param  revision         a revision number of the repository location to which 
+     *                          this driver object is set
      * @param  target           a target entry name (optional)
      * @param  ignoreAncestry   if <span class="javakeyword">true</span> then
      *                          the ancestry of the two entries to be diffed is 
@@ -1343,7 +1349,11 @@ public abstract class SVNRepository {
         // check path?
         SVNNodeKind nodeKind = checkPath("", revision);
         if (nodeKind == SVNNodeKind.FILE) {
-            throw new SVNException("svn: URL '" + getLocation().toString() + "' refers to a file, not a directory");
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.RA_ILLEGAL_URL, "URL ''{0}'' refers to a file, not a directory", getLocation());
+            SVNErrorManager.error(err);
+        } else if (nodeKind == SVNNodeKind.NONE) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.RA_ILLEGAL_URL, "URL ''{0}'' doesn't exist", getLocation());
+            SVNErrorManager.error(err);
         }
         update(revision, target, recursive, new ISVNReporterBaton() {
                     public void report(ISVNReporter reporter) throws SVNException {
@@ -1525,7 +1535,7 @@ public abstract class SVNRepository {
      * <p>
 	 * Each path to be locked is handled with the provided <code>handler</code>.
      * If a path was successfully locked, the <code>handler</code>'s 
-     * {@link ISVNLockHandler#handleLock(String, SVNLock, SVNException) handleLock()}
+     * {@link ISVNLockHandler#handleLock(String, SVNLock, SVNErrorMessage) handleLock()}
      * is called that receives the path and either a lock object (representing the lock
      * that was set on the path) or an error exception, if locking failed for that path.
      * 
@@ -1575,7 +1585,7 @@ public abstract class SVNRepository {
      * <p>
      * Each path to be unlocked is handled with the provided <code>handler</code>.
      * If a path was successfully unlocked, the <code>handler</code>'s 
-     * {@link ISVNLockHandler#handleUnlock(String, SVNLock, SVNException) handleUnlock()}
+     * {@link ISVNLockHandler#handleUnlock(String, SVNLock, SVNErrorMessage) handleUnlock()}
      * is called that receives the path and either a lock object (representing the lock
      * that was removed from the path) or an error exception, if unlocking failed for 
      * that path.
@@ -1639,7 +1649,7 @@ public abstract class SVNRepository {
             synchronized(this) {
                 while ((myLockCount > 0) || (myLocker != null)) {
                     if (Thread.currentThread() == myLocker) {
-                        throw new Error("SVNRerpository methods are not reenterable");
+                        throw new Error("SVNRepository methods are not reenterable");
                     }
                     wait();
                 }
@@ -1675,7 +1685,8 @@ public abstract class SVNRepository {
     
     protected static void assertValidRevision(long revision) throws SVNException {
         if (!isValidRevision(revision)) {
-            SVNErrorManager.error("svn: Invalid revision number '" + revision + "'");
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.CLIENT_BAD_REVISION, "Invalid revision number ''{0}''", new Long(revision));
+            SVNErrorManager.error(err);
         }
     }
 
@@ -1692,6 +1703,7 @@ public abstract class SVNRepository {
      * @param  relativePath a path relative to the location to which
      *                      this <b>SVNRepository</b> is set
      * @return              a path relative to the repository root
+     * @throws SVNException             
      */
     public String getRepositoryPath(String relativePath) throws SVNException {
         if (relativePath == null) {
@@ -1716,6 +1728,7 @@ public abstract class SVNRepository {
      * @param  relativeOrRepositoryPath a relative path within the
      *                                  repository 
      * @return                          a path relative to the host
+     * @throws SVNException
      */
     public String getFullPath(String relativeOrRepositoryPath) throws SVNException {
         if (relativeOrRepositoryPath == null) {

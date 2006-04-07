@@ -1,11 +1,12 @@
 /*
  * ====================================================================
- * Copyright (c) 2004 TMate Software Ltd. All rights reserved.
- * 
- * This software is licensed as described in the file COPYING, which you should
- * have received as part of this distribution. The terms are also available at
- * http://tmate.org/svn/license.html. If newer versions of this license are
- * posted there, you may use a newer version instead, at your option.
+ * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ *
+ * This software is licensed as described in the file COPYING, which
+ * you should have received as part of this distribution.  The terms
+ * are also available at http://tmate.org/svn/license.html.
+ * If newer versions of this license are posted there, you may use a
+ * newer version instead, at your option.
  * ====================================================================
  */
 
@@ -13,7 +14,6 @@ package org.tmatesoft.svn.core.internal.util;
 
 import java.io.IOException;
 import java.io.InterruptedIOException;
-import java.net.ConnectException;
 import java.net.InetAddress;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
@@ -29,10 +29,9 @@ import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
 
-import org.tmatesoft.svn.core.SVNException;
-import org.tmatesoft.svn.core.SVNURL;
+import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.auth.ISVNSSLManager;
-import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
+import org.tmatesoft.svn.core.auth.SVNSSLAuthentication;
 
 /**
  * <code>SVNSocketFactory</code> is a utility class that represents a custom
@@ -49,88 +48,31 @@ import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
  */
 public class SVNSocketFactory {
     
-    public static Socket createPlainSocket(String host, int port) throws SVNException {
-        int attempts = 3;
-        while (true) {
-            try {
-                InetAddress address = createAddres(host);
-                Socket socket = new Socket(address, port);
-                socket.setTcpNoDelay(true);
-                socket.setKeepAlive(true);
-                return socket;
-            } catch (ConnectException timeOut) {
-                if (timeOut.getMessage().indexOf("time") >= 0) {
-                    attempts--;
-                    if (attempts <= 0) {
-                        SVNErrorManager.error("svn: Connection timeout");
-                    }
-                    continue;
-                }
-                SVNErrorManager.error("svn: Connection failed: '" + timeOut.getMessage() + "'");
-            } catch (IOException e) {
-                String message = e.getMessage();
-                if (e instanceof UnknownHostException) {
-                    message = "svn: Unknown host '" + host + "'";
-                }
-                SVNErrorManager.error(message);
-            }
-        }
+    public static Socket createPlainSocket(String host, int port) throws IOException {
+        InetAddress address = createAddres(host);
+        Socket socket = new Socket(address, port);
+        socket.setTcpNoDelay(true);
+        socket.setKeepAlive(true);
+        socket.setReuseAddress(true);
+        return socket;
     }
 
-    public static Socket createSSLSocket(ISVNSSLManager manager, String host, int port) throws SVNException {
-        int attempts = 3;
+    public static Socket createSSLSocket(ISVNSSLManager manager, String host, int port) throws IOException {
         manager = manager == null ? DEFAULT_SSL_MANAGER : manager;
-        while (true) {
-            try {
-                Socket sslSocket = manager.getSSLContext().getSocketFactory().createSocket(createAddres(host), port);
-                sslSocket.setTcpNoDelay(true);
-                sslSocket.setKeepAlive(true);
-                return sslSocket;
-            } catch (ConnectException timeOut) {
-                if (timeOut.getMessage().indexOf("time") >= 0) {
-                    attempts--;
-                    if (attempts <= 0) {
-                        SVNErrorManager.error("svn: Connection timeout");
-                    }
-                    continue;
-                }
-                SVNErrorManager.error("svn: Connection failed: '" + timeOut.getMessage() + "'");
-            } catch (IOException e) {
-                String message = e.getMessage();
-                if (e instanceof UnknownHostException) {
-                    message = "svn: Unknown host '" + host + "'";
-                }
-                SVNErrorManager.error(message);
-            }
-        }
+        Socket sslSocket = manager.getSSLContext().getSocketFactory().createSocket(createAddres(host), port);
+        sslSocket.setTcpNoDelay(true);
+        sslSocket.setKeepAlive(true);
+        sslSocket.setReuseAddress(true);
+        return sslSocket;
     }
 
-    public static Socket createSSLSocket(ISVNSSLManager manager, String host, int port, Socket socket) throws SVNException {
-        int attempts = 3;
+    public static Socket createSSLSocket(ISVNSSLManager manager, String host, int port, Socket socket) throws IOException {
         manager = manager == null ? DEFAULT_SSL_MANAGER : manager;
-        while (true) {
-            try {
-                Socket sslSocket = manager.getSSLContext().getSocketFactory().createSocket(socket, host, port, true);
-                sslSocket.setTcpNoDelay(true);
-                sslSocket.setKeepAlive(true);
-                return sslSocket;
-            } catch (ConnectException timeOut) {
-                if (timeOut.getMessage().indexOf("time") >= 0) {
-                    attempts--;
-                    if (attempts <= 0) {
-                        SVNErrorManager.error("svn: Connection timeout");
-                    }
-                    continue;
-                }
-                SVNErrorManager.error("svn: Connection failed: '" + timeOut.getMessage() + "'");
-            } catch (IOException e) {
-                String message = e.getMessage();
-                if (e instanceof UnknownHostException) {
-                    message = "svn: Unknown host '" + host + "'";
-                }
-                SVNErrorManager.error(message);
-            }
-        }
+        Socket sslSocket = manager.getSSLContext().getSocketFactory().createSocket(socket, host, port, true);
+        sslSocket.setTcpNoDelay(true);
+        sslSocket.setKeepAlive(true);
+        sslSocket.setReuseAddress(true);
+        return sslSocket;
     }
 
     private static InetAddress createAddres(String hostName) throws UnknownHostException {
@@ -181,11 +123,19 @@ public class SVNSocketFactory {
             }
             return context;
         }
-        public void acknowledgeSSLContext(boolean accepted, String errorMessage) {
+        public void acknowledgeSSLContext(boolean accepted, SVNErrorMessage errorMessage) {
+        }
+        public boolean isClientCertPromptRequired() {
+            return false;
+        }
+        public void setClientAuthentication(SVNSSLAuthentication sslAuthentication) {
+        }
+        public SVNSSLAuthentication getClientAuthentication() {
+            return null;
         }
     };
 
-    public static boolean isSocketStale(Socket socket, SVNURL url) throws SVNException {
+    public static boolean isSocketStale(Socket socket) throws IOException {
         boolean isStale = true;
         if (socket != null) {
             isStale = false;
@@ -207,7 +157,7 @@ public class SVNSocketFactory {
                 }
             } catch (InterruptedIOException e) {
                 if (!SocketTimeoutException.class.isInstance(e)) {
-                    SVNErrorManager.error("svn: Connection timeout while connecting to '" + url.toString() + "'");
+                    throw e;
                 }
             } catch (IOException e) {
                 isStale = true;

@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -17,6 +17,8 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.regex.Pattern;
 
+import org.tmatesoft.svn.core.SVNErrorCode;
+import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNURL;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
@@ -172,7 +174,12 @@ public abstract class SVNRepositoryFactory {
     			return ((SVNRepositoryFactory) myFactoriesMap.get(key)).createRepositoryImpl(url, options);
     		}
     	}
-    	SVNErrorManager.error("svn: Unable to open an ra_local session to URL '" + url + "'\nsvn: No connection protocol implementation for " + url.getProtocol());
+        if ("file".equalsIgnoreCase(url.getProtocol())) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.RA_LOCAL_REPOS_OPEN_FAILED, "Unable to open an ra_local session to URL");
+            SVNErrorManager.error(err);
+        }
+        SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.BAD_URL, "Unable to create SVNRepository object for ''{0}''", url);
+        SVNErrorManager.error(err);
         return null;
     }
 

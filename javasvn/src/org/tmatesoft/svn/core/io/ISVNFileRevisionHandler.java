@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -47,20 +47,23 @@ public interface ISVNFileRevisionHandler {
 	public void openRevision(SVNFileRevision fileRevision) throws SVNException;
 	
     /**
+     * Starts deltas applying for a given file name or path (denoted by token). 
+     * 
+     * @param  token         a file token
+     * @throws SVNException
+	 */
+    public void applyTextDelta(String token) throws SVNException;
+    /**
      * Handles a next diff window for a file (represented by a token) and
      * returns an output stream to write instructions and new text data for
      * the window. 
      * 
      * @param  token            a file path or name (or anything an implementor would
      *                          like to use for his own implementation)
-     *                          for <code>diffWindow</code> will be written
-     * @throws SVNException
-	 */
-    public void applyTextDelta(String token) throws SVNException;
-
-    /**
      * @param  diffWindow       a diff window representing a delta chunk 
      * @return                  an output stream where instructions and new text data
+     *                          for <code>diffWindow</code> will be written
+     * @throws SVNException
      */
     public OutputStream textDeltaChunk(String token, SVNDiffWindow diffWindow) throws SVNException;
     
@@ -76,6 +79,13 @@ public interface ISVNFileRevisionHandler {
      */
     public void textDeltaEnd(String token) throws SVNException;
     
+    /**
+     * Performs final handling for the processed file revision (when all 
+     * deltas are applied and fulltext is got). 
+     * 
+     * @param  token         a file token (name or path)
+     * @throws SVNException
+     */
     public void closeRevision(String token) throws SVNException;
 
 }

@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -324,7 +324,7 @@ public class DefaultSVNOptions implements ISVNOptions, ISVNMergerFactory {
         return Pattern.compile(result.toString());
     }
 
-    public ISVNMerger createMerger(byte[] conflictStart, byte[] conflictSeparator, byte[] conflictEnd, byte[] eol) {
-        return new DefaultSVNMerger(conflictStart, conflictSeparator, conflictEnd, eol);
+    public ISVNMerger createMerger(byte[] conflictStart, byte[] conflictSeparator, byte[] conflictEnd) {
+        return new DefaultSVNMerger(conflictStart, conflictSeparator, conflictEnd);
     }
 }

@@ -1,11 +1,12 @@
 /*
  * ====================================================================
- * Copyright (c) 2004 TMate Software Ltd. All rights reserved.
- * 
- * This software is licensed as described in the file COPYING, which you should
- * have received as part of this distribution. The terms are also available at
- * http://tmate.org/svn/license.html. If newer versions of this license are
- * posted there, you may use a newer version instead, at your option.
+ * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ *
+ * This software is licensed as described in the file COPYING, which
+ * you should have received as part of this distribution.  The terms
+ * are also available at http://tmate.org/svn/license.html.
+ * If newer versions of this license are posted there, you may use a
+ * newer version instead, at your option.
  * ====================================================================
  */
 package org.tmatesoft.svn.core.wc;
@@ -93,9 +94,17 @@ package org.tmatesoft.svn.core.wc;
 public class SVNStatusType {
 
     private int myID;
+    private String myName;
+    private char myCode;
 
     private SVNStatusType(int id) {
+        this(id, null, ' ');
+    }
+
+    private SVNStatusType(int id, String name, char code) {
         myID = id;
+        myName = name;
+        myCode = code;
     }
     
     /**
@@ -110,13 +119,22 @@ public class SVNStatusType {
     }
     
     /**
+     * Returns id of this object. 
+     * 
+     * @return id code
+     */
+    public char getCode() {
+        return myCode;
+    }
+    
+    /**
      * Returns a string representation of this object. As a matter of fact
      * this is a string representation of this object's id.
      * 
      * @return a string representing this object
      */
     public String toString() {
-        return Integer.toString(myID);
+        return myName == null ? Integer.toString(myID) : myName;
     }
     
     /**
@@ -231,7 +249,7 @@ public class SVNStatusType {
      * In a status operation denotes that no status type information is 
      * available. 
      */
-    public static final SVNStatusType STATUS_NONE = new SVNStatusType(0);
+    public static final SVNStatusType STATUS_NONE = new SVNStatusType(0, "none", ' ');
 
     /**
      * In a status operation (if it's being running with an option to report
@@ -239,31 +257,31 @@ public class SVNStatusType {
      * item in the Working Copy being currently processed has no local changes 
      * (in a normal state).  
      */
-    public static final SVNStatusType STATUS_NORMAL = new SVNStatusType(1);
+    public static final SVNStatusType STATUS_NORMAL = new SVNStatusType(1, "normal", ' ');
     
     /**
      * In a status operation denotes that the item in the Working Copy being 
      * currently processed has local modifications.
      */
-    public static final SVNStatusType STATUS_MODIFIED = new SVNStatusType(2);
+    public static final SVNStatusType STATUS_MODIFIED = new SVNStatusType(2, "modified", 'M');
 
     /**
      * In a status operation denotes that the item in the Working Copy being 
      * currently processed is scheduled for addition to the repository.
      */
-    public static final SVNStatusType STATUS_ADDED = new SVNStatusType(3);
+    public static final SVNStatusType STATUS_ADDED = new SVNStatusType(3, "added", 'A');
 
     /**
      * In a status operation denotes that the item in the Working Copy being 
      * currently processed is scheduled for deletion from the repository.
      */
-    public static final SVNStatusType STATUS_DELETED = new SVNStatusType(4);
+    public static final SVNStatusType STATUS_DELETED = new SVNStatusType(4, "deleted", 'D');
 
     /**
      * In a status operation denotes that the item in the Working Copy being 
      * currently processed is not under version control.
      */
-    public static final SVNStatusType STATUS_UNVERSIONED = new SVNStatusType(5);
+    public static final SVNStatusType STATUS_UNVERSIONED = new SVNStatusType(5, "unversioned", '?');
 
     /**
      * In a status operation denotes that the item in the Working Copy being 
@@ -271,7 +289,7 @@ public class SVNStatusType {
      * removed from the filesystem with a non-SVN, non-JavaSVN or 
      * any other SVN non-compatible delete command).
      */
-    public static final SVNStatusType STATUS_MISSING = new SVNStatusType(6);
+    public static final SVNStatusType STATUS_MISSING = new SVNStatusType(6, "missing", '!');
     
     /**
      * In a status operation denotes that the item in the Working Copy being 
@@ -280,14 +298,14 @@ public class SVNStatusType {
      * the same name was scheduled for addition). Though they may have the same name
      * the items have their own distinct histories. 
      */
-    public static final SVNStatusType STATUS_REPLACED = new SVNStatusType(7);
+    public static final SVNStatusType STATUS_REPLACED = new SVNStatusType(7, "replaced", 'R');
     
     /**
      * In a status operation denotes that the item in the Working Copy being 
      * currently processed was merged - that is it was applied the differences
      * (delta) between two sources in a merge operation.
      */
-    public static final SVNStatusType STATUS_MERGED = new SVNStatusType(8);
+    public static final SVNStatusType STATUS_MERGED = new SVNStatusType(8, "merged", 'G');
 
     /**
      * In a status operation denotes that the item in the Working Copy being 
@@ -295,7 +313,7 @@ public class SVNStatusType {
      * that came from the repository). The conflicting overlaps need to be manually
      * resolved.
      */
-    public static final SVNStatusType STATUS_CONFLICTED = new SVNStatusType(9);
+    public static final SVNStatusType STATUS_CONFLICTED = new SVNStatusType(9, "conflicted", 'C');
     
     /**
      * In a status operation denotes that the item in the Working Copy being 
@@ -304,25 +322,25 @@ public class SVNStatusType {
      * delete operation) and a directory with the same name as the file had had was added 
      * (but again with an SVN client non-compatible operation).
      */
-    public static final SVNStatusType STATUS_OBSTRUCTED = new SVNStatusType(10);
+    public static final SVNStatusType STATUS_OBSTRUCTED = new SVNStatusType(10, "obstructed", '~');
 
     /**
      * In a status operation denotes that the file item in the Working Copy being 
      * currently processed was set to be ignored (was added to svn:ignore property).
      */
-    public static final SVNStatusType STATUS_IGNORED = new SVNStatusType(11);
+    public static final SVNStatusType STATUS_IGNORED = new SVNStatusType(11, "ignored", 'I');
 
     /**
      * In a status operation denotes that the item in the Working Copy being 
      * currently processed is under version control but is somehow incomplete - 
      * for example, it may happen when the previous update was interrupted. 
      */
-    public static final SVNStatusType STATUS_INCOMPLETE = new SVNStatusType(12);
+    public static final SVNStatusType STATUS_INCOMPLETE = new SVNStatusType(12, "incomplete", '!');
 
     /**
      * In a status operation denotes that the item in the Working Copy being 
      * currently processed is not under version control but is related to 
      * externals definitions. 
      */
-    public static final SVNStatusType STATUS_EXTERNAL = new SVNStatusType(13);
+    public static final SVNStatusType STATUS_EXTERNAL = new SVNStatusType(13, "external", 'X');
 }

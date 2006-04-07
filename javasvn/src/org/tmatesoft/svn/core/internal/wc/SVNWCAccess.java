@@ -1,11 +1,12 @@
 /*
  * ====================================================================
- * Copyright (c) 2004 TMate Software Ltd. All rights reserved.
- * 
- * This software is licensed as described in the file COPYING, which you should
- * have received as part of this distribution. The terms are also available at
- * http://tmate.org/svn/license.html. If newer versions of this license are
- * posted there, you may use a newer version instead, at your option.
+ * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ *
+ * This software is licensed as described in the file COPYING, which
+ * you should have received as part of this distribution.  The terms
+ * are also available at http://tmate.org/svn/license.html.
+ * If newer versions of this license are posted there, you may use a
+ * newer version instead, at your option.
  * ====================================================================
  */
 package org.tmatesoft.svn.core.internal.wc;
@@ -21,6 +22,8 @@ import java.util.StringTokenizer;
 import java.util.TreeMap;
 
 import org.tmatesoft.svn.core.SVNCancelException;
+import org.tmatesoft.svn.core.SVNErrorCode;
+import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNNodeKind;
 import org.tmatesoft.svn.core.SVNURL;
@@ -48,17 +51,25 @@ public class SVNWCAccess implements ISVNEventHandler {
         file = new File(file.getAbsolutePath());
         File parentFile = file.getParentFile();
         String name = file.getName();
-        if (parentFile != null && (!parentFile.exists() || !parentFile.isDirectory())) {
+        SVNFileType parentType = SVNFileType.getType(parentFile);
+        if (parentFile != null && parentType != SVNFileType.DIRECTORY) {
             // parent doesn't exist or not a directory
-            SVNErrorManager.error("svn: '" + parentFile + "' does not exist");
+            if (!(parentType == SVNFileType.SYMLINK && parentFile.isDirectory())) {
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_PATH_NOT_FOUND, "''{0}'' does not exist", parentFile);
+                SVNErrorManager.error(err);
+            }
         }
+        SVNFileType targetType = SVNFileType.getType(file);
         SVNDirectory anchor = parentFile != null ? new SVNDirectory(null, "", parentFile) : null;
-        SVNDirectory target = file.isDirectory() ? new SVNDirectory(null, name, file) : null;
+        SVNDirectory target = targetType == SVNFileType.DIRECTORY ? new SVNDirectory(null, name, file) : null;
 
         if (anchor == null || !anchor.isVersioned()) {
             // parent is not versioned, do not use it.
             anchor = null;
             if (target != null) {
+                target.setWCAccess(null, "");
+            } else if (targetType == SVNFileType.SYMLINK && file.isDirectory()) {
+                target = new SVNDirectory(null, name, file);
                 target.setWCAccess(null, "");
             }
         }
@@ -111,7 +122,8 @@ public class SVNWCAccess implements ISVNEventHandler {
             }
         } else if (target == null && anchor == null) {
             // both are not versioned :(
-            SVNErrorManager.error("svn: '" + file + "' is not under version control");
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.UNVERSIONED_RESOURCE, "''{0}'' is not under version control", file);
+            SVNErrorManager.error(err);
         }
         return new SVNWCAccess(anchor != null ? anchor : target, target != null ? target : anchor, anchor != null ? name : "");
     }
@@ -178,6 +190,10 @@ public class SVNWCAccess implements ISVNEventHandler {
         return (SVNDirectory) myDirectories.get(path);
     }
 
+    public SVNDirectory[] getAllDirectories() {
+        return (SVNDirectory[]) myDirectories.values().toArray(new SVNDirectory[myDirectories.size()]);
+    }
+
     public SVNDirectory[] getChildDirectories(String path) {
         if (path.startsWith("/")) {
             path = path.substring(1);
@@ -235,9 +251,7 @@ public class SVNWCAccess implements ISVNEventHandler {
                 myDirectories.put(myName, myTarget);
             }
             if (recursive) {
-                // target may be the same as anchor in case "name" does not exist.
-                // in that case anchor should be locked, but not recursively.
-                if (myName != null && !"".equals(myName) && myTarget == myAnchor) {
+                if (myTarget == myAnchor && (myName != null && !"".equals(myName))) {
                     return;
                 }
                 visitDirectories(myTarget == myAnchor ? "" : myName, myTarget,
@@ -429,16 +443,18 @@ public class SVNWCAccess implements ISVNEventHandler {
     }
 
     public SVNDirectory addDirectory(String path, File file) throws SVNException {
-        return addDirectory(path, file, false, false);
+        return addDirectory(path, file, false, false, false);
     }
 
-    public SVNDirectory addDirectory(String path, File file, boolean recursive,
-            boolean lock) throws SVNException {
-        if (file == null || !file.isDirectory()) {
+    public SVNDirectory addDirectory(String path, File file, boolean recursive, boolean lock, boolean checkVersioned) throws SVNException {
+        if (file == null || SVNFileType.getType(file) != SVNFileType.DIRECTORY) {
             return null;
         }
         if (myDirectories != null) {
             SVNDirectory dir = new SVNDirectory(this, path, file);
+            if (checkVersioned && !dir.isVersioned()) {
+                return null;
+            }
             if (myDirectories.put(path, dir) == null && lock && !dir.isLocked()) {
                 dir.lock();
             }
@@ -452,9 +468,8 @@ public class SVNWCAccess implements ISVNEventHandler {
                     SVNFileType fType = SVNFileType.getType(childDir);
                     if (fType == SVNFileType.DIRECTORY && SVNWCAccess.isVersionedDirectory(childDir)) {
                         // recurse
-                        String childPath = SVNPathUtil.append(path, childDir
-                                .getName());
-                        addDirectory(childPath, childDir, recursive, lock);
+                        String childPath = SVNPathUtil.append(path, childDir.getName());
+                        addDirectory(childPath, childDir, recursive, lock, checkVersioned);
                     }
                 }
             }
@@ -464,12 +479,26 @@ public class SVNWCAccess implements ISVNEventHandler {
     }
 
     public void removeDirectory(String path) throws SVNException {
+        removeDirectory(path, false);
+    }
+
+    public void removeDirectory(String path, boolean recursive) throws SVNException {
         SVNDirectory dir = (SVNDirectory) myDirectories.remove(path);
         if (dir != null) {
             if (myExternals != null) {
                 myExternals.remove(path);
             }
             dir.unlock();
+        }
+        if (recursive) {
+            for (Iterator paths = myDirectories.keySet().iterator(); paths.hasNext();) {
+                String p = (String) paths.next();
+                SVNDirectory childDir = (SVNDirectory) myDirectories.get(p);
+                if (p.startsWith(path + "/")) {
+                    paths.remove();
+                    childDir.unlock();
+                }
+            }
         }
     }
 

@@ -1,11 +1,12 @@
 /*
  * ====================================================================
- * Copyright (c) 2004 TMate Software Ltd. All rights reserved.
- * 
- * This software is licensed as described in the file COPYING, which you should
- * have received as part of this distribution. The terms are also available at
- * http://tmate.org/svn/license.html. If newer versions of this license are
- * posted there, you may use a newer version instead, at your option.
+ * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ *
+ * This software is licensed as described in the file COPYING, which
+ * you should have received as part of this distribution.  The terms
+ * are also available at http://tmate.org/svn/license.html.
+ * If newer versions of this license are posted there, you may use a
+ * newer version instead, at your option.
  * ====================================================================
  */
 package org.tmatesoft.svn.core.internal.io.svn;
@@ -16,9 +17,12 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.Socket;
 
+import org.tmatesoft.svn.core.SVNErrorCode;
+import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNURL;
 import org.tmatesoft.svn.core.internal.util.SVNSocketFactory;
+import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 
 /**
  * @version 1.0
@@ -35,7 +39,12 @@ public class SVNPlainConnector implements ISVNConnector {
             return;
         }
         SVNURL location = repository.getLocation();
-        mySocket = SVNSocketFactory.createPlainSocket(location.getHost(), location.getPort());
+        try {
+            mySocket = SVNSocketFactory.createPlainSocket(location.getHost(), location.getPort());
+        } catch (IOException e) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.RA_SVN_IO_ERROR, e.getLocalizedMessage());
+            SVNErrorManager.error(err, e);
+        }
     }
 
     public void close() throws SVNException {
@@ -43,7 +52,7 @@ public class SVNPlainConnector implements ISVNConnector {
             try {
                 mySocket.close();
             } catch (IOException ex) {
-                throw new SVNException(ex);
+                SVNErrorManager.error(SVNErrorMessage.create(SVNErrorCode.RA_SVN_IO_ERROR, ex.getMessage(), ex));
             } finally {
                 mySocket = null;
                 myInputStream = null;

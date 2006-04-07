@@ -1,5 +1,13 @@
 /*
- * Created on 16.06.2005
+ * ====================================================================
+ * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ *
+ * This software is licensed as described in the file COPYING, which
+ * you should have received as part of this distribution.  The terms
+ * are also available at http://tmate.org/svn/license.html.
+ * If newer versions of this license are posted there, you may use a
+ * newer version instead, at your option.
+ * ====================================================================
  */
 package org.tmatesoft.svn.core.javahl;
 
@@ -10,6 +18,7 @@ import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Date;
+import java.util.List;
 
 import org.tigris.subversion.javahl.BlameCallback;
 import org.tigris.subversion.javahl.ClientException;
@@ -32,9 +41,12 @@ import org.tigris.subversion.javahl.SVNClientLogLevel;
 import org.tigris.subversion.javahl.Status;
 import org.tmatesoft.svn.core.ISVNDirEntryHandler;
 import org.tmatesoft.svn.core.ISVNLogEntryHandler;
+import org.tmatesoft.svn.core.SVNAuthenticationException;
 import org.tmatesoft.svn.core.SVNCancelException;
 import org.tmatesoft.svn.core.SVNCommitInfo;
 import org.tmatesoft.svn.core.SVNDirEntry;
+import org.tmatesoft.svn.core.SVNErrorCode;
+import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNLogEntry;
 import org.tmatesoft.svn.core.SVNURL;
@@ -44,6 +56,7 @@ import org.tmatesoft.svn.core.internal.io.dav.DAVRepositoryFactory;
 import org.tmatesoft.svn.core.internal.io.svn.SVNGanymedSession;
 import org.tmatesoft.svn.core.internal.io.svn.SVNRepositoryFactoryImpl;
 import org.tmatesoft.svn.core.internal.util.SVNFormatUtil;
+import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 import org.tmatesoft.svn.core.wc.DefaultSVNRepositoryPool;
 import org.tmatesoft.svn.core.wc.ISVNAnnotateHandler;
@@ -135,6 +148,20 @@ public class SVNClientImpl implements SVNClientInterface {
                 }
             });
         } catch (SVNException e) {
+            SVNErrorMessage err = e.getErrorMessage();
+            if (err == null || e instanceof SVNAuthenticationException || e instanceof SVNCancelException) {
+                throwException(e);
+            }
+            while(err != null) {
+                int category = err.getErrorCode().getCategory();
+                if (category == SVNErrorCode.RA_CATEGORY ||
+                        category == SVNErrorCode.FS_CATEGORY ||
+                        category == SVNErrorCode.RA_SVN_CATEGORY ||
+                        category == SVNErrorCode.RA_DAV_CATEGORY) {
+                    throwException(e);
+                }
+                err = err.getChildErrorMessage();
+            }
             return new Status[] {};
         }
         return (Status[]) statuses.toArray(new Status[statuses.size()]);
@@ -469,14 +496,37 @@ public class SVNClientImpl implements SVNClientInterface {
 
     public void mkdir(String[] path, String message) throws ClientException {
         SVNCommitClient client = getSVNCommitClient();
-        try {
-            SVNURL[] urls = new SVNURL[path.length];
-            for (int i = 0; i < path.length; i++) {
-                urls[i] = SVNURL.parseURIEncoded(path[i]);
+        List urls = new ArrayList();
+        List paths = new ArrayList();
+        for (int i = 0; i < path.length; i++) {
+            if (isURL(path[i])) {
+                try {
+                    urls.add(SVNURL.parseURIEncoded(path[i]));
+                } catch (SVNException e) {
+                    throwException(e);
+                }
+            } else {
+                paths.add(new File(path[i]));
             }
-            client.doMkDir(urls, message);
-        } catch (SVNException e) {
-            throwException(e);
+        }
+        SVNURL[] svnURLs = (SVNURL[]) urls.toArray(new SVNURL[urls.size()]);
+        File[] files = (File[]) paths.toArray(new File[paths.size()]);
+        if (svnURLs.length > 0) {
+            try {
+                client.doMkDir(svnURLs, message);
+            } catch (SVNException e) {
+                throwException(e);
+            }
+        }
+        if (files.length > 0) {
+            for (int i = 0; i < files.length; i++) {
+                File file = files[i];
+                try {
+                    getSVNWCClient().doAdd(file, false, true, false, false);
+                } catch (SVNException e) {
+                    throwException(e);
+                }
+            }
         }
     }
 
@@ -843,6 +893,23 @@ public class SVNClientImpl implements SVNClientInterface {
         return null;
     }
 
+    public void streamFileContent(String path, Revision revision, Revision pegRevision, int bufferSize, OutputStream stream) throws ClientException {
+        SVNWCClient client = getSVNWCClient();
+        try {
+            if(isURL(path)){
+                client.doGetFileContents(SVNURL.parseURIEncoded(path),
+                        JavaHLObjectFactory.getSVNRevision(pegRevision),
+                        JavaHLObjectFactory.getSVNRevision(revision), true, stream);
+            }else{
+                client.doGetFileContents(new File(path).getAbsoluteFile(),
+                        JavaHLObjectFactory.getSVNRevision(pegRevision),
+                        JavaHLObjectFactory.getSVNRevision(revision), true, stream);
+            }
+        } catch (SVNException e) {
+            throwException(e);
+        }
+    }
+
     public void relocate(String from, String to, String path, boolean recurse) throws ClientException {
         SVNUpdateClient client = getSVNUpdateClient();
         try {
@@ -1088,7 +1155,7 @@ public class SVNClientImpl implements SVNClientInterface {
                 public void checkCancelled() throws SVNCancelException {
                     if(myCancelOperation){
                         myCancelOperation = false;
-                        throw new SVNCancelException("operation cancelled");
+                        SVNErrorManager.cancel("operation cancelled");
                     }
                 }
             };
@@ -1148,5 +1215,15 @@ public class SVNClientImpl implements SVNClientInterface {
                         || pathOrUrl.startsWith("https://")
                         || pathOrUrl.startsWith("svn://") 
                         || pathOrUrl.startsWith("svn+ssh://"));
+    }
+
+    public String getAdminDirectoryName() {
+        return SVNFileUtil.getAdminDirectoryName();
+    }
+
+    public boolean isAdminDirectory(String name) {
+        return name != null && (SVNFileUtil.isWindows) ?
+                name.equalsIgnoreCase(SVNFileUtil.getAdminDirectoryName()) :
+                name.equals(SVNFileUtil.getAdminDirectoryName());
     }
 }

@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -77,6 +77,8 @@ public class DefaultSVNRepositoryPool implements ISVNRepositoryPool, ISVNSession
     
     private Map myPool;
     private static Map ourPool;
+    
+    private static final boolean ourAllowPersistentConnections = "true".equalsIgnoreCase(System.getProperty("javasvn.http.keepAlive", "true"));
     
     /**
      * Constructs a <b>DefaultSVNRepositoryPool</b> instance
@@ -170,7 +172,11 @@ public class DefaultSVNRepositoryPool implements ISVNRepositoryPool, ISVNSession
      *                     the driver should keep a connection
      */
     public boolean keepConnection(SVNRepository repository) {
-        return myIsKeepConnections && !"svn+ssh".equals(repository.getLocation().getProtocol());
+        if (!ourAllowPersistentConnections) {
+            return false;
+        }
+        String protocol = repository.getLocation().getProtocol();
+        return myIsKeepConnections && !"svn".equalsIgnoreCase(protocol) && !"svn+ssh".equalsIgnoreCase(protocol);
     }
     
     /**

@@ -1,11 +1,12 @@
 /*
  * ====================================================================
- * Copyright (c) 2004 TMate Software Ltd. All rights reserved.
- * 
- * This software is licensed as described in the file COPYING, which you should
- * have received as part of this distribution. The terms are also available at
- * http://tmate.org/svn/license.html. If newer versions of this license are
- * posted there, you may use a newer version instead, at your option.
+ * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ *
+ * This software is licensed as described in the file COPYING, which
+ * you should have received as part of this distribution.  The terms
+ * are also available at http://tmate.org/svn/license.html.
+ * If newer versions of this license are posted there, you may use a
+ * newer version instead, at your option.
  * ====================================================================
  */
 
@@ -39,9 +40,15 @@ public class SVNTimeUtil {
     }
 
     public static String formatDate(Date date) {
-        if (date == null || date.getTime() == 0) {
+        return formatDate(date, false);
+    }
+
+    public static String formatDate(Date date, boolean formatZeroDate) {
+        if (date == null) {
             return null;
-        }
+        } else if (!formatZeroDate && date.getTime() == 0) {
+            return null;
+        }        
         return ISO8601_FORMAT_OUT.format(date);
     }
 

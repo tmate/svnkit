@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -104,11 +104,9 @@ public class DAVProppatchHandler extends BasicDAVHandler {
     }
 
     protected void startElement(DAVElement parent, DAVElement element, Attributes attrs) throws SVNException {
-        System.err.println(element);
     }
 
     protected void endElement(DAVElement parent, DAVElement element, StringBuffer cdata) throws SVNException {
-        System.err.println(element);
     }
     
     private static boolean hasNullValues(Map map) {

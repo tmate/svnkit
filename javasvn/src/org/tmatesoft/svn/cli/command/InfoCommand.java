@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -45,7 +45,7 @@ public class InfoCommand extends SVNCommand implements ISVNInfoHandler {
         final boolean recursive = getCommandLine().hasArgument(SVNArgument.RECURSIVE);
         SVNRevision revision = SVNRevision.UNDEFINED;
 
-        if (getCommandLine().hasArgument(SVNArgument.RECURSIVE)) {
+        if (getCommandLine().hasArgument(SVNArgument.REVISION)) {
             revision = SVNRevision.parse((String) getCommandLine().getArgumentValue(SVNArgument.REVISION));
         }
         SVNWCClient wcClient = getClientManager().getWCClient();
@@ -53,7 +53,8 @@ public class InfoCommand extends SVNCommand implements ISVNInfoHandler {
 
         for (int i = 0; i < getCommandLine().getPathCount(); i++) {
             myBaseFile = new File(getCommandLine().getPathAt(i));
-            wcClient.doInfo(myBaseFile, revision, recursive, this);
+            SVNRevision peg = getCommandLine().getPathPegRevision(i);
+            wcClient.doInfo(myBaseFile, peg, revision, recursive, this);
         }
         myBaseFile = null;
         for (int i = 0; i < getCommandLine().getURLCount(); i++) {
@@ -154,14 +155,16 @@ public class InfoCommand extends SVNCommand implements ISVNInfoHandler {
             print("Lock Token: " + lock.getID(), myOut);
             print("Lock Owner: " + lock.getOwner(), myOut);
             print("Lock Created: " + formatDate(lock.getCreationDate()), myOut);
-            myOut.print("Lock Comment ");
-            int lineCount = getLinesCount(lock.getComment());
-            if (lineCount == 1) {
-                myOut.print("(1 line)");
-            } else {
-                myOut.print("(" + lineCount + " lines)");
+            if (lock.getComment() != null) {
+                myOut.print("Lock Comment ");
+                int lineCount = getLinesCount(lock.getComment());
+                if (lineCount == 1) {
+                    myOut.print("(1 line)");
+                } else {
+                    myOut.print("(" + lineCount + " lines)");
+                }
+                myOut.print(":\n" + lock.getComment() + "\n");
             }
-            myOut.print(":\n" + lock.getComment() + "\n");
         }
         println(myOut);
     }

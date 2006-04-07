@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -12,18 +12,20 @@
 
 package org.tmatesoft.svn.cli.command;
 
-import org.tmatesoft.svn.cli.SVNArgument;
-import org.tmatesoft.svn.cli.SVNCommand;
-import org.tmatesoft.svn.core.SVNCommitInfo;
-import org.tmatesoft.svn.core.SVNException;
-import org.tmatesoft.svn.core.SVNURL;
-import org.tmatesoft.svn.core.wc.SVNCommitClient;
-import org.tmatesoft.svn.core.wc.SVNWCClient;
-
 import java.io.File;
 import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.Collection;
+
+import org.tmatesoft.svn.cli.SVNArgument;
+import org.tmatesoft.svn.cli.SVNCommand;
+import org.tmatesoft.svn.core.SVNCommitInfo;
+import org.tmatesoft.svn.core.SVNErrorCode;
+import org.tmatesoft.svn.core.SVNErrorMessage;
+import org.tmatesoft.svn.core.SVNException;
+import org.tmatesoft.svn.core.SVNURL;
+import org.tmatesoft.svn.core.wc.SVNCommitClient;
+import org.tmatesoft.svn.core.wc.SVNWCClient;
 
 /**
  * @author TMate Software Ltd.
@@ -34,6 +36,10 @@ public class DeleteCommand extends SVNCommand {
         if (getCommandLine().hasURLs()) {
             runRemote(out);
         } else {
+            if (getCommandLine().getArgumentValue(SVNArgument.MESSAGE) != null) {
+                SVNErrorMessage msg = SVNErrorMessage.create(SVNErrorCode.CL_UNNECESSARY_LOG_MESSAGE, "Local, non-commit operations do not take a log message.");
+                throw new SVNException(msg);
+            }
             runLocally(out, err);
         }
     }

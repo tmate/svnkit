@@ -1,11 +1,12 @@
 /*
  * ====================================================================
- * Copyright (c) 2004 TMate Software Ltd. All rights reserved.
- * 
- * This software is licensed as described in the file COPYING, which you should
- * have received as part of this distribution. The terms are also available at
- * http://tmate.org/svn/license.html. If newer versions of this license are
- * posted there, you may use a newer version instead, at your option.
+ * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ *
+ * This software is licensed as described in the file COPYING, which
+ * you should have received as part of this distribution.  The terms
+ * are also available at http://tmate.org/svn/license.html.
+ * If newer versions of this license are posted there, you may use a
+ * newer version instead, at your option.
  * ====================================================================
  */
 
@@ -17,11 +18,13 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.List;
 
-import org.tmatesoft.svn.core.SVNAuthenticationException;
+import org.tmatesoft.svn.core.SVNErrorCode;
+import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNURL;
 import org.tmatesoft.svn.core.auth.ISVNAuthenticationManager;
 import org.tmatesoft.svn.core.auth.SVNPasswordAuthentication;
+import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.util.SVNDebugLog;
 
 /**
@@ -65,9 +68,10 @@ class SVNConnection {
 
     protected void handshake(SVNRepositoryImpl repository) throws SVNException {
         Object[] items = read("[(*N(*W)(*W))]", null);
-        if (!SVNReader.hasValue(items, 0, 2)
-                || !SVNReader.hasValue(items, 2, EDIT_PIPELINE)) {
-            throw new SVNException("unsupported version or capability");
+        if (!SVNReader.hasValue(items, 0, 2)) {
+            SVNErrorManager.error(SVNErrorMessage.create(SVNErrorCode.RA_SVN_BAD_VERSION, "Only protocol of version '2' or older is supported"));
+        } else if (!SVNReader.hasValue(items, 2, EDIT_PIPELINE)) {
+            SVNErrorManager.error(SVNErrorMessage.create(SVNErrorCode.RA_SVN_BAD_VERSION, "Only servers with 'edit-pipeline' capability is supported"));
         }
         write("(n(w)s)", new Object[] { "2", EDIT_PIPELINE,
                 repository.getLocation().toString() });
@@ -77,7 +81,7 @@ class SVNConnection {
     private InputStream myLoggingInputStream;
 
     public void authenticate(SVNRepositoryImpl repository) throws SVNException {
-        String failureReason = null;
+        SVNErrorMessage failureReason = null;
         Object[] items = read("[((*W)?S)]", null);
         List mechs = SVNReader.getList(items, 0);
         myRealm = SVNReader.getString(items, 1);
@@ -87,14 +91,9 @@ class SVNConnection {
         ISVNAuthenticationManager authManager = myRepository.getAuthenticationManager();
         SVNURL location = myRepository.getLocation();        
         SVNPasswordAuthentication auth = null;
-        if (repository.getExternalAuthentication() != null && mechs.contains("EXTERNAL")) {
-            write("(w(s))", new Object[] { "EXTERNAL", "" });
-            boolean rootReceived = myRoot == null;
+        if (repository.getExternalUserName() != null && mechs.contains("EXTERNAL")) {
+            write("(w(s))", new Object[] { "EXTERNAL", repository.getExternalUserName() });
             failureReason = readAuthResponse(repository);
-            if (failureReason == null && rootReceived) {
-                String realm = "<" + location.getProtocol() + "://" + location.getHost() + ":" + location.getPort() + "> " + myRealm;
-                authManager.acknowledgeAuthentication(true, ISVNAuthenticationManager.SSH, realm, null, repository.getExternalAuthentication());
-            }
         } else if (mechs.contains("ANONYMOUS")) {
             write("(w())", new Object[] { "ANONYMOUS" });
             failureReason = readAuthResponse(repository);
@@ -114,7 +113,7 @@ class SVNConnection {
                     auth = (SVNPasswordAuthentication) authManager.getNextAuthentication(ISVNAuthenticationManager.PASSWORD, realm, location);
                 }
                 if (auth == null || auth.getUserName() == null || auth.getPassword() == null) {
-                    failureReason = "authentication is required for '" + realm + "'";
+                    failureReason = SVNErrorMessage.create(SVNErrorCode.RA_NOT_AUTHORIZED, "Authentication is required for ''{0}''", realm);
                     break;
                 }
                 write("(w())", new Object[] { "CRAM-MD5" });
@@ -137,27 +136,29 @@ class SVNConnection {
                         authManager.acknowledgeAuthentication(true, ISVNAuthenticationManager.PASSWORD, realm, null, auth);
                         return;
                     } else if (FAILURE.equals(items[0])) {
-                        failureReason = new String((byte[]) items[1]);
+                        failureReason = SVNErrorMessage.create(SVNErrorCode.RA_NOT_AUTHORIZED, new String((byte[]) items[1]));
                         break;
                     } else if (STEP.equals(items[0])) {
-                        byte[] response = authenticator.buildChallengeReponse((byte[]) items[1]);
                         try {
+                            byte[] response = authenticator.buildChallengeReponse((byte[]) items[1]);
                             getOutputStream().write(response);
                             getOutputStream().flush();
                         } catch (IOException e) {
-                            throw new SVNException(e);
+                            SVNErrorManager.error(SVNErrorMessage.create(SVNErrorCode.RA_SVN_IO_ERROR, e.getMessage()), e);
                         } 
                     }
                 }
             }
+        } else {
+            SVNErrorManager.error(SVNErrorMessage.create(SVNErrorCode.RA_UNKNOWN_AUTH));
         }
         if (failureReason == null) {
             return;
         }
-        throw new SVNAuthenticationException(failureReason);
+        SVNErrorManager.error(failureReason);
     }
 
-    private String readAuthResponse(SVNRepositoryImpl repository) throws SVNException {
+    private SVNErrorMessage readAuthResponse(SVNRepositoryImpl repository) throws SVNException {
         Object[] items = read("(W(?S))", null);
         if (SUCCESS.equals(items[0])) {
             if (!myIsCredentialsReceived) {
@@ -177,9 +178,9 @@ class SVNConnection {
             }
             return null;
         } else if (FAILURE.equals(items[0])) {
-            return (String) items[1];
+            return SVNErrorMessage.create(SVNErrorCode.RA_NOT_AUTHORIZED, (String) items[1]);
         }
-        return "unexpected server responce";
+        return SVNErrorMessage.create(SVNErrorCode.RA_NOT_AUTHORIZED, "unexpected server response");
     }
 
     public void close() throws SVNException {
@@ -202,7 +203,6 @@ class SVNConnection {
     
     public void write(String template, Object[] items) throws SVNException {
         try {
-//            checkConnection();
             SVNWriter.write(getOutputStream(), template, items);
         } finally {
             try {
@@ -233,8 +233,8 @@ class SVNConnection {
         if (myOutputStream == null) {
             try {
                 myOutputStream = SVNDebugLog.createLogStream(myConnector.getOutputStream());
-            } catch (IOException ex) {
-                throw new SVNException(ex);
+            } catch (IOException e) {
+                SVNErrorManager.error(SVNErrorMessage.create(SVNErrorCode.RA_SVN_IO_ERROR, e.getMessage()), e);
             }
         }
         return myOutputStream;
@@ -246,8 +246,8 @@ class SVNConnection {
                 myInputStream = SVNDebugLog.createLogStream(new BufferedInputStream(myConnector.getInputStream()));
                 myLoggingInputStream = myInputStream;
                 myInputStream = new SVNRollbackInputStream(myInputStream, 1024);
-            } catch (IOException ex) {
-                throw new SVNException(ex);
+            } catch (IOException e) {
+                SVNErrorManager.error(SVNErrorMessage.create(SVNErrorCode.RA_SVN_IO_ERROR, e.getMessage()), e);
             }
         }
         return myInputStream;

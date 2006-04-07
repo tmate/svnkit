@@ -1,11 +1,12 @@
 /*
  * ====================================================================
- * Copyright (c) 2004 TMate Software Ltd. All rights reserved.
- * 
- * This software is licensed as described in the file COPYING, which you should
- * have received as part of this distribution. The terms are also available at
- * http://tmate.org/svn/license.html. If newer versions of this license are
- * posted there, you may use a newer version instead, at your option.
+ * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ *
+ * This software is licensed as described in the file COPYING, which
+ * you should have received as part of this distribution.  The terms
+ * are also available at http://tmate.org/svn/license.html.
+ * If newer versions of this license are posted there, you may use a
+ * newer version instead, at your option.
  * ====================================================================
  */
 
@@ -17,9 +18,12 @@ import java.io.OutputStream;
 import java.util.Date;
 
 import org.tmatesoft.svn.core.SVNCommitInfo;
+import org.tmatesoft.svn.core.SVNErrorCode;
+import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.internal.util.SVNEncodingUtil;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
+import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.io.ISVNEditor;
 import org.tmatesoft.svn.core.io.diff.SVNDiffWindow;
 import org.tmatesoft.svn.core.io.diff.SVNDiffWindowBuilder;
@@ -120,11 +124,11 @@ class SVNCommitEditor implements ISVNEditor {
     }
 
     private int myDiffWindowCount = 0;
+    private boolean myIsAborted;
     
     public OutputStream textDeltaChunk(String path, SVNDiffWindow diffWindow) throws SVNException {
         myConnection.write("(w(s", new Object[] { "textdelta-chunk", path });
         ByteArrayOutputStream bos = new ByteArrayOutputStream();
-        
         try {
             SVNDiffWindowBuilder.save(diffWindow, myDiffWindowCount == 0, bos);
             byte[] header = bos.toByteArray();
@@ -135,8 +139,9 @@ class SVNCommitEditor implements ISVNEditor {
             myConnection.getOutputStream().write(length.getBytes("UTF-8"));
             return new ChunkOutputStream();
         } catch (IOException e) {
-            throw new SVNException(e);
+            SVNErrorManager.error(SVNErrorMessage.create(SVNErrorCode.RA_SVN_IO_ERROR, e.getMessage()), e);
         }
+        return null;
     }
 
     public void textDeltaEnd(String path) throws SVNException {
@@ -154,22 +159,34 @@ class SVNCommitEditor implements ISVNEditor {
     }
 
     public SVNCommitInfo closeEdit() throws SVNException {
-        myConnection.write("(w())", new Object[] { "close-edit" });
+	    try {
+		    myConnection.write("(w())", new Object[] { "close-edit" });
 
-        myConnection.read("[()]", null);
-        myRepository.authenticate();
+		    myConnection.read("[()]", null);
+		    myRepository.authenticate();
 
-        Object[] items = myConnection.read("(N(?S)(?S))", new Object[3]);
-        long revision = SVNReader.getLong(items, 0);
-        Date date = SVNReader.getDate(items, 1);
+		    Object[] items = myConnection.read("(N(?S)(?S))", new Object[3]);
+		    long revision = SVNReader.getLong(items, 0);
+		    Date date = SVNReader.getDate(items, 1);
 
-        myCloseCallback.run();
-        return new SVNCommitInfo(revision, (String) items[2], date);
+		    return new SVNCommitInfo(revision, (String) items[2], date);
+	    } finally {
+		    myCloseCallback.run();
+            myCloseCallback = null;
+	    }
     }
 
     public void abortEdit() throws SVNException {
-        myConnection.write("(w())", new Object[] { "abort-edit" });
-        myCloseCallback.run();
+        if (myIsAborted || myCloseCallback == null) {
+            return;
+        }
+        myIsAborted = true;
+	    try {
+		    myConnection.write("(w())", new Object[] { "abort-edit" });
+	    } finally {
+		    myCloseCallback.run();
+            myCloseCallback = null;
+	    }
     }
 
     private static String computeParentPath(String path) {

@@ -2,7 +2,7 @@
 publish_examples("http://tmate.org/svn");
 
 function publish_examples($url){
-	$docURL = "http://72.9.228.230:8080/svn/jsvn/trunk/doc/examples/src/org/tmatesoft/svn/examples";
+	$docURL = "http://svn.tmate.org/repos/jsvn/trunk/doc/examples/src/org/tmatesoft/svn/examples";
 	$examplesPath = array($docURL."/repository/",$docURL."/wc/");
 	
 	$packageDescription = array();
@@ -50,10 +50,10 @@ function publish_examples($url){
 		fwrite($fhandle, "</div>");
 
 	}
-	fwrite($fhandle, "<table style=\"margin-top: 1em; font-size: 90%;\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\"><tr><td id=\"footer\" align=\"left\">Copyright &copy;2004-2005, TMate Software</td></tr></table></td></tr></table></body></html>");
+	fwrite($fhandle, "<table style=\"margin-top: 1em; font-size: 90%;\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\"><tr><td id=\"footer\" align=\"left\">Copyright &copy;2004-2006, TMate Software</td></tr></table></td></tr></table></body></html>");
 
 /*
- * <div style=\"width: 350px;\"><center><small><span style=\"font-size: 80%;\">(c) 2004-2005 TMate Software. All rights reserved.</span></small></center></div>
+ * <div style=\"width: 350px;\"><center><small><span style=\"font-size: 80%;\">(c) 2004-2006 TMate Software. All rights reserved.</span></small></center></div>
  */
 	fclose($fhandle);
 	

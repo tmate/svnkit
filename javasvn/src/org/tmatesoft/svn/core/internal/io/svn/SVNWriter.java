@@ -1,11 +1,12 @@
 /*
  * ====================================================================
- * Copyright (c) 2004 TMate Software Ltd. All rights reserved.
- * 
- * This software is licensed as described in the file COPYING, which you should
- * have received as part of this distribution. The terms are also available at
- * http://tmate.org/svn/license.html. If newer versions of this license are
- * posted there, you may use a newer version instead, at your option.
+ * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ *
+ * This software is licensed as described in the file COPYING, which
+ * you should have received as part of this distribution.  The terms
+ * are also available at http://tmate.org/svn/license.html.
+ * If newer versions of this license are posted there, you may use a
+ * newer version instead, at your option.
  * ====================================================================
  */
 
@@ -18,9 +19,11 @@ import java.util.Date;
 import java.util.Iterator;
 import java.util.Map;
 
+import org.tmatesoft.svn.core.SVNErrorCode;
+import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.internal.util.SVNTimeUtil;
-import org.tmatesoft.svn.util.SVNDebugLog;
+import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 
 /**
  * @version 1.0
@@ -54,7 +57,7 @@ public class SVNWriter {
                     continue;
                 }
                 if (item instanceof Date) {
-                    item = SVNTimeUtil.formatDate((Date) item);
+                    item = SVNTimeUtil.formatDate((Date) item, true);
                 }
                 if (ch == 'i') {
 
@@ -141,8 +144,7 @@ public class SVNWriter {
                 os.write(' ');
             }
         } catch (IOException e) {
-            SVNDebugLog.logInfo(e);
-            throw new SVNException("error while sending data", e);
+            SVNErrorManager.error(SVNErrorMessage.create(SVNErrorCode.RA_SVN_IO_ERROR, e.getMessage()), e);
         } 
     }
 }

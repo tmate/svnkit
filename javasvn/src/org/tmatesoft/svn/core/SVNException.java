@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -15,49 +15,52 @@ package org.tmatesoft.svn.core;
 
 /**
  * A main exception class that is used in the JavaSVN library. All other
- * JavaSVN exception classes extend this one. 
+ * JavaSVN exception classes extend this one. Detailed information 
+ * on the error (description, error code) is encapsulated inside an error 
+ * message that is held by an <b>SVNException</b>. 
  *  
  * @version	1.0
  * @author 	TMate Software Ltd.
  */
 public class SVNException extends Exception {
+    
+    private SVNErrorMessage myErrorMessage;
 
     /**
-     * A default constructor.
-     *
+     * Creates an exception given an error message. 
+     * 
+     * @param errorMessage an error message
      */
-    public SVNException() {
+    public SVNException(SVNErrorMessage errorMessage) {
+        this(errorMessage, null);
     }
     
     /**
-     * Constructs an <b>SVNException</b> provided an error 
-     * description message.
+     * Creates an exception given an error message and the cause exception.
      * 
-     * @param message	an informational message
+     * @param errorMessage an error message
+     * @param cause        the real cause of the error
      */
-    public SVNException(String message) {
-        super(message);
-    }
-    
-    /**
-     * Constructs an <b>SVNException</b> provided an error description 
-     * message and an original exception - the cause of this exception.
-     * 
-     * @param message	an informational message
-     * @param cause		an initial cause of this exception 
-     */
-    public SVNException(String message, Throwable cause) {
-        super(message, cause);
-    }
-    
-    /**
-     * Constructs an <code>SVNException</code> provided an original 
-     * <code>Throwable</code> - as a real cause of the exception.
-     * 
-     * @param cause		an initial cause of this exception 
-     */
-    public SVNException(Throwable cause) {
+    public SVNException(SVNErrorMessage errorMessage, Throwable cause) {
         super(cause);
+        if (cause instanceof SVNException) {
+            SVNErrorMessage childMessages = ((SVNException) cause).getErrorMessage();
+            SVNErrorMessage parent = errorMessage;
+            while(parent.hasChildErrorMessage()) {
+                parent = parent.getChildErrorMessage();
+            }
+            parent.setChildErrorMessage(childMessages);
+        }
+        myErrorMessage = errorMessage;
+    }
+    
+    /**
+     * Returns an error message provided to this exception object.
+     * 
+     * @return an error message that contains details on the error
+     */
+    public SVNErrorMessage getErrorMessage() {
+        return myErrorMessage;
     }
     
     /**
@@ -67,14 +70,10 @@ public class SVNException extends Exception {
      * @return an informational message
      */
     public String getMessage() {
-        StringBuffer message = new StringBuffer();
-        if (super.getMessage() != null && !"".equals(super.getMessage().trim())) {
-            message.append(super.getMessage());
+        SVNErrorMessage error = getErrorMessage();
+        if (error != null) {
+            return error.getFullMessage();
         }
-        if (getCause() instanceof SVNException) {
-            message.append("\n");
-            message.append(((SVNException) getCause()).getMessage());
-        }
-        return message.toString();
+        return super.getMessage();
     }
 }

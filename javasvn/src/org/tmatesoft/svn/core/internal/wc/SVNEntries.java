@@ -1,11 +1,12 @@
 /*
  * ====================================================================
- * Copyright (c) 2004 TMate Software Ltd. All rights reserved.
- * 
- * This software is licensed as described in the file COPYING, which you should
- * have received as part of this distribution. The terms are also available at
- * http://tmate.org/svn/license.html. If newer versions of this license are
- * posted there, you may use a newer version instead, at your option.
+ * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ *
+ * This software is licensed as described in the file COPYING, which
+ * you should have received as part of this distribution.  The terms
+ * are also available at http://tmate.org/svn/license.html.
+ * If newer versions of this license are posted there, you may use a
+ * newer version instead, at your option.
  * ====================================================================
  */
 package org.tmatesoft.svn.core.internal.wc;
@@ -27,6 +28,8 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 
+import org.tmatesoft.svn.core.SVNErrorCode;
+import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNProperty;
 import org.tmatesoft.svn.core.internal.util.SVNEncodingUtil;
@@ -112,6 +115,9 @@ public class SVNEntries {
                                 if (entry.get(SVNProperty.UUID) == null) {
                                     entry.put(SVNProperty.UUID, rootEntry.get(SVNProperty.UUID));
                                 }
+                                if (entry.get(SVNProperty.REPOS) == null && rootEntry.get(SVNProperty.REPOS) != null) {
+                                    entry.put(SVNProperty.REPOS, rootEntry.get(SVNProperty.REPOS));
+                                }
                             }
                         }
                         entry = null;
@@ -119,7 +125,8 @@ public class SVNEntries {
                 }
             }
         } catch (IOException e) {
-            SVNErrorManager.error("svn: Cannot load entries file '" + myFile + "'");
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, "Cannot read entries file ''{0}'': {1}", new Object[] {myFile, e.getLocalizedMessage()});
+            SVNErrorManager.error(err, e);
         } finally {
             SVNFileUtil.closeFile(reader);
         }
@@ -155,20 +162,19 @@ public class SVNEntries {
                     }
                     if (!"".equals(name)) {
                         Object expectedValue;
-                        if (SVNProperty.KIND_DIR.equals(entry
-                                .get(SVNProperty.KIND))) {
+                        if (SVNProperty.KIND_DIR.equals(entry.get(SVNProperty.KIND))) {
                             if (SVNProperty.UUID.equals(propName)
                                     || SVNProperty.REVISION.equals(propName)
-                                    || SVNProperty.URL.equals(propName)) {
+                                    || SVNProperty.URL.equals(propName) 
+                                    || SVNProperty.REPOS.equals(propName)) {
                                 continue;
                             }
                         } else {
                             if (SVNProperty.URL.equals(propName)) {
-                                expectedValue = SVNPathUtil.append(
-                                        (String) rootEntry.get(propName),
-                                        SVNEncodingUtil.uriEncode(name));
-                            } else if (SVNProperty.UUID.equals(propName)
-                                    || SVNProperty.REVISION.equals(propName)) {
+                                expectedValue = SVNPathUtil.append((String) rootEntry.get(propName), SVNEncodingUtil.uriEncode(name));
+                            } else if (SVNProperty.UUID.equals(propName) || SVNProperty.REVISION.equals(propName)) {
+                                expectedValue = rootEntry.get(propName);
+                            } else if (SVNProperty.REPOS.equals(propName)) {
                                 expectedValue = rootEntry.get(propName);
                             } else {
                                 expectedValue = null;
@@ -178,8 +184,7 @@ public class SVNEntries {
                             }
                         }
                     }
-                    propName = propName.substring(SVNProperty.SVN_ENTRY_PREFIX
-                            .length());
+                    propName = propName.substring(SVNProperty.SVN_ENTRY_PREFIX.length());
                     propValue = SVNEncodingUtil.xmlEncodeAttr(propValue);
                     os.write("\n   ");
                     os.write(propName);
@@ -191,8 +196,10 @@ public class SVNEntries {
             }
             os.write("</wc-entries>\n");
         } catch (IOException e) {
-            tmpFile.delete();
-            SVNErrorManager.error("svn: Cannot save entries file '" + myFile + "'");
+            SVNFileUtil.closeFile(os);
+            SVNFileUtil.deleteFile(tmpFile);
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, "Cannot wrtie entries file ''{0}'': {1}", new Object[] {myFile, e.getLocalizedMessage()});
+            SVNErrorManager.error(err, e);
         } finally {
             SVNFileUtil.closeFile(os);
         }

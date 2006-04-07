@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -11,6 +11,7 @@
  */
 package org.tmatesoft.svn.core.auth;
 
+import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNURL;
 
@@ -68,6 +69,10 @@ public interface ISVNAuthenticationManager {
      * An ssh credential kind (<span class="javastring">"svn.ssh"</span>)
      */
     public static final String SSH = "svn.ssh";
+    /**
+     * An ssl credential kind (<span class="javastring">"svn.ssl"</span>)
+     */
+    public static final String SSL = "svn.ssl";
     
     /**
      * Sets a custom authentication provider that will provide user 
@@ -173,7 +178,7 @@ public interface ISVNAuthenticationManager {
      * @param errorMessage   the reason of the authentication failure 
      * @param authentication a user credential to accept/drop
      */
-    public void acknowledgeAuthentication(boolean accepted, String kind, String realm, String errorMessage, SVNAuthentication authentication);
+    public void acknowledgeAuthentication(boolean accepted, String kind, String realm, SVNErrorMessage errorMessage, SVNAuthentication authentication);
     
     /**
      * Sets a specific runtime authentication storage manager. This storage 
@@ -184,6 +189,9 @@ public interface ISVNAuthenticationManager {
      */
     public void setRuntimeStorage(ISVNAuthenticationStorage storage);
     
+    /**
+     * @deprecated
+     */
     public boolean isAuthenticationForced();
 
 }

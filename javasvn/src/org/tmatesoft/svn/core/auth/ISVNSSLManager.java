@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -14,6 +14,9 @@ package org.tmatesoft.svn.core.auth;
 import java.io.IOException;
 
 import javax.net.ssl.SSLContext;
+
+import org.tmatesoft.svn.core.SVNErrorMessage;
+import org.tmatesoft.svn.core.SVNURL;
 
 /**
  * The <b>ISVNSSLManager</b> interface is intended for 
@@ -50,6 +53,7 @@ import javax.net.ssl.SSLContext;
  * @see     ISVNAuthenticationManager
  */
 public interface ISVNSSLManager {
+    
     /**
      * Returns an SSL context for the appropriate authentiation realm. 
      * 
@@ -57,6 +61,26 @@ public interface ISVNSSLManager {
      * @throws IOException  if an i/o error occurred
      */
     public SSLContext getSSLContext() throws IOException;
+    
+    /**
+     * @return true if user should be prompted for client certificate
+     */
+    public boolean isClientCertPromptRequired();
+    
+    
+    /**
+     * Sets client authentication that will be used in SSLContext.
+     * 
+     *  @param sslAuthentication a client authentication
+     */
+    public void setClientAuthentication(SVNSSLAuthentication sslAuthentication);
+    
+    /**
+     * Returns client authentication.
+     * 
+     * @return client authentication
+     */
+    public SVNSSLAuthentication getClientAuthentication();
     
     /**
      * Accepts this SSL context if authentication has succeeded or 
@@ -67,5 +91,5 @@ public interface ISVNSSLManager {
      *                      <span class="javakeyword">false</span>
      * @param errorMessage  the reason of the authentication failure
      */
-    public void acknowledgeSSLContext(boolean accepted, String errorMessage);
+    public void acknowledgeSSLContext(boolean accepted, SVNErrorMessage errorMessage);
 }

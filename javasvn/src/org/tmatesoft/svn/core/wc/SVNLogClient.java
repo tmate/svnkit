@@ -1,25 +1,32 @@
 /*
  * ====================================================================
- * Copyright (c) 2004 TMate Software Ltd. All rights reserved.
- * 
- * This software is licensed as described in the file COPYING, which you should
- * have received as part of this distribution. The terms are also available at
- * http://tmate.org/svn/license.html. If newer versions of this license are
- * posted there, you may use a newer version instead, at your option.
+ * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ *
+ * This software is licensed as described in the file COPYING, which
+ * you should have received as part of this distribution.  The terms
+ * are also available at http://tmate.org/svn/license.html.
+ * If newer versions of this license are posted there, you may use a
+ * newer version instead, at your option.
  * ====================================================================
  */
 package org.tmatesoft.svn.core.wc;
 
 import java.io.File;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.TreeSet;
 
 import org.tmatesoft.svn.core.ISVNDirEntryHandler;
 import org.tmatesoft.svn.core.ISVNLogEntryHandler;
 import org.tmatesoft.svn.core.SVNAnnotationGenerator;
 import org.tmatesoft.svn.core.SVNDirEntry;
+import org.tmatesoft.svn.core.SVNErrorCode;
+import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
+import org.tmatesoft.svn.core.SVNLock;
+import org.tmatesoft.svn.core.SVNLogEntry;
 import org.tmatesoft.svn.core.SVNNodeKind;
 import org.tmatesoft.svn.core.SVNURL;
 import org.tmatesoft.svn.core.auth.ISVNAuthenticationManager;
@@ -120,7 +127,7 @@ public class SVNLogClient extends SVNBasicClient {
         long endRev = getRevisionNumber(endRevision, repos, path);
         long startRev = getRevisionNumber(startRevision, repos, path);
         if (endRev < startRev) {
-            SVNErrorManager.error("svn: Start revision must precede end revision (" + startRev + ":" + endRev + ")");
+            SVNErrorManager.error(SVNErrorMessage.create(SVNErrorCode.CLIENT_BAD_REVISION, "Start revision must precede end revision"));
         }
         File tmpFile = new File(path.getParentFile(), SVNFileUtil.getAdminDirectoryName());
         tmpFile = new File(tmpFile, "tmp/text-base");
@@ -157,16 +164,16 @@ public class SVNLogClient extends SVNBasicClient {
         long endRev = getRevisionNumber(endRevision, repos, null);
         long startRev = getRevisionNumber(startRevision, repos, null);
         if (endRev < startRev) {
-            SVNErrorManager.error("svn: Start revision must precede end revision (" + startRev + ":" + endRev + ")");
+            SVNErrorManager.error(SVNErrorMessage.create(SVNErrorCode.CLIENT_BAD_REVISION, "Start revision must precede end revision"));
         }
         File tmpFile = SVNFileUtil.createTempDirectory("annotate");
-        doAnnotate(repos.getLocation().toString(), startRev, tmpFile, repos, endRev, handler);
+        doAnnotate(repos.getLocation().toDecodedString(), startRev, tmpFile, repos, endRev, handler);
     }
     
     private void doAnnotate(String path, long startRev, File tmpFile, SVNRepository repos, long endRev, ISVNAnnotateHandler handler) throws SVNException {
-        SVNAnnotationGenerator generator = new SVNAnnotationGenerator(path, tmpFile, this);
+        SVNAnnotationGenerator generator = new SVNAnnotationGenerator(path, tmpFile, startRev, this);
         try {
-            repos.getFileRevisions("", startRev, endRev, generator);
+            repos.getFileRevisions("", startRev > 0 ? startRev - 1 : startRev, endRev, generator);
             generator.reportAnnotations(handler, null);
         } finally {
             generator.dispose();
@@ -223,7 +230,7 @@ public class SVNLogClient extends SVNBasicClient {
      *                         </ul>
      * @see                    #doLog(SVNURL, String[], SVNRevision, SVNRevision, SVNRevision, boolean, boolean, long, ISVNLogEntryHandler)                        
      */
-    public void doLog(File[] paths, SVNRevision startRevision, SVNRevision endRevision, boolean stopOnCopy, boolean reportPaths, long limit, ISVNLogEntryHandler handler) throws SVNException {
+    public void doLog(File[] paths, SVNRevision startRevision, SVNRevision endRevision, boolean stopOnCopy, boolean reportPaths, long limit, final ISVNLogEntryHandler handler) throws SVNException {
         if (paths == null || paths.length == 0) {
             return;
         }
@@ -235,17 +242,26 @@ public class SVNLogClient extends SVNBasicClient {
                 endRevision = SVNRevision.create(0);
             }
         }
+        ISVNLogEntryHandler wrappingHandler = new ISVNLogEntryHandler() {
+            public void handleLogEntry(SVNLogEntry logEntry) throws SVNException {
+                checkCancelled();
+                handler.handleLogEntry(logEntry);
+            }
+        };
         SVNURL[] urls = new SVNURL[paths.length];
         for (int i = 0; i < paths.length; i++) {
+            checkCancelled();
             File path = paths[i];
             SVNWCAccess wcAccess = createWCAccess(path);
             SVNEntry entry = wcAccess.getTargetEntry();
             if (entry == null) {
-                SVNErrorManager.error("svn: '" + path + "' is not under version control");
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_NOT_FOUND, "''{0}'' is not under version control", path);
+                SVNErrorManager.error(err);
                 return;
             }
             if (entry.getURL() == null) {
-                SVNErrorManager.error("svn: '" + path + "' has no URL");
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_MISSING_URL, "''{0}'' has no URL", path);
+                SVNErrorManager.error(err);
             }
             urls[i] = entry.getSVNURL();
         }
@@ -255,7 +271,8 @@ public class SVNLogClient extends SVNBasicClient {
         Collection targets = new TreeSet();
         SVNURL baseURL = SVNURLUtil.condenceURLs(urls, targets, true);
         if (baseURL == null) {
-            SVNErrorManager.error("svn: Entries belong to different repositories");
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ILLEGAL_TARGET, "target log paths belong to different repositories");
+            SVNErrorManager.error(err);
         }
         if (targets.isEmpty()) {
             targets.add("");
@@ -267,14 +284,15 @@ public class SVNLogClient extends SVNBasicClient {
         }
         if (startRevision.isLocal() || endRevision.isLocal()) {
             for (int i = 0; i < paths.length; i++) {
+                checkCancelled();
                 long startRev = getRevisionNumber(startRevision, repos, paths[i]);
                 long endRev = getRevisionNumber(endRevision, repos, paths[i]);
-                repos.log(targetPaths, startRev, endRev, reportPaths, stopOnCopy, limit, handler);
+                repos.log(targetPaths, startRev, endRev, reportPaths, stopOnCopy, limit, wrappingHandler);
             }
         } else {
             long startRev = getRevisionNumber(startRevision, repos, null);
             long endRev = getRevisionNumber(endRevision, repos, null);
-            repos.log(targetPaths, startRev, endRev, reportPaths, stopOnCopy, limit, handler);
+            repos.log(targetPaths, startRev, endRev, reportPaths, stopOnCopy, limit, wrappingHandler);
         }
     }
     
@@ -323,7 +341,7 @@ public class SVNLogClient extends SVNBasicClient {
      * @throws SVNException
      * @see                    #doLog(File[], SVNRevision, SVNRevision, boolean, boolean, long, ISVNLogEntryHandler)
      */
-    public void doLog(SVNURL url, String[] paths, SVNRevision pegRevision, SVNRevision startRevision, SVNRevision endRevision, boolean stopOnCopy, boolean reportPaths, long limit, ISVNLogEntryHandler handler) throws SVNException {
+    public void doLog(SVNURL url, String[] paths, SVNRevision pegRevision, SVNRevision startRevision, SVNRevision endRevision, boolean stopOnCopy, boolean reportPaths, long limit, final ISVNLogEntryHandler handler) throws SVNException {
         if (startRevision.isValid() && !endRevision.isValid()) {
             endRevision = startRevision;
         } else if (!startRevision.isValid()) {
@@ -333,17 +351,55 @@ public class SVNLogClient extends SVNBasicClient {
             }
         }
         paths = paths == null || paths.length == 0 ? new String[] {""} : paths;
+        ISVNLogEntryHandler wrappingHandler = new ISVNLogEntryHandler() {
+            public void handleLogEntry(SVNLogEntry logEntry) throws SVNException {
+                checkCancelled();
+                handler.handleLogEntry(logEntry);
+            }
+        };
         long targetRevNumber = startRevision.getNumber();
-        if (endRevision.getNumber() > 0) {
-            targetRevNumber = Math.max(targetRevNumber, endRevision.getNumber());
-        }
         SVNRepository repos = targetRevNumber > 0 && pegRevision.isValid() && !pegRevision.isLocal() ?
                 createRepository(url, null, pegRevision, SVNRevision.create(targetRevNumber)) : createRepository(url, true);
+        checkCancelled();
         long startRev = getRevisionNumber(startRevision, repos, null);
+        checkCancelled();
         long endRev = getRevisionNumber(endRevision, repos, null);
-        repos.log(paths, startRev, endRev, reportPaths, stopOnCopy, limit, handler);
+        checkCancelled();
+        repos.log(paths, startRev, endRev, reportPaths, stopOnCopy, limit, wrappingHandler);
     }
     
+    /**
+     * Browses directory entries from a repository (using Working 
+     * Copy paths to get corresponding URLs) and uses the provided dir 
+     * entry handler to process them.
+     * 
+     * <p>
+     * On every entry that this method stops it gets some useful entry 
+     * information which is packed into an {@link org.tmatesoft.svn.core.SVNDirEntry}
+     * object and passed to the <code>handler</code>'s 
+     * {@link org.tmatesoft.svn.core.ISVNDirEntryHandler#handleDirEntry(SVNDirEntry) handleDirEntry()} method.
+     *  
+     * @param  path           a WC item to get its repository location            
+     * @param  pegRevision    a revision in which the item's URL is first looked up
+     * @param  revision       a target revision
+     * @param  fetchLocks     <span class="javakeyword">true</span> to fetch locks 
+     *                        information from a repository
+     * @param  recursive      <span class="javakeyword">true</span> to
+     *                        descend recursively (relevant for directories)    
+     * @param  handler        a caller's directory entry handler (to process
+     *                        info on an entry)
+     * @throws SVNException 
+     * @see                   #doList(SVNURL, SVNRevision, SVNRevision, boolean, ISVNDirEntryHandler)  
+     */
+    public void doList(File path, SVNRevision pegRevision, SVNRevision revision, boolean fetchLocks, boolean recursive, ISVNDirEntryHandler handler) throws SVNException {
+        if (revision == null || !revision.isValid()) {
+            revision = SVNRevision.BASE;
+        }
+        SVNRepository repos = createRepository(null, path, pegRevision, revision);
+        long rev = getRevisionNumber(revision, repos, path);
+        doList(repos, rev, handler, fetchLocks, recursive);
+    }
+
     /**
      * Browses directory entries from a repository (using Working 
      * Copy paths to get corresponding URLs) and uses the provided dir 
@@ -366,14 +422,42 @@ public class SVNLogClient extends SVNBasicClient {
      * @see                   #doList(SVNURL, SVNRevision, SVNRevision, boolean, ISVNDirEntryHandler)  
      */
     public void doList(File path, SVNRevision pegRevision, SVNRevision revision, boolean recursive, ISVNDirEntryHandler handler) throws SVNException {
-        if (revision == null || !revision.isValid()) {
-            revision = SVNRevision.BASE;
-        }
-        SVNRepository repos = createRepository(null, path, pegRevision, revision);
-        long rev = getRevisionNumber(revision, repos, path);
-        doList(repos, rev, handler, recursive);
+        doList(path, pegRevision, revision, false, recursive, handler);
+        
     }
     
+    /**
+     * Browses directory entries from a repository and uses the provided 
+     * dir entry handler to process them. This method is 
+     * especially useful when having no Working Copy. 
+     * 
+     * <p>
+     * On every entry that this method stops it gets some useful entry 
+     * information which is packed into an {@link org.tmatesoft.svn.core.SVNDirEntry}
+     * object and passed to the <code>handler</code>'s 
+     * {@link org.tmatesoft.svn.core.ISVNDirEntryHandler#handleDirEntry(SVNDirEntry) handleDirEntry()} method.
+     * 
+     * @param  url            a repository location to be "listed"
+     * @param  pegRevision    a revision in which the item's URL is first looked up
+     * @param  revision       a target revision
+     * @param  fetchLocks     <span class="javakeyword">true</span> to 
+     *                        fetch locks information from repository
+     * @param  recursive      <span class="javakeyword">true</span> to
+     *                        descend recursively (relevant for directories)    
+     * @param  handler        a caller's directory entry handler (to process
+     *                        info on an entry)
+     * @throws SVNException
+     * @see                   #doList(File, SVNRevision, SVNRevision, boolean, ISVNDirEntryHandler)   
+     */
+    public void doList(SVNURL url, SVNRevision pegRevision, SVNRevision revision, boolean fetchLocks, boolean recursive, ISVNDirEntryHandler handler) throws SVNException {
+        long[] pegRev = new long[] {-1};
+        SVNRepository repos = createRepository(url, null, pegRevision, revision, pegRev);
+        if (pegRev[0] < 0) {
+            pegRev[0] = getRevisionNumber(revision, repos, null);
+        }
+        doList(repos, pegRev[0], handler, fetchLocks, recursive);
+    }
+
     /**
      * Browses directory entries from a repository and uses the provided 
      * dir entry handler to process them. This method is 
@@ -396,18 +480,35 @@ public class SVNLogClient extends SVNBasicClient {
      * @see                   #doList(File, SVNRevision, SVNRevision, boolean, ISVNDirEntryHandler)   
      */
     public void doList(SVNURL url, SVNRevision pegRevision, SVNRevision revision, boolean recursive, ISVNDirEntryHandler handler) throws SVNException {
-        if (revision == null || !revision.isValid()) {
-            revision = SVNRevision.HEAD;
-        }
-        long[] pegRev = new long[] {-1};
-        SVNRepository repos = createRepository(url, null, pegRevision, revision, pegRev);
-        if (pegRev[0] < 0) {
-            pegRev[0] = getRevisionNumber(revision, repos, null);
-        }
-        doList(repos, pegRev[0], handler, recursive);
+        doList(url, pegRevision, revision, false, recursive, handler);
     }
 
-    private void doList(SVNRepository repos, long rev, ISVNDirEntryHandler handler, boolean recursive) throws SVNException {
+    private void doList(SVNRepository repos, long rev, final ISVNDirEntryHandler handler, boolean fetchLocks, boolean recursive) throws SVNException {
+        final Map locksMap = new HashMap();
+        if (fetchLocks) {
+            SVNLock[] locks = new SVNLock[0];
+            try {
+                locks = repos.getLocks("");                
+            } catch (SVNException e) {
+                if (!(e.getErrorMessage() != null && e.getErrorMessage().getErrorCode() == SVNErrorCode.RA_NOT_IMPLEMENTED)) {
+                    throw e;
+                }                
+            }
+            
+            if (locks != null && locks.length > 0) {
+                SVNURL root = repos.getRepositoryRoot(true);
+                for (int i = 0; i < locks.length; i++) {
+                    String repositoryPath = locks[i].getPath();
+                    locksMap.put(root.appendPath(repositoryPath, false), locks[i]); 
+                }
+            }
+        }
+        ISVNDirEntryHandler nestedHandler = new ISVNDirEntryHandler() {
+            public void handleDirEntry(SVNDirEntry dirEntry) throws SVNException {
+                dirEntry.setLock((SVNLock) locksMap.get(dirEntry.getURL()));
+                handler.handleDirEntry(dirEntry);
+            }
+        };
         if (repos.checkPath("", rev) == SVNNodeKind.FILE) {
             String name = SVNPathUtil.tail(repos.getLocation().getPath());
             SVNURL fileULR = repos.getLocation();
@@ -423,13 +524,14 @@ public class SVNLogClient extends SVNBasicClient {
                 }
             }
             if (fileEntry != null) {
-                fileEntry.setPath(name);
-                handler.handleDirEntry(fileEntry);
+                fileEntry.setRelativePath(name);
+                nestedHandler.handleDirEntry(fileEntry);
             } else {
-                SVNErrorManager.error("svn: URL '" + fileULR + "' non-existent in that revision");
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_NOT_FOUND, "URL ''{0}'' non-existent in that revision", fileULR);
+                SVNErrorManager.error(err);
             }
         } else {
-            list(repos, "", rev, recursive, handler);
+            list(repos, "", rev, recursive, nestedHandler);
         }
     }
 
@@ -440,7 +542,7 @@ public class SVNLogClient extends SVNBasicClient {
         for (Iterator iterator = entries.iterator(); iterator.hasNext();) {
             SVNDirEntry entry = (SVNDirEntry) iterator.next();
             String childPath = SVNPathUtil.append(path, entry.getName());
-            entry.setPath(childPath);
+            entry.setRelativePath(childPath);
             handler.handleDirEntry(entry);
             if (entry.getKind() == SVNNodeKind.DIR && entry.getDate() != null && recursive) {
                 list(repository, childPath, rev, recursive, handler);

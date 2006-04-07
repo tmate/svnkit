@@ -1,17 +1,19 @@
 /*
  * ====================================================================
- * Copyright (c) 2004 TMate Software Ltd. All rights reserved.
- * 
- * This software is licensed as described in the file COPYING, which you should
- * have received as part of this distribution. The terms are also available at
- * http://tmate.org/svn/license.html. If newer versions of this license are
- * posted there, you may use a newer version instead, at your option.
+ * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ *
+ * This software is licensed as described in the file COPYING, which
+ * you should have received as part of this distribution.  The terms
+ * are also available at http://tmate.org/svn/license.html.
+ * If newer versions of this license are posted there, you may use a
+ * newer version instead, at your option.
  * ====================================================================
  */
 package org.tmatesoft.svn.core.internal.wc;
 
 import java.io.File;
 
+import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNLock;
 import org.tmatesoft.svn.core.SVNNodeKind;
@@ -65,13 +67,13 @@ public class SVNEventFactory {
     }
 
     public static SVNEvent createLockEvent(SVNWCAccess source, String path,
-            SVNEventAction action, SVNLock lock, String message) {
+            SVNEventAction action, SVNLock lock, SVNErrorMessage message) {
         SVNEvent event = new SVNEvent(source, null, SVNPathUtil.tail(path), action, SVNNodeKind.FILE, -1, null, null, null, null, lock, message);
         event.setPath(path);
         return event;
     }
 
-    public static SVNEvent createLockEvent(String path, SVNEventAction action, SVNLock lock, String message) {
+    public static SVNEvent createLockEvent(String path, SVNEventAction action, SVNLock lock, SVNErrorMessage message) {
         SVNEvent event = new SVNEvent(null, null, SVNPathUtil.tail(path), action, SVNNodeKind.FILE, -1, null, null, null, null, lock, message);
         event.setPath(path);
         return event;

@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -46,6 +46,7 @@ public abstract class SVNArgument {
     public static final SVNArgument NEW = createStringArgument(new String[] {"--new"});
     public static final SVNArgument NO_AUTH_CACHE = createUnaryArgument(new String[] {"--no-auth-cache"});
     public static final SVNArgument FORCE = createUnaryArgument(new String[] { "--force" });
+    public static final SVNArgument FORCE_LOG = createUnaryArgument(new String[] { "--force-log" });
     public static final SVNArgument FILE = createStringArgument(new String[] { "-F" });
     public static final SVNArgument EDITOR_CMD = createStringArgument(new String[] { "--editor-cmd" });
     public static final SVNArgument STRICT = createUnaryArgument(new String[] { "--strict" });
@@ -56,6 +57,7 @@ public abstract class SVNArgument {
     public static final SVNArgument DRY_RUN = createUnaryArgument(new String[] { "--dry-run" });
     public static final SVNArgument INCREMENTAL = createUnaryArgument(new String[] { "--incremental" });
     public static final SVNArgument XML = createUnaryArgument(new String[] { "--xml" });
+    public static final SVNArgument LIMIT = createStringArgument(new String[] { "--limit" });
 
     public static SVNArgument findArgument(String name) {
         for (Iterator arguments = ourArguments.iterator(); arguments.hasNext();) {
@@ -87,6 +89,7 @@ public abstract class SVNArgument {
         ourArguments.add(SVNArgument.MESSAGE);
         ourArguments.add(SVNArgument.REVISION);
         ourArguments.add(SVNArgument.FORCE);
+        ourArguments.add(SVNArgument.FORCE_LOG);
         ourArguments.add(SVNArgument.FILE);
         ourArguments.add(SVNArgument.EDITOR_CMD);
         ourArguments.add(SVNArgument.STRICT);
@@ -105,6 +108,7 @@ public abstract class SVNArgument {
         ourArguments.add(SVNArgument.REV_PROP);
         ourArguments.add(SVNArgument.INCREMENTAL);
         ourArguments.add(SVNArgument.XML);
+        ourArguments.add(SVNArgument.LIMIT);
         ourArguments.add(SVNArgument.STOP_ON_COPY);
     }
 

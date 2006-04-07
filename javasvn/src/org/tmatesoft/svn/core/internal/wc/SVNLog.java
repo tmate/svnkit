@@ -1,15 +1,18 @@
 /*
  * ====================================================================
- * Copyright (c) 2004 TMate Software Ltd. All rights reserved.
+ * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
  *
- * This software is licensed as described in the file COPYING, which you should
- * have received as part of this distribution. The terms are also available at
- * http://tmate.org/svn/license.html. If newer versions of this license are
- * posted there, you may use a newer version instead, at your option.
+ * This software is licensed as described in the file COPYING, which
+ * you should have received as part of this distribution.  The terms
+ * are also available at http://tmate.org/svn/license.html.
+ * If newer versions of this license are posted there, you may use a
+ * newer version instead, at your option.
  * ====================================================================
  */
 package org.tmatesoft.svn.core.internal.wc;
 
+import org.tmatesoft.svn.core.SVNErrorCode;
+import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNProperty;
 import org.tmatesoft.svn.core.internal.util.SVNEncodingUtil;
@@ -182,7 +185,8 @@ public class SVNLog {
                 os.write("/>\n");
             }
         } catch (IOException e) {
-            SVNErrorManager.error("svn: Cannot save log file '" + myFile + "'");
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, "Cannot write log file ''{0}'': {1}", new Object[] {myFile, e.getLocalizedMessage()});
+            SVNErrorManager.error(err, e);
         } finally {
             SVNFileUtil.closeFile(os);
             myCache = null;
@@ -235,7 +239,8 @@ public class SVNLog {
                 }
             }
         } catch (IOException e) {
-            SVNErrorManager.error("svn: Cannot read log file '" + myFile + "'");
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, "Cannot read log file ''{0}'': {1}", new Object[] {myFile, e.getLocalizedMessage()});
+            SVNErrorManager.error(err, e);
         } finally {
             SVNFileUtil.closeFile(reader);
         }

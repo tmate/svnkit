@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -19,6 +19,8 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
+import org.tmatesoft.svn.core.SVNErrorCode;
+import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
@@ -36,12 +38,27 @@ import de.regnis.q.sequence.line.QSequenceLineResult;
  * produces defferences delta for two text files, and full text delta if a 
  * target file is binary.
  * 
+ * @deprecated see {@link SVNDeltaGenerator} 
  * @author  TMate Software Ltd.
  * @version 1.0
  */
 public class SVNSequenceDeltaGenerator implements ISVNDeltaGenerator {
 
 	private static final SVNAllDeltaGenerator ALL_DELTA_GENERATOR = new SVNAllDeltaGenerator();
+
+    /**
+     * Memory threshold. 
+     * 
+     * <p>
+     * When comparing one file against another (working vs. base), 
+     * if each file has got a length less than this memory threshold, the files will 
+     * be compared in the memory. Otherwise if at least one of the files has a length 
+     * greater than the memory threshold, the files will be compared in the filesystem.
+     * 
+     * <p>
+     * This threshold may be defined via setting the <span class="javakeyword">"javasvn.sequence.memorythreshold"</span> 
+     * system property (before the first <b>SVNSequenceDeltaGenerator</b> instance is created).    
+	 */
 	private final int memoryThreshold;
 	private final int fileSegmentSize;
 	private final double searchDepthExponent;
@@ -99,17 +116,20 @@ public class SVNSequenceDeltaGenerator implements ISVNDeltaGenerator {
 			doGenerateDiffWindow(commitPath, workFile, baseFile, consumer, memoryThreshold, fileSegmentSize, searchDepthExponent, tempDirectory);
 		}
 		catch (IOException ex) {
-			throw new SVNException(ex);
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, ex.getLocalizedMessage());
+            SVNErrorManager.error(err, ex);
 		}
 	}
 
 	private static void doGenerateDiffWindow(String commitPath, ISVNRAData workFile, ISVNRAData baseFile, ISVNEditor consumer, int memoryTreshold, int fileSegmentSize, double searchDepthExponent, final File tempDirectory) throws IOException, SVNException {
 		final QSequenceLineResult result;
 		try {
-			result = QSequenceLineMedia.createBlocks(new SVNSequenceLineRAData(baseFile), new SVNSequenceLineRAData(workFile), null, memoryTreshold, fileSegmentSize, searchDepthExponent, new QSequenceLineFixedTempDirectoryFactory(tempDirectory));
+			result = QSequenceLineMedia.createBlocks(new SVNSequenceLineRAData(baseFile), new SVNSequenceLineRAData(workFile), memoryTreshold, fileSegmentSize, searchDepthExponent, new QSequenceLineFixedTempDirectoryFactory(tempDirectory));
 		}
 		catch (QSequenceException ex) {
-			throw new SVNException(ex);
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, ex.getLocalizedMessage());
+            SVNErrorManager.error(err, ex);
+            return;
 		}
 
 		try {
@@ -141,7 +161,8 @@ public class SVNSequenceDeltaGenerator implements ISVNDeltaGenerator {
 			}
 		}
 		catch (IOException e) {
-			SVNErrorManager.error(e.getMessage());
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, e.getLocalizedMessage());
+            SVNErrorManager.error(err, e);
 		}
 		finally {
 			SVNFileUtil.closeFile(is);
@@ -154,7 +175,8 @@ public class SVNSequenceDeltaGenerator implements ISVNDeltaGenerator {
 			}
 		}
 		catch (IOException e) {
-			SVNErrorManager.error(e.getMessage());
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, e.getLocalizedMessage());
+            SVNErrorManager.error(err, e);
 		}
 		finally {
 			SVNFileUtil.closeFile(is);

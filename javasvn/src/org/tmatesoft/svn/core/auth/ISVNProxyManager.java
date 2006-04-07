@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -10,6 +10,8 @@
  * ====================================================================
  */
 package org.tmatesoft.svn.core.auth;
+
+import org.tmatesoft.svn.core.SVNErrorMessage;
 
 /**
  * The <b>ISVNProxyManager</b> interface is used to manage http server 
@@ -72,5 +74,5 @@ public interface ISVNProxyManager {
      * @param errorMessage  the reason of the failure to connect to 
      *                      the proxy server
      */
-    public void acknowledgeProxyContext(boolean accepted, String errorMessage);
+    public void acknowledgeProxyContext(boolean accepted, SVNErrorMessage errorMessage);
 }

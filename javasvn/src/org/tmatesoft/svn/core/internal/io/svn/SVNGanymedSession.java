@@ -1,11 +1,12 @@
 /*
  * ====================================================================
- * Copyright (c) 2004 TMate Software Ltd. All rights reserved.
- * 
- * This software is licensed as described in the file COPYING, which you should
- * have received as part of this distribution. The terms are also available at
- * http://tmate.org/svn/license.html. If newer versions of this license are
- * posted there, you may use a newer version instead, at your option.
+ * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ *
+ * This software is licensed as described in the file COPYING, which
+ * you should have received as part of this distribution.  The terms
+ * are also available at http://tmate.org/svn/license.html.
+ * If newer versions of this license are posted there, you may use a
+ * newer version instead, at your option.
  * ====================================================================
  */
 package org.tmatesoft.svn.core.internal.io.svn;
@@ -21,7 +22,8 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
 
-import org.tmatesoft.svn.core.SVNAuthenticationException;
+import org.tmatesoft.svn.core.SVNErrorCode;
+import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNURL;
 import org.tmatesoft.svn.core.auth.SVNSSHAuthentication;
@@ -29,6 +31,7 @@ import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 
 import ch.ethz.ssh2.Connection;
+import ch.ethz.ssh2.InteractiveCallback;
 import ch.ethz.ssh2.crypto.PEMDecoder;
 
 /**
@@ -47,14 +50,14 @@ public class SVNGanymedSession {
 
     static Connection getConnection(SVNURL location, SVNSSHAuthentication credentials) throws SVNException {
         if ("".equals(credentials.getUserName()) || credentials.getUserName() == null) {
-            throw new SVNAuthenticationException("svn: User name is required to establish svn+shh connection");
+            SVNErrorMessage error = SVNErrorMessage.create(SVNErrorCode.RA_NOT_AUTHORIZED, "User name is required to establish SSH connection");
+            SVNErrorManager.error(error);
         }
         int port = location.hasPort() ? location.getPort() : credentials.getPortNumber();
         if (port < 0) {
             port = 22;
         }
         String key = credentials.getUserName() + ":" + location.getHost() + ":" + port;
-        String hostID = location.getHost() + ":" + port;
         Connection connection = isUsePersistentConnection() ? (Connection) ourConnectionsPool.get(key) : null;
         
         if (connection == null) {
@@ -63,34 +66,60 @@ public class SVNGanymedSession {
             String password = credentials.getPassword();
             String userName = credentials.getUserName();
             
-            password = "".equals(password) ? null : password;
+            password = "".equals(password) && privateKey != null ? null : password;
             passphrase = "".equals(passphrase) ? null : passphrase;
             
             if (privateKey != null && !isValidPrivateKey(privateKey, passphrase)) {
                 if (password == null) {
-                    throw new SVNAuthenticationException("svn: Authentication failed: file '" + privateKey.getAbsolutePath() + "' is not valid OpenSSH DSA or RSA private key file");
+                    SVNErrorMessage error = SVNErrorMessage.create(SVNErrorCode.RA_NOT_AUTHORIZED, "File ''{0}'' is not valid OpenSSH DSA or RSA private key file", privateKey);
+                    SVNErrorManager.error(error);
                 } 
                 privateKey = null;
             }
             if (privateKey == null && password == null) {
-                throw new SVNAuthenticationException("svn: Either password or OpenSSH private key file required for svn+ssh connection");
+                SVNErrorMessage error = SVNErrorMessage.create(SVNErrorCode.RA_NOT_AUTHORIZED, "Either password or private key should be provided to establish SSH connection");
+                SVNErrorManager.error(error);
             }
             
             connection = new Connection(location.getHost(), port);
             try {
                 connection.connect();
-                boolean authenticated;
+                boolean authenticated = false;
                 if (privateKey != null) {
                     authenticated = connection.authenticateWithPublicKey(userName, privateKey, passphrase);
+                } else if (password != null) {
+                    String[] methods = connection.getRemainingAuthMethods(userName);
+                    authenticated = false;
+                    for (int i = 0; i < methods.length; i++) {
+                        if ("password".equals(methods[i])) {
+                            authenticated = connection.authenticateWithPassword(userName, password);                    
+                        } else if ("keyboard-interactive".equals(methods[i])) {
+                            final String p = password;
+                            authenticated = connection.authenticateWithKeyboardInteractive(userName, new InteractiveCallback() {
+                                public String[] replyToChallenge(String name, String instruction, int numPrompts, String[] prompt, boolean[] echo) throws Exception {
+                                    String[] reply = new String[numPrompts];
+                                    for (int i = 0; i < reply.length; i++) {
+                                        reply[i] = p;
+                                    }
+                                    return reply;
+                                }
+                            });
+                        }
+                        if (authenticated) {
+                            break;
+                        }
+                    }
                 } else {
-                    authenticated = connection.authenticateWithPassword(userName, password);
+                    SVNErrorMessage error = SVNErrorMessage.create(SVNErrorCode.RA_NOT_AUTHORIZED, "Either password or private key should be provided to establish SSH connection");
+                    SVNErrorManager.error(error);
                 }
                 if (authenticated) {
                     if (isUsePersistentConnection()) {
                         ourConnectionsPool.put(key, connection);
                     }
                 } else {
-                    throw new SVNAuthenticationException("svn: Authentication failed");
+                    SVNErrorMessage error = SVNErrorMessage.create(SVNErrorCode.RA_NOT_AUTHORIZED, "SSH server rejects provided credentials");
+                    SVNErrorManager.error(error);
                 }
             } catch (IOException e) {
                 if (connection != null) {
@@ -99,7 +128,8 @@ public class SVNGanymedSession {
                         ourConnectionsPool.remove(key);
                     }
                 }
-                SVNErrorManager.error("svn: Connection to '" + hostID + "' failed: '" + e.getMessage() + "'");
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.RA_SVN_CONNECTION_CLOSED, "Cannot connect to ''{0}'': {1}", new Object[] {location.setPath("", false), e.getLocalizedMessage()});
+                SVNErrorManager.error(err, e);
             } 
         } 
         return connection;

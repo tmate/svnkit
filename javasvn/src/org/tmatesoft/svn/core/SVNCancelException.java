@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -23,13 +23,21 @@ package org.tmatesoft.svn.core;
  */
 public class SVNCancelException extends SVNException {
     /**
+     * Creates a cancel exception.
+     *
+     */
+    public SVNCancelException() {
+        super(SVNErrorMessage.create(SVNErrorCode.CANCELLED, "Operation cancelled"));
+    }
+
+    /**
      * Constructs an <b>SVNCancelException</b> given the
      * error message.
      * 
-     * @param message  an error message describing why the operation 
-     *                 was cancelled
+     * @param errorMessage  an error message describing why the operation 
+     *                      was cancelled
      */
-    public SVNCancelException(String message) {
-        super(message);
+    public SVNCancelException(SVNErrorMessage errorMessage) {
+        super(errorMessage);
     }
 }

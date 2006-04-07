@@ -1,5 +1,13 @@
 /*
- * Created on 17.06.2005
+ * ====================================================================
+ * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ *
+ * This software is licensed as described in the file COPYING, which
+ * you should have received as part of this distribution.  The terms
+ * are also available at http://tmate.org/svn/license.html.
+ * If newer versions of this license are posted there, you may use a
+ * newer version instead, at your option.
+ * ====================================================================
  */
 package org.tigris.subversion.javahl;
 
@@ -30,7 +38,8 @@ import org.tmatesoft.svn.core.wc.SVNStatusType;
 import org.tmatesoft.svn.util.SVNDebugLog;
 
 /**
- * @author evgeny
+ * @version 1.0
+ * @author  TMate Software Ltd.
  */
 public class JavaHLObjectFactory {
 
@@ -127,10 +136,6 @@ public class JavaHLObjectFactory {
         if(status.getCommittedRevision() != null){
             lastChangedRevision = status.getCommittedRevision().getNumber();
         }
-        if (status.getRemoteRevision() != null && 
-                status.getRemoteRevision() != SVNRevision.UNDEFINED) {
-            lastChangedRevision = status.getRemoteRevision().getNumber();
-        }
         Date d = status.getCommittedDate();
         long lastChangedDate = -1;
         if(d != null){
@@ -173,22 +178,29 @@ public class JavaHLObjectFactory {
         if (path != null) {
             path = path.replace(File.separatorChar, '/');
         }
-
+        
+        long reposRev = status.getRemoteRevision() != null ? status.getRemoteRevision().getNumber() : -1;
+        long reposDate = status.getRemoteDate() != null ? status.getRemoteDate().getTime() * 1000 : -1;
+        String reposAuthor = status.getRemoteAuthor();
+        int reposKind = getNodeKind(status.getRemoteKind());
+        
         Status st = new Status(path, url, nodeKind, revision, lastChangedRevision, lastChangedDate, lastCommitAuthor, textStatus, propStatus,
                 repositoryTextStatus, repositoryPropStatus, locked, copied, conflictOld, conflictNew, conflictWorking, urlCopiedFrom, revisionCopiedFrom,
-                switched, lockToken, lockOwner, lockComment, lockCreationDate, reposLock);
+                switched, lockToken, lockOwner, lockComment, lockCreationDate, reposLock,
+                /* remote: rev, date, kind, author */
+                reposRev, reposDate, reposKind, reposAuthor);
         return st;
     }
 
     public static SVNRevision getSVNRevision(Revision r){
         if(r == null){
             return SVNRevision.UNDEFINED;
-        }
-        if(r.getKind() == RevisionKind.number){
+        } else if(r.getKind() == RevisionKind.number){
             return SVNRevision.create(((Revision.Number)r).getNumber());
-        }
-        if(r.getKind() == RevisionKind.date){
+        } else if(r.getKind() == RevisionKind.date){
             return SVNRevision.create(((Revision.DateSpec)r).getDate());
+        } else if (r == Revision.START) {
+            return SVNRevision.create(0);
         }
         return (SVNRevision)REVISION_KIND_CONVERSION_MAP.get(new Integer(r.getKind()));
     }
@@ -233,9 +245,9 @@ public class JavaHLObjectFactory {
             return null;
         }
         return new DirEntry(
-                dirEntry.getPath() != null ? dirEntry.getPath() : dirEntry.getName(),
+                dirEntry.getRelativePath(),
                 getNodeKind(dirEntry.getKind()),
-                dirEntry.size(),
+                dirEntry.getSize(),
                 dirEntry.hasProperties(),
                 dirEntry.getRevision(),
                 dirEntry.getDate() != null ? dirEntry.getDate().getTime()*1000 : 0,
@@ -396,13 +408,18 @@ public class JavaHLObjectFactory {
     }
 
     public static NotifyInformation createNotifyInformation(SVNEvent event, String path) {
+        // include full error message.
+        String errMsg = null;
+        if (event.getErrorMessage() != null) {
+            errMsg = event.getErrorMessage().getFullMessage();
+        }
         return new NotifyInformation(
                 path,
                 JavaHLObjectFactory.getNotifyActionValue(event.getAction()),
                 JavaHLObjectFactory.getNodeKind(event.getNodeKind()),
                 event.getMimeType(),
                 JavaHLObjectFactory.createLock(event.getLock()),
-                event.getErrorMessage(),
+                errMsg,
                 JavaHLObjectFactory.getStatusValue(event.getContentsStatus()),
                 JavaHLObjectFactory.getStatusValue(event.getPropertiesStatus()),
                 JavaHLObjectFactory.getLockStatusValue(event.getLockStatus()),
@@ -411,7 +428,11 @@ public class JavaHLObjectFactory {
     }
 
     public static void throwException(SVNException e) throws ClientException {
-        ClientException ec = new ClientException(e.getMessage(), "", 0);
+        int code = 0;
+        if (e.getErrorMessage() != null) {
+            code = e.getErrorMessage().getErrorCode().getCode();
+        }
+        ClientException ec = new ClientException(e.getMessage(), "", code);
         SVNDebugLog.logInfo(ec);
         SVNDebugLog.logInfo(e);
         throw ec;

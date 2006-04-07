@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -23,6 +23,8 @@ import de.regnis.q.sequence.line.QSequenceLineRAData;
  * The <b>SVNSequenceLineRAData</b> class is an adapter for <b>ISVNRAData</b> 
  * objects, so that they could be used with <b>de.regnis.q.sequence.line</b> 
  * classes. This adapter is used by the <b>SVNSequenceDeltaGenerator</b> class.  
+ * 
+ * @deprecated see {@link SVNDeltaGenerator}
  * 
  * @version 1.0
  * @author  TMate Software Ltd.

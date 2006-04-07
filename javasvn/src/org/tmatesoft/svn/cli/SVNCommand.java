@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -12,14 +12,22 @@
 
 package org.tmatesoft.svn.cli;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
 import java.io.PrintStream;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.StringTokenizer;
 
+import org.tmatesoft.svn.core.SVNErrorCode;
+import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNURL;
 import org.tmatesoft.svn.core.wc.ISVNOptions;
@@ -38,6 +46,9 @@ public abstract class SVNCommand {
     private String myPassword;
 
     private static Map ourCommands;
+    private static Set ourPegCommands;
+    private static HashSet ourForceLogCommands;
+    
     private boolean myIsStoreCreds;
     private SVNClientManager myClientManager;
 
@@ -69,6 +80,61 @@ public abstract class SVNCommand {
         return myClientManager;
     }
 
+    protected String getCommitMessage() throws SVNException {
+        String fileName = (String) getCommandLine().getArgumentValue(SVNArgument.FILE);
+        if (fileName != null) {
+            FileInputStream is = null;
+            ByteArrayOutputStream bos = new ByteArrayOutputStream();
+            try {
+                is = new FileInputStream(fileName);
+                while (true) {
+                    int r = is.read();
+                    if (r < 0) {
+                        break;
+                    }
+                    if (r == 0) {
+                        // invalid
+                        SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.CL_BAD_LOG_MESSAGE, "error: commit message contains a zero byte");
+                        throw new SVNException(err);
+                    }
+                    bos.write(r);
+                }
+            } catch (IOException e) {
+                SVNErrorMessage msg = SVNErrorMessage.create(SVNErrorCode.CL_BAD_LOG_MESSAGE, e.getLocalizedMessage());
+                throw new SVNException(msg, e);
+            } finally {
+                try {
+                    if (is != null) {
+                        is.close();
+                    }
+                    bos.close();
+                } catch (IOException e) {
+                    SVNErrorMessage msg = SVNErrorMessage.create(SVNErrorCode.CL_BAD_LOG_MESSAGE, e.getLocalizedMessage());
+                    throw new SVNException(msg, e);
+                }
+            }
+            return new String(bos.toByteArray());
+        }
+        return (String) getCommandLine().getArgumentValue(SVNArgument.MESSAGE);
+    }
+
+    public static String formatString(String str, int chars, boolean left) {
+        if (str.length() > chars) {
+            return str.substring(0, chars);
+        }
+        StringBuffer formatted = new StringBuffer();
+        if (left) {
+            formatted.append(str);
+        }
+        for(int i = 0; i < chars - str.length(); i++) {
+            formatted.append(' ');
+        }
+        if (!left) {
+            formatted.append(str);
+        }
+        return formatted.toString();
+    }
+
     public static SVNCommand getCommand(String name) {
         if (name == null) {
             return null;
@@ -95,9 +161,40 @@ public abstract class SVNCommand {
                 return (SVNCommand) clazz.newInstance();
             }
         } catch (Throwable th) {
+            SVNDebugLog.logInfo(th);
             //
         }
         return null;
+    }
+
+    public static boolean hasPegRevision(String commandName) {
+        String fullName = getFullCommandName(commandName);
+        return fullName != null && ourPegCommands.contains(fullName);
+    }
+
+    public static boolean isForceLogCommand(String commandName) {
+        String fullName = getFullCommandName(commandName);
+        return fullName != null && ourForceLogCommands.contains(fullName);
+    }
+
+    private static String getFullCommandName(String commandName) {
+        if (commandName == null) {
+            return null;
+        }
+        String fullName = null;
+        for (Iterator keys = ourCommands.keySet().iterator(); keys.hasNext();) {
+            String[] names = (String[]) keys.next();
+            for (int i = 0; i < names.length; i++) {
+                if (commandName.equalsIgnoreCase(names[i])) {
+                    fullName = names[0];
+                    break;
+                }
+            }
+            if (fullName != null) {
+                break;
+            }
+        }
+        return fullName;
     }
 
     protected static SVNRevision parseRevision(SVNCommandLine commandLine) {
@@ -164,21 +261,28 @@ public abstract class SVNCommand {
         ourCommands.put(new String[] { "info" }, "org.tmatesoft.svn.cli.command.InfoCommand");
         ourCommands.put(new String[] { "resolved" }, "org.tmatesoft.svn.cli.command.ResolvedCommand");
         ourCommands.put(new String[] { "cat" }, "org.tmatesoft.svn.cli.command.CatCommand");
-        ourCommands.put(new String[] { "ls" }, "org.tmatesoft.svn.cli.command.LsCommand");
+        ourCommands.put(new String[] { "ls", "list" }, "org.tmatesoft.svn.cli.command.LsCommand");
         ourCommands.put(new String[] { "log" }, "org.tmatesoft.svn.cli.command.LogCommand");
         ourCommands.put(new String[] { "switch", "sw" }, "org.tmatesoft.svn.cli.command.SwitchCommand");
         ourCommands.put(new String[] { "diff", "di" }, "org.tmatesoft.svn.cli.command.DiffCommand");
         ourCommands.put(new String[] { "merge" }, "org.tmatesoft.svn.cli.command.MergeCommand");
         ourCommands.put(new String[] { "export" }, "org.tmatesoft.svn.cli.command.ExportCommand");
         ourCommands.put(new String[] { "cleanup" }, "org.tmatesoft.svn.cli.command.CleanupCommand");
-
         ourCommands.put(new String[] { "lock" }, "org.tmatesoft.svn.cli.command.LockCommand");
         ourCommands.put(new String[] { "unlock" }, "org.tmatesoft.svn.cli.command.UnlockCommand");
-
         ourCommands.put(new String[] { "annotate", "blame", "praise", "ann" }, "org.tmatesoft.svn.cli.command.AnnotateCommand");
+        
+        ourPegCommands = new HashSet();
+        ourPegCommands.addAll(Arrays.asList(new String[] {"cat", "annotate", "checkout", "diff", "export", "info", "ls", "merge", "propget", "proplist"}));
+
+        ourForceLogCommands = new HashSet();
+        ourForceLogCommands.addAll(Arrays.asList(new String[] {"commit", "copy", "delete", "import", "mkdir", "move", "lock"}));
     }
 
     protected static int getLinesCount(String str) {
+        if ("".equals(str)) {
+            return 1;
+        }
         int count = 0;
         for(StringTokenizer lines = new StringTokenizer(str, "\n"); lines.hasMoreTokens();) {
             lines.nextToken();

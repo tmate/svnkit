@@ -1,3 +1,39 @@
+= version 1.0.4
+
++ Subversion 1.3.1 compatibilty bugfixes.
++ SSH port number was not saved properly when JavaSVN is used within Eclipse.
++ HTTP (DAV) protocol implementation improvements.
++ XML output support for list operation.
++ javasvn.ssh.author system property could be used to ovveride SSH username.
++ commit hook error now properly reported in JavaSVN error message.
++ OS/2 support
+
+= version 1.0.3
+
++ improved cancellation support.
++ improved versioned symlinks handling.
++ improved HTTP proxies support.
++ bugfixes.
+
+= version 1.0.2
+
++ full support of the new Subversion 1.3.0 features.
++ ssh 'keyboard-interactive' authentication support.
++ ssl client certificate prompt support.
++ error codes and error messages hierarchy support in the API.
++ utility classes to genereta operatios output in XML format.
++ faster delta generation and delta processing code.
++ utility API classes to process and generate deltas.
++ documentations improved, Commit and Export examples simplified.
++ bugfixes
+
+! Note: 
+  This version includes minor API changes and is not binary compatible 
+  with the previous versions. API changes are:
+  * String error messages replaced with SVNErrorMessage objects
+  * ISVNFileRevisionHanlder callback interface changed
+  * all callback interfaces methods now declared as throwing SVNException
+
 = version 1.0.1
 
 + bugfixes

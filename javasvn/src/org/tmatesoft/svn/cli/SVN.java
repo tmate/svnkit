@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -12,10 +12,15 @@
 
 package org.tmatesoft.svn.cli;
 
+import java.io.File;
 
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.internal.io.dav.DAVRepositoryFactory;
 import org.tmatesoft.svn.core.internal.io.svn.SVNRepositoryFactoryImpl;
+import org.tmatesoft.svn.core.internal.wc.SVNFileType;
+import org.tmatesoft.svn.core.wc.SVNStatus;
+import org.tmatesoft.svn.core.wc.SVNStatusClient;
+import org.tmatesoft.svn.core.wc.SVNStatusType;
 import org.tmatesoft.svn.util.SVNDebugLog;
 
 /**
@@ -40,15 +45,47 @@ public class SVN {
                 commandLine = new SVNCommandLine(args);
             } catch (SVNException e) {
                 SVNDebugLog.logInfo(e);
-                System.err.println("error: " + e.getMessage());
+                System.err.println(e.getMessage());
                 System.exit(1);
             }
             String commandName = commandLine.getCommandName();
             SVNCommand command = SVNCommand.getCommand(commandName);
+            
     
             if (command != null) {
+                if (SVNCommand.isForceLogCommand(commandName) && !commandLine.hasArgument(SVNArgument.FORCE_LOG)) {
+                    if (commandLine.hasArgument(SVNArgument.FILE)) {
+                        File file = new File((String) commandLine.getArgumentValue(SVNArgument.FILE));
+                        // check if it is a versioned file.
+                        SVNStatusClient stClient = new SVNStatusClient(null, null);
+                        try {
+                            SVNStatus status = stClient.doStatus(file.getAbsoluteFile(), false);
+                            if (status != null && status.getContentsStatus() != SVNStatusType.STATUS_UNVERSIONED &&
+                                    status.getContentsStatus() != SVNStatusType.STATUS_IGNORED &&
+                                    status.getContentsStatus() != SVNStatusType.STATUS_EXTERNAL) {
+                                if ("lock".equals(commandName)) {
+                                    System.err.println("svn: Lock comment file is a versioned file; use '--force-log' to override");
+                                } else {
+                                    System.err.println("svn: Log message file is a versioned file; use '--force-log' to override");
+                                }
+                                System.exit(1);
+                            }
+                        } catch (SVNException e) {}
+                    } 
+                    if (commandLine.hasArgument(SVNArgument.MESSAGE)) {
+                        File file = new File((String) commandLine.getArgumentValue(SVNArgument.MESSAGE));
+                        if (SVNFileType.getType(file) != SVNFileType.NONE) {
+                            if ("lock".equals(commandName)) {
+                                System.err.println("svn: The lock comment is a path name (was -F intended?); use '--force-log' to override");
+                            } else {
+                                System.err.println("svn: The log message is a path name (was -F intended?); use '--force-log' to override");
+                            }
+                            System.exit(1);
+                        }
+                    }
+                }
                 DAVRepositoryFactory.setup();
-                SVNRepositoryFactoryImpl.setup();
+                SVNRepositoryFactoryImpl.setup();                
     
                 command.setCommandLine(commandLine);
                 try {

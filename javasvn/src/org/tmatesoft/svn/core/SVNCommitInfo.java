@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -30,13 +30,15 @@ import java.util.Date;
  * @author 	TMate Software Ltd.
  */
 public class SVNCommitInfo {
-
+    /**
+     * Denotes an unsuccessful commit.
+     */
     public static final SVNCommitInfo NULL = new SVNCommitInfo(-1, null, null, null);
     
     private long myNewRevision;
     private Date myDate;
     private String myAuthor;
-    private SVNException myError;
+    private SVNErrorMessage myErrorMessage;
 
     /**
      * 
@@ -56,14 +58,14 @@ public class SVNCommitInfo {
      * @param revision      a revision number 
      * @param author        the name of the author who committed the revision
      * @param date          the datestamp when the revision was committed
-     * @param error         if a commit failed - this is an exception containing
-     *                      an error description 
+     * @param error         if a commit failed - this is an error description 
+     *                      containing details on the failure 
      */
-    public SVNCommitInfo(long revision, String author, Date date, SVNException error) {
+    public SVNCommitInfo(long revision, String author, Date date, SVNErrorMessage error) {
         myNewRevision = revision;
         myAuthor = author;
         myDate = date;
-        myError = error;
+        myErrorMessage = error;
     }
 
     /**
@@ -94,12 +96,51 @@ public class SVNCommitInfo {
     }
     
     /**
-     * Gets an exception that occurred (if occurred) while committing 
-     * a new revision.
+     * Gets an error message for a failed commit (if it 
+     * has failed). This message will usually keep the entire 
+     * stack trace of all the error messages as of results of errors
+     * occurred. 
      * 
-     * @return an exception with description of an error
+     * @return an error messages or <span class="javakeyword">null</span>. 
+     */
+    public SVNErrorMessage getErrorMessage() {
+        return myErrorMessage;
+    }
+
+    /**
+     * @deprecated use {@link #getErrorMessage() } instead
      */
     public SVNException getError() {
-        return myError;
+        if (myErrorMessage != null) {
+            return new SVNException(getErrorMessage());
+        }
+        return null;
+    }
+    
+    /**
+     * Gives a string representation of this object.
+     * 
+     * @return a string describing commit info
+     */
+    public String toString() {
+        if (this == NULL) {
+            return "EMPTY COMMIT";
+        } else if (myErrorMessage == null) {
+            StringBuffer sb = new StringBuffer();
+            sb.append("r");
+            sb.append(myNewRevision);
+            if (myAuthor != null) {
+                sb.append(" by '");
+                sb.append(myAuthor);
+                sb.append("'");
+            }
+            if (myDate != null) {
+                sb.append(" at ");
+                sb.append(myDate);
+            }
+            return sb.toString(); 
+        } else {         
+            return myErrorMessage.getFullMessage();
+        }
     }
 }

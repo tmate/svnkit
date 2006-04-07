@@ -1,11 +1,12 @@
 /*
  * ====================================================================
- * Copyright (c) 2004 TMate Software Ltd. All rights reserved.
- * 
- * This software is licensed as described in the file COPYING, which you should
- * have received as part of this distribution. The terms are also available at
- * http://tmate.org/svn/license.html. If newer versions of this license are
- * posted there, you may use a newer version instead, at your option.
+ * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ *
+ * This software is licensed as described in the file COPYING, which
+ * you should have received as part of this distribution.  The terms
+ * are also available at http://tmate.org/svn/license.html.
+ * If newer versions of this license are posted there, you may use a
+ * newer version instead, at your option.
  * ====================================================================
  */
 package org.tmatesoft.svn.core.internal.wc;
@@ -22,6 +23,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.StringTokenizer;
 
+import org.tmatesoft.svn.core.SVNErrorCode;
+import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNProperty;
 import org.tmatesoft.svn.core.internal.util.SVNEncodingUtil;
@@ -81,10 +84,36 @@ public class SVNTranslator {
             }
         }
     }
+    
+    public static String convertEOLs(String line) {
+        if (line == null) {
+            return line;
+        }
+        StringBuffer result = null;
+        for (int i = 0; i < line.length(); i++) {
+            char ch = line.charAt(i);
+            if (ch == '\r') {
+                if (result == null) {
+                    result = new StringBuffer(line.length());
+                    result.append(line.substring(0, i));
+                }                
+                if (i + 1 < line.length() && line.charAt(i + 1) == '\n') {
+                    // skip \r in \r\n
+                    continue;
+                }
+                // replace \r with \r\n
+                ch = '\n';
+            }
+            if (result != null) {
+                result.append(ch);
+            }
+        }
+        return result != null ? result.toString() : line;
+    }
 
     public static void translate(File src, File dst, byte[] eol, Map keywords, boolean special, boolean expand) throws SVNException {
         if (src == null || dst == null) {
-            SVNErrorManager.error("svn: Invalid agruments in SVNFileUtil.translate method");
+            SVNErrorManager.error(SVNErrorMessage.create(SVNErrorCode.INCORRECT_PARAMS));
             return;
         }
         if (src.equals(dst)) {
@@ -115,7 +144,8 @@ public class SVNTranslator {
         try {
             copy(is, os, eol, keywords);
         } catch (IOException e) {
-            SVNErrorManager.error("svn: I/O error while transalting file '" + src + "' to '" + dst + "'");
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, e.getLocalizedMessage());
+            SVNErrorManager.error(err, e);
         } finally {
             SVNFileUtil.closeFile(os);
             SVNFileUtil.closeFile(is);
@@ -158,7 +188,7 @@ public class SVNTranslator {
         return true;
     }
 
-    private static void copy(InputStream src, OutputStream dst, byte[] eol, Map keywords) throws IOException {
+    public static void copy(InputStream src, OutputStream dst, byte[] eol, Map keywords) throws IOException {
         if (keywords != null && keywords.isEmpty()) {
             keywords = null;
         }
@@ -202,8 +232,7 @@ public class SVNTranslator {
                         dst.write(keywordBuffer, 0, length);
                     }
                 } else if (keywordLength > 0) {
-                    int from = translateKeyword(dst, keywords, keywordBuffer,
-                            keywordLength);
+                    int from = translateKeyword(dst, keywords, keywordBuffer, keywordLength);
                     in.unread(keywordBuffer, from, length - from);
                 }
             } else {
@@ -212,8 +241,7 @@ public class SVNTranslator {
         }
     }
 
-    private static int translateKeyword(OutputStream os, Map keywords,
-            byte[] keyword, int length) throws IOException {
+    private static int translateKeyword(OutputStream os, Map keywords, byte[] keyword, int length) throws IOException {
         // $$ = 0, 2 => 1,0
         String keywordName = null;
         int i = 0;
@@ -249,32 +277,36 @@ public class SVNTranslator {
                 if (value == null) {
                     keyword[i] = ' ';
                 } else {
-                    keyword[i] = vOffset < value.length ? value[vOffset]
-                            : (byte) ' ';
+                    keyword[i] = vOffset < value.length ? value[vOffset] : (byte) ' ';
                 }
                 vOffset++;
             }
-            keyword[i] = (byte) (value != null && vOffset < value.length ? '#'
-                    : ' ');
+            keyword[i] = (byte) (value != null && vOffset < value.length ? '#' : ' ');
             // now save all.
             os.write(keyword, start, length - start);
-        } else if (length - i > 4 && keyword[i] == ':' && keyword[i + 1] == ' '
-                && keyword[length - 2] == ' ') {
+        } else if (length - i > 4 && keyword[i] == ':' && keyword[i + 1] == ' ' && keyword[length - 2] == ' ') {
             // : x $
             if (value != null) {
                 os.write(keyword, i, value.length > 0 ? 1 : 2); // ': ' or ':'
-                os.write(value);
+                if (value.length > 250) {
+                    os.write(value, 0, 250);
+                } else {
+                    os.write(value);
+                }
                 os.write(keyword, length - 2, 2); // ' $';
             } else {
                 os.write('$');
             }
-        } else if (keyword[i] == '$'
-                || (keyword[i] == ':' && keyword[i + 1] == '$')) {
+        } else if (keyword[i] == '$' || (keyword[i] == ':' && keyword[i + 1] == '$')) {
             // $ or :$
             if (value != null) {
                 os.write(':');
                 os.write(' ');
-                os.write(value);
+                if (value.length > 250 - keywordName.length()) {
+                    os.write(value, 0, 250 - keywordName.length());
+                } else {
+                    os.write(value);
+                }
                 if (value.length > 0) {
                     os.write(' ');
                 }
@@ -291,8 +323,7 @@ public class SVNTranslator {
 
     }
 
-    public static Map computeKeywords(String keywords, String u, String a,
-            String d, String r) {
+    public static Map computeKeywords(String keywords, String u, String a, String d, String r) {
         if (keywords == null) {
             return Collections.EMPTY_MAP;
         }
@@ -308,39 +339,31 @@ public class SVNTranslator {
 
         Map map = new HashMap();
         try {
-            for (StringTokenizer tokens = new StringTokenizer(keywords,
-                    " \t\n\b\r\f"); tokens.hasMoreTokens();) {
+            for (StringTokenizer tokens = new StringTokenizer(keywords," \t\n\b\r\f"); tokens.hasMoreTokens();) {
                 String token = tokens.nextToken();
                 if ("LastChangedDate".equals(token) || "Date".equals(token)) {
                     date = expand && date == null ? SVNFormatUtil.formatDate(jDate, true).getBytes("UTF-8") : date;
                     map.put("LastChangedDate", date);
                     map.put("Date", date);
-                } else if ("LastChangedRevision".equals(token)
-                        || "Revision".equals(token) || "Rev".equals(token)) {
+                } else if ("LastChangedRevision".equals(token) || "Revision".equals(token) || "Rev".equals(token)) {
                     rev = expand && rev == null ? r.getBytes("UTF-8") : rev;
                     map.put("LastChangedRevision", rev);
                     map.put("Revision", rev);
                     map.put("Rev", rev);
-                } else if ("LastChangedBy".equals(token)
-                        || "Author".equals(token)) {
-                    author = expand && author == null ? (a == null ? new byte[0]
-                            : a.getBytes("UTF-8"))
-                            : author;
+                } else if ("LastChangedBy".equals(token) || "Author".equals(token)) {
+                    author = expand && author == null ? (a == null ? new byte[0] : a.getBytes("UTF-8")) : author;
                     map.put("LastChangedBy", author);
                     map.put("Author", author);
                 } else if ("HeadURL".equals(token) || "URL".equals(token)) {
-                    url = expand && url == null ? SVNEncodingUtil.uriDecode(u).getBytes(
-                            "UTF-8") : url;
+                    url = expand && url == null ? SVNEncodingUtil.uriDecode(u).getBytes("UTF-8") : url;
                     map.put("HeadURL", url);
                     map.put("URL", url);
                 } else if ("Id".equals(token)) {
                     if (expand && id == null) {
                         rev = rev == null ? r.getBytes("UTF-8") : rev;
                         date = date == null ? SVNFormatUtil.formatDate(jDate, false).getBytes("UTF-8") : date;
-                        name = name == null ? SVNEncodingUtil.uriDecode(SVNPathUtil.tail(u))
-                                .getBytes("UTF-8") : name;
-                        author = author == null ? (a == null ? new byte[0] : a
-                                .getBytes("UTF-8")) : author;
+                        name = name == null ? SVNEncodingUtil.uriDecode(SVNPathUtil.tail(u)).getBytes("UTF-8") : name;
+                        author = author == null ? (a == null ? new byte[0] : a.getBytes("UTF-8")) : author;
                         ByteArrayOutputStream bos = new ByteArrayOutputStream();
                         bos.write(name);
                         bos.write(' ');

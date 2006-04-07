@@ -1,11 +1,12 @@
 /*
  * ====================================================================
- * Copyright (c) 2004 TMate Software Ltd. All rights reserved.
- * 
- * This software is licensed as described in the file COPYING, which you should
- * have received as part of this distribution. The terms are also available at
- * http://tmate.org/svn/license.html. If newer versions of this license are
- * posted there, you may use a newer version instead, at your option.
+ * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ *
+ * This software is licensed as described in the file COPYING, which
+ * you should have received as part of this distribution.  The terms
+ * are also available at http://tmate.org/svn/license.html.
+ * If newer versions of this license are posted there, you may use a
+ * newer version instead, at your option.
  * ====================================================================
  */
 
@@ -17,6 +18,8 @@ import java.io.OutputStream;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.tmatesoft.svn.core.SVNErrorCode;
+import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
@@ -68,7 +71,7 @@ public class SVNEditModeReader {
     public boolean processCommand(String commandName, InputStream parameters) throws SVNException {
         String pattern = (String) COMMANDS_MAP.get(commandName);
         if (pattern == null) {
-            throw new SVNException("unknown command name: " + commandName);
+            SVNErrorManager.error(SVNErrorMessage.create(SVNErrorCode.RA_SVN_UNKNOWN_CMD));
         }
         if ("textdelta-chunk".equals(commandName)) {
             if (myBuilder.getDiffWindow() == null) {
@@ -76,7 +79,8 @@ public class SVNEditModeReader {
                 try {
                     items = SVNReader.parse(parameters, "(SB))", null);
                 } catch (Throwable th) {
-                    SVNErrorManager.error("svn: Cannot read edit command: " + th.getMessage());
+                    SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.RA_SVN_MALFORMED_DATA, "Cannot read editor command: {0}", th.getLocalizedMessage());
+                    SVNErrorManager.error(err, th);
                 } 
                 byte[] bytes = (byte[]) items[1];
                 myBuilder.accept(bytes, 0);
@@ -89,7 +93,8 @@ public class SVNEditModeReader {
                     try {
                         myDiffStream.write(myBuilder.getInstructionsData());
                     } catch (IOException e) {
-                        SVNErrorManager.error(e.getMessage());
+                        SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.RA_SVN_IO_ERROR, e.getLocalizedMessage());
+                        SVNErrorManager.error(err, e);
                     }
                     if (myLenght == 0) {
                         closeDiffStream();
@@ -103,7 +108,7 @@ public class SVNEditModeReader {
                     try {
                         myDiffStream.write(line);
                     } catch (IOException e) {
-                        throw new SVNException(e);
+                        SVNErrorManager.error(SVNErrorMessage.create(SVNErrorCode.RA_SVN_IO_ERROR, e.getMessage()), e);
                     }
                 }
                 if (myLenght == 0) {
@@ -163,7 +168,7 @@ public class SVNEditModeReader {
         try {
             myDiffStream.close();
         } catch (IOException e) {
-            throw new SVNException(e);
+            SVNErrorManager.error(SVNErrorMessage.create(SVNErrorCode.RA_SVN_IO_ERROR, e.getMessage()), e);
         }
         myBuilder.reset(SVNDiffWindowBuilder.OFFSET);
         myDiffStream = null;

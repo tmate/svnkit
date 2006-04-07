@@ -1,11 +1,12 @@
 /*
  * ====================================================================
- * Copyright (c) 2004 TMate Software Ltd. All rights reserved.
- * 
- * This software is licensed as described in the file COPYING, which you should
- * have received as part of this distribution. The terms are also available at
- * http://tmate.org/svn/license.html. If newer versions of this license are
- * posted there, you may use a newer version instead, at your option.
+ * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ *
+ * This software is licensed as described in the file COPYING, which
+ * you should have received as part of this distribution.  The terms
+ * are also available at http://tmate.org/svn/license.html.
+ * If newer versions of this license are posted there, you may use a
+ * newer version instead, at your option.
  * ====================================================================
  */
 package org.tmatesoft.svn.core.wc;
@@ -16,6 +17,7 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Stack;
 
+import org.tmatesoft.svn.core.SVNCancelException;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNNodeKind;
 import org.tmatesoft.svn.core.SVNProperty;
@@ -118,13 +120,15 @@ public class SVNStatusClient extends SVNBasicClient {
      * 							ignores), otherwise <span class="javakeyword">false</span>  
      * @param  handler			a caller's status handler that will be involved
      * 							in processing status information
+     * @return                  the revision number the status information was collected
+     *                          against
      * @throws SVNException
      * @see	                    ISVNStatusHandler
      */
-    public void doStatus(File path, boolean recursive, boolean remote,
+    public long doStatus(File path, boolean recursive, boolean remote,
                          boolean reportAll, boolean includeIgnored, ISVNStatusHandler handler)
             throws SVNException {
-        doStatus(path, recursive, remote, reportAll, includeIgnored, false,
+        return doStatus(path, recursive, remote, reportAll, includeIgnored, false,
                  handler);
     }
     
@@ -183,7 +187,7 @@ public class SVNStatusClient extends SVNBasicClient {
         }
         final boolean[] deletedInRepos = new boolean[] {false};
         ISVNStatusHandler realHandler = new ISVNStatusHandler() {
-            public void handleStatus(SVNStatus status) {
+            public void handleStatus(SVNStatus status) throws SVNException {
                 if (deletedInRepos[0]) {
                     status.setRemoteStatus(SVNStatusType.STATUS_DELETED, null, null, null);
                 }
@@ -197,6 +201,8 @@ public class SVNStatusClient extends SVNBasicClient {
             SVNNodeKind kind = repos.checkPath("", -1);
             if (kind == SVNNodeKind.NONE) {
                 deletedInRepos[0] = true;
+                reportAll = true;
+                statusEditor = new SVNStatusEditor(getOptions(), wcAccess, realHandler, parentExternals, includeIgnored, reportAll, recursive);
             } else {
                 SVNRepository locksRepos = createRepository(url, false);
     
@@ -208,6 +214,7 @@ public class SVNStatusClient extends SVNBasicClient {
             }
         }
         // to report all when there is completely no changes
+        checkCancelled();
         statusEditor.closeEdit();
         if (remote && statusEditor.getTargetRevision() >= 0) {
             SVNEvent event = SVNEventFactory.createStatusCompletedEvent(wcAccess, statusEditor.getTargetRevision());
@@ -228,8 +235,11 @@ public class SVNStatusClient extends SVNBasicClient {
                     doStatus(externalFile, recursive, remote, reportAll, includeIgnored, false, handler);
                 } catch (SVNException e) {
                     // fire error event.
+                    if (e instanceof SVNCancelException) {
+                        throw e;
+                    }
                 } finally {
-                    setEventPathPrefix(externalPath);
+                    setEventPathPrefix(null);
                 }
             }
         }

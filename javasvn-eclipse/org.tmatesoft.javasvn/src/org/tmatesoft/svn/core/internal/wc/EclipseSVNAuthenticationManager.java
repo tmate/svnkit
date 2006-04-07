@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -20,11 +20,14 @@ import java.util.Map;
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.Platform;
 import org.tmatesoft.svn.core.SVNURL;
+import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.auth.ISVNAuthenticationManager;
 import org.tmatesoft.svn.core.auth.ISVNAuthenticationProvider;
 import org.tmatesoft.svn.core.auth.SVNAuthentication;
 import org.tmatesoft.svn.core.auth.SVNPasswordAuthentication;
 import org.tmatesoft.svn.core.auth.SVNSSHAuthentication;
+import org.tmatesoft.svn.core.auth.SVNSSLAuthentication;
+import org.tmatesoft.svn.util.SVNDebugLog;
 
 /**
  * @version 1.0
@@ -51,7 +54,7 @@ public class EclipseSVNAuthenticationManager extends DefaultSVNAuthenticationMan
 
     protected ISVNAuthenticationProvider createDefaultAuthenticationProvider(String userName, String password, boolean allowSave) {
         return new ISVNAuthenticationProvider() {
-            public SVNAuthentication requestClientAuthentication(String kind, SVNURL url, String realm, String errorMessage, SVNAuthentication previousAuth, boolean authMayBeStored) {
+            public SVNAuthentication requestClientAuthentication(String kind, SVNURL url, String realm, SVNErrorMessage errorMessage, SVNAuthentication previousAuth, boolean authMayBeStored) {
                 return null;
             }
             public int acceptServerAuthentication(SVNURL url, String realm, Object certificate, boolean resultMayBeStored) {
@@ -62,22 +65,36 @@ public class EclipseSVNAuthenticationManager extends DefaultSVNAuthenticationMan
     
     static class KeyringAuthenticationProvider implements ISVNAuthenticationProvider, IPersistentAuthenticationProvider {
 
-        public SVNAuthentication requestClientAuthentication(String kind, SVNURL url, String realm, String errorMessage, SVNAuthentication previousAuth, boolean authMayBeStored) {
+        public SVNAuthentication requestClientAuthentication(String kind, SVNURL url, String realm, SVNErrorMessage errorMessage, SVNAuthentication previousAuth, boolean authMayBeStored) {
             // get from key-ring, use realm.
             realm = realm == null ? DEFAULT_URL.toString() : realm;
             Map info = Platform.getAuthorizationInfo(DEFAULT_URL, realm, kind);
             // convert info to SVNAuthentication.
-            if (info != null && !info.isEmpty() && info.get("username") != null) {
+            if (info != null && ISVNAuthenticationManager.SSL.equals(kind)) {
+                String path = (String) info.get("cert");
+                String password = (String) info.get("password");
+                if (path != null) {
+                    return new SVNSSLAuthentication(new File(path), password, authMayBeStored);
+                }
+            } else if (info != null && !info.isEmpty() && info.get("username") != null) {
                 if (ISVNAuthenticationManager.PASSWORD.equals(kind)) {
                     return new SVNPasswordAuthentication((String) info.get("username"), (String) info.get("password"), authMayBeStored);
                 } else if (ISVNAuthenticationManager.SSH.equals(kind)) {
-                    int port = url.getPort();
-                    if (port < 0 && info.get("port") != null) {
+                    int port = -1;
+                    SVNDebugLog.logInfo("loading ssh auth, from keyring");
+                    if (info.get("port") != null) {
                         port = Integer.parseInt((String) info.get("port"));
+                    }
+                    SVNDebugLog.logInfo("stored port: " + port);
+                    if (port < 0) {
+                        port = url.getPort();
+                        SVNDebugLog.logInfo("URL port: " + port);
                     }
                     if (port < 0) {
                         port = 22;
+                        SVNDebugLog.logInfo("default port: " + port);
                     }
+                    SVNDebugLog.logInfo("using port: " + port);
                     if (info.get("key") != null) {
                         File keyPath = new File((String) info.get("key"));
                         return new SVNSSHAuthentication((String) info.get("username"), keyPath, (String) info.get("passphrase"), port, authMayBeStored);
@@ -94,7 +111,7 @@ public class EclipseSVNAuthenticationManager extends DefaultSVNAuthenticationMan
         }
 
         public void saveAuthentication(SVNAuthentication auth, String kind, String realm) {
-            if (auth.getUserName() == null || "".equals(auth.getUserName())) {
+            if (!(auth instanceof SVNSSLAuthentication) && (auth.getUserName() == null || "".equals(auth.getUserName()))) {
                 return;
             }
             realm = realm == null ? DEFAULT_URL.toString() : realm;
@@ -104,6 +121,7 @@ public class EclipseSVNAuthenticationManager extends DefaultSVNAuthenticationMan
             if (auth instanceof SVNPasswordAuthentication) {
                 info.put("password", ((SVNPasswordAuthentication) auth).getPassword());
             } else if (auth instanceof SVNSSHAuthentication) {
+                SVNDebugLog.logInfo("saving SSH auth: " + auth);
                 SVNSSHAuthentication sshAuth = (SVNSSHAuthentication) auth;
                 if (sshAuth.getPrivateKeyFile() != null) {
                     info.put("key", sshAuth.getPrivateKeyFile().getAbsolutePath());
@@ -114,7 +132,20 @@ public class EclipseSVNAuthenticationManager extends DefaultSVNAuthenticationMan
                     info.put("password", sshAuth.getPassword());
                 }
                 if (sshAuth.getPortNumber() >= 0) {
+                    SVNDebugLog.logInfo("saving port number: " + sshAuth.getPortNumber());
                     info.put("port", Integer.toString(sshAuth.getPortNumber()));
+                } else {
+                    SVNDebugLog.logInfo("not saving port number: " + sshAuth.getPortNumber());
+                }
+            } else if (auth instanceof SVNSSLAuthentication) {
+                SVNSSLAuthentication sslAuth = (SVNSSLAuthentication) auth;
+                File path = sslAuth.getCertificateFile();
+                String password = sslAuth.getPassword();
+                if (path != null) {
+                    info.put("cert", path.getAbsolutePath());
+                    if (password != null && !"".equals(password)) {
+                        info.put("password", password);
+                    }
                 }
             }
             try {

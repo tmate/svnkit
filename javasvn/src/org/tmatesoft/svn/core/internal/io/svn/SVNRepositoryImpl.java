@@ -1,11 +1,12 @@
 /*
  * ====================================================================
- * Copyright (c) 2004 TMate Software Ltd. All rights reserved.
- * 
- * This software is licensed as described in the file COPYING, which you should
- * have received as part of this distribution. The terms are also available at
- * http://tmate.org/svn/license.html. If newer versions of this license are
- * posted there, you may use a newer version instead, at your option.
+ * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ *
+ * This software is licensed as described in the file COPYING, which
+ * you should have received as part of this distribution.  The terms
+ * are also available at http://tmate.org/svn/license.html.
+ * If newer versions of this license are posted there, you may use a
+ * newer version instead, at your option.
  * ====================================================================
  */
 
@@ -22,6 +23,8 @@ import java.util.Map;
 import org.tmatesoft.svn.core.ISVNDirEntryHandler;
 import org.tmatesoft.svn.core.ISVNLogEntryHandler;
 import org.tmatesoft.svn.core.SVNDirEntry;
+import org.tmatesoft.svn.core.SVNErrorCode;
+import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNLock;
 import org.tmatesoft.svn.core.SVNLogEntry;
@@ -30,7 +33,6 @@ import org.tmatesoft.svn.core.SVNNodeKind;
 import org.tmatesoft.svn.core.SVNProperty;
 import org.tmatesoft.svn.core.SVNRevisionProperty;
 import org.tmatesoft.svn.core.SVNURL;
-import org.tmatesoft.svn.core.auth.SVNAuthentication;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.io.ISVNEditor;
@@ -56,7 +58,7 @@ public class SVNRepositoryImpl extends SVNRepository implements ISVNReporter {
 
     private SVNConnection myConnection;
     private String myRealm;
-    private SVNAuthentication myExternalUserName;
+    private String myExternalUserName;
 
     protected SVNRepositoryImpl(SVNURL location, ISVNSession options) {
         super(location, options);
@@ -71,11 +73,7 @@ public class SVNRepositoryImpl extends SVNRepository implements ISVNReporter {
     }
     
     public void setLocation(SVNURL url, boolean forceReconnect) throws SVNException {
-        if (!url.equals(myConnection)) {
-            super.setLocation(url, true);
-        } else {
-            super.setLocation(url, forceReconnect);
-        }
+        super.setLocation(url, true);
         myRealm = null;
     }
 
@@ -160,8 +158,7 @@ public class SVNRepositoryImpl extends SVNRepository implements ISVNReporter {
         }
     }
 
-    public int getLocations(String path, long pegRevision, long[] revisions,
-            ISVNLocationEntryHandler handler) throws SVNException {
+    public int getLocations(String path, long pegRevision, long[] revisions, ISVNLocationEntryHandler handler) throws SVNException {
         assertValidRevision(pegRevision);
         for (int i = 0; i < revisions.length; i++) {
             assertValidRevision(revisions[i]);
@@ -192,6 +189,8 @@ public class SVNRepositoryImpl extends SVNRepository implements ISVNReporter {
             }
             read("x", buffer);
             read("[()]", buffer);
+        } catch (SVNException e) {
+            handleUnsupportedCommand(e, "'get-locations' not implemented");
         } finally {
             closeConnection();
         }
@@ -226,12 +225,15 @@ public class SVNRepositoryImpl extends SVNRepository implements ISVNReporter {
         }
     }
 
-    public long getDir(String path, long revision, Map properties, ISVNDirEntryHandler handler) throws SVNException {
+    public long getDir(String path, long revision, Map properties, final ISVNDirEntryHandler handler) throws SVNException {
         Long rev = getRevisionObject(revision);
-        // convert path to path relative to repos root.
         try {
             openConnection();
+            
+            String fullPath = getFullPath(path);
+            final SVNURL url = getLocation().setPath(fullPath, false);
             path = getRepositoryPath(path);
+
             Object[] buffer = new Object[] { "get-dir", path, rev,
                     Boolean.valueOf(properties != null),
                     Boolean.valueOf(handler != null) };
@@ -241,8 +243,13 @@ public class SVNRepositoryImpl extends SVNRepository implements ISVNReporter {
             buffer[1] = properties;
             buffer = read("[(N(*P)", buffer);
             revision = buffer[0] != null ? SVNReader.getLong(buffer, 0) : revision;
+            ISVNDirEntryHandler nestedHandler = new ISVNDirEntryHandler() {
+                public void handleDirEntry(SVNDirEntry dirEntry) throws SVNException {
+                    handler.handleDirEntry(new SVNDirEntry(url.appendPath(dirEntry.getName(), false), dirEntry.getName(), dirEntry.getKind(), dirEntry.getSize(), dirEntry.hasProperties(), dirEntry.getRevision(), dirEntry.getDate(), dirEntry.getAuthor()));
+                }
+            };
             if (handler != null) {
-                buffer[0] = handler;
+                buffer[0] = nestedHandler;
                 read("(*D)))", buffer);
             } else {
                 read("()))", null);
@@ -255,15 +262,18 @@ public class SVNRepositoryImpl extends SVNRepository implements ISVNReporter {
 
     public SVNDirEntry getDir(String path, long revision, boolean includeComment, final Collection entries) throws SVNException {
         Long rev = getRevisionObject(revision);
-        ISVNDirEntryHandler handler = new ISVNDirEntryHandler() {
-            public void handleDirEntry(SVNDirEntry dirEntry) {
-                entries.add(dirEntry);
-            }            
-        };
         // convert path to path relative to repos root.
         SVNDirEntry parentEntry = null;
         try {
             openConnection();
+            final SVNURL url = getLocation().setPath(getFullPath(path), false);
+            ISVNDirEntryHandler handler = new ISVNDirEntryHandler() {
+                public void handleDirEntry(SVNDirEntry dirEntry) throws SVNException {
+                    dirEntry = new SVNDirEntry(url.appendPath(dirEntry.getName(), false), dirEntry.getName(), 
+                            dirEntry.getKind(), dirEntry.getSize(), dirEntry.hasProperties(), dirEntry.getRevision(), dirEntry.getDate(), dirEntry.getAuthor());
+                    entries.add(dirEntry);
+                }            
+            };
             path = getRepositoryPath(path);
             // get parent
             Object[] buffer = new Object[] { "stat", path, getRevisionObject(revision) };
@@ -271,8 +281,7 @@ public class SVNRepositoryImpl extends SVNRepository implements ISVNReporter {
             authenticate();
             read("[((?F))]", buffer);
             parentEntry = (SVNDirEntry) buffer[0];
-            parentEntry.setPath(path);
-            parentEntry.setName("");
+            parentEntry = new SVNDirEntry(url, "", parentEntry.getKind(), parentEntry.getSize(), parentEntry.hasProperties(), parentEntry.getRevision(), parentEntry.getDate(), parentEntry.getAuthor());
 
             // get entries.
             buffer = new Object[] { "get-dir", path, rev, Boolean.FALSE, Boolean.TRUE };
@@ -388,7 +397,8 @@ public class SVNRepositoryImpl extends SVNRepository implements ISVNReporter {
                             try {
                                 os.write(builder.getInstructionsData());
                             } catch (IOException e) {
-                                SVNErrorManager.error(e.getMessage());
+                                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, e.getLocalizedMessage());
+                                SVNErrorManager.error(err, e);
                             }
                         }
                         builder.reset(SVNDiffWindowBuilder.OFFSET);
@@ -420,9 +430,12 @@ public class SVNRepositoryImpl extends SVNRepository implements ISVNReporter {
                     handler.closeRevision(name == null ? path : name);
                 }
             }
+        } catch (SVNException e) {
+            handleUnsupportedCommand(e, "'get-file-revs' not implemented");
         } finally {
             closeConnection();
         }
+        return -1;
     }
 
     public long log(String[] targetPaths, long startRevision, long endRevision,
@@ -517,7 +530,7 @@ public class SVNRepositoryImpl extends SVNRepository implements ISVNReporter {
             throws SVNException {
         target = target == null ? "" : target;
         if (url == null) {
-            throw new SVNException(url + ": not valid URL");
+            SVNErrorManager.error(SVNErrorMessage.create(SVNErrorCode.BAD_URL, "URL can not be NULL"));
         }
         Object[] buffer = new Object[] { "switch", getRevisionObject(revision),
                 target, Boolean.valueOf(recursive), url.toString() };
@@ -545,7 +558,7 @@ public class SVNRepositoryImpl extends SVNRepository implements ISVNReporter {
             ISVNReporterBaton reporter, ISVNEditor editor) throws SVNException {
         target = target == null ? "" : target;
         if (url == null) {
-            throw new SVNException(url + ": not valid URL");
+            SVNErrorManager.error(SVNErrorMessage.create(SVNErrorCode.BAD_URL, "URL can not be NULL"));
         }
         Object[] buffer = new Object[] { "diff", getRevisionObject(tRevision),
                 target, Boolean.valueOf(recursive),
@@ -628,9 +641,12 @@ public class SVNRepositoryImpl extends SVNRepository implements ISVNReporter {
             authenticate();
             read("[((?L))]", buffer);
             return (SVNLock) buffer[0];
+        } catch (SVNException e) {
+            handleUnsupportedCommand(e, "Server doesn't support the get-lock command");
         } finally {
             closeConnection();
         }
+        return null;
     }
 
     public SVNLock[] getLocks(String path) throws SVNException {
@@ -643,93 +659,202 @@ public class SVNRepositoryImpl extends SVNRepository implements ISVNReporter {
             read("[((*L))]", buffer);
             Collection lockObjects = (Collection) buffer[0];
             return lockObjects == null ? new SVNLock[0] : (SVNLock[]) lockObjects.toArray(new SVNLock[lockObjects.size()]);
+        } catch (SVNException e) {
+            handleUnsupportedCommand(e, "Server doesn't support the get-lock command");            
         } finally {
             closeConnection();
         }
+        return null;
     }
 
     public void lock(Map pathsToRevisions, String comment, boolean force, ISVNLockHandler handler) throws SVNException {
         try {
             openConnection();
-            for(Iterator paths = pathsToRevisions.keySet().iterator(); paths.hasNext();) {
-                String path = (String) paths.next();
-                Long revision = (Long) pathsToRevisions.get(path);
-                path = getRepositoryPath(path);
-                Object[] buffer = new Object[] { "lock", path, comment, Boolean.valueOf(force), revision };
-                write("(w(s(s)w(n)))", buffer);
+            Object[] buffer = new Object[] { "lock-many", comment, Boolean.valueOf(force) };
+            write("(w((s)w(", buffer);
+            buffer = new Object[2];
+            for (Iterator paths = pathsToRevisions.keySet().iterator(); paths.hasNext();) {
+                buffer[0] = paths.next();
+                buffer[1] = pathsToRevisions.get(buffer[0]);
+                write("(s(n))", buffer);
+            }
+            write(")))", buffer);
+            try {
                 authenticate();
-                SVNException error = null;
+            } catch (SVNException e) {                
+                SVNDebugLog.logInfo(e.getErrorMessage().getErrorCode() + "");
+                if (e.getErrorMessage() != null && e.getErrorMessage().getErrorCode() == SVNErrorCode.RA_SVN_UNKNOWN_CMD) {
+                    closeConnection();
+                    openConnection();
+                    lock12(pathsToRevisions, comment, force, handler);
+                    return;
+                }
+                throw e;
+            }
+            for (Iterator paths = pathsToRevisions.keySet().iterator(); paths.hasNext();) {
+                String path = (String) paths.next();
+                SVNLock lock = null;
+                SVNErrorMessage error = null;
                 try {
-                    read("[(L)]", buffer);
+                    read("[L]", buffer);
+                    lock = (SVNLock) buffer[0];
+                    path = lock.getPath();
                 } catch (SVNException e) {
-                    error = e;
+                    path = getRepositoryPath(path);
+                    error = e.getErrorMessage();
                 }
                 if (handler != null) {
-                    SVNLock lock = (SVNLock) buffer[0];
                     handler.handleLock(path, lock, error);
                 }
             }
+            read("x", buffer);
+            read("[()]", buffer);
+        } catch (SVNException e) {
+            SVNDebugLog.logInfo(e);
+            handleUnsupportedCommand(e, "Server doesn't support the lock command");
         } finally {
             closeConnection();
+        }
+    }
+    
+    private void lock12(Map pathsToRevisions, String comment, boolean force, ISVNLockHandler handler) throws SVNException {
+        for(Iterator paths = pathsToRevisions.keySet().iterator(); paths.hasNext();) {
+            String path = (String) paths.next();
+            Long revision = (Long) pathsToRevisions.get(path);
+            path = getRepositoryPath(path);
+            Object[] buffer = new Object[] { "lock", path, comment, Boolean.valueOf(force), revision };
+            write("(w(s(s)w(n)))", buffer);
+            authenticate();
+            SVNErrorMessage error = null;
+            try {
+                read("[(L)]", buffer);
+            } catch (SVNException e) {                
+                if (e.getErrorMessage() != null) {
+                    SVNErrorCode code = e.getErrorMessage().getErrorCode();
+                    if (code == SVNErrorCode.FS_PATH_ALREADY_LOCKED || code == SVNErrorCode.FS_OUT_OF_DATE) {
+                        error = e.getErrorMessage();                            
+                    }
+                }
+                if (error == null) {
+                    throw e;
+                }
+            }
+            if (handler != null) {
+                SVNLock lock = (SVNLock) buffer[0];
+                handler.handleLock(path, lock, error);
+            }
         }
     }
 
     public void unlock(Map pathToTokens, boolean force, ISVNLockHandler handler) throws SVNException {
         try {
             openConnection();
+            Object[] buffer = new Object[] { "unlock-many", Boolean.valueOf(force) };
+            write("(w(w(", buffer);
+            buffer = new Object[2];
+            for (Iterator paths = pathToTokens.keySet().iterator(); paths.hasNext();) {
+                buffer[0] = paths.next();
+                buffer[1] = pathToTokens.get(buffer[0]);
+                write("(s(s))", buffer);
+            }
+            write(")))", buffer);
+            try {
+                authenticate();
+            } catch (SVNException e) {
+                if (e.getErrorMessage() != null && e.getErrorMessage().getErrorCode() == SVNErrorCode.RA_SVN_UNKNOWN_CMD) {
+                    closeConnection();
+                    openConnection();
+                    unlock12(pathToTokens, force, handler);
+                    return;
+                }
+                throw e;
+            }
             for (Iterator paths = pathToTokens.keySet().iterator(); paths.hasNext();) {
                 String path = (String) paths.next();
                 String id = (String) pathToTokens.get(path);
-                path = getRepositoryPath(path);
-                if (id  == null) {
-                    Object[] buffer = new Object[] { "get-lock", path };
-                    write("(w(s))", buffer);
-                    authenticate();
-                    read("[((?L))]", buffer);
-                    SVNLock lock = (SVNLock) buffer[0];
-                    if (lock == null) {
-                        lock = new SVNLock(path, "", null, null, null, null);
-                        handler.handleUnlock(path, lock, null);
-                        continue;
-                    }
-                    id = lock.getID();
-                }
-                Object[] buffer = new Object[] { "unlock", path, id, Boolean.valueOf(force) };
-                write("(w(s(s)w))", buffer);
-                authenticate();
-                SVNException error = null;
+                SVNErrorMessage error = null;
                 try {
-                    read("[()]", buffer);
+                    read("[(S)]", buffer);
+                    path = (String) buffer[0];
                 } catch (SVNException e) {
-                    error = e;
+                    error = e.getErrorMessage();
                 }
+                path = getRepositoryPath(path);
                 if (handler != null) {
-                    SVNLock lock = error != null ? new SVNLock(path, id, null, null, null, null) : null;
-                    handler.handleUnlock(path, lock, error);
+                    handler.handleUnlock(path, new SVNLock(path, id, null, null, null, null), error);
                 }
             }
+            read("x", buffer);
+            read("[()]", buffer);
+        } catch (SVNException e) {
+            handleUnsupportedCommand(e, "Server doesn't support the unlock command");
         } finally {
             closeConnection();
         }
     }
+    
+    private void unlock12(Map pathToTokens, boolean force, ISVNLockHandler handler) throws SVNException {
+        for (Iterator paths = pathToTokens.keySet().iterator(); paths.hasNext();) {
+            String path = (String) paths.next();
+            String id = (String) pathToTokens.get(path);
+            path = getRepositoryPath(path);
+            if (id  == null) {
+                Object[] buffer = new Object[] { "get-lock", path };
+                write("(w(s))", buffer);
+                authenticate();
+                read("[((?L))]", buffer);
+                SVNLock lock = (SVNLock) buffer[0];
+                if (lock == null) {
+                    lock = new SVNLock(path, "", null, null, null, null);
+                    SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.RA_NOT_LOCKED, "No lock on path ''{0}''", path);
+                    handler.handleUnlock(path, lock, err);
+                    continue;
+                }
+                id = lock.getID();
+            }
+            Object[] buffer = new Object[] { "unlock", path, id, Boolean.valueOf(force) };
+            write("(w(s(s)w))", buffer);
+            authenticate();
+            SVNErrorMessage error = null;
+            try {
+                read("[()]", buffer);
+            } catch (SVNException e) {
+                if (e.getErrorMessage() != null && e.getErrorMessage().getErrorCode() == SVNErrorCode.RA_NOT_LOCKED) {
+                    error = e.getErrorMessage();
+                    error = SVNErrorMessage.create(error.getErrorCode(), error.getMessageTemplate(), path);
+                } else {
+                    throw e;
+                }
+            }
+            if (handler != null) {
+                SVNLock lock = new SVNLock(path, id, null, null, null, null);
+                handler.handleUnlock(path, lock, error);
+            }
+        }
+    }
+
 
     public SVNDirEntry info(String path, long revision) throws SVNException {
         try {
             openConnection();
+            String fullPath = getFullPath(path);
+            SVNURL url = getLocation().setPath(fullPath, false);
             path = getRepositoryPath(path);
-            Object[] buffer = new Object[] { "stat", path,
-                    getRevisionObject(revision) };
+            Object[] buffer = new Object[] { "stat", path, getRevisionObject(revision) };
             write("(w(s(n)))", buffer);
             authenticate();
             read("[((?F))]", buffer);
             SVNDirEntry entry = (SVNDirEntry) buffer[0];
             if (entry != null) {
-                entry.setName(SVNPathUtil.tail(path));
+                entry = new SVNDirEntry(url, SVNPathUtil.tail(path), entry.getKind(), entry.getSize(), entry.hasProperties(), entry.getRevision(), entry.getDate(), entry.getAuthor());
             }
-            return (SVNDirEntry) buffer[0];
+            return entry;
+        } catch (SVNException e) {
+            handleUnsupportedCommand(e, "'stat' not implemented");
         } finally {
             closeConnection();
         }
+        return null;
     }
 
     void updateCredentials(String uuid, SVNURL rootURL) throws SVNException {
@@ -741,8 +866,8 @@ public class SVNRepositoryImpl extends SVNRepository implements ISVNReporter {
 
     private void openConnection() throws SVNException {
         lock();
-        if (getOptions().keepConnection(this) && myConnection != null) {
-            return;
+        if (myConnection != null) {
+            closeConnection();
         }
         ISVNConnector connector = SVNRepositoryFactoryImpl.getConnectorFactory().createConnector(this);
         myConnection = new SVNConnection(connector, this);
@@ -765,10 +890,6 @@ public class SVNRepositoryImpl extends SVNRepository implements ISVNReporter {
     }
 
     private void closeConnection() {
-        if (getOptions().keepConnection(this)) {
-            unlock();
-            return;
-        }
         if (myConnection != null) {
             try {
                 myConnection.close();
@@ -783,14 +904,14 @@ public class SVNRepositoryImpl extends SVNRepository implements ISVNReporter {
 
     private void write(String template, Object[] values) throws SVNException {
         if (myConnection == null) {
-            throw new SVNException("connection is closed, can't write");
+            SVNErrorManager.error(SVNErrorMessage.create(SVNErrorCode.RA_SVN_CONNECTION_CLOSED));
         }
         myConnection.write(template, values);
     }
 
     private Object[] read(String template, Object[] values) throws SVNException {
         if (myConnection == null) {
-            throw new SVNException("connection is closed, can't read");
+            SVNErrorManager.error(SVNErrorMessage.create(SVNErrorCode.RA_SVN_CONNECTION_CLOSED));
         }
         return myConnection.read(template, values);
     }
@@ -855,11 +976,11 @@ public class SVNRepositoryImpl extends SVNRepository implements ISVNReporter {
     // get full path (path starting with /, relative to host).
     // get relative path (repository path, now relative to repository location, not starting with '/').
 
-    public void setExternalAuthentication(SVNAuthentication auth) {
-        myExternalUserName = auth;
+    public void setExternalUserName(String userName) {
+        myExternalUserName = userName;
     }
 
-    public SVNAuthentication getExternalAuthentication() {
+    public String getExternalUserName() {
         return myExternalUserName;
     }
 
@@ -873,5 +994,13 @@ public class SVNRepositoryImpl extends SVNRepository implements ISVNReporter {
                 myConnection = null;
             }
         }
+    }
+    
+    private void handleUnsupportedCommand(SVNException e, String message) throws SVNException {
+        if (e.getErrorMessage() != null && e.getErrorMessage().getErrorCode() == SVNErrorCode.RA_SVN_UNKNOWN_CMD) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.RA_NOT_IMPLEMENTED, message);
+            SVNErrorManager.error(err, e.getErrorMessage());
+        }
+        throw e;
     }
 }

@@ -1,5 +1,13 @@
 /*
- * Created on 25.06.2005
+ * ====================================================================
+ * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ *
+ * This software is licensed as described in the file COPYING, which
+ * you should have received as part of this distribution.  The terms
+ * are also available at http://tmate.org/svn/license.html.
+ * If newer versions of this license are posted there, you may use a
+ * newer version instead, at your option.
+ * ====================================================================
  */
 package org.tmatesoft.svn.core.javahl;
 
@@ -10,12 +18,15 @@ import java.security.cert.X509Certificate;
 import org.tigris.subversion.javahl.PromptUserPassword;
 import org.tigris.subversion.javahl.PromptUserPassword2;
 import org.tigris.subversion.javahl.PromptUserPassword3;
+import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNURL;
 import org.tmatesoft.svn.core.auth.ISVNAuthenticationManager;
 import org.tmatesoft.svn.core.auth.ISVNAuthenticationProvider;
 import org.tmatesoft.svn.core.auth.SVNAuthentication;
 import org.tmatesoft.svn.core.auth.SVNPasswordAuthentication;
 import org.tmatesoft.svn.core.auth.SVNSSHAuthentication;
+import org.tmatesoft.svn.core.auth.SVNSSLAuthentication;
+import org.tmatesoft.svn.util.SVNDebugLog;
 
 class JavaHLAuthenticationProvider implements ISVNAuthenticationProvider {
     
@@ -25,9 +36,9 @@ class JavaHLAuthenticationProvider implements ISVNAuthenticationProvider {
         myPrompt = prompt;
     }
 
-    public SVNAuthentication requestClientAuthentication(String kind, SVNURL url, String realm, String errorMessage, SVNAuthentication previousAuth, boolean authMayBeStored) {
-        if (ISVNAuthenticationManager.SSH.equals(kind) && myPrompt instanceof PromptUserPassword4) {
-            PromptUserPassword4 prompt4 = (PromptUserPassword4) myPrompt;
+    public SVNAuthentication requestClientAuthentication(String kind, SVNURL url, String realm, SVNErrorMessage errorMessage, SVNAuthentication previousAuth, boolean authMayBeStored) {
+        if (ISVNAuthenticationManager.SSH.equals(kind) && myPrompt instanceof PromptUserPasswordSSH) {
+            PromptUserPasswordSSH prompt4 = (PromptUserPasswordSSH) myPrompt;
             String userName = previousAuth != null && previousAuth.getUserName() != null ? previousAuth.getUserName() : System.getProperty("user.name");
             int port = url != null ? url.getPort() : -1;
             if (prompt4.promptSSH(realm, userName, port, authMayBeStored)) {
@@ -44,19 +55,35 @@ class JavaHLAuthenticationProvider implements ISVNAuthenticationProvider {
                 port = prompt4.getSSHPort();
                 if (port < 0 && url != null) {
                     port = url.getPort();
+                    SVNDebugLog.logInfo("using URL port: " + port);
                 }
                 if (port < 0) {
                     port = 22;
+                    SVNDebugLog.logInfo("using default port: " + port);
                 }
+                SVNDebugLog.logInfo("port number from user's prompt is: " + port);
                 boolean save = prompt4.userAllowedSave();
                 if (keyPath != null && !"".equals(keyPath)) {
                     return new SVNSSHAuthentication(userName, new File(keyPath), passphrase, port, save);
-                } else if (password != null && !"".equals(password)){
+                } else if (password != null){
                     return new SVNSSHAuthentication(userName, password, port, save);
                 }
             }
-            return null;
-                        
+            return null;                        
+        } else if (ISVNAuthenticationManager.SSL.equals(kind) && myPrompt instanceof PromptUserPasswordSSL) {
+            PromptUserPasswordSSL prompt4 = (PromptUserPasswordSSL) myPrompt;
+            if (prompt4.promptSSL(realm, authMayBeStored)) {
+                String cert = prompt4.getSSLClientCertPath();
+                String password = prompt4.getSSLClientCertPassword();
+                if (cert != null) {
+                    if ("".equals(password)) {
+                        password = null;
+                    }
+                    boolean save = prompt4.userAllowedSave();
+                    return new SVNSSLAuthentication(new File(cert), password, save);
+                }
+            }
+            return null;                        
         }
         if (ISVNAuthenticationManager.SSH.equals(kind) && previousAuth == null) {
             // use configuration file here? but it was already used once...

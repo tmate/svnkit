@@ -1,19 +1,18 @@
 /*
  * ====================================================================
- * Copyright (c) 2004 TMate Software Ltd. All rights reserved.
- * 
- * This software is licensed as described in the file COPYING, which you should
- * have received as part of this distribution. The terms are also available at
- * http://tmate.org/svn/license.html. If newer versions of this license are
- * posted there, you may use a newer version instead, at your option.
+ * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ *
+ * This software is licensed as described in the file COPYING, which
+ * you should have received as part of this distribution.  The terms
+ * are also available at http://tmate.org/svn/license.html.
+ * If newer versions of this license are posted there, you may use a
+ * newer version instead, at your option.
  * ====================================================================
  */
 package org.tmatesoft.svn.core.wc;
 
 import java.io.File;
-import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -25,7 +24,10 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 
+import org.tmatesoft.svn.core.SVNCancelException;
 import org.tmatesoft.svn.core.SVNCommitInfo;
+import org.tmatesoft.svn.core.SVNErrorCode;
+import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNNodeKind;
 import org.tmatesoft.svn.core.SVNProperty;
@@ -49,8 +51,7 @@ import org.tmatesoft.svn.core.internal.wc.SVNTranslator;
 import org.tmatesoft.svn.core.internal.wc.SVNWCAccess;
 import org.tmatesoft.svn.core.io.ISVNEditor;
 import org.tmatesoft.svn.core.io.SVNRepository;
-import org.tmatesoft.svn.core.io.diff.SVNDiffWindow;
-import org.tmatesoft.svn.core.io.diff.SVNDiffWindowBuilder;
+import org.tmatesoft.svn.core.io.diff.SVNDeltaGenerator;
 import org.tmatesoft.svn.util.SVNDebugLog;
 
 /**
@@ -186,7 +187,8 @@ public class SVNCommitClient extends SVNBasicClient {
         List paths = new ArrayList();
         SVNURL rootURL = SVNURLUtil.condenceURLs(urls, paths, true);
         if (rootURL == null) {
-            SVNErrorManager.error("svn: Cannot deleted passed URLs as part of a single commit, probably they are refer to the different repositories");
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.RA_ILLEGAL_URL, "Cannot compute common root URL for specified URLs");
+            SVNErrorManager.error(err);
         }
         if (paths.isEmpty()) {
             // there is just root.
@@ -216,9 +218,11 @@ public class SVNCommitClient extends SVNBasicClient {
             SVNNodeKind kind = repos.checkPath(path, -1);
             if (kind == SVNNodeKind.NONE) {
                 SVNURL url = rootURL.appendPath(path, false);
-                SVNErrorManager.error("svn: URL '" + url + "' does not exist");
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_NOT_FOUND, "URL ''{0}'' does not exist", url);
+                SVNErrorManager.error(err);
             }
         }
+        commitMessage = validateCommitMessage(commitMessage);
         ISVNEditor commitEditor = repos.getCommitEditor(commitMessage, null, false, null);
         ISVNCommitPathHandler deleter = new ISVNCommitPathHandler() {
             public boolean handleCommitPath(String commitPath, ISVNEditor commitEditor) throws SVNException {
@@ -262,7 +266,8 @@ public class SVNCommitClient extends SVNBasicClient {
         List paths = new ArrayList();
         SVNURL rootURL = SVNURLUtil.condenceURLs(urls, paths, false);
         if (rootURL == null) {
-            SVNErrorManager.error("svn: Cannot create passed URLs as part of a single commit, probably they are refer to the different repositories");
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.RA_ILLEGAL_URL, "Cannot compute common root URL for specified URLs");
+            SVNErrorManager.error(err);
         }
         if (paths.isEmpty()) {
             paths.add(SVNPathUtil.tail(rootURL.getURIEncodedPath()));
@@ -301,6 +306,7 @@ public class SVNCommitClient extends SVNBasicClient {
         }
         paths = decodedPaths;
         SVNRepository repos = createRepository(rootURL, true);
+        commitMessage = validateCommitMessage(commitMessage);
         ISVNEditor commitEditor = repos.getCommitEditor(commitMessage, null, false, null);
         ISVNCommitPathHandler creater = new ISVNCommitPathHandler() {
             public boolean handleCommitPath(String commitPath, ISVNEditor commitEditor) throws SVNException {
@@ -352,20 +358,52 @@ public class SVNCommitClient extends SVNBasicClient {
      *                          </ul>
      */
     public SVNCommitInfo doImport(File path, SVNURL dstURL, String commitMessage, boolean recursive) throws SVNException {
+        return doImport(path, dstURL, commitMessage, true, recursive);
+    }
+
+    /**
+     * Committs an addition of a local unversioned file or directory into 
+     * the repository. If the destination URL (<code>dstURL</code>) contains any
+     * non-existent parent directories they will be automatically created by the
+     * server. 
+     * 
+     * @param  path             a local unversioned file or directory to be imported
+     *                          into the repository
+     * @param  dstURL           a URL-string that represents a repository location
+     *                          where the <code>path</code> will be imported            
+     * @param  commitMessage    a string to be a commit log message
+     * @param  useGlobalIgnores if <span class="javakeyword">true</span> 
+     *                          then those paths that match global ignore patterns controlled 
+     *                          by a config options driver (see {@link ISVNOptions#isIgnored(String) isIgnored()}) 
+     *                          will not be imported, otherwise global ignore patterns are not  
+     *                          used
+     * @param  recursive        this flag is relevant only when the <code>path</code> is 
+     *                          a directory: if <span class="javakeyword">true</span> then the entire directory
+     *                          tree will be imported including all child directories, otherwise 
+     *                          only items located in the directory itself
+     * @return                  information on a new revision as the result
+     *                          of the commit
+     * @throws SVNException     if one of the following is true:
+     *                          <ul>
+     *                          <li><code>dstURL</code> is invalid
+     *                          <li>the path denoted by <code>dstURL</code> already
+     *                          exists
+     *                          <li><code>path</code> contains a reserved name - <i>'.svn'</i>
+     *                          </ul>
+     */
+    public SVNCommitInfo doImport(File path, SVNURL dstURL, String commitMessage, boolean useGlobalIgnores, boolean recursive) throws SVNException {
         // first find dstURL root.
         SVNRepository repos = null;
         SVNFileType srcKind = SVNFileType.getType(path);
+        if (srcKind == SVNFileType.NONE) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_NOT_FOUND, "Path ''{0}'' does not exist", path);            
+            SVNErrorManager.error(err);
+        }
         List newPaths = new ArrayList();
         SVNURL rootURL = dstURL;
         while (true) {
-            try {
-                repos = createRepository(rootURL, true);
-            } catch (SVNException e) {
-                SVNErrorManager.error("svn: invalid URL '" + dstURL + "'");
-            }
-            if (repos == null) {
-                SVNErrorManager.error("svn: invalid URL '" + dstURL + "'");
-            } else if (repos.checkPath("", -1) == SVNNodeKind.NONE) {
+            repos = createRepository(rootURL, true);
+            if (repos.checkPath("", -1) == SVNNodeKind.NONE) {
                 newPaths.add(SVNPathUtil.tail(rootURL.getPath()));
                 rootURL = rootURL.removePathTail();
             } else {
@@ -373,10 +411,12 @@ public class SVNCommitClient extends SVNBasicClient {
             }
         }
         if (newPaths.isEmpty() && (srcKind == SVNFileType.FILE || srcKind == SVNFileType.SYMLINK)) {
-            SVNErrorManager.error("svn: Path '" + dstURL + "' already exists");
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_EXISTS, "Path ''{0}'' already exists", dstURL);            
+            SVNErrorManager.error(err);
         }
         if (newPaths.contains(SVNFileUtil.getAdminDirectoryName())) {
-            SVNErrorManager.error("svn: '.svn' is a reserved name and cannot be imported");
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.CL_ADM_DIR_RESERVED, "''{0}'' is a reserved name and cannot be imported", SVNFileUtil.getAdminDirectoryName());            
+            SVNErrorManager.error(err);
         }
         SVNCommitItem[] items = new SVNCommitItem[1];
         items[0] = new SVNCommitItem(path, dstURL, null, srcKind == SVNFileType.DIRECTORY ? SVNNodeKind.DIR : SVNNodeKind.FILE, SVNRevision.UNDEFINED, 
@@ -385,7 +425,8 @@ public class SVNCommitClient extends SVNBasicClient {
         if (commitMessage == null) {
             return SVNCommitInfo.NULL;
         }
-        ISVNEditor commitEditor = repos.getCommitEditor(commitMessage, null, false, new SVNImportMediator(srcKind == SVNFileType.DIRECTORY ? path : path.getParentFile()));
+        commitMessage = validateCommitMessage(commitMessage);
+        ISVNEditor commitEditor = repos.getCommitEditor(commitMessage, null, false, new SVNImportMediator());
         String filePath = "";
         if (srcKind != SVNFileType.DIRECTORY) {
             filePath = (String) newPaths.remove(0);
@@ -395,39 +436,39 @@ public class SVNCommitClient extends SVNBasicClient {
             }
         }
         checkCancelled();
-        commitEditor.openRoot(-1);
-        String newDirPath = null;
-        for (int i = newPaths.size() - 1; i >= 0; i--) {
-            newDirPath = newDirPath == null ? (String) newPaths.get(i) : SVNPathUtil.append(newDirPath, (String) newPaths.get(i));
-            commitEditor.addDir(newDirPath, null, -1);
-        }
-        boolean changed;
-        if (srcKind == SVNFileType.DIRECTORY) {
-            changed = importDir(path, path, newDirPath, recursive, commitEditor);
-        } else {
-            changed = importFile(path.getParentFile(), path, srcKind, filePath, commitEditor);
-        }
-        if (!changed) {
-            try {
-                commitEditor.abortEdit();
-            } catch (SVNException e) {
-                //
-            }
-            return SVNCommitInfo.NULL;
-        }
-        for (int i = 0; i < newPaths.size(); i++) {
-            commitEditor.closeDir();
-        }
+        boolean changed = false;
         SVNCommitInfo info = null;
         try {
-            info = commitEditor.closeEdit();
-        } catch (SVNException e) {
-            try {
-                commitEditor.abortEdit();
-            } catch (SVNException e1) {
-                // inner
+            commitEditor.openRoot(-1);
+            String newDirPath = null;
+            for (int i = newPaths.size() - 1; i >= 0; i--) {
+                newDirPath = newDirPath == null ? (String) newPaths.get(i) : SVNPathUtil.append(newDirPath, (String) newPaths.get(i));
+                commitEditor.addDir(newDirPath, null, -1);
             }
-            throw e;
+            SVNDeltaGenerator deltaGenerator = new SVNDeltaGenerator();
+            if (srcKind == SVNFileType.DIRECTORY) {
+                changed = importDir(deltaGenerator, path, path, newDirPath, useGlobalIgnores, recursive, commitEditor);
+            } else {
+                changed = importFile(deltaGenerator, path.getParentFile(), path, srcKind, filePath, commitEditor);
+            }
+            if (!changed) {
+                try {
+                    commitEditor.abortEdit();
+                } catch (SVNException e) {}
+                return SVNCommitInfo.NULL;
+            }
+            for (int i = 0; i < newPaths.size(); i++) {
+                commitEditor.closeDir();
+            }
+            info = commitEditor.closeEdit();
+        } finally {
+            if (!changed || info == null) {
+                try {
+                    commitEditor.abortEdit();
+                } catch (SVNException e) {
+                    //
+                }
+            }
         }
         if (info != null && info.getNewRevision() >= 0) { 
             dispatchEvent(SVNEventFactory.createCommitCompletedEvent(null, info.getNewRevision()), ISVNEventHandler.UNKNOWN);
@@ -493,8 +534,8 @@ public class SVNCommitClient extends SVNBasicClient {
     public SVNCommitInfo doCommit(SVNCommitPacket commitPacket, boolean keepLocks, String commitMessage) throws SVNException {
         SVNCommitInfo[] info = doCommit(new SVNCommitPacket[] {commitPacket}, keepLocks, commitMessage);
         if (info != null && info.length > 0) {
-            if (info[0].getError() != null) {
-                throw info[0].getError();
+            if (info[0].getErrorMessage() != null) {
+                SVNErrorManager.error(info[0].getErrorMessage());
             }
             return info[0];
         } 
@@ -542,11 +583,12 @@ public class SVNCommitClient extends SVNBasicClient {
                 continue;
             }
             try {
-                commitMessage = getCommitHandler().getCommitMessage(commitMessage, commitPacket.getCommitItems());
+                commitMessage = getCommitHandler().getCommitMessage(commitMessage, commitPacket.getCommitItems());                
                 if (commitMessage == null) {
                     infos.add(SVNCommitInfo.NULL);
                     continue;
                 }
+                commitMessage = validateCommitMessage(commitMessage);
                 Map commitables = new TreeMap();
                 String baseURL = SVNCommitUtil.translateCommitables(commitPacket.getCommitItems(), commitables);
                 Map lockTokens = SVNCommitUtil.translateLockTokens(commitPacket.getLockTokens(), baseURL);
@@ -564,6 +606,13 @@ public class SVNCommitClient extends SVNBasicClient {
                 info = SVNCommitter.commit(mediator.getTmpFiles(), commitables, repositoryRoot, commitEditor);
                 // update wc.
                 Collection processedItems = new HashSet();
+                Collection explicitCommitPaths = new HashSet();
+                for (Iterator urls = commitables.keySet().iterator(); urls.hasNext();) {
+                    String url = (String) urls.next();
+                    SVNCommitItem item = (SVNCommitItem) commitables.get(url);
+                    explicitCommitPaths.add(item.getPath());
+                }
+                
                 for (Iterator urls = commitables.keySet().iterator(); urls.hasNext();) {
                     String url = (String) urls.next();
                     SVNCommitItem item = (SVNCommitItem) commitables.get(url);
@@ -615,15 +664,20 @@ public class SVNCommitClient extends SVNBasicClient {
                     boolean removeLock = !keepLocks && item.isLocked();
                     // update entry in dir.
                     Map wcPropChanges = mediator.getWCProperties(item);
-                    dir.commit(target, info, wcPropChanges, removeLock, recurse);
+                    dir.commit(target, info, wcPropChanges, removeLock, recurse, explicitCommitPaths);
                     processedItems.add(path);
                 } 
                 needsSleepForTimeStamp = true;
                 // commit completed, include revision number.
                 dispatchEvent(SVNEventFactory.createCommitCompletedEvent(null, info.getNewRevision()), ISVNEventHandler.UNKNOWN);
             } catch (SVNException e) {
-                infos.add(new SVNCommitInfo(-1, null, null, e));
-                dispatchEvent(new SVNEvent(e.getMessage()), ISVNEventHandler.UNKNOWN);
+                if (e instanceof SVNCancelException) {
+                    throw e;
+                }
+                SVNErrorMessage err = SVNErrorMessage.create(e.getErrorMessage().getErrorCode(), "Commit failed (details follow):");
+                err.setChildErrorMessage(e.getErrorMessage());
+                infos.add(new SVNCommitInfo(-1, null, null, err));
+                dispatchEvent(new SVNEvent(err), ISVNEventHandler.UNKNOWN);
                 continue;
             } finally {
                 if (info == null && commitEditor != null) {
@@ -705,7 +759,13 @@ public class SVNCommitClient extends SVNBasicClient {
             return new SVNCommitPacket(wcAccess, commitItems, lockTokens);
         } catch (SVNException e) {
             wcAccess.close(true);
-            throw new SVNException("svn: Commit failed (details follow):", e);
+            if (e instanceof SVNCancelException) {
+                throw e;
+            }
+            SVNErrorMessage nestedErr = e.getErrorMessage();
+            SVNErrorMessage err = SVNErrorMessage.create(nestedErr.getErrorCode(), "Commit failed (details follow):");
+            SVNErrorManager.error(err, e);
+            return null;
         }
     }
     
@@ -769,7 +829,12 @@ public class SVNCommitClient extends SVNBasicClient {
                 for (int j = 0; j < wcAccesses.length; j++) {
                     wcAccesses[j].close(true);
                 }
-                throw new SVNException("svn: Commit failed (details follow):", e);
+                if (e instanceof SVNCancelException) {
+                    throw e;
+                }
+                SVNErrorMessage nestedErr = e.getErrorMessage();
+                SVNErrorMessage err = SVNErrorMessage.create(nestedErr.getErrorCode(), "Commit failed (details follow):");
+                SVNErrorManager.error(err, e);
             }
         }
         SVNCommitPacket[] packetsArray = (SVNCommitPacket[]) packets.toArray(new SVNCommitPacket[packets.size()]);
@@ -786,9 +851,16 @@ public class SVNCommitClient extends SVNBasicClient {
                 File wcRoot = SVNWCUtil.getWorkingCopyRoot(packet.getCommitItems()[0].getWCAccess().getAnchor().getRoot(), true);
                 SVNWCAccess rootWCAccess = SVNWCAccess.create(wcRoot);
                 String uuid = rootWCAccess.getTargetEntry().getUUID();
+                SVNURL url = rootWCAccess.getTargetEntry().getSVNURL();
                 rootWCAccess.close(false);
                 if (uuid == null) {
-                    SVNErrorManager.error("svn: Cannot get repository UUID for entry at '" + wcRoot + "'");
+                    if (url != null) {
+                        SVNRepository repos = createRepository(url, true);
+                        uuid = repos.getRepositoryUUID(true);
+                    } else {
+                        SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_MISSING_URL, "''{0}'' has no URL", wcRoot);
+                        SVNErrorManager.error(err);
+                    }
                 }
                 if (!repoUUIDs.containsKey(uuid)) {
                     repoUUIDs.put(uuid, new ArrayList());
@@ -816,12 +888,17 @@ public class SVNCommitClient extends SVNBasicClient {
             for (int j = 0; j < wcAccesses.length; j++) {
                 wcAccesses[j].close(true);
             }
-            throw new SVNException("svn: Commit failed (details follow):", e);
+            if (e instanceof SVNCancelException) {
+                throw e;
+            }            
+            SVNErrorMessage nestedErr = e.getErrorMessage();
+            SVNErrorMessage err = SVNErrorMessage.create(nestedErr.getErrorCode(), "Commit failed (details follow):");
+            SVNErrorManager.error(err, e);
         }
         return packetsArray;        
     }
 
-    private boolean importDir(File rootFile, File dir, String importPath, boolean recursive, ISVNEditor editor) throws SVNException {
+    private boolean importDir(SVNDeltaGenerator deltaGenerator, File rootFile, File dir, String importPath, boolean useGlobalIgnores, boolean recursive, ISVNEditor editor) throws SVNException {
         checkCancelled();
         File[] children = dir.listFiles();
         boolean changed = false;
@@ -833,7 +910,7 @@ public class SVNCommitClient extends SVNBasicClient {
                 handleEvent(skippedEvent, ISVNEventHandler.UNKNOWN);
                 continue;
             }
-            if (getOptions().isIgnored(file.getName())) {
+            if (useGlobalIgnores && getOptions().isIgnored(file.getName())) {
                 continue;
             }
             String path = importPath == null ? file.getName() : SVNPathUtil.append(importPath, file.getName());
@@ -845,19 +922,20 @@ public class SVNCommitClient extends SVNBasicClient {
                         file, SVNEventAction.COMMIT_ADDED, SVNNodeKind.DIR,
                         null);
                 handleEvent(event, ISVNEventHandler.UNKNOWN);
-                importDir(rootFile, file, path, recursive, editor);
+                importDir(deltaGenerator, rootFile, file, path, useGlobalIgnores, recursive, editor);
                 editor.closeDir();
-            } else {
-                changed |= importFile(rootFile, file, fileType, path, editor);
+            } else if (fileType == SVNFileType.FILE || fileType == SVNFileType.SYMLINK){
+                changed |= importFile(deltaGenerator, rootFile, file, fileType, path, editor);
             }
 
         }
         return changed;
     }
 
-    private boolean importFile(File rootFile, File file, SVNFileType fileType, String filePath, ISVNEditor editor) throws SVNException {
+    private boolean importFile(SVNDeltaGenerator deltaGenerator, File rootFile, File file, SVNFileType fileType, String filePath, ISVNEditor editor) throws SVNException {
         if (fileType == null || fileType == SVNFileType.UNKNOWN) {
-            SVNErrorManager.error("svn: unknown or unversionable type for '" + file + "'");
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.NODE_UNKNOWN_KIND, "unknown or unversionable type for ''{0}''", file);
+            SVNErrorManager.error(err);
         }
         editor.addFile(filePath, null, -1);
         String mimeType = null;
@@ -894,7 +972,6 @@ public class SVNCommitClient extends SVNBasicClient {
         // send "adding"
         SVNEvent addedEvent = SVNEventFactory.createCommitEvent(rootFile, file, SVNEventAction.COMMIT_ADDED, SVNNodeKind.FILE, mimeType);
         handleEvent(addedEvent, ISVNEventHandler.UNKNOWN);
-        editor.applyTextDelta(filePath, null);
         // translate and send file.
         String eolStyle = (String) autoProperties.get(SVNProperty.EOL_STYLE);
         String keywords = (String) autoProperties.get(SVNProperty.KEYWORDS);
@@ -903,34 +980,20 @@ public class SVNCommitClient extends SVNBasicClient {
         if (eolStyle != null || keywords != null || special) {
             byte[] eolBytes = SVNTranslator.getBaseEOL(eolStyle);
             Map keywordsMap = keywords != null ? SVNTranslator.computeKeywords(keywords, null, null, null, null) : null;
-            tmpFile = SVNFileUtil.createUniqueFile(file.getParentFile(), file.getName(), ".tmp");
+            tmpFile = SVNFileUtil.createTempFile(file.getName(), ".tmp");
             SVNTranslator.translate(file, tmpFile, eolBytes, keywordsMap, special, false);
         }
         File importedFile = tmpFile != null ? tmpFile : file;
-        String checksum = SVNFileUtil.computeChecksum(importedFile);
-        SVNDiffWindow[] windows = SVNDiffWindowBuilder.createReplacementDiffWindows(importedFile.length(), 100*1024);
-        byte[] newData = new byte[100*1024];
         InputStream is = null;
-        OutputStream os = null;
+        String checksum = null;
         try {
             is = SVNFileUtil.openFileForReading(importedFile);
-            for (int i = 0; i < windows.length; i++) {
-                SVNDiffWindow window = windows[i];
-                os = editor.textDeltaChunk(filePath, window);
-                is.read(newData, 0, (int) window.getNewDataLength());
-                os.write(newData, 0, (int) window.getNewDataLength());
-                SVNFileUtil.closeFile(os);
-            }
-        } catch (IOException e) {
-            SVNErrorManager.error("svn: IO error while importing file '" + file + "': " + e.getMessage());
+            editor.applyTextDelta(filePath, null);
+            checksum = deltaGenerator.sendDelta(filePath, is, editor, true);
         } finally {
             SVNFileUtil.closeFile(is);
-            SVNFileUtil.closeFile(os);
-            if (tmpFile != null) {
-                tmpFile.delete();
-            }
+            SVNFileUtil.deleteFile(tmpFile);
         }
-        editor.textDeltaEnd(filePath);
         editor.closeFile(filePath, checksum);
         return true;
     }
@@ -944,6 +1007,10 @@ public class SVNCommitClient extends SVNBasicClient {
             return false;
         }
         return hasProcessedParents(paths, path);
+    }
+    
+    static String validateCommitMessage(String message) {
+        return SVNTranslator.convertEOLs(message);
     }
 
 }

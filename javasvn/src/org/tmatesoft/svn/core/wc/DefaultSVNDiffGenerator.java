@@ -1,16 +1,16 @@
 /*
  * ====================================================================
- * Copyright (c) 2004 TMate Software Ltd. All rights reserved.
- * 
- * This software is licensed as described in the file COPYING, which you should
- * have received as part of this distribution. The terms are also available at
- * http://tmate.org/svn/license.html. If newer versions of this license are
- * posted there, you may use a newer version instead, at your option.
+ * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ *
+ * This software is licensed as described in the file COPYING, which
+ * you should have received as part of this distribution.  The terms
+ * are also available at http://tmate.org/svn/license.html.
+ * If newer versions of this license are posted there, you may use a
+ * newer version instead, at your option.
  * ====================================================================
  */
 package org.tmatesoft.svn.core.wc;
 
-import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
@@ -18,19 +18,18 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 
+import org.tmatesoft.svn.core.SVNErrorCode;
+import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNProperty;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNTranslator;
-import org.tmatesoft.svn.util.SVNDebugLog;
 
 import de.regnis.q.sequence.line.diff.QDiffGenerator;
-import de.regnis.q.sequence.line.diff.QDiffGeneratorFactory;
 import de.regnis.q.sequence.line.diff.QDiffManager;
 import de.regnis.q.sequence.line.diff.QDiffUniGenerator;
 
@@ -51,7 +50,7 @@ public class DefaultSVNDiffGenerator implements ISVNDiffGenerator {
     protected static final byte[] HEADER_SEPARATOR = "===================================================================".getBytes();
     protected static final byte[] EOL = SVNTranslator.getEOL("native");
     protected static final String WC_REVISION_LABEL = "(working copy)";
-    protected static final InputStream EMPTY_FILE_IS = new ByteArrayInputStream(new byte[0]);
+    protected static final InputStream EMPTY_FILE_IS = SVNFileUtil.DUMMY_IN;
 
     private boolean myIsForcedBinaryDiff;
     private String myAnchorPath1;
@@ -104,7 +103,10 @@ public class DefaultSVNDiffGenerator implements ISVNDiffGenerator {
             return ".";
         }
         if (path.startsWith(basePath + "/")) {
-            return path.substring(basePath.length() + 1);
+            path = path.substring(basePath.length() + 1);
+            if (path.startsWith("./")) {
+                path = path.substring("./".length());
+            }
         }
         return path;
     }
@@ -147,12 +149,12 @@ public class DefaultSVNDiffGenerator implements ISVNDiffGenerator {
             }
             bos.write(EOL);
         } catch (IOException e) {
-            SVNErrorManager.error("svn: Failed to save diff data: " + e.getMessage());
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, e.getLocalizedMessage());
+            SVNErrorManager.error(err, e);
         } finally {
             try {
                 bos.close();
                 bos.writeTo(result);
-                SVNDebugLog.logInfo(bos.toString());
             } catch (IOException e) {
             }
         }
@@ -220,10 +222,10 @@ public class DefaultSVNDiffGenerator implements ISVNDiffGenerator {
             try {
                 bos.close();
                 bos.writeTo(result);
-                SVNDebugLog.logInfo(bos.toString());
             } catch (IOException inner) {
             }
-            SVNErrorManager.error("svn: Failed to save diff data: " + e.getMessage());
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, e.getLocalizedMessage());
+            SVNErrorManager.error(err, e);
         }
         if (!isForcedBinaryDiff() && (SVNProperty.isBinaryMimeType(mimeType1) || SVNProperty.isBinaryMimeType(mimeType2))) {
             try {
@@ -255,14 +257,22 @@ public class DefaultSVNDiffGenerator implements ISVNDiffGenerator {
                     }
                 }
             } catch (IOException e) {
-                SVNErrorManager.error("svn: Failed to save diff data: " + e.getMessage());
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, e.getLocalizedMessage());
+                SVNErrorManager.error(err, e);
             } finally {
                 try {
                     bos.close();
                     bos.writeTo(result);
-                    SVNDebugLog.logInfo(bos.toString());
                 } catch (IOException e) {
                 }
+            }
+            return;
+        }
+        if (file1 == file2 && file1 == null) {
+            try {
+                bos.close();
+                bos.writeTo(result);
+            } catch (IOException e) {
             }
             return;
         }
@@ -284,8 +294,16 @@ public class DefaultSVNDiffGenerator implements ISVNDiffGenerator {
                 bos.writeTo(result);
             } catch (IOException inner) {
             }
-            SVNErrorManager.error("svn: Failed to save diff data: " + e.getMessage());
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, e.getLocalizedMessage());
+            SVNErrorManager.error(err, e);
         }
+        try {
+            bos.close();
+            bos.writeTo(result);
+        } catch (IOException inner) {
+            //
+        }
+
         InputStream is1 = null;
         InputStream is2 = null;
         try {
@@ -293,25 +311,16 @@ public class DefaultSVNDiffGenerator implements ISVNDiffGenerator {
             is2 = file2 == null ? EMPTY_FILE_IS : SVNFileUtil.openFileForReading(file2);
 
             QDiffUniGenerator.setup();
-            Map generatorProperties = new HashMap();
-            generatorProperties.put(QDiffGeneratorFactory.COMPARE_EOL_PROPERTY, Boolean.TRUE.toString());
-            QDiffGenerator generator = QDiffManager.getDiffGenerator(QDiffUniGenerator.TYPE, generatorProperties);
-            Writer writer = new OutputStreamWriter(bos, getEncoding());
+            QDiffGenerator generator = QDiffManager.getDiffGenerator(QDiffUniGenerator.TYPE, null);
+            Writer writer = new OutputStreamWriter(result, getEncoding());
             QDiffManager.generateTextDiff(is1, is2, getEncoding(), writer, generator);
             writer.flush();
-            writer.close();
         } catch (IOException e) {
-            SVNErrorManager.error("svn: Failed to save diff data: " + e.getMessage());
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, e.getLocalizedMessage());
+            SVNErrorManager.error(err, e);
         } finally {
             SVNFileUtil.closeFile(is1);
             SVNFileUtil.closeFile(is2);
-            try {
-                bos.close();
-                bos.writeTo(result);
-                SVNDebugLog.logInfo(bos.toString());
-            } catch (IOException inner) {
-                //
-            }
         }
     }
 

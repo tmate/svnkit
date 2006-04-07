@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -12,6 +12,8 @@
 package org.tmatesoft.svn.core.wc;
 
 import java.util.Date;
+
+import org.tmatesoft.svn.core.SVNException;
 
 /**
  * The <b>ISVNAnnotateHandler</b> interface should be implemented to be further
@@ -61,8 +63,9 @@ public interface ISVNAnnotateHandler {
 	 * @param author	the person who did those changes
 	 * @param line		a text line of the target file (on which 
      *                  {@link SVNLogClient#doAnnotate(File, SVNRevision, SVNRevision, SVNRevision, ISVNAnnotateHandler) doAnnotate()}
-     *                  was invoked)  
+     *                  was invoked)
+     * @throws SVNException  
 	 */
-	public void handleLine(Date date, long revision, String author, String line);
+	public void handleLine(Date date, long revision, String author, String line) throws SVNException;
 
 }

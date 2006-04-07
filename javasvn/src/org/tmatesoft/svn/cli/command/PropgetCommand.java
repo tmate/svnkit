@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -86,6 +86,10 @@ public class PropgetCommand extends SVNCommand implements ISVNPropertyHandler {
     }
     
     public void handleProperty(long revision, SVNPropertyData property) throws SVNException {
+        myOut.print(property.getValue());
+        if (!myIsStrict) {
+            myOut.println();
+        }
     }
     
 }

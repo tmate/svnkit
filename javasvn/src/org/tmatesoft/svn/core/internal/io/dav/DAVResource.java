@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -12,11 +12,8 @@
 
 package org.tmatesoft.svn.core.internal.io.dav;
 
-import java.io.BufferedOutputStream;
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.FilterInputStream;
-import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.HashMap;
@@ -85,32 +82,35 @@ class DAVResource {
     }
     
     public String getVersionURL() throws SVNException {
-        // do fetch from server if empty...
         if (myVURL == null) {
             if (myMediator != null) {
                 myVURL = myMediator.getWorkspaceProperty(SVNEncodingUtil.uriDecode(myPath), "svn:wc:ra_dav:version-url");
-                if (myVURL != null) {
-                    return myVURL;
-                }
             }
-            String path = myURL;
-            if (myRevision >= 0) {
-                // get baseline collection url for revision from public url.
-                DAVBaselineInfo info = DAVUtil.getBaselineInfo(myConnection, path, myRevision, false, false, null);
-                path = SVNPathUtil.append(info.baselineBase, info.baselinePath);
-            }
-            // get "checked-in" property from baseline collection or from HEAD, this will be vURL.
-            // this shouldn't be called for copied urls.
-            myVURL = (String) DAVUtil.getPropertyValue(myConnection, path, null, DAVElement.CHECKED_IN);
         }
         return myVURL;
     }    
+    
+    public void fetchVersionURL(boolean force) throws SVNException {
+        if (!force && getVersionURL() != null) {
+            return;
+        }
+        // now from server.
+        String path = myURL;
+        if (myRevision >= 0) {
+            // get baseline collection url for revision from public url.
+            DAVBaselineInfo info = DAVUtil.getBaselineInfo(myConnection, null, path, myRevision, false, false, null);
+            path = SVNPathUtil.append(info.baselineBase, info.baselinePath);
+        }
+        // get "checked-in" property from baseline collection or from HEAD, this will be vURL.
+        // this shouldn't be called for copied urls.
+        myVURL = DAVUtil.getPropertyValue(myConnection, path, null, DAVElement.CHECKED_IN);
+    }
 
     public String getWorkingURL() {
         return myWURL;
     }
     
-    public OutputStream addTextDelta() throws IOException {
+    public OutputStream addTextDelta() throws SVNException {
         if (myDeltaFiles == null) {
             myDeltaFiles = new LinkedList();
         }
@@ -120,30 +120,26 @@ class DAVResource {
             myDeltaFiles.add(id);
             return myMediator.createTemporaryLocation(SVNEncodingUtil.uriDecode(myPath), id);
         }
-        File tempFile = File.createTempFile("svn", "temp");
+        File tempFile = SVNFileUtil.createTempFile(".javasvn.", ".tmp");
         tempFile.deleteOnExit();
         myDeltaFiles.add(tempFile);
-        return new BufferedOutputStream(new FileOutputStream(tempFile));
+        return SVNFileUtil.openFileForWriting(tempFile);
     }
     
     public int getDeltaCount() {
         return myDeltaFiles == null ? 0 : myDeltaFiles.size();        
     }
     
-    public InputStream getTextDelta(int i) throws IOException {
+    public InputStream getTextDelta(int i) throws SVNException {
         if (myMediator != null) {
             long length = myMediator.getLength(new Integer(i));
             return new MeasurableStream(myMediator.getTemporaryLocation(new Integer(i)), length);
         }
         File file = (File) myDeltaFiles.get(i);
-        try {
-            return new MeasurableStream(SVNFileUtil.openFileForReading(file), file.length());
-        } catch (SVNException e) {
-            throw new IOException(e.getMessage());
-        }
+        return new MeasurableStream(SVNFileUtil.openFileForReading(file), file.length());
     }
 
-    public long getTextDeltaLength(int i) throws IOException {
+    public long getTextDeltaLength(int i) throws SVNException {
         if (myMediator != null) {
             return myMediator.getLength(new Integer(i));
         }

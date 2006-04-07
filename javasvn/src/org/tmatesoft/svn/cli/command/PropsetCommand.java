@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -20,6 +20,8 @@ import java.io.PrintStream;
 
 import org.tmatesoft.svn.cli.SVNArgument;
 import org.tmatesoft.svn.cli.SVNCommand;
+import org.tmatesoft.svn.core.SVNErrorCode;
+import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNURL;
 import org.tmatesoft.svn.core.internal.util.SVNFormatUtil;
@@ -55,7 +57,8 @@ public class PropsetCommand extends SVNCommand {
                     os.write(r);
                 }
             } catch (IOException e) {
-                throw new SVNException(e);
+                SVNErrorMessage msg = SVNErrorMessage.create(SVNErrorCode.CL_ARG_PARSING_ERROR, e.getLocalizedMessage());
+                throw new SVNException(msg, e);
             } finally {
                 try {
                     os.close();

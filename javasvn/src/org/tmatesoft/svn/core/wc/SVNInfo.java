@@ -1,11 +1,12 @@
 /*
  * ====================================================================
- * Copyright (c) 2004 TMate Software Ltd. All rights reserved.
- * 
- * This software is licensed as described in the file COPYING, which you should
- * have received as part of this distribution. The terms are also available at
- * http://tmate.org/svn/license.html. If newer versions of this license are
- * posted there, you may use a newer version instead, at your option.
+ * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ *
+ * This software is licensed as described in the file COPYING, which
+ * you should have received as part of this distribution.  The terms
+ * are also available at http://tmate.org/svn/license.html.
+ * If newer versions of this license are posted there, you may use a
+ * newer version instead, at your option.
  * ====================================================================
  */
 package org.tmatesoft.svn.core.wc;
@@ -14,6 +15,7 @@ import java.io.File;
 import java.util.Date;
 
 import org.tmatesoft.svn.core.SVNDirEntry;
+import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNLock;
 import org.tmatesoft.svn.core.SVNNodeKind;
 import org.tmatesoft.svn.core.SVNURL;
@@ -115,7 +117,7 @@ public class SVNInfo {
 
     private File myPropConflictFile;
 
-    static SVNInfo createInfo(File file, SVNEntry entry) {
+    static SVNInfo createInfo(File file, SVNEntry entry) throws SVNException {
         if (entry == null) {
             return null;
         }
@@ -125,8 +127,8 @@ public class SVNInfo {
                     entry.getLockOwner(), entry.getLockComment(), SVNTimeUtil
                             .parseDate(entry.getLockCreationDate()), null);
         }
-        return new SVNInfo(file, entry.getSVNURL(), entry.getRevision(), entry
-                .getKind(), entry.getUUID(), entry.getCommittedRevision(),
+        return new SVNInfo(file, entry.getSVNURL(), entry.getRepositoryRootURL(), 
+                entry.getRevision(), entry.getKind(), entry.getUUID(), entry.getCommittedRevision(),
                 entry.getCommittedDate(), entry.getAuthor(), entry
                         .getSchedule(), entry.getCopyFromSVNURL(), entry
                         .getCopyFromRevision(), entry.getTextTime(), entry
@@ -145,7 +147,7 @@ public class SVNInfo {
                 dirEntry.getAuthor(), lock);
     }
 
-    protected SVNInfo(File file, SVNURL url, long revision, SVNNodeKind kind,
+    protected SVNInfo(File file, SVNURL url, SVNURL rootURL, long revision, SVNNodeKind kind,
             String uuid, long committedRevision, String committedDate,
             String author, String schedule, SVNURL copyFromURL,
             long copyFromRevision, String textTime, String propTime,
@@ -156,6 +158,7 @@ public class SVNInfo {
         myRevision = SVNRevision.create(revision);
         myKind = kind;
         myRepositoryUUID = uuid;
+        myRepositoryRootURL = rootURL;
 
         myCommittedRevision = SVNRevision.create(committedRevision);
         myCommittedDate = committedDate != null ? SVNTimeUtil

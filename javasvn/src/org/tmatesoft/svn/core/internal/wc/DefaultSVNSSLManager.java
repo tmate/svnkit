@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -35,10 +35,12 @@ import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
 
+import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNURL;
 import org.tmatesoft.svn.core.auth.ISVNAuthenticationProvider;
 import org.tmatesoft.svn.core.auth.ISVNSSLManager;
+import org.tmatesoft.svn.core.auth.SVNSSLAuthentication;
 import org.tmatesoft.svn.core.internal.util.SVNBase64;
 
 
@@ -60,14 +62,18 @@ public class DefaultSVNSSLManager implements ISVNSSLManager {
     private File myAuthDirectory;
     private boolean myIsUseKeyStore;
     private File[] myServerCertFiles;
+    private boolean myIsPromptForClientCert;
+    private SVNSSLAuthentication myClientAuthentication;
 
     public DefaultSVNSSLManager(File authDir, SVNURL url, 
-            File[] serverCertFiles, boolean useKeyStore, File clientFile, String clientPassword, 
+            File[] serverCertFiles, boolean useKeyStore, File clientFile, String clientPassword,
+            boolean promptForClientCert,
             DefaultSVNAuthenticationManager authManager) {
         myURL = url;
         myAuthDirectory = authDir;
         myClientCertFile = clientFile;
         myClientCertPassword = clientPassword;
+        myIsPromptForClientCert = promptForClientCert;
         myRealm = "https://" + url.getHost() + ":" + url.getPort();
         myAuthManager = authManager;
         myIsUseKeyStore = useKeyStore;
@@ -126,7 +132,7 @@ public class DefaultSVNSSLManager implements ISVNSSLManager {
 
     public SSLContext getSSLContext() throws IOException {
         try {
-            SSLContext context = SSLContext.getInstance("TLS");
+            SSLContext context = SSLContext.getInstance("SSLv3");
             context.init(getKeyManagers(), new TrustManager[] {new X509TrustManager() { 
                 public X509Certificate[] getAcceptedIssuers() {
                     init();
@@ -176,7 +182,12 @@ public class DefaultSVNSSLManager implements ISVNSSLManager {
         }            
     }
 
-    public void acknowledgeSSLContext(boolean accepted, String errorMessage) {
+    public void acknowledgeSSLContext(boolean accepted, SVNErrorMessage errorMessage) {
+        if (!accepted) {
+            myIsKeyManagerCreated = false;
+            myKeyManagers = null;
+            myTrustedCerts = null;
+        }
     }
     
     private int getServerCertificateFailures(X509Certificate cert) {
@@ -299,6 +310,24 @@ public class DefaultSVNSSLManager implements ISVNSSLManager {
         } finally {
             SVNFileUtil.closeFile(is);
         }
+    }
+
+    public boolean isClientCertPromptRequired() {
+        return myIsPromptForClientCert;
+    }
+
+    public void setClientAuthentication(SVNSSLAuthentication sslAuthentication) {
+        if (sslAuthentication != null) {
+            myClientCertFile = sslAuthentication.getCertificateFile();
+            myClientCertPassword = sslAuthentication.getPassword();
+        } else {
+            myClientCertFile = null;
+            myClientCertPassword = null;
+        }
+        myClientAuthentication = sslAuthentication;
     } 
     
+    public SVNSSLAuthentication getClientAuthentication() {
+        return myClientAuthentication;
+    }
 }

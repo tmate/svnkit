@@ -1,16 +1,18 @@
 /*
  * ====================================================================
- * Copyright (c) 2004 TMate Software Ltd. All rights reserved.
- * 
- * This software is licensed as described in the file COPYING, which you should
- * have received as part of this distribution. The terms are also available at
- * http://tmate.org/svn/license.html. If newer versions of this license are
- * posted there, you may use a newer version instead, at your option.
+ * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ *
+ * This software is licensed as described in the file COPYING, which
+ * you should have received as part of this distribution.  The terms
+ * are also available at http://tmate.org/svn/license.html.
+ * If newer versions of this license are posted there, you may use a
+ * newer version instead, at your option.
  * ====================================================================
  */
 package org.tmatesoft.svn.core.wc;
 
 import org.tmatesoft.svn.core.SVNCancelException;
+import org.tmatesoft.svn.core.SVNException;
 
 /**
  * The <b>ISVNEventHandler</b> interface should be implemented in
@@ -90,8 +92,9 @@ public interface ISVNEventHandler {
      *                   
      * @param progress  currently reserved for future use; now it's value
      *                  is always set to {@link #UNKNOWN}
+     * @throws SVNException
      */
-    public void handleEvent(SVNEvent event, double progress);
+    public void handleEvent(SVNEvent event, double progress) throws SVNException;
     
     /**
      * Checks if the current operation is cancelled (somehow interrupted)

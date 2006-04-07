@@ -1,3 +1,14 @@
+/*
+ * ====================================================================
+ * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ *
+ * This software is licensed as described in the file COPYING, which
+ * you should have received as part of this distribution.  The terms
+ * are also available at http://tmate.org/svn/license.html.
+ * If newer versions of this license are posted there, you may use a
+ * newer version instead, at your option.
+ * ====================================================================
+ */
 package org.tmatesoft.svn.cli;
 
 import java.io.PrintStream;
@@ -8,13 +19,6 @@ import org.tmatesoft.svn.core.wc.ISVNStatusHandler;
 import org.tmatesoft.svn.core.wc.SVNStatus;
 import org.tmatesoft.svn.core.wc.SVNStatusType;
 
-/**
- * Created by IntelliJ IDEA.
- * User: alex
- * Date: 07.06.2005
- * Time: 22:48:39
- * To change this template use File | Settings | File Templates.
- */
 public class SVNCommandStatusHandler implements ISVNStatusHandler {
 
     private PrintStream myOut;
@@ -106,11 +110,11 @@ public class SVNCommandStatusHandler implements ISVNStatusHandler {
                 result.append(" ");
                 result.append(remoteStatus);
                 result.append("   ");
-                result.append(formatString(wcRevision, 6, false)); // 6 chars
+                result.append(SVNCommand.formatString(wcRevision, 6, false)); // 6 chars
                 result.append("   ");
-                result.append(formatString(commitRevision, 6, false)); // 6 chars
+                result.append(SVNCommand.formatString(commitRevision, 6, false)); // 6 chars
                 result.append(" ");
-                result.append(formatString(commitAuthor, 12, true)); // 12 chars
+                result.append(SVNCommand.formatString(commitAuthor, 12, true)); // 12 chars
                 result.append(" ");
                 result.append(SVNFormatUtil.formatPath(status.getFile()));
             }  else {
@@ -123,7 +127,7 @@ public class SVNCommandStatusHandler implements ISVNStatusHandler {
                 result.append(" ");
                 result.append(remoteStatus);
                 result.append("    ");
-                result.append(formatString(wcRevision, 6, false)); // 6 chars
+                result.append(SVNCommand.formatString(wcRevision, 6, false)); // 6 chars
                 result.append("    ");
                 result.append(SVNFormatUtil.formatPath(status.getFile()));
             }
@@ -163,22 +167,5 @@ public class SVNCommandStatusHandler implements ISVNStatusHandler {
             return '?';
         }
         return '?';
-    }
-
-    private static String formatString(String str, int chars, boolean left) {
-        if (str.length() > chars) {
-            return str.substring(0, chars);
-        }
-        StringBuffer formatted = new StringBuffer();
-        if (left) {
-            formatted.append(str);
-        }
-        for(int i = 0; i < chars - str.length(); i++) {
-            formatted.append(' ');
-        }
-        if (!left) {
-            formatted.append(str);
-        }
-        return formatted.toString();
     }
 }

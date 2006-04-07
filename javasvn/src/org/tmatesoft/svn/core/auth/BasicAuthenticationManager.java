@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -15,9 +15,10 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.tmatesoft.svn.core.SVNAuthenticationException;
+import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNURL;
+import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 
 
 /**
@@ -119,7 +120,7 @@ public class BasicAuthenticationManager implements ISVNAuthenticationManager, IS
      */
     public void setProxy(String proxyHost, int proxyPort, String proxyUserName, String proxyPassword) {
         myProxyHost = proxyHost;
-        myProxyPort = proxyPort >= 0 ? proxyPort : 80;
+        myProxyPort = proxyPort >= 0 ? proxyPort : 3128;
         myProxyUserName = proxyUserName;
         myProxyPassword = proxyPassword;
     }
@@ -132,7 +133,8 @@ public class BasicAuthenticationManager implements ISVNAuthenticationManager, IS
             myPasswordIndex = 0; 
             return (SVNAuthentication) myPasswordAuthentications.get(0);
         }
-        throw new SVNAuthenticationException("svn: Authentication required for '" + realm + "'");
+        SVNErrorManager.authenticationFailed("Authentication required for ''{0}''", realm);
+        return null;
     } 
 
     public SVNAuthentication getNextAuthentication(String kind, String realm, SVNURL url) throws SVNException {
@@ -143,7 +145,8 @@ public class BasicAuthenticationManager implements ISVNAuthenticationManager, IS
             myPasswordIndex++; 
             return (SVNAuthentication) myPasswordAuthentications.get(myPasswordIndex);
         }
-        throw new SVNAuthenticationException("svn: Authentication failed for '" + realm + "'");
+        SVNErrorManager.authenticationFailed("Authentication required for ''{0}''", realm);
+        return null;
     }
     
     /**
@@ -186,7 +189,7 @@ public class BasicAuthenticationManager implements ISVNAuthenticationManager, IS
      * @param errorMessage
      * @param authentication
      */
-    public void acknowledgeAuthentication(boolean accepted, String kind, String realm, String errorMessage, SVNAuthentication authentication) {
+    public void acknowledgeAuthentication(boolean accepted, String kind, String realm, SVNErrorMessage errorMessage, SVNAuthentication authentication) {
     }
     
     /**
@@ -223,7 +226,7 @@ public class BasicAuthenticationManager implements ISVNAuthenticationManager, IS
      * @param accepted
      * @param errorMessage
      */
-    public void acknowledgeProxyContext(boolean accepted, String errorMessage) {
+    public void acknowledgeProxyContext(boolean accepted, SVNErrorMessage errorMessage) {
     }
 
 }

@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -70,18 +70,23 @@ public class SVNFileRevision implements Comparable {
      * constants (they are revision property names) to retrieve values of the
      * corresponding properties.
      * 
+     * @deprecated use {@link #getRevisionProperties() } instead 
      * @return	a map which keys are revision property names and values
      * 			are their values (both are strings)
      */
-    public Map getRevisionProperties() {
+    public Map getProperties() {
         return myProperties;
     }
-
+    
     /**
-     * Use {@link #getRevisionProperties() } instead.
-     * @deprecated
+     * Returns revision properties. Use {@link org.tmatesoft.svn.core.SVNRevisionProperty}
+     * constants (they are revision property names) to retrieve values of the
+     * corresponding properties.
+     * 
+     * @return  a map which keys are revision property names and values
+     *          are their values (both are strings)
      */
-    public Map getProperties() {
+    public Map getRevisionProperties() {
         return myProperties;
     }
     

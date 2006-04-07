@@ -1,11 +1,12 @@
 /*
  * ====================================================================
- * Copyright (c) 2004 TMate Software Ltd. All rights reserved.
- * 
- * This software is licensed as described in the file COPYING, which you should
- * have received as part of this distribution. The terms are also available at
- * http://tmate.org/svn/license.html. If newer versions of this license are
- * posted there, you may use a newer version instead, at your option.
+ * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ *
+ * This software is licensed as described in the file COPYING, which
+ * you should have received as part of this distribution.  The terms
+ * are also available at http://tmate.org/svn/license.html.
+ * If newer versions of this license are posted there, you may use a
+ * newer version instead, at your option.
  * ====================================================================
  */
 package org.tmatesoft.svn.core.wc;
@@ -16,6 +17,9 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 
+import org.tmatesoft.svn.core.SVNCancelException;
+import org.tmatesoft.svn.core.SVNErrorCode;
+import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNNodeKind;
 import org.tmatesoft.svn.core.SVNProperty;
@@ -25,6 +29,7 @@ import org.tmatesoft.svn.core.internal.util.SVNEncodingUtil;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
 import org.tmatesoft.svn.core.internal.util.SVNTimeUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNCancellableEditor;
+import org.tmatesoft.svn.core.internal.wc.SVNCancellableOutputStream;
 import org.tmatesoft.svn.core.internal.wc.SVNDirectory;
 import org.tmatesoft.svn.core.internal.wc.SVNEntries;
 import org.tmatesoft.svn.core.internal.wc.SVNEntry;
@@ -183,11 +188,13 @@ public class SVNUpdateClient extends SVNBasicClient {
             wcAccess.open(true, recursive);
             SVNEntry entry = wcAccess.getAnchor().getEntries().getEntry("", false);
             if (entry == null) {
-                SVNErrorManager.error("svn: '" + file + "' is not under version control");
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_NOT_FOUND, "''{0}'' is not under version control", file);
+                SVNErrorManager.error(err);
             }
             SVNURL sourceURL = entry.getSVNURL();
             if (url == null) {
-                SVNErrorManager.error("svn: '" + file + "' has no URL");
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_MISSING_URL, "''{0}'' has no URL", file);
+                SVNErrorManager.error(err);
             }
             SVNRepository repository = createRepository(sourceURL, true);
             long revNumber = getRevisionNumber(revision, repository, file);
@@ -237,16 +244,20 @@ public class SVNUpdateClient extends SVNBasicClient {
      */
     public long doCheckout(SVNURL url, File dstPath, SVNRevision pegRevision, SVNRevision revision, boolean recursive) throws SVNException {
         if (dstPath == null) {
-            SVNErrorManager.error("svn: Destination path should be defined for check out");
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.BAD_FILENAME, "Checkout destination path can not be NULL");
+            SVNErrorManager.error(err);
         }
         SVNRepository repos = createRepository(url, null, pegRevision, revision);
         long revNumber = getRevisionNumber(revision, repos, null);
         SVNNodeKind targetNodeKind = repos.checkPath("", revNumber);
-        String uuid = repos.getRepositoryUUID();
+        String uuid = repos.getRepositoryUUID(true);
+        SVNURL repositoryRoot = repos.getRepositoryRoot(true);
         if (targetNodeKind == SVNNodeKind.FILE) {
-            SVNErrorManager.error("svn: URL '" + url + "' refers to a file not a directory");
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.UNSUPPORTED_FEATURE, "URL ''{0}'' refers to a file, not a directory", url);
+            SVNErrorManager.error(err);
         } else if (targetNodeKind == SVNNodeKind.NONE) {
-            SVNErrorManager.error("svn: URL '" + url + "' doesn't exist at revision " + revNumber);
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.RA_ILLEGAL_URL, "URL ''{0}'' doesn't exist", url);
+            SVNErrorManager.error(err);
         }
         long result = -1;
         SVNWCAccess wcAccess = null;
@@ -259,16 +270,22 @@ public class SVNUpdateClient extends SVNBasicClient {
                 //
             }
             if (!dstPath.exists() || wcAccess == null || entry == null) {
-                createVersionedDirectory(dstPath, url, uuid, revNumber);
+                createVersionedDirectory(dstPath, url, repositoryRoot, uuid, revNumber);
                 result = doUpdate(dstPath, revision, recursive);
             } else if (dstPath.isDirectory() && entry != null) {
                 if (url.equals(entry.getSVNURL())) {
                     result = doUpdate(dstPath, revision, recursive);
                 } else {
-                    SVNErrorManager.error("svn: working copy with different URL '" + entry.getURL() + "' already exists at checkout destination");
+                    String message = "''{0}'' is already a working copy for a different URL";
+                    if (entry.isIncomplete()) {
+                        message += "; perform update to complete it";
+                    }
+                    SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_OBSTRUCTED_UPDATE, message, dstPath);
+                    SVNErrorManager.error(err);
                 }
             } else {
-                SVNErrorManager.error("svn: '" + dstPath + "' already exists and it is a file");
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_NODE_KIND_CHANGE, "''{0}'' already exists and is not a directory", dstPath);
+                SVNErrorManager.error(err);
             }
         } finally {
             sleepForTimeStamp();
@@ -395,7 +412,9 @@ public class SVNUpdateClient extends SVNBasicClient {
         wcAccess.open(false, false);
         SVNEntry targetEntry = wcAccess.getTargetEntry();
         if (targetEntry == null) {
-            SVNErrorManager.error("svn: '" + from + "' is not under version control or doesn't exist");
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_NOT_FOUND, "''{0}'' is not under version control or doesn't exist", from,
+                    SVNErrorMessage.TYPE_WARNING);
+            SVNErrorManager.error(err);
         }
         if (revision == SVNRevision.WORKING && targetEntry.isScheduledForDeletion()) {
             return;
@@ -407,10 +426,12 @@ public class SVNUpdateClient extends SVNBasicClient {
             // create dir
             boolean dirCreated = to.mkdirs();
             if (!to.exists() || to.isFile()) {
-                SVNErrorManager.error("svn: Cannot create destination directory");
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, "Cannot create directory ''{0}''", to);
+                SVNErrorManager.error(err);
             }
             if (!dirCreated && to.isDirectory() && !force) {
-                SVNErrorManager.error("svn: Destination directory exists, and will not be overwritten unless forced");
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_OBSTRUCTED_UPDATE, "''{0}'' already exists and will not be owerwritten unless forced", to);
+                SVNErrorManager.error(err);
             }
             // read entries
             SVNEntries entries = wcAccess.getTarget().getEntries();
@@ -438,7 +459,10 @@ public class SVNUpdateClient extends SVNBasicClient {
         SVNEntries entries = dir.getEntries();
         SVNEntry entry = entries.getEntry(fileName, false);
         if (entry == null) {
-            SVNErrorManager.error("svn: '" + dir.getFile(fileName) + "' is not under version control or doesn't exist");
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_NOT_FOUND, "''{0}'' is not under version control or doesn't exist", 
+                    dir.getFile(fileName),
+                    SVNErrorMessage.TYPE_WARNING);
+            SVNErrorManager.error(err);
         }
         if (revision == SVNRevision.WORKING && entry.isScheduledForDeletion()) {
             return;
@@ -537,8 +561,11 @@ public class SVNUpdateClient extends SVNBasicClient {
                         try {
                             setEventPathPrefix(relativePath);
                             doExport(srcURL, targetDir, srcRevision, srcRevision, eolStyle, force, recursive);
-                        } catch (Throwable th) {
-                            dispatchEvent(new SVNEvent(th.getMessage()));
+                        } catch (SVNException e) {
+                            if (e instanceof SVNCancelException) {
+                                throw e;
+                            }
+                            dispatchEvent(new SVNEvent(e.getErrorMessage()));
                         } finally {
                             setEventPathPrefix(null);
                         }
@@ -552,7 +579,8 @@ public class SVNUpdateClient extends SVNBasicClient {
             }
             if (dstPath.exists()) {
                 if (!force) {
-                    SVNErrorManager.error("svn: '" + dstPath + "' already exists");
+                    SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_OBSTRUCTED_UPDATE, "Path ''{0}'' already exists", dstPath);
+                    SVNErrorManager.error(err);
                 }
             } else {
                 dstPath.getParentFile().mkdirs();
@@ -562,7 +590,7 @@ public class SVNUpdateClient extends SVNBasicClient {
             File tmpFile = SVNFileUtil.createUniqueFile(dstPath.getParentFile(), dstPath.getName(), ".tmp");
             os = SVNFileUtil.openFileForWriting(tmpFile);
             try {
-                repository.getFile("", revNumber, properties, os);
+                repository.getFile("", revNumber, properties, new SVNCancellableOutputStream(os, this));
             } finally {
                 SVNFileUtil.closeFile(os);
             }
@@ -573,10 +601,12 @@ public class SVNUpdateClient extends SVNBasicClient {
                             (String) properties.get(SVNProperty.LAST_AUTHOR),
                             (String) properties.get(SVNProperty.COMMITTED_DATE),
                             (String) properties.get(SVNProperty.COMMITTED_REVISION));
-            if (eolStyle == null) {
-                eolStyle = (String) properties.get(SVNProperty.EOL_STYLE);
+            byte[] eols = null;
+            if (SVNProperty.EOL_STYLE_NATIVE.equals(properties.get(SVNProperty.EOL_STYLE))) {
+                eols = SVNTranslator.getWorkingEOL(eolStyle != null ? eolStyle : (String) properties.get(SVNProperty.EOL_STYLE));
+            } else if (properties.containsKey(SVNProperty.EOL_STYLE)) {
+                eols = SVNTranslator.getWorkingEOL((String) properties.get(SVNProperty.EOL_STYLE));
             }
-            byte[] eols = SVNTranslator.getWorkingEOL(eolStyle);
             SVNTranslator.translate(tmpFile, dstPath, eols, keywords, properties.get(SVNProperty.SPECIAL) != null, true);
             tmpFile.delete();
             if (properties.get(SVNProperty.EXECUTABLE) != null) {
@@ -606,63 +636,22 @@ public class SVNUpdateClient extends SVNBasicClient {
      * @throws SVNException
      */
     public void doRelocate(File dst, SVNURL oldURL, SVNURL newURL, boolean recursive) throws SVNException {
-        SVNRepository repos = createRepository(newURL, true);
-        repos.testConnection();
-
-        String uuid = repos.getRepositoryUUID();
         SVNWCAccess wcAccess = createWCAccess(dst);
         try {
             wcAccess.open(true, recursive);
             SVNEntry entry = wcAccess.getTargetEntry();
-            String oldUUID = null;
-            if (entry != null) {
-                oldUUID = entry.getUUID();
+            String name = "";
+            if (entry != null && entry.isFile()) {
+                name = entry.getName();
             }
-            if (oldUUID == null || !oldUUID.equals(uuid)) {
-                SVNErrorManager.error("The repository at '" + newURL + "' has uuid '" + uuid + "', but the WC has '" + oldUUID + "'");
-            }
-            doRelocate(wcAccess.getAnchor(), wcAccess.getTargetName(), oldURL.toString(), newURL.toString(), recursive);
+            doRelocate(wcAccess.getTarget(), name, oldURL.toString(), newURL.toString(), recursive, new HashMap());
         } finally {
             wcAccess.close(true);
 
         }
     }
 
-    private void doRelocate(SVNDirectory dir, String targetName, String oldURL, String newURL, boolean recursive) throws SVNException {
-        SVNEntries entries = dir.getEntries();
-        for (Iterator ents = entries.entries(true); ents.hasNext();) {
-            SVNEntry entry = (SVNEntry) ents.next();
-            if (targetName != null && !"".equals(targetName)) {
-                if (!targetName.equals(entry.getName())) {
-                    continue;
-                }
-            }
-            String copyFromURL = entry.getCopyFromURL();
-            
-            if (copyFromURL != null && copyFromURL.startsWith(oldURL)) {
-                copyFromURL = copyFromURL.substring(oldURL.length());
-                copyFromURL = SVNPathUtil.append(newURL, copyFromURL);
-                entry.setCopyFromURL(copyFromURL);
-            }
-            if (recursive && entry.isDirectory() && !"".equals(entry.getName())) {
-                if (dir.getChildDirectory(entry.getName()) != null) {
-                    doRelocate(dir.getChildDirectory(entry.getName()), null,
-                            oldURL, newURL, recursive);
-                }
-            } else if (entry.isFile() || "".equals(entry.getName())) {
-                String url = entry.getURL();
-                if (url.startsWith(oldURL)) {
-                    url = url.substring(oldURL.length());
-                    url = SVNPathUtil.append(newURL, url);
-                    entry.setURL(url);
-                    dir.getWCProperties(entry.getName()).delete();
-                }
-            }
-        }
-        dir.getEntries().save(true);
-    }
-
-    private void handleExternals(SVNWCAccess wcAccess) {
+    private void handleExternals(SVNWCAccess wcAccess) throws SVNException {
         for (Iterator externals = wcAccess.externals(); externals.hasNext();) {
             SVNExternalInfo external = (SVNExternalInfo) externals.next();
             if (external.getOldURL() == null && external.getNewURL() == null) {
@@ -675,7 +664,6 @@ public class SVNUpdateClient extends SVNBasicClient {
                 if (external.getOldURL() == null) {
                     external.getFile().mkdirs();
                     dispatchEvent(SVNEventFactory.createUpdateExternalEvent(wcAccess, ""));
-                    SVNDebugLog.logInfo("doing checkout on rev: " + revision);
                     doCheckout(external.getNewURL(), external.getFile(), revision, revision, true);
                 } else if (external.getNewURL() == null) {
                     if (SVNWCAccess.isVersionedDirectory(external.getFile())) {
@@ -691,12 +679,10 @@ public class SVNUpdateClient extends SVNBasicClient {
                     deleteExternal(external);
                     external.getFile().mkdirs();
                     dispatchEvent(SVNEventFactory.createUpdateExternalEvent(wcAccess, ""));
-                    SVNDebugLog.logInfo("doing checkout on rev: " + revision);
                     doCheckout(external.getNewURL(), external.getFile(), revision, revision, true);
                 } else {
                     if (!external.getFile().isDirectory()) {
                         external.getFile().mkdirs();
-                        SVNDebugLog.logInfo("doing checkout on rev: " + revision);
                         doCheckout(external.getNewURL(), external.getFile(), revision, revision, true);
                     } else {
                         String url = null;
@@ -709,7 +695,6 @@ public class SVNUpdateClient extends SVNBasicClient {
                             deleteExternal(external);
                             external.getFile().mkdirs();
                             dispatchEvent(SVNEventFactory.createUpdateExternalEvent(wcAccess, ""));
-                            SVNDebugLog.logInfo("doing checkout on rev: " + revision);
                             doCheckout(external.getNewURL(), external.getFile(), revision, revision, true);
                         } else {
                             dispatchEvent(SVNEventFactory.createUpdateExternalEvent(wcAccess, ""));
@@ -717,8 +702,11 @@ public class SVNUpdateClient extends SVNBasicClient {
                         }
                     }
                 }
-            } catch (Throwable th) {
-                dispatchEvent(new SVNEvent(th.getMessage()));
+            } catch (SVNException th) {
+                if (th instanceof SVNCancelException) {
+                    throw th;
+                }
+                dispatchEvent(new SVNEvent(th.getErrorMessage()));
                 SVNDebugLog.logInfo(th);
             } finally {
                 setEventPathPrefix(null);
@@ -746,7 +734,7 @@ public class SVNUpdateClient extends SVNBasicClient {
         }
     }
 
-    private SVNDirectory createVersionedDirectory(File dstPath, SVNURL url, String uuid, long revNumber) throws SVNException {
+    private SVNDirectory createVersionedDirectory(File dstPath, SVNURL url, SVNURL rootURL, String uuid, long revNumber) throws SVNException {
         SVNDirectory.createVersionedDirectory(dstPath);
         // add entry first.
         SVNDirectory dir = new SVNDirectory(null, "", dstPath);
@@ -757,11 +745,105 @@ public class SVNUpdateClient extends SVNBasicClient {
         }
         entry.setURL(url.toString());
         entry.setUUID(uuid);
+        entry.setRepositoryRootURL(rootURL);
         entry.setKind(SVNNodeKind.DIR);
         entry.setRevision(revNumber);
         entry.setIncomplete(true);
 
         entries.save(true);
         return dir;
+    }
+    
+    private Map validateRelocateTargetURL(SVNURL targetURL, String expectedUUID, Map validatedURLs) throws SVNException {
+        if (validatedURLs == null) {
+            return null;
+        }
+        for(Iterator targetURLs = validatedURLs.keySet().iterator(); targetURLs.hasNext();) {
+            SVNURL validatedURL = (SVNURL) targetURLs.next();
+            if (targetURL.toString().startsWith(validatedURL.toString())) {
+                continue;
+            }
+            String validatedUUID = (String) validatedURLs.get(validatedURL);
+            if (validatedUUID != null && validatedUUID.equals(expectedUUID)) {
+                return validatedURLs;
+            }
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.CLIENT_INVALID_RELOCATION, "The repository at ''{0}'' has uuid ''{1}'', but the WC has ''{2}''",
+                    new Object[] {validatedURL, validatedUUID, expectedUUID});
+            SVNErrorManager.error(err);
+        }
+        SVNRepository repos = createRepository(targetURL, true);
+        String actualUUID = repos.getRepositoryUUID(true);
+        if (actualUUID == null || !actualUUID.equals(expectedUUID)) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.CLIENT_INVALID_RELOCATION, "The repository at ''{0}'' has uuid ''{1}'', but the WC has ''{2}''",
+                    new Object[] {targetURL, actualUUID, expectedUUID});
+            SVNErrorManager.error(err);
+        }
+        validatedURLs.put(targetURL, actualUUID);
+        return validatedURLs;
+    }
+    
+    private Map relocateEntry(SVNEntry entry, String from, String to, Map validatedURLs) throws SVNException {
+        if (entry.getRepositoryRoot() != null) {
+            // that is what i do not understand :)
+            String repos = entry.getRepositoryRoot();
+            if (from.length() > repos.length()) {
+                String fromPath = from.substring(repos.length());
+                if (!to.endsWith(fromPath)) {
+                    SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.CLIENT_INVALID_RELOCATION, "Relocate can only change the repository part of URL");
+                    SVNErrorManager.error(err);
+                }
+                from = repos;
+                to = to.substring(0, to.length() - fromPath.length());
+            }
+            if (repos.startsWith(from)) {
+                entry.setRepositoryRoot(to + repos.substring(from.length()));
+            }
+        }
+        if (entry.getURL() != null && entry.getURL().startsWith(from)) {
+            entry.setURL(to + entry.getURL().substring(from.length()));
+            if (entry.getUUID() != null && validatedURLs != null) {
+                validatedURLs = validateRelocateTargetURL(entry.getSVNURL(), entry.getUUID(), validatedURLs);
+            }
+        }
+        if (entry.getCopyFromURL() != null && entry.getCopyFromURL().startsWith(from)) {
+            entry.setCopyFromURL(to + entry.getCopyFromURL().substring(from.length()));
+            if (entry.getUUID() != null && validatedURLs != null) {
+                validatedURLs = validateRelocateTargetURL(entry.getCopyFromSVNURL(), entry.getUUID(), validatedURLs);
+            }
+        }
+        return validatedURLs;
+    }
+    
+    private Map doRelocate(SVNDirectory dir, String name, String from, String to, boolean recursive, Map validatedURLs) throws SVNException {
+        if (!"".equals(name)) {
+            SVNEntry entry = dir.getEntries().getEntry(name, true);
+            relocateEntry(entry, from, to, validatedURLs);
+            dir.getWCProperties(name).setPropertyValue(SVNProperty.WC_URL, null);
+            dir.getEntries().save(true);
+            return validatedURLs;
+        }
+        SVNEntry rootEntry = dir.getEntries().getEntry("", true);
+        validatedURLs = relocateEntry(rootEntry, from, to, validatedURLs);
+        dir.getWCProperties("").setPropertyValue(SVNProperty.WC_URL, null);
+        // now all child entries that doesn't has repos/url has new values.
+        for(Iterator ents = dir.getEntries().entries(true); ents.hasNext();) {
+            SVNEntry entry = (SVNEntry) ents.next();
+            if ("".equals(entry.getName())) {
+                continue;
+            }
+            if (recursive && entry.isDirectory() && 
+                    (entry.isScheduledForAddition() || !entry.isDeleted()) &&
+                    !entry.isAbsent()) {
+                SVNDirectory childDir = dir.getChildDirectory(entry.getName());
+                if (childDir != null) {
+                    validatedURLs = doRelocate(childDir, "", from, to, recursive, validatedURLs);
+                }
+            }
+            validatedURLs = relocateEntry(entry, from, to, validatedURLs);
+            dir.getWCProperties(entry.getName()).setPropertyValue(SVNProperty.WC_URL, null);
+        }
+        dir.getEntries().save(true);
+        return validatedURLs;
+        
     }
 }

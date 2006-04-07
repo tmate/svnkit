@@ -1,11 +1,12 @@
 /*
  * ====================================================================
- * Copyright (c) 2004 TMate Software Ltd. All rights reserved.
- * 
- * This software is licensed as described in the file COPYING, which you should
- * have received as part of this distribution. The terms are also available at
- * http://tmate.org/svn/license.html. If newer versions of this license are
- * posted there, you may use a newer version instead, at your option.
+ * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ *
+ * This software is licensed as described in the file COPYING, which
+ * you should have received as part of this distribution.  The terms
+ * are also available at http://tmate.org/svn/license.html.
+ * If newer versions of this license are posted there, you may use a
+ * newer version instead, at your option.
  * ====================================================================
  */
 package org.tmatesoft.svn.core.internal.io.svn;
@@ -15,6 +16,8 @@ import java.io.InputStream;
 import java.io.OutputStream;
 
 import org.tmatesoft.svn.core.SVNAuthenticationException;
+import org.tmatesoft.svn.core.SVNErrorCode;
+import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.auth.ISVNAuthenticationManager;
 import org.tmatesoft.svn.core.auth.SVNSSHAuthentication;
@@ -32,7 +35,9 @@ import ch.ethz.ssh2.StreamGobbler;
  */
 public class SVNGanymedConnector implements ISVNConnector {
 
-    private static final String SVNSERVE_COMMAND = "svnserve --tunnel";
+    private static final String SVNSERVE_COMMAND = "svnserve -t";
+    private static final String SVNSERVE_COMMAND_WITH_USER_NAME = "svnserve -t --tunnel-user ";
+    private static final String ourCustomUserName = System.getProperty("javasvn.ssh.author", "");
 
     private Session mySession;
     private InputStream myInputStream;
@@ -56,25 +61,30 @@ public class SVNGanymedConnector implements ISVNConnector {
                 try {
                     connection = SVNGanymedSession.getConnection(repository.getLocation(), authentication);
                     if (connection == null) {
-                        SVNErrorManager.error("svn: Connection to '" + realm + "'failed");
+                        SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.RA_SVN_CONNECTION_CLOSED, "Cannot connect to ''{0}''", repository.getLocation().setPath("", false));
+                        SVNErrorManager.error(err);
                     }
-//                    authManager.acknowledgeAuthentication(true, ISVNAuthenticationManager.SSH, realm, null, authentication);
-                    repository.setExternalAuthentication(authentication);
+                    authManager.acknowledgeAuthentication(true, ISVNAuthenticationManager.SSH, realm, null, authentication);
+                    repository.setExternalUserName(ourCustomUserName);
                     break;
                 } catch (SVNAuthenticationException e) {
-                    authManager.acknowledgeAuthentication(false, ISVNAuthenticationManager.SSH, realm, e.getMessage(), authentication);
+                    authManager.acknowledgeAuthentication(false, ISVNAuthenticationManager.SSH, realm, e.getErrorMessage(), authentication);
                     authentication = (SVNSSHAuthentication) authManager.getNextAuthentication(ISVNAuthenticationManager.SSH, realm, repository.getLocation());
                     connection = null;
                 }
             }
             if (authentication == null) {
-                throw new SVNAuthenticationException("svn: Authenticantion cancelled");
+                SVNErrorManager.cancel("authentication cancelled");
             } else if (connection == null) {
-                SVNErrorManager.error("svn: Connection to '" + realm + "' failed");
+                SVNErrorManager.error(SVNErrorMessage.create(SVNErrorCode.RA_SVN_CONNECTION_CLOSED, "Can not establish connection with to ''{0}''", realm));
             }
             try {
                 mySession = connection.openSession();
-                mySession.execCommand(SVNSERVE_COMMAND);
+                if ("".equals(repository.getExternalUserName())) {
+                    mySession.execCommand(SVNSERVE_COMMAND);
+                } else {
+                    mySession.execCommand(SVNSERVE_COMMAND_WITH_USER_NAME + repository.getExternalUserName());
+                }
     
                 myOutputStream = mySession.getStdin();
                 myInputStream = mySession.getStdout();
@@ -93,7 +103,8 @@ public class SVNGanymedConnector implements ISVNConnector {
                 }
                 SVNDebugLog.logInfo(e);
                 close();
-                SVNErrorManager.error("svn: Connection to '" + realm + "' failed\nsvn: Could not open SSH session: " + e.getMessage());
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.RA_SVN_CONNECTION_CLOSED, "Cannot connect to ''{0}'': {1}", new Object[] {repository.getLocation().setPath("", false), e.getLocalizedMessage()});
+                SVNErrorManager.error(err, e);
             }
         }
     }

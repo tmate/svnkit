@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -70,7 +70,7 @@ public class History {
         /*
          * Default values:
          */
-        String url = "http://72.9.228.230:8080/svn/jsvn/branches/0.9.0/doc";
+        String url = "http://svn.tmate.org:8080/svn/jsvn/branches/0.9.0/doc";
         String name = "anonymous";
         String password = "anonymous";
         long startRevision = 0;

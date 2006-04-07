@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -69,7 +69,7 @@ public class DisplayRepositoryTree {
         /*
          * default values:
          */
-        String url = "http://72.9.228.230:8080/svn/jsvn/branches/jorunal";
+        String url = "http://svn.tmate.org:8080/svn/jsvn/branches/jorunal";
         String name = "anonymous";
         String password = "anonymous";
 
@@ -149,8 +149,7 @@ public class DisplayRepositoryTree {
              * getRepositoryUUID returns Universal Unique IDentifier (UUID) - an
              * identifier of the repository
              */
-            System.out.println("Repository UUID: "
-                    + repository.getRepositoryUUID());
+            System.out.println("Repository UUID: " + repository.getRepositoryUUID(true));
             System.out.println("");
 
             /*

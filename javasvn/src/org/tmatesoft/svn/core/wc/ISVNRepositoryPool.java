@@ -1,11 +1,12 @@
 /*
  * ====================================================================
- * Copyright (c) 2004 TMate Software Ltd. All rights reserved.
- * 
- * This software is licensed as described in the file COPYING, which you should
- * have received as part of this distribution. The terms are also available at
- * http://tmate.org/svn/license.html. If newer versions of this license are
- * posted there, you may use a newer version instead, at your option.
+ * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ *
+ * This software is licensed as described in the file COPYING, which
+ * you should have received as part of this distribution.  The terms
+ * are also available at http://tmate.org/svn/license.html.
+ * If newer versions of this license are posted there, you may use a
+ * newer version instead, at your option.
  * ====================================================================
  */
 package org.tmatesoft.svn.core.wc;
@@ -36,7 +37,7 @@ public interface ISVNRepositoryPool {
      * 
      * <p>
      * If <code>mayReuse</code> is <span class="javakeyword">true</span>
-     * and the pool feature for caching <b>SVNRepository</b> objects is suported
+     * and the pool feature for caching <b>SVNRepository</b> objects is supported
      * by the concrete implementation of this interface, then this method first 
      * tries to find an existing <b>SVNRepository</b> object 
      * in the pool of the current thread. If such an object is found that was

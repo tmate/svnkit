@@ -1,11 +1,12 @@
 /*
  * ====================================================================
- * Copyright (c) 2004 TMate Software Ltd. All rights reserved.
- * 
- * This software is licensed as described in the file COPYING, which you should
- * have received as part of this distribution. The terms are also available at
- * http://tmate.org/svn/license.html. If newer versions of this license are
- * posted there, you may use a newer version instead, at your option.
+ * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ *
+ * This software is licensed as described in the file COPYING, which
+ * you should have received as part of this distribution.  The terms
+ * are also available at http://tmate.org/svn/license.html.
+ * If newer versions of this license are posted there, you may use a
+ * newer version instead, at your option.
  * ====================================================================
  */
 package org.tmatesoft.svn.core.internal.wc;
@@ -53,19 +54,20 @@ public class SVNMerger {
         return myIsDryRun;
     }
 
-    public SVNStatusType directoryDeleted(final String path) {
+    public SVNStatusType directoryDeleted(final String path) throws SVNException {
         SVNDirectory parentDir = getParentDirectory(path);
         if (parentDir == null) {
             return SVNStatusType.MISSING;
         }
         String name = SVNPathUtil.tail(path);
         File targetFile = parentDir.getFile(name);
-        if (targetFile.isDirectory()) {
+        SVNFileType targetFileType = SVNFileType.getType(targetFile);
+        if (targetFileType == SVNFileType.DIRECTORY) {
             // check for normal entry?
             final ISVNEventHandler oldDispatcher = myWCAccess
                     .getEventDispatcher();
             myWCAccess.setEventDispatcher(new ISVNEventHandler() {
-                public void handleEvent(SVNEvent event, double progress) {
+                public void handleEvent(SVNEvent event, double progress) throws SVNException {
                     String eventPath = event.getPath();
                     eventPath = eventPath.replace(File.separatorChar, '/');
                     if (event.getPath().equals(path)) {
@@ -87,6 +89,9 @@ public class SVNMerger {
                     try {
                         parentDir.canScheduleForDeletion(name);
                     } catch (SVNException e) {
+                        if (e instanceof SVNCancelException) {
+                            throw e;
+                        }
                         SVNDebugLog.logInfo(e);
                         return SVNStatusType.OBSTRUCTED;
                     }
@@ -95,6 +100,9 @@ public class SVNMerger {
                     try {
                         parentDir.scheduleForDeletion(name, true);
                     } catch (SVNException e) {
+                        if (e instanceof SVNCancelException) {
+                            throw e;
+                        }
                         return SVNStatusType.OBSTRUCTED;
                     }
                 }
@@ -102,29 +110,41 @@ public class SVNMerger {
                 myWCAccess.setEventDispatcher(oldDispatcher);
             }
             return SVNStatusType.CHANGED;
-        } else if (targetFile.isFile()) {
+        } else if (targetFileType.isFile()) {
             return SVNStatusType.OBSTRUCTED;
         }
         return SVNStatusType.MISSING;
     }
 
-    public SVNStatusType fileDeleted(String path) {
+    public SVNStatusType fileDeleted(String path) throws SVNException {
         SVNDirectory parentDir = getParentDirectory(path);
         if (parentDir == null) {
             return SVNStatusType.MISSING;
         }
         String name = SVNPathUtil.tail(path);
         File targetFile = parentDir.getFile(name);
-        if (targetFile.isDirectory()) {
+        SVNFileType targetFileType = SVNFileType.getType(targetFile);
+        if (targetFileType == SVNFileType.DIRECTORY) {
             return SVNStatusType.OBSTRUCTED;
-        } else if (targetFile.isFile()) {
-            ISVNEventHandler oldDispatcher = myWCAccess.getEventDispatcher();
+        } else if (targetFileType.isFile()) {
+            final ISVNEventHandler oldDispatcher = myWCAccess.getEventDispatcher();
             try {
-                myWCAccess.setEventDispatcher(null);
+                myWCAccess.setEventDispatcher(new ISVNEventHandler() {
+                    public void handleEvent(SVNEvent event, double progress) throws SVNException {
+                    }
+                    public void checkCancelled() throws SVNCancelException {
+                        if (oldDispatcher != null) {
+                            oldDispatcher.checkCancelled();
+                        }
+                    }                    
+                });
                 if (!myIsForce) {
                     try {
                         parentDir.canScheduleForDeletion(name);
                     } catch (SVNException e) {
+                        if (e instanceof SVNCancelException) {
+                            throw e;
+                        }
                         return SVNStatusType.OBSTRUCTED;
                     }
                 }
@@ -132,6 +152,9 @@ public class SVNMerger {
                     try {
                         parentDir.scheduleForDeletion(name, true);
                     } catch (SVNException e) {
+                        if (e instanceof SVNCancelException) {
+                            throw e;
+                        }
                         return SVNStatusType.OBSTRUCTED;
                     }
                 }
@@ -154,7 +177,8 @@ public class SVNMerger {
         }
         String name = SVNPathUtil.tail(path);
         File file = parentDir.getFile(name);
-        if (!file.exists()) {
+        SVNFileType fileType = SVNFileType.getType(file);
+        if (fileType == SVNFileType.NONE) {
             SVNEntry entry = parentDir.getEntries().getEntry(name, true);
             if (entry != null && !entry.isScheduledForDeletion()) {
                 // missing entry.
@@ -168,7 +192,7 @@ public class SVNMerger {
                 myAddedPath = path + "/";
             }
             return SVNStatusType.CHANGED;
-        } else if (file.isDirectory()) {
+        } else if (fileType == SVNFileType.DIRECTORY) {
             SVNEntry entry = parentDir.getEntries().getEntry(name, true);
             if (entry == null || entry.isScheduledForDeletion()) {
                 if (myIsDryRun) {
@@ -181,7 +205,7 @@ public class SVNMerger {
                 return SVNStatusType.CHANGED;
             }
             return SVNStatusType.OBSTRUCTED;            
-        } else if (file.isFile()) {
+        } else if (fileType.isFile()) {
             if (myIsDryRun) {
                 myAddedPath = null;
             }
@@ -192,7 +216,7 @@ public class SVNMerger {
 
     public SVNStatusType[] fileChanged(String path, File older, File yours,
             long rev1, long rev2, String mimeType1, String mimeType2,
-            Map propDiff) throws SVNException {
+            Map baseProps, Map propDiff) throws SVNException {
         SVNStatusType[] result = new SVNStatusType[] { SVNStatusType.UNKNOWN,
                 SVNStatusType.UNKNOWN };
         String parentPath = SVNPathUtil.removeTail(path);
@@ -206,14 +230,14 @@ public class SVNMerger {
         String name = SVNPathUtil.tail(path);
         File mine = parentDir.getFile(name);
         SVNEntry entry = parentDir.getEntries().getEntry(name, true);
-
-        if (!mine.isFile() || entry == null || entry.isHidden()) {
+        SVNFileType mineType = SVNFileType.getType(mine);
+        if (!mineType.isFile() || entry == null || entry.isHidden()) {
             result[0] = SVNStatusType.MISSING;
             result[1] = SVNStatusType.MISSING;
             return result;
         }
         if (propDiff != null && !propDiff.isEmpty()) {
-            result[1] = propertiesChanged(parentPath, name, propDiff);
+            result[1] = propertiesChanged(parentPath, name, baseProps, propDiff);
         } else {
             result[1] = SVNStatusType.UNCHANGED;
         }
@@ -260,7 +284,7 @@ public class SVNMerger {
 
     public SVNStatusType[] fileAdded(String path, File older, File yours,
             long rev1, long rev2, String mimeType1, String mimeType2,
-            Map propDiff, Map entryProps) throws SVNException {
+            Map baseProps, Map propDiff, Map entryProps) throws SVNException {
         SVNStatusType[] result = new SVNStatusType[] { SVNStatusType.UNKNOWN,
                 SVNStatusType.UNKNOWN };
         SVNDirectory parentDir = getParentDirectory(path);
@@ -277,8 +301,8 @@ public class SVNMerger {
         }
         String name = SVNPathUtil.tail(path);
         File mine = parentDir.getFile(name);
-
-        if (!mine.exists()) {
+        SVNFileType mineType = SVNFileType.getType(mine);
+        if (mineType == SVNFileType.NONE) {
             SVNEntry entry = parentDir.getEntries().getEntry(name, true);
             if (entry != null && !entry.isScheduledForDeletion()) {
                 result[0] = SVNStatusType.OBSTRUCTED;
@@ -293,15 +317,15 @@ public class SVNMerger {
             if (propDiff != null && !propDiff.isEmpty()) {
                 result[1] = SVNStatusType.CHANGED;
             }
-        } else if (mine.isDirectory()) {
+        } else if (mineType == SVNFileType.DIRECTORY) {
             result[0] = SVNStatusType.OBSTRUCTED;
-        } else if (mine.isFile()) {
+        } else if (mineType.isFile()) {
             SVNEntry entry = parentDir.getEntries().getEntry(name, true);
             if (entry == null || entry.isScheduledForDeletion()) {
                 result[0] = SVNStatusType.OBSTRUCTED;
             } else {
                 return fileChanged(path, older, yours, rev1, rev2, mimeType1,
-                        mimeType2, propDiff);
+                        mimeType2, baseProps, propDiff);
             }
         }
         return result;
@@ -319,11 +343,11 @@ public class SVNMerger {
         return pathInURL;
     }
 
-    public SVNStatusType directoryPropertiesChanged(String path, Map propDiff) throws SVNException {
-        return propertiesChanged(path, "", propDiff);
+    public SVNStatusType directoryPropertiesChanged(String path, Map baseProps, Map propDiff) throws SVNException {
+        return propertiesChanged(path, "", baseProps, propDiff);
     }
 
-    public File getFile(String path, boolean base) {
+    public File getFile(String path, boolean base) throws SVNException {
         SVNDirectory dir = null;
         String parentPath = path;
         while (dir == null && !"".equals(parentPath)) {
@@ -338,7 +362,7 @@ public class SVNMerger {
         return null;
     }
 
-    private SVNStatusType propertiesChanged(String path, String name, Map propDiff) throws SVNException {
+    private SVNStatusType propertiesChanged(String path, String name, Map baseProps, Map propDiff) throws SVNException {
         if (propDiff == null || propDiff.isEmpty()) {
             return SVNStatusType.UNCHANGED;
         }
@@ -351,24 +375,10 @@ public class SVNMerger {
         if (!myIsDryRun) {
             log = dir.getLog(0);
         }
-        // 1. convert props to diff (need we?), just use remote diff
-        // ->
-        // 2. get local mods.
-        SVNProperties localBaseProps = dir.getBaseProperties(name, false);
-        SVNProperties localWCProps = dir.getProperties(name, false);
-
-        // will contain all deleted and added, but not unchanged.
-        Map localDiff = localBaseProps.compareTo(localWCProps);
-        // 3. merge
-        result = dir.mergeProperties(name, propDiff, localDiff, false, log);
+        result = dir.mergeProperties(name, baseProps, propDiff, false, log);
         if (log != null) {
             log.save();
             dir.runLogs();
-        }
-        // to make python tests pass.
-        if (result == SVNStatusType.MERGED
-                || result == SVNStatusType.CONFLICTED) {
-            result = SVNStatusType.CHANGED;
         }
         return result;
     }
@@ -381,6 +391,7 @@ public class SVNMerger {
         SVNEntry entry = entries.getEntry(name, true);
         String url = null;
         String uuid = entries.getEntry("", true).getUUID();
+        String reposRootURL = entries.getEntry("", true).getRepositoryRoot();
         if (entry != null) {
             entry.loadProperties(entryProps);
             if (entry.isScheduledForDeletion()) {
@@ -401,7 +412,7 @@ public class SVNMerger {
         entries.save(false);
         SVNDirectory childDir = parentDir.getChildDirectory(name);
         if (childDir == null) {
-            childDir = parentDir.createChildDirectory(name, url, copyFromRev);
+            childDir = parentDir.createChildDirectory(name, url, reposRootURL, copyFromRev);
             SVNEntry root = childDir.getEntries().getEntry("", true);
             root.scheduleForAddition();
             root.setUUID(uuid);
@@ -417,6 +428,7 @@ public class SVNMerger {
         rootEntry.setCopyFromURL(copyFromURL);
         rootEntry.setCopyFromRevision(copyFromRev);
         rootEntry.setCopied(true);
+        rootEntry.setRepositoryRoot(reposRootURL);
         entries.save(false);
     }
 

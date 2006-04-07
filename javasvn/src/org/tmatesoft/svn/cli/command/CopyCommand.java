@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -18,6 +18,8 @@ import java.io.PrintStream;
 import org.tmatesoft.svn.cli.SVNArgument;
 import org.tmatesoft.svn.cli.SVNCommand;
 import org.tmatesoft.svn.core.SVNCommitInfo;
+import org.tmatesoft.svn.core.SVNErrorCode;
+import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNURL;
 import org.tmatesoft.svn.core.wc.SVNCopyClient;
@@ -34,6 +36,10 @@ public class CopyCommand extends SVNCommand {
                 final String path = getCommandLine().getPathAt(0);
                 final String url = getCommandLine().getURL(0);
                 if (getCommandLine().isPathURLBefore(url, path)) {
+                    if (getCommandLine().getArgumentValue(SVNArgument.MESSAGE) != null) {
+                        SVNErrorMessage msg = SVNErrorMessage.create(SVNErrorCode.CL_UNNECESSARY_LOG_MESSAGE, "Local, non-commit operations do not take a log message.");
+                        throw new SVNException(msg);
+                    }
                     runRemoteToLocal(out, err);
                 } else {
                     runLocalToRemote(out, err);
@@ -42,13 +48,18 @@ public class CopyCommand extends SVNCommand {
                 runRemote(out, err);
             }
         } else {
+            if (getCommandLine().getArgumentValue(SVNArgument.MESSAGE) != null) {
+                SVNErrorMessage msg = SVNErrorMessage.create(SVNErrorCode.CL_UNNECESSARY_LOG_MESSAGE, "Local, non-commit operations do not take a log message.");
+                throw new SVNException(msg);
+            }
             runLocally(out, err);
         }
     }
 
     private void runLocally(final PrintStream out, PrintStream err) throws SVNException {
         if (getCommandLine().getPathCount() != 2) {
-            throw new SVNException("Please enter SRC and DST path");
+            SVNErrorMessage msg = SVNErrorMessage.create(SVNErrorCode.CL_INSUFFICIENT_ARGS, "Please enter SRC and DST path");
+            throw new SVNException(msg);
         }
 
         final String absoluteSrcPath = getCommandLine().getPathAt(0);
@@ -66,7 +77,8 @@ public class CopyCommand extends SVNCommand {
 
     private void runRemote(PrintStream out, PrintStream err) throws SVNException {
         if (getCommandLine().getURLCount() != 2) {
-            throw new SVNException("Please enter SRC and DST URL");
+            SVNErrorMessage msg = SVNErrorMessage.create(SVNErrorCode.CL_INSUFFICIENT_ARGS, "Please enter SRC and DST URLs");
+            throw new SVNException(msg);
         }
         String srcURL = getCommandLine().getURL(0);
         SVNRevision srcRevision = SVNRevision.parse((String) getCommandLine().getArgumentValue(SVNArgument.REVISION));
@@ -76,7 +88,7 @@ public class CopyCommand extends SVNCommand {
             return;
         }
 
-        String commitMessage = (String) getCommandLine().getArgumentValue(SVNArgument.MESSAGE);
+        String commitMessage = getCommitMessage();
         getClientManager().setEventHandler(new SVNCommandEventProcessor(out, err, false));
         SVNCopyClient updater = getClientManager().getCopyClient();
         SVNCommitInfo result = updater.doCopy(SVNURL.parseURIEncoded(srcURL), srcRevision, SVNURL.parseURIEncoded(dstURL), false, commitMessage);
@@ -104,7 +116,7 @@ public class CopyCommand extends SVNCommand {
         if (matchTabsInPath(srcPath, err) || matchTabsInURL(dstURL, err)) {
             return;
         }
-        String message = (String) getCommandLine().getArgumentValue(SVNArgument.MESSAGE);
+        String message = getCommitMessage();
         SVNRevision revision = SVNRevision.parse((String) getCommandLine().getArgumentValue(SVNArgument.REVISION));
         if (revision == null || !revision.isValid()) {
             revision = SVNRevision.WORKING;

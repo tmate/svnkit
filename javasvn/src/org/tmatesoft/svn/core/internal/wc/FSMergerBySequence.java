@@ -1,11 +1,12 @@
 /*
  * ====================================================================
- * Copyright (c) 2004 TMate Software Ltd. All rights reserved.
- * 
- * This software is licensed as described in the file COPYING, which you should
- * have received as part of this distribution. The terms are also available at
- * http://tmate.org/svn/license.html. If newer versions of this license are
- * posted there, you may use a newer version instead, at your option.
+ * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ *
+ * This software is licensed as described in the file COPYING, which
+ * you should have received as part of this distribution.  The terms
+ * are also available at http://tmate.org/svn/license.html.
+ * If newer versions of this license are posted there, you may use a
+ * newer version instead, at your option.
  * ====================================================================
  */
 
@@ -13,6 +14,8 @@ package org.tmatesoft.svn.core.internal.wc;
 
 import java.io.IOException;
 import java.io.OutputStream;
+
+import org.tmatesoft.svn.util.SVNDebugLog;
 
 import de.regnis.q.sequence.QSequenceDifferenceBlock;
 import de.regnis.q.sequence.core.QSequenceException;
@@ -38,15 +41,13 @@ class FSMergerBySequence {
 	private final byte[] myConflictStart;
 	private final byte[] myConflictSeparator;
 	private final byte[] myConflictEnd;
-	private final byte[] myEOLBytes;
 
 	// Setup ==================================================================
 
-	public FSMergerBySequence(byte[] conflictStart, byte[] conflictSeparator, byte[] conflictEnd, byte[] eolBytesArray) {
+	public FSMergerBySequence(byte[] conflictStart, byte[] conflictSeparator, byte[] conflictEnd) {
 		myConflictStart = conflictStart;
 		myConflictSeparator = conflictSeparator;
 		myConflictEnd = conflictEnd;
-		myEOLBytes = eolBytesArray;
 	}
 
 	// Accessing ==============================================================
@@ -54,11 +55,16 @@ class FSMergerBySequence {
 	public int merge(QSequenceLineRAData baseData,
 	                 QSequenceLineRAData localData, QSequenceLineRAData latestData,
 	                 OutputStream result) throws IOException {
+
+//        dump("base", baseData);
+//        dump("latest", latestData);
+//        dump("local", localData);
+
 		final QSequenceLineResult localResult;
 		final QSequenceLineResult latestResult;
 		try {
-			localResult = QSequenceLineMedia.createBlocks(baseData, localData, myEOLBytes);
-			latestResult = QSequenceLineMedia.createBlocks(baseData, latestData, myEOLBytes);
+			localResult = QSequenceLineMedia.createBlocks(baseData, localData);
+			latestResult = QSequenceLineMedia.createBlocks(baseData, latestData);
 		}
 		catch (QSequenceException ex) {
 			throw new IOException(ex.getMessage());
@@ -148,11 +154,10 @@ class FSMergerBySequence {
 			if (to2 < from2) {
 				return from1 == from2;
 			}
-			else if (from1 == baseLineCount && to2 >= baseLineCount - 1) {
+			if (from1 == baseLineCount && to2 >= baseLineCount - 1) {
 				return true;
-			} else {
-                return from1 >= from2 && from1 <= to2;
-            }
+			}
+			return from1 >= from2 && from1 <= to2;
 		}
 		else if (to2 < from2) {
 			if (from2 == baseLineCount && to1 >= baseLineCount - 1) {
@@ -276,12 +281,17 @@ class FSMergerBySequence {
 			throws IOException {
 		if (bytes.length > 0) {
 			os.write(bytes);
-			if (myEOLBytes != null) {
-				os.write(myEOLBytes);
-			}
-			else {
-				os.write(DEFAULT_EOL.getBytes());
-			}
+			os.write(DEFAULT_EOL.getBytes());
 		}
 	}
+
+    public static void dump(String name, QSequenceLineRAData data) throws IOException {
+        SVNDebugLog.logInfo("=== " + name + " ===");
+        byte[] buffer = new byte[(int) data.length()];
+        data.get(buffer, 0, data.length());
+        SVNDebugLog.logInfo(new String(buffer));
+        SVNDebugLog.logInfo("===");
+
+    }
+
 }

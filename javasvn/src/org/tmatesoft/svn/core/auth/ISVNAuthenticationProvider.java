@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -11,6 +11,7 @@
  */
 package org.tmatesoft.svn.core.auth;
 
+import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNURL;
 
 /**
@@ -72,7 +73,7 @@ public interface ISVNAuthenticationProvider {
      * @return                  a next user credential
      */
     public SVNAuthentication requestClientAuthentication(String kind,
-            SVNURL url, String realm, String errorMessage, SVNAuthentication previousAuth,
+            SVNURL url, String realm, SVNErrorMessage errorMessage, SVNAuthentication previousAuth,
             boolean authMayBeStored);
     /**
      * Checks a server authentication certificate and whether accepts it 

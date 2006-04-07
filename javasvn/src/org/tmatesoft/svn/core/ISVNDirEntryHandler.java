@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -23,9 +23,10 @@ public interface ISVNDirEntryHandler {
     /**
      * Handles a directory entry passed.
      * 
-     * @param dirEntry 		a directory entry
-     * @see 				SVNDirEntry 
+     * @param  dirEntry		a directory entry
+     * @see 				SVNDirEntry
+     * @throws SVNException 
      */
-    public void handleDirEntry(SVNDirEntry dirEntry); 
+    public void handleDirEntry(SVNDirEntry dirEntry) throws SVNException; 
 
 }

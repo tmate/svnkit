@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -11,6 +11,7 @@
  */
 package org.tmatesoft.svn.core.io;
 
+import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNLock;
 
@@ -32,12 +33,12 @@ public interface ISVNLockHandler {
      *                        root directory         
      * @param  lock           the lock set on this <code>path</code>
      * @param  error          if not <span class="javakeyword">null</code> then
-     *                        it's an exception occurred while trying to lock, in 
-     *                        this case <code>lock</code> may be <span class="javakeyword">null</code> 
-     *                        the <code>path</code>
+     *                        it's an error message object for an error occurred 
+     *                        while trying to lock an entry, in this case 
+     *                        <code>lock</code> may be <span class="javakeyword">null</code> 
      * @throws SVNException
      */
-    public void handleLock(String path, SVNLock lock, SVNException error) throws SVNException;
+    public void handleLock(String path, SVNLock lock, SVNErrorMessage error) throws SVNException;
     
     /**
      * Handles the path unlocked.
@@ -51,5 +52,5 @@ public interface ISVNLockHandler {
      *                        may be <span class="javakeyword">null</code>
      * @throws SVNException
      */
-    public void handleUnlock(String path, SVNLock lock, SVNException error) throws SVNException;
+    public void handleUnlock(String path, SVNLock lock, SVNErrorMessage error) throws SVNException;
 }

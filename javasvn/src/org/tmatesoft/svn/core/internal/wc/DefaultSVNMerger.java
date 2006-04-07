@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -16,6 +16,8 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.io.RandomAccessFile;
 
+import org.tmatesoft.svn.core.SVNErrorCode;
+import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.wc.ISVNMerger;
 import org.tmatesoft.svn.core.wc.SVNStatusType;
@@ -32,17 +34,15 @@ public class DefaultSVNMerger implements ISVNMerger {
     private byte[] myStart;
     private byte[] mySeparator;
     private byte[] myEnd;
-    private byte[] myEOL;
 
-    public DefaultSVNMerger(byte[] start, byte[] sep, byte[] end, byte[] eol) {
+    public DefaultSVNMerger(byte[] start, byte[] sep, byte[] end) {
         myStart = start;
         mySeparator = sep;
         myEnd = end;
-        myEOL = eol;
     }
 
     public SVNStatusType mergeText(File baseFile, File localFile, File latestFile, boolean dryRun, OutputStream result) throws SVNException {
-        FSMergerBySequence merger = new FSMergerBySequence(myStart, mySeparator, myEnd, myEOL);
+        FSMergerBySequence merger = new FSMergerBySequence(myStart, mySeparator, myEnd);
         int mergeResult = 0;
         RandomAccessFile localIS = null;
         RandomAccessFile latestIS = null;
@@ -57,7 +57,8 @@ public class DefaultSVNMerger implements ISVNMerger {
             QSequenceLineRAData latestData = new QSequenceLineRAFileData(latestIS);
             mergeResult = merger.merge(baseData, localData, latestData, result);
         } catch (IOException e) {
-            SVNErrorManager.error("svn: I/O error while merge: '" + e.getMessage() + "'");
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, e.getLocalizedMessage());
+            SVNErrorManager.error(err, e);
         } finally {
             if (localIS != null) {
                 try {

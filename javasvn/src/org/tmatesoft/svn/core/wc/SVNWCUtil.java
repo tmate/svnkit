@@ -1,11 +1,12 @@
 /*
  * ====================================================================
- * Copyright (c) 2004 TMate Software Ltd. All rights reserved.
- * 
- * This software is licensed as described in the file COPYING, which you should
- * have received as part of this distribution. The terms are also available at
- * http://tmate.org/svn/license.html. If newer versions of this license are
- * posted there, you may use a newer version instead, at your option.
+ * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ *
+ * This software is licensed as described in the file COPYING, which
+ * you should have received as part of this distribution.  The terms
+ * are also available at http://tmate.org/svn/license.html.
+ * If newer versions of this license are posted there, you may use a
+ * newer version instead, at your option.
  * ====================================================================
  */
 package org.tmatesoft.svn.core.wc;
@@ -14,6 +15,7 @@ import java.io.File;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 
+import org.tmatesoft.svn.core.SVNCancelException;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNProperty;
 import org.tmatesoft.svn.core.auth.ISVNAuthenticationManager;
@@ -23,7 +25,6 @@ import org.tmatesoft.svn.core.internal.wc.SVNExternalInfo;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNProperties;
 import org.tmatesoft.svn.core.internal.wc.SVNWCAccess;
-import org.tmatesoft.svn.util.SVNDebugLog;
 
 /**
  * The <b>SVNWCUtil</b> is a utility class providing some common methods 
@@ -156,7 +157,6 @@ public class SVNWCUtil {
                     }
                 }
             } catch (Throwable e) {
-                SVNDebugLog.logInfo(e);
             } 
         }
         return new DefaultSVNAuthenticationManager(configDir, storeAuth, userName, password);
@@ -228,7 +228,7 @@ public class SVNWCUtil {
      *                                  (or the root of externals if <code>considerExternalAsRoot</code>
      *                                  is <span class="javakeyword">true</span>), otherwise <span class="javakeyword">false</span> 
      */
-    public static boolean isWorkingCopyRoot(final File versionedDir, final boolean considerExternalAsRoot) {
+    public static boolean isWorkingCopyRoot(final File versionedDir, final boolean considerExternalAsRoot) throws SVNException {
         if (versionedDir == null || !isVersionedDirectory(versionedDir)) {
             // unversioned.
             return false;
@@ -262,6 +262,9 @@ public class SVNWCUtil {
                         }
                     });
         } catch (SVNException e) {
+            if (e instanceof SVNCancelException) {
+                throw e;
+            }
             return true;
         }
         return isRoot[0];
@@ -283,8 +286,7 @@ public class SVNWCUtil {
      * @return                  the WC root directory (if it is found) or
      *                          <span class="javakeyword">null</span>.
      */
-    public static File getWorkingCopyRoot(File versionedDir,
-            boolean stopOnExtenrals) {
+    public static File getWorkingCopyRoot(File versionedDir, boolean stopOnExtenrals) throws SVNException {
         versionedDir = versionedDir.getAbsoluteFile();
         if (versionedDir == null
                 || (!isVersionedDirectory(versionedDir) && !isVersionedDirectory(versionedDir.getParentFile()))) {
@@ -322,7 +324,9 @@ public class SVNWCUtil {
                         }
                     }
                 } catch (SVNException e) {
-                    //
+                    if (e instanceof SVNCancelException) {
+                        throw e;
+                    }
                 }
                 if (parent.equals(parentRoot)) {
                     break;

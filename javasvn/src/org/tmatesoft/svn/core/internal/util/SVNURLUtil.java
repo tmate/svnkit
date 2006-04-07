@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -33,7 +33,7 @@ public class SVNURLUtil {
             return null;
         }
         if (url1.getUserInfo() != null) {
-            if (!url1.getUserInfo().equals(url2.getUserInfo())) {
+            if (url1.getUserInfo().equals(url2.getUserInfo())) {
                 return null;
             }
         } else {
@@ -45,7 +45,7 @@ public class SVNURLUtil {
         String path2 = url2.getPath();
         String commonPath = SVNPathUtil.getCommonPathAncestor(path1, path2);
         try {
-            return SVNURL.create(url1.getProtocol(), url1.getUserInfo(), url1.getHost(), url1.hasPort() ? url1.getPort() : -1, commonPath, false);
+            return url1.setPath(commonPath, false);
         } catch (SVNException e) {
         }
         return null;

@@ -1,17 +1,20 @@
 /*
  * ====================================================================
- * Copyright (c) 2004 TMate Software Ltd. All rights reserved.
- * 
- * This software is licensed as described in the file COPYING, which you should
- * have received as part of this distribution. The terms are also available at
- * http://tmate.org/svn/license.html. If newer versions of this license are
- * posted there, you may use a newer version instead, at your option.
+ * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ *
+ * This software is licensed as described in the file COPYING, which
+ * you should have received as part of this distribution.  The terms
+ * are also available at http://tmate.org/svn/license.html.
+ * If newer versions of this license are posted there, you may use a
+ * newer version instead, at your option.
  * ====================================================================
  */
 package org.tmatesoft.svn.core.wc;
 
 import java.io.File;
 
+import org.tmatesoft.svn.core.SVNErrorCode;
+import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNNodeKind;
 import org.tmatesoft.svn.core.auth.ISVNAuthenticationManager;
@@ -132,11 +135,11 @@ public class SVNMoveClient extends SVNBasicClient {
      */ 
     public void doMove(File src, File dst) throws SVNException {
         if (dst.exists()) {
-            throw new SVNException("svn: Cannot move '" + src
-                    + "' over existing file '" + dst);
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_EXISTS, "File ''{0}'' already exists", dst);
+            SVNErrorManager.error(err);
         } else if (!src.exists()) {
-            throw new SVNException("svn: Cannot move '" + src
-                    + "'; file does not exist");
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.NODE_UNKNOWN_KIND, "Path ''{0}'' does not exist", src);
+            SVNErrorManager.error(err);
         }
         // src considered as unversioned when it is not versioned
         boolean srcIsVersioned = isVersionedFile(src);
@@ -252,6 +255,7 @@ public class SVNMoveClient extends SVNBasicClient {
                 String srcURL = srcEntry.getURL();
                 String srcCFURL = srcEntry.getCopyFromURL();
                 String dstURL = dstParentEntry.getURL();
+                String repositoryRootURL = dstParentEntry.getRepositoryRoot();
                 long srcRevision = srcEntry.getRevision();
                 long srcCFRevision = srcEntry.getCopyFromRevision();
 
@@ -297,9 +301,9 @@ public class SVNMoveClient extends SVNBasicClient {
                         dstEntry.setCopyFromRevision(srcRevision);
                         dstEntry.setURL(dstURL);
                         dstEntry.setCopyFromURL(srcURL);
+                        dstEntry.setRepositoryRoot(repositoryRootURL);
 
-                        SVNCopyClient.updateCopiedDirectory(dstDir, "", dstURL,
-                                null, -1);
+                        SVNCopyClient.updateCopiedDirectory(dstDir, "", dstURL, repositoryRootURL, null, -1);
                         dstDir.getEntries().save(true);
                     } finally {
                         dstAccess.close(false);
@@ -397,8 +401,8 @@ public class SVNMoveClient extends SVNBasicClient {
     public void undoMove(File src, File dst) throws SVNException {
         // dst could exists, if it is deleted directory.
         if (!src.exists()) {
-            throw new SVNException("svn: Cannot undo move of '" + dst
-                    + "'; file '" + src + "' does not exist");
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.NODE_UNKNOWN_KIND, "Path ''{0}'' does not exist", src);
+            SVNErrorManager.error(err);
         }
         // src considered as unversioned when it is not versioned
         boolean srcIsVersioned = isVersionedFile(src);
@@ -508,6 +512,7 @@ public class SVNMoveClient extends SVNBasicClient {
                 String dstURL = dstParentEntry.getURL();
                 long srcRevision = srcEntry.getRevision();
                 long srcCFRevision = srcEntry.getCopyFromRevision();
+                String repositoryRootURL = srcEntry.getRepositoryRoot();
 
                 dstURL = SVNPathUtil
                         .append(dstURL, SVNEncodingUtil.uriEncode(dst.getName()));
@@ -548,17 +553,16 @@ public class SVNMoveClient extends SVNBasicClient {
                         dstEntry.setCopyFromRevision(srcRevision);
                         dstEntry.setURL(dstURL);
                         dstEntry.setCopyFromURL(srcURL);
+                        dstEntry.setRepositoryRoot(repositoryRootURL);
 
-                        SVNCopyClient.updateCopiedDirectory(dstDir, "", dstURL,
-                                null, -1);
+                        SVNCopyClient.updateCopiedDirectory(dstDir, "", dstURL, repositoryRootURL,  null, -1);
                         dstDir.getEntries().save(true);
                     } finally {
                         dstAccess.close(false);
                     }
                 } else {
                     // replay
-                    dstAccess.getAnchor().getEntries().deleteEntry(
-                            dst.getName());
+                    dstAccess.getAnchor().getEntries().deleteEntry(dst.getName());
                     dstAccess.getAnchor().getEntries().save(true);
                     SVNFileUtil.deleteAll(dst, this);
                     SVNFileUtil.copy(src, dst, false, false);
@@ -618,16 +622,20 @@ public class SVNMoveClient extends SVNBasicClient {
         
         String opName = move ? "move" : "copy";
         if (move && srcType != SVNFileType.NONE) {
-            SVNErrorManager.error("svn: Cannot perform 'virtual' " + opName + ": '" + src + "' still exists");
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_EXISTS, "Cannot perform 'virtual' {0}: ''{1}'' still exists", new Object[] {opName, src});
+            SVNErrorManager.error(err);
         }
         if (dstType == SVNFileType.NONE) {
-            SVNErrorManager.error("svn: Cannot perform 'virtual' " + opName + ": '" + dst + "' does not exist");
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_NOT_FOUND, "Cannot perform 'virtual' {0}: ''{1}'' does not exist", new Object[] {opName, dst});
+            SVNErrorManager.error(err);
         }
         if (dstType == SVNFileType.DIRECTORY) {
-            SVNErrorManager.error("svn: Cannot perform 'virtual' " + opName + ": '" + dst + "' is a directory");
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ILLEGAL_TARGET, "Cannot perform 'virtual' {0}: ''{1}'' is a directory", new Object[] {opName, dst});
+            SVNErrorManager.error(err);
         }
         if (!move && srcType == SVNFileType.DIRECTORY) {
-            SVNErrorManager.error("svn: Cannot perform 'virtual' " + opName + ": '" + src + "' is a directory");
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ILLEGAL_TARGET, "Cannot perform 'virtual' {0}: ''{1}'' is a directory", new Object[] {opName, src});
+            SVNErrorManager.error(err);
         }
         
         SVNWCAccess srcAccess = createWCAccess(src);
@@ -638,13 +646,15 @@ public class SVNMoveClient extends SVNBasicClient {
             srcAccess.open(false, false);
             SVNEntry srcEntry = srcAccess.getTargetEntry();
             if (srcEntry == null) {
-                SVNErrorManager.error("svn: '" + src + "' is not under version control");
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_NOT_FOUND, "''{0}'' is not under version control", src);
+                SVNErrorManager.error(err);
             }
             if (srcEntry.isCopied() && !srcEntry.isScheduledForAddition()) {
                 cfURL = getCopyFromURL(src.getParentFile(), SVNEncodingUtil.uriEncode(src.getName()));
                 cfRevision = getCopyFromRevision(src.getParentFile());
                 if (cfURL == null || cfRevision < 0) {
-                    SVNErrorManager.error("svn: Cannot locate copied directory root for '" + src + "'");
+                    SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_NOT_FOUND, "Cannot locate copied directory root for ''{0}''", src);
+                    SVNErrorManager.error(err);
                 }
                 added = false;
             } else {
@@ -668,7 +678,8 @@ public class SVNMoveClient extends SVNBasicClient {
             dstAccess.open(true, false);
             SVNEntry dstEntry = dstAccess.getTargetEntry();
             if (dstEntry != null) {
-                SVNErrorManager.error("svn: '" + dst + "' is already under version control");                
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_EXISTS, "''{0}'' is already under version control", dst);
+                SVNErrorManager.error(err);                
             }
             dstEntry = dstAccess.getAnchor().getEntries().addEntry(dst.getName());
             dstEntry.setCopyFromURL(cfURL);
