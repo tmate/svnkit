@@ -133,6 +133,7 @@ class HTTPConnection implements IHTTPConnection {
                     proxyAuth.acknowledgeProxyContext(false, err);
                     SVNErrorManager.error(err, connectRequest.getErrorMessage());
                 }
+                //TODO: is it a bug or not?
                 proxyAuth.acknowledgeProxyContext(true, null);
             } else {
                 mySocket = myIsSecured ? SVNSocketFactory.createSSLSocket(sslManager, host, port) : SVNSocketFactory.createPlainSocket(host, port);
