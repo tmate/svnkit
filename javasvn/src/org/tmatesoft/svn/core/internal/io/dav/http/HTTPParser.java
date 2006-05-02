@@ -14,8 +14,13 @@ package org.tmatesoft.svn.core.internal.io.dav.http;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.Collection;
+import java.util.Iterator;
+
+import org.tmatesoft.svn.core.SVNErrorCode;
+import org.tmatesoft.svn.core.SVNErrorMessage;
+import org.tmatesoft.svn.core.SVNException;
+import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 
 
 /**
@@ -35,8 +40,8 @@ class HTTPParser {
         return HTTPStatus.createHTTPStatus(line);
     }
     
-    public static Map parseHeader(InputStream is) throws IOException {
-        Map headers = new HashMap();
+    public static HTTPHeader parseHeader(InputStream is) throws IOException {
+        HTTPHeader headers = new HTTPHeader();
         String name = null;
         StringBuffer value = null;
         for (; ;) {
@@ -51,8 +56,9 @@ class HTTPParser {
                 }
             } else {
                 if (name != null) {
-                    headers.put(name, value.toString());
+                    headers.addHeaderValue(name, value.toString());
                 }
+                
                 int colon = line.indexOf(":");
                 if (colon < 0) {
                     throw new IOException("Unable to parse header: " + line);
@@ -62,10 +68,10 @@ class HTTPParser {
             }
     
         }
+
         if (name != null) {
-            headers.put(name, value.toString());
+            headers.addHeaderValue(name, value.toString());
         }
-        
         return headers;
     }
 
@@ -99,67 +105,92 @@ class HTTPParser {
         return buf.toByteArray();
     }
 
-    public static Map parseAuthParameters(String source) {
-        if (source == null) {
+    public static HTTPAuthentication parseAuthParameters(Collection authHeaderValues) throws SVNException {
+        if (authHeaderValues == null) {
             return null;
         }
-        source = source.trim();
-        Map parameters = new HashMap();
-        // parse strings: name="value" or name=value
-        int index = source.indexOf(' ');
-        if (index <= 0) {
-            return null;
-        }
-        String method = source.substring(0, index);
-        parameters.put("", method);
-    
-        source = source.substring(index).trim();
-        if ("Basic".equalsIgnoreCase(method)) {
-            if (source.indexOf("realm=") >= 0) {
-                source = source.substring(source.indexOf("realm=") + "realm=".length());
-                source = source.trim();
-                if (source.startsWith("\"")) {
-                    source = source.substring(1);
-                }
-                if (source.endsWith("\"")) {
-                    source = source.substring(0, source.length() - 1);
-                }
-                parameters.put("realm", source);
+
+        //Map parameters = new HashMap();
+        HTTPAuthentication auth = null;
+        String authHeader = null;
+        for (Iterator authSchemes = authHeaderValues.iterator(); authSchemes.hasNext();) {
+            authHeader = (String)authSchemes.next();
+            String source = authHeader.trim();
+            // parse strings: name="value" or name=value
+            int index = source.indexOf(' ');
+            if (index <= 0) {
+                return null;
             }
-            return parameters;
-        }
-        char[] chars = source.toCharArray();
-        int tokenIndex = 0;
-        boolean parsingToken = true;
-        String name = null;
-        String value;
-        int quotesCount = 0;
-    
-        for(int i = 0; i < chars.length; i++) {
-            if (parsingToken) {
-                if (chars[i] == '=') {
-                    name = new String(chars, tokenIndex, i - tokenIndex);
-                    name = name.trim();
-                    tokenIndex = i + 1;
-                    parsingToken = false;
-                }
-            } else {
-                if (chars[i] == '\"') {
-                    quotesCount = quotesCount > 0 ? 0 : 1;
-                } else if ( i + 1 >= chars.length || (chars[i] == ',' && quotesCount == 0)) {
-                    value = new String(chars, tokenIndex, i - tokenIndex);
-                    value = value.trim();
-                    if (value.charAt(0) == '\"' && value.charAt(value.length() - 1) == '\"') {
-                        value = value.substring(1);
-                        value = value.substring(0, value.length() - 1);
+            String method = source.substring(0, index);
+            //parameters.put("", method);
+        
+            source = source.substring(index).trim();
+            if ("Basic".equalsIgnoreCase(method)) {
+                auth = new HTTPBasicAuthentication(null);
+                
+                if (source.indexOf("realm=") >= 0) {
+                    source = source.substring(source.indexOf("realm=") + "realm=".length());
+                    source = source.trim();
+                    if (source.startsWith("\"")) {
+                        source = source.substring(1);
                     }
-                    parameters.put(name, value);
-                    tokenIndex = i + 1;
-                    parsingToken = true;
+                    if (source.endsWith("\"")) {
+                        source = source.substring(0, source.length() - 1);
+                    }
+                    //parameters.put("realm", source);
+                    auth.setChallengeParameter("realm", source);
                 }
+                break;
+            } else if ("Digest".equalsIgnoreCase(method)) {
+                auth = new HTTPDigestAuthentication(null);
+                
+                char[] chars = source.toCharArray();
+                int tokenIndex = 0;
+                boolean parsingToken = true;
+                String name = null;
+                String value;
+                int quotesCount = 0;
+            
+                for(int i = 0; i < chars.length; i++) {
+                    if (parsingToken) {
+                        if (chars[i] == '=') {
+                            name = new String(chars, tokenIndex, i - tokenIndex);
+                            name = name.trim();
+                            tokenIndex = i + 1;
+                            parsingToken = false;
+                        }
+                    } else {
+                        if (chars[i] == '\"') {
+                            quotesCount = quotesCount > 0 ? 0 : 1;
+                        } else if ( i + 1 >= chars.length || (chars[i] == ',' && quotesCount == 0)) {
+                            value = new String(chars, tokenIndex, i - tokenIndex);
+                            value = value.trim();
+                            if (value.charAt(0) == '\"' && value.charAt(value.length() - 1) == '\"') {
+                                value = value.substring(1);
+                                value = value.substring(0, value.length() - 1);
+                            }
+                            //parameters.put(name, value);
+                            auth.setChallengeParameter(name, value);
+                            tokenIndex = i + 1;
+                            parsingToken = true;
+                        }
+                    }
+                }
+                HTTPDigestAuthentication digestAuth = (HTTPDigestAuthentication)auth; 
+                digestAuth.init();
+                
+                break;
             }
+            //TODO: add NTLM authentication
+
         }
-        return parameters;
+
+        if (auth == null) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.UNSUPPORTED_FEATURE, "HTTP authorization method ''{0}'' is not supported", authHeader); 
+            SVNErrorManager.error(err);
+        }
+        
+        return auth;
     }
 
     public static StringBuffer getCanonicalPath(String path, StringBuffer target) {
