@@ -654,7 +654,7 @@ class HTTPConnection implements IHTTPConnection {
             // and force connection close? (not to read garbage on the next request).
             is = new FixedSizeInputStream(is, 0);
             // this will force connection to close.
-            readHeader.addHeaderValue(HTTPHeader.CONNECTION_HEADER, "close");
+            readHeader.setHeaderValue(HTTPHeader.CONNECTION_HEADER, "close");
         } 
         
         if ("gzip".equals(readHeader.getFirstHeaderValue(HTTPHeader.CONTENT_ENCODING_HEADER))) {
