@@ -110,6 +110,17 @@ public class HTTPHeader {
         }
     }
     
+    public void setHeaderValue(String name, String value){
+        Map headers = getHeaders();
+        Collection values = (Collection)headers.get(name);
+        if (values == null) {
+            values = new LinkedList();
+            headers.put(name, values);
+        }
+        values.clear();
+        values.add(value);
+    }
+    
     private Map getHeaders() {
         if (myHeaders == null) {
             myHeaders = new TreeMap();

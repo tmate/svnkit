@@ -39,17 +39,17 @@ public class DAVUtil {
     public static HTTPStatus getProperties(DAVConnection connection, String path, int depth, String label, DAVElement[] properties, Map result) throws SVNException {
         HTTPHeader header = new HTTPHeader();
         if (depth == DEPTH_ZERO) {
-            header.addHeaderValue(HTTPHeader.DEPTH_HEADER, "0");
+            header.setHeaderValue(HTTPHeader.DEPTH_HEADER, "0");
         } else if (depth == DEPTH_ONE) {
-            header.addHeaderValue(HTTPHeader.DEPTH_HEADER, "1");
+            header.setHeaderValue(HTTPHeader.DEPTH_HEADER, "1");
         } else if (depth == DEPTH_INFINITE) {
-            header.addHeaderValue(HTTPHeader.DEPTH_HEADER, "infinite");
+            header.setHeaderValue(HTTPHeader.DEPTH_HEADER, "infinite");
         } else {
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.RA_DAV_MALFORMED_DATA, "Invalid PROPFIND depth value: '{0}'", new Integer(depth));
             SVNErrorManager.error(err);
         }
         if (label != null) {
-            header.addHeaderValue(HTTPHeader.LABEL_HEADER, label);
+            header.setHeaderValue(HTTPHeader.LABEL_HEADER, label);
         }
         StringBuffer body = DAVPropertiesHandler.generatePropertiesRequest(null, properties);
         DAVPropertiesHandler davHandler = new DAVPropertiesHandler();
