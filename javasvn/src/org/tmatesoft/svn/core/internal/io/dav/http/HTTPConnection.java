@@ -144,7 +144,7 @@ class HTTPConnection implements IHTTPConnection {
         InputStream is = SVNDebugLog.createLogStream(getInputStream());
         try {            
             HTTPStatus status = HTTPParser.parseStatus(is);
-            HTTPHeader header = HTTPParser.parseHeader(is);
+            HTTPHeader header = HTTPHeader.parseHeader(is);
             request.setStatus(status);
             request.setResponseHeader(header);
         } finally {
@@ -322,7 +322,7 @@ class HTTPConnection implements IHTTPConnection {
                 }
                 
                 try {
-                    myChallengeCredentials = HTTPParser.parseAuthParameters(authHeaderValues); 
+                    myChallengeCredentials = HTTPAuthentication.parseAuthParameters(authHeaderValues); 
                 } catch (SVNException svne) {
                     err = svne.getErrorMessage(); 
                     break;

@@ -11,6 +11,8 @@
  */
 package org.tmatesoft.svn.core.internal.io.dav.http;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -113,6 +115,41 @@ public class HTTPHeader {
             myHeaders = new TreeMap();
         }
         return myHeaders;
+    }
+
+    public static HTTPHeader parseHeader(InputStream is) throws IOException {
+        HTTPHeader headers = new HTTPHeader();
+        String name = null;
+        StringBuffer value = null;
+        for (; ;) {
+            String line = HTTPParser.readLine(is);
+            if ((line == null) || (line.trim().length() < 1)) {
+                break;
+            }
+            if ((line.charAt(0) == ' ') || (line.charAt(0) == '\t')) {
+                if (value != null) {
+                    value.append(' ');
+                    value.append(line.trim());
+                }
+            } else {
+                if (name != null) {
+                    headers.addHeaderValue(name, value.toString());
+                }
+                
+                int colon = line.indexOf(":");
+                if (colon < 0) {
+                    throw new IOException("Unable to parse header: " + line);
+                }
+                name = line.substring(0, colon).trim();
+                value = new StringBuffer(line.substring(colon + 1).trim());
+            }
+    
+        }
+    
+        if (name != null) {
+            headers.addHeaderValue(name, value.toString());
+        }
+        return headers;
     }
     
 }
