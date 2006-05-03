@@ -12,7 +12,6 @@
 package org.tmatesoft.svn.core.internal.io.dav.http;
 
 import java.io.IOException;
-import java.util.Map;
 
 import org.tmatesoft.svn.core.SVNErrorMessage;
 
