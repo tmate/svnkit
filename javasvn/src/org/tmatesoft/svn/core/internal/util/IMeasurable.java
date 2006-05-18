@@ -9,17 +9,15 @@
  * newer version instead, at your option.
  * ====================================================================
  */
-package org.tmatesoft.svn.core.javahl;
-
-import org.tigris.subversion.javahl.PromptUserPassword3;
+package org.tmatesoft.svn.core.internal.util;
 
 
 /**
  * @version 1.0
  * @author  TMate Software Ltd.
  */
-public interface PromptUserPasswordUser extends PromptUserPassword3 {
-
-    public boolean promptUser(String realm, String defaultUsetName, boolean maySave);
+public interface IMeasurable {
+    
+    public long getLength();
 
 }

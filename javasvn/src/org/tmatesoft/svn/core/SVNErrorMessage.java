@@ -11,7 +11,6 @@
  */
 package org.tmatesoft.svn.core;
 
-import java.io.Serializable;
 import java.text.MessageFormat;
 
 
@@ -36,10 +35,10 @@ import java.text.MessageFormat;
  * Error messages may be supplied within exceptions of the main exception type - 
  * {@link SVNException}.
  * 
- * @version 1.1
+ * @version 1.0
  * @author  TMate Software Ltd.
  */
-public class SVNErrorMessage implements Serializable {
+public class SVNErrorMessage {
     /**
      * Error messages of this type are considered to be errors (most critical) rather 
      * than warnings. 
@@ -164,7 +163,7 @@ public class SVNErrorMessage implements Serializable {
         return new SVNErrorMessage(code == null ? SVNErrorCode.BASE : code, message == null ? "" : message, 
                 objects == null ? EMPTY_ARRAY : objects, type);
     }
-    
+
     protected SVNErrorMessage(SVNErrorCode code, String message, Object[] relatedObjects, int type) {
         myErrorCode = code;
         if (message != null && message.startsWith("svn: ")) {
@@ -299,36 +298,4 @@ public class SVNErrorMessage implements Serializable {
     public void setChildErrorMessage(SVNErrorMessage childMessage) {
         myChildErrorMessage = childMessage;
     }
-    
-    /**
-     * Wraps this error message into a new one that is returned as 
-     * a parent error message. A parent message is set the error code 
-     * of this error message, a new error description and this error 
-     * message as its child. 
-     *  
-     * @param  parentMessage     a parent error description
-     * @return                   a parent error message
-     */
-    public SVNErrorMessage wrap(String parentMessage){
-        SVNErrorMessage parentError = SVNErrorMessage.create(this.getErrorCode(), parentMessage);
-        parentError.setChildErrorMessage(this);
-        return parentError;
-    }
-
-    /**
-     * Wraps this error message into a new one that is returned as 
-     * a parent error message. A parent message is set the error code 
-     * of this error message, a new error description and this error 
-     * message as its child. 
-     *  
-     * @param  parentMessage     a parent error description
-     * @param  relatedObject     an object to be formatted with <code>parentMessage</code>
-     * @return                   a parent error message
-     */
-    public SVNErrorMessage wrap(String parentMessage, Object relatedObject){
-        SVNErrorMessage parentError = SVNErrorMessage.create(this.getErrorCode(), parentMessage, relatedObject);
-        parentError.setChildErrorMessage(this);
-        return parentError;
-    }
-    
 }

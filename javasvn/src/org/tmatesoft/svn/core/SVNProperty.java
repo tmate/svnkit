@@ -18,7 +18,7 @@ package org.tmatesoft.svn.core;
  * supported by Subversion. This class holds string constants that are property 
  * names, and gives some useful methods to operate with properties (in particular).
  * 
- * @version 1.1
+ * @version 1.0
  * @author  TMate Software Ltd.
  */
 public class SVNProperty {
@@ -30,17 +30,6 @@ public class SVNProperty {
      * An <span class="javastring">"svn:wc:"</span> prefix.
      */
     public static final String SVN_WC_PREFIX = "svn:wc:";
-
-    /**
-     * A special property used in a commit transaction. 
-     */
-    public static final String TXN_CHECK_LOCKS = SVN_PREFIX + "check-locks";
-
-    /**
-     * A special property used in a commit transaction. 
-     */
-    public static final String TXN_CHECK_OUT_OF_DATENESS = SVN_PREFIX + "check-ood";
-
     /**
      * An <span class="javastring">"svn:entry:"</span> prefix.
      */
@@ -291,24 +280,6 @@ public class SVNProperty {
     public static boolean isSVNProperty(String name) {
         return name != null && name.startsWith(SVN_PREFIX);
     }
-
-    /**
-     * Checks if a property is regular. Regular are some <span class="javastring">"svn:"</span> 
-     * properties and all user props, i.e. ones stored in the repository filesystem.
-     *
-     * @param  name a property name
-     * @return      <span class="javakeyword">true</span> if regular, otherwise 
-     *              <span class="javakeyword">false</span>
-     */
-    public static boolean isRegularProperty(String name){
-        if(name == null){
-            return false;
-        }else if(name.startsWith(SVN_WC_PREFIX) || name.startsWith(SVN_ENTRY_PREFIX)){
-            return false;
-        }else{
-            return true;
-        }
-    }
     
     /**
      * Says if the given MIME-type corresponds to a text type.
@@ -322,7 +293,6 @@ public class SVNProperty {
     public static boolean isTextMimeType(String mimeType) {
         return mimeType == null || mimeType.startsWith("text/");
     }
-    
     /**
      * Says if the given MIME-type corresponds to a binary (non-textual) type.
      * 

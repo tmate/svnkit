@@ -47,7 +47,7 @@ import org.tmatesoft.svn.core.SVNException;
  *     ...</pre><br />
  * 
  * 
- * @version 1.1
+ * @version 1.0
  * @author 	TMate Software Ltd.
  * @see     SVNLogClient
  */

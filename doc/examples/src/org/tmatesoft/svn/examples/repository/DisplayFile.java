@@ -23,7 +23,6 @@ import org.tmatesoft.svn.core.SVNProperty;
 import org.tmatesoft.svn.core.SVNURL;
 import org.tmatesoft.svn.core.auth.ISVNAuthenticationManager;
 import org.tmatesoft.svn.core.internal.io.dav.DAVRepositoryFactory;
-import org.tmatesoft.svn.core.internal.io.fs.FSRepositoryFactory;
 import org.tmatesoft.svn.core.internal.io.svn.SVNRepositoryFactoryImpl;
 import org.tmatesoft.svn.core.io.SVNRepository;
 import org.tmatesoft.svn.core.io.SVNRepositoryFactory;
@@ -75,7 +74,7 @@ public class DisplayFile {
         String url = "http://svn.tmate.org:8080/svn/jsvn/trunk";
         String name = "anonymous";
         String password = "anonymous";
-        String filePath = "www/license.html";
+        String filePath = "www/usage.html";
         /*
          * Initializes the library (it must be done before ever using the
          * library itself)
@@ -121,22 +120,17 @@ public class DisplayFile {
         }
 
         /*
-         * User's authentication information (name/password) is provided via  an 
-         * ISVNAuthenticationManager  instance.  SVNWCUtil  creates  a   default 
-         * authentication manager given user's name and password.
-         * 
-         * Default authentication manager first attempts to use provided user name 
-         * and password and then falls back to the credentials stored in the 
-         * default Subversion credentials storage that is located in Subversion 
-         * configuration area. If you'd like to use provided user name and password 
-         * only you may use BasicAuthenticationManager class instead of default 
-         * authentication manager:
-         * 
-         *  authManager = new BasicAuthenticationsManager(userName, userPassword);
-         *  
-         * You may also skip this point - anonymous access will be used. 
+         * User's authentication information is provided via an ISVNAuthenticationManager
+         * instance. SVNWCUtil creates a default usre's authentication manager given user's
+         * name and password.
          */
         ISVNAuthenticationManager authManager = SVNWCUtil.createDefaultAuthenticationManager(name, password);
+
+        /*
+         * Sets the manager of the user's authentication information that will 
+         * be used to authenticate the user to the server (if needed) during 
+         * operations handled by the SVNRepository.
+         */
         repository.setAuthenticationManager(authManager);
 
         /*
@@ -230,22 +224,17 @@ public class DisplayFile {
     }
 
     /*
-     * Initializes the library to work with a repository via 
-     * different protocols.
+     * Initializes the library to work with a repository either via svn:// 
+     * (and svn+ssh://) or via http:// (and https://)
      */
     private static void setupLibrary() {
         /*
-         * For using over http:// and https://
+         * for DAV (over http and https)
          */
         DAVRepositoryFactory.setup();
         /*
-         * For using over svn:// and svn+xxx://
+         * for SVN (over svn and svn+ssh)
          */
         SVNRepositoryFactoryImpl.setup();
-        
-        /*
-         * For using over file:///
-         */
-        FSRepositoryFactory.setup();
     }
 }

@@ -11,6 +11,7 @@
  */
 package org.tmatesoft.svn.core.internal.io.dav.http;
 
+import java.io.UnsupportedEncodingException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.StringTokenizer;
@@ -40,16 +41,8 @@ class HTTPDigestAuthentication extends HTTPAuthentication {
         super(credentials);
     }
 
-    protected HTTPDigestAuthentication (String name, String password) {
-        super(name, password);
-    }
-
-    protected HTTPDigestAuthentication () {
-        super();
-    }
-
     public void init() throws SVNException {
-        String qop = getChallengeParameter("qop");
+        String qop = getChallengeParameter("qop");//(String) challengeParams.get("qop");
         String selectedQop = null;
 
         if (qop != null) {
@@ -69,11 +62,8 @@ class HTTPDigestAuthentication extends HTTPAuthentication {
     }
     
     public String authenticate() throws SVNException {
-        if (getUserName() == null || getPassword() == null) {
-            return null;
-        }
-        
         String uname = getUserName();
+
         String digest = createDigest(uname, getPassword(), "US-ASCII");
 
         String uri = getParameter("uri");
@@ -104,10 +94,6 @@ class HTTPDigestAuthentication extends HTTPAuthentication {
         return sb.toString();
     }
 
-    public String getAuthenticationScheme(){
-        return "Digest";
-    }
-
     private String createDigest(String uname, String pwd, String charset) throws SVNException {
         final String digAlg = "MD5";
 
@@ -133,7 +119,7 @@ class HTTPDigestAuthentication extends HTTPAuthentication {
         tmp.append(pwd);
         String a1 = tmp.toString();
         if(algorithm.equals("MD5-sess")) {
-            String tmp2=encode(md5Helper.digest(HTTPAuthentication.getBytes(a1, charset)));
+            String tmp2=encode(md5Helper.digest(getBytes(a1, charset)));
             StringBuffer tmp3 = new StringBuffer(tmp2.length() + nonce.length() + myCnonce.length() + 2);
             tmp3.append(tmp2);
             tmp3.append(':');
@@ -143,9 +129,9 @@ class HTTPDigestAuthentication extends HTTPAuthentication {
             a1 = tmp3.toString();
         }
 
-        String md5a1 = encode(md5Helper.digest(HTTPAuthentication.getBytes(a1, charset)));
+        String md5a1 = encode(md5Helper.digest(getBytes(a1, charset)));
         String a2 = method + ":" + uri;
-        String md5a2 = encode(md5Helper.digest(HTTPAuthentication.getASCIIBytes(a2)));
+        String md5a2 = encode(md5Helper.digest(getAsciiBytes(a2)));
 
         StringBuffer tmp2;
         if (myQop == null) {
@@ -172,7 +158,7 @@ class HTTPDigestAuthentication extends HTTPAuthentication {
             tmp2.append(md5a2);
         }
 
-        return encode(md5Helper.digest(HTTPAuthentication.getASCIIBytes(tmp2.toString())));
+        return encode(md5Helper.digest(getAsciiBytes(tmp2.toString())));
     }
 
     private String getParameter(String name) {
@@ -180,7 +166,7 @@ class HTTPDigestAuthentication extends HTTPAuthentication {
     }
 
     private String getParameter(String name, String defaultValue) {
-        String value = getChallengeParameter(name);
+        String value = getChallengeParameter(name);//(String) challengeParams.get(name);
         if (value == null) {
             value = defaultValue;
         }
@@ -198,7 +184,7 @@ class HTTPDigestAuthentication extends HTTPAuthentication {
             return null;
         }
         cnonce = Long.toString(System.currentTimeMillis());
-        cnonce = encode(md5Helper.digest(HTTPAuthentication.getASCIIBytes(cnonce)));
+        cnonce = encode(md5Helper.digest(getAsciiBytes(cnonce)));
         return cnonce;
     }
 
@@ -216,6 +202,18 @@ class HTTPDigestAuthentication extends HTTPAuthentication {
         }
 
         return new String(buffer);
+    }
+
+    private static byte[] getAsciiBytes(final String data) {
+        return getBytes(data, "US-ASCII");
+    }
+
+    private static byte[] getBytes(final String data, String charset) {
+        try {
+            return data.getBytes(charset);
+        } catch (UnsupportedEncodingException e) {
+            return data.getBytes();
+        }
     }
 
 }

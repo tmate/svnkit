@@ -41,7 +41,7 @@ import de.regnis.q.sequence.line.diff.QDiffUniGenerator;
  * interface, JavaSVN uses this default implementation. To set a custom
  * diff driver use {@link SVNDiffClient#setDiffGenerator(ISVNDiffGenerator) setDiffGenerator()}.
  * 
- * @version 1.1
+ * @version 1.0
  * @author  TMate Software Ltd.
  */
 public class DefaultSVNDiffGenerator implements ISVNDiffGenerator {
@@ -59,7 +59,6 @@ public class DefaultSVNDiffGenerator implements ISVNDiffGenerator {
     private String myEncoding;
     private boolean myIsDiffDeleted;
     private File myBasePath;
-    private boolean myIsDiffUnversioned;
     
     /**
      * Constructs a <b>DefaultSVNDiffGenerator</b>.
@@ -338,42 +337,5 @@ public class DefaultSVNDiffGenerator implements ISVNDiffGenerator {
 
     public File createTempDirectory() throws SVNException {
         return SVNFileUtil.createTempDirectory("diff");
-    }
-
-    /**
-     * Says if unversioned files are also diffed or ignored.
-     * 
-     * <p>
-     * By default unversioned files are ignored. 
-     * 
-     * @return <span class="javakeyword">true</span> if diffed, 
-     *         <span class="javakeyword">false</span> if ignored  
-     * @see    #setDiffUnversioned(boolean)
-     * 
-     */
-
-    public boolean isDiffUnversioned() {
-        return myIsDiffUnversioned;
-    }
-
-    /**
-     * Includes or not unversioned files into diff processing. 
-     * 
-     * <p>
-     * If a diff operation is invoked on  a versioned directory and 
-     * <code>diffUnversioned</code> is <span class="javakeyword">true</span> 
-     * then all unversioned files that may be met in the directory will 
-     * be processed as added. Otherwise if <code>diffUnversioned</code> 
-     * is <span class="javakeyword">false</span> such files are ignored. 
-     * 
-     * <p>
-     * By default unversioned files are ignored.
-     * 
-     * @param diffUnversioned controls whether to diff unversioned files 
-     *                        or not 
-     * @see                   #isDiffUnversioned()
-     */
-    public void setDiffUnversioned(boolean diffUnversioned) {
-        myIsDiffUnversioned = diffUnversioned;
     }
 }

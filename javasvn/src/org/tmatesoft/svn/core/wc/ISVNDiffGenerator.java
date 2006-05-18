@@ -22,7 +22,7 @@ import org.tmatesoft.svn.core.SVNException;
  * contents difference between files in order to be used in 'diff' operations 
  * performed by <b>SVNDiffClient</b>. 
  * 
- * @version 1.1
+ * @version 1.0
  * @author  TMate Software Ltd.
  * @see     SVNDiffClient
  * @see     DefaultSVNDiffGenerator
@@ -92,7 +92,6 @@ public interface ISVNDiffGenerator {
      * 
      * @param isDiffDeleted if <span class="javakeyword">true</span> then
      *                      deleted files will be diffed, otherwise not
-     * @see                 #isDiffDeleted()                      
      */
     public void setDiffDeleted(boolean isDiffDeleted);
     
@@ -102,35 +101,9 @@ public interface ISVNDiffGenerator {
      * @return <span class="javakeyword">true</span> if deleted files
      *         should be diffed (the driver is set to generate differences
      *         for deleted files as well), otherwise 
-     *         <span class="javakeyword">false</span>
-     * @see    #isDiffDeleted() 
+     *         <span class="javakeyword">false</span> 
      */
     public boolean isDiffDeleted();
-    
-    /**
-     * Includes or not unversioned files into diff processing. 
-     * 
-     * <p>
-     * If a diff operation is invoked on  a versioned directory and 
-     * <code>diffUnversioned</code> is <span class="javakeyword">true</span> 
-     * then all unversioned files that may be met in the directory will 
-     * be processed as added. Otherwise if <code>diffUnversioned</code> 
-     * is <span class="javakeyword">false</span> such files are ignored. 
-     * 
-     * @param diffUnversioned controls whether to diff unversioned files 
-     *                        or not 
-     * @see                   #isDiffUnversioned()
-     */
-    public void setDiffUnversioned(boolean diffUnversioned);
-    
-    /**
-     * Says if unversioned files are also diffed or ignored.
-     * 
-     * @return <span class="javakeyword">true</span> if diffed, 
-     *         <span class="javakeyword">false</span> if ignored  
-     * @see    #setDiffUnversioned(boolean)
-     */
-    public boolean isDiffUnversioned();
     
     /**
      * Creates a temporary directory (when necessary) where temporary files

@@ -23,7 +23,6 @@ import org.tmatesoft.svn.core.SVNNodeKind;
 import org.tmatesoft.svn.core.SVNURL;
 import org.tmatesoft.svn.core.auth.ISVNAuthenticationManager;
 import org.tmatesoft.svn.core.internal.io.dav.DAVRepositoryFactory;
-import org.tmatesoft.svn.core.internal.io.fs.FSRepositoryFactory;
 import org.tmatesoft.svn.core.internal.io.svn.SVNRepositoryFactoryImpl;
 import org.tmatesoft.svn.core.io.ISVNEditor;
 import org.tmatesoft.svn.core.io.ISVNReporter;
@@ -237,7 +236,7 @@ public class Export {
             myRootDirectory = root;
             /*
              * Utility class that will help us to transform 'deltas' sent by the 
-             * server to the new file contents.  
+             * server to the new files contents.  
              */
             myDeltaProcessor = new SVNDeltaProcessor();
         }
@@ -354,7 +353,7 @@ public class Export {
 
         /*
          * Server sends deltas in form of 'diff windows'. Depending on the file size 
-         * there may be several diff windows. Utility class SVNDeltaProcessor processes 
+         * there may be several diff windows. Utility class SVNDeltaProcessor process 
          * these windows for us.
          */
         public OutputStream textDeltaChunk(String path, SVNDiffWindow diffWindow)   throws SVNException {
@@ -422,22 +421,17 @@ public class Export {
     }
 
     /*
-     * Initializes the library to work with a repository via 
-     * different protocols.
+     * Initializes the library to work with a repository either via 
+     * svn:// (and svn+ssh://) or via http:// (and https://)
      */
     private static void setupLibrary() {
         /*
-         * For using over http:// and https://
+         * for DAV (over http and https)
          */
         DAVRepositoryFactory.setup();
         /*
-         * For using over svn:// and svn+xxx://
+         * for SVN (over svn and svn+ssh)
          */
         SVNRepositoryFactoryImpl.setup();
-        
-        /*
-         * For using over file:///
-         */
-        FSRepositoryFactory.setup();
     }
 }

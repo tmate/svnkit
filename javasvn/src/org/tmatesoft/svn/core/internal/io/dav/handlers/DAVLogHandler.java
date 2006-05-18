@@ -71,7 +71,7 @@ public class DAVLogHandler extends BasicDAVHandler {
 	private String myAuthor;
 	private Date myDate;
 	private String myComment;
-	private SVNLogEntryPath myPath;
+	private SVNLogEntryPathEx myPath;
 
 	private int myCount;
     private long myLimit;
@@ -95,7 +95,7 @@ public class DAVLogHandler extends BasicDAVHandler {
 		String copyPath = null;
 		long copyRevision = -1;
 		if (element == ADDED_PATH || element == REPLACED_PATH) {
-			type = element == ADDED_PATH ? SVNLogEntryPath.TYPE_ADDED : SVNLogEntryPath.TYPE_REPLACED;
+			type = element == ADDED_PATH ? 'A' : 'R';
 			copyPath = attrs.getValue("copyfrom-path");
 			String copyRevisionStr = attrs.getValue("copyfrom-rev");
 			if (copyPath != null && copyRevisionStr != null) {
@@ -105,12 +105,12 @@ public class DAVLogHandler extends BasicDAVHandler {
 				}
 			} 
 		} else if (element == MODIFIED_PATH) {
-			type = SVNLogEntryPath.TYPE_MODIFIED;
+			type = 'M';
 		} else if (element == DELETED_PATH) {
-			type = SVNLogEntryPath.TYPE_DELETED;			
+			type = 'D';			
 		}
 		if (type != 0) {
-			myPath = new SVNLogEntryPath(null, type, copyPath, copyRevision);
+			myPath = new SVNLogEntryPathEx(type, copyPath, copyRevision);
 		}
 		
 	}
@@ -148,9 +148,9 @@ public class DAVLogHandler extends BasicDAVHandler {
 				if (myPaths == null) {
 					myPaths = new HashMap();
 				}
-				myPath.setPath(cdata.toString());
+				myPath.setPathValue(cdata.toString());
                 String path = myPath.getPath();
-                myPath.setPath(path);
+                myPath.setPathValue(path);
                 myPaths.put(myPath.getPath(), myPath);
 			}
 			myPath = null;
@@ -159,5 +159,15 @@ public class DAVLogHandler extends BasicDAVHandler {
 
 	public int getEntriesCount() {
 		return myCount;
+	}
+	
+	private static class SVNLogEntryPathEx extends SVNLogEntryPath {
+		public SVNLogEntryPathEx(char type, String copyPath, long copyRevision) {
+			super(null, type, copyPath, copyRevision);
+		}
+
+		public void setPathValue(String path) {
+			super.setPath(path);
+		}
 	}
 }

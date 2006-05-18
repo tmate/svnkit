@@ -85,7 +85,7 @@ import org.tmatesoft.svn.util.SVNDebugLog;
  * </tr>
  * </table>
  *   
- * @version 1.1
+ * @version 1.0
  * @author  TMate Software Ltd.
  * @see     <a target="_top" href="http://tmate.org/svn/kb/examples/">Examples</a>
  * 
@@ -93,7 +93,6 @@ import org.tmatesoft.svn.util.SVNDebugLog;
 public class SVNCommitClient extends SVNBasicClient {
 
     private ISVNCommitHandler myCommitHandler;
-    private ISVNCommitParameters myCommitParameters;
     
     /**
      * Constructs and initializes an <b>SVNCommitClient</b> object
@@ -166,37 +165,6 @@ public class SVNCommitClient extends SVNBasicClient {
     }
     
     /**
-     * Sets commit parameters to use.
-     * 
-     * <p>
-     * When no parameters are set {@link DefaultSVNCommitParameters default} 
-     * ones are used. 
-     * 
-     * @param parameters commit parameters
-     * @see              #getCommitParameters()
-     */
-    public void setCommitParameters(ISVNCommitParameters parameters) {
-        myCommitParameters = parameters;
-    }
-    
-    /**
-     * Returns commit parameters. 
-     * 
-     * <p>
-     * If no user parameters were previously specified, once creates and 
-     * returns {@link DefaultSVNCommitParameters default} ones. 
-     * 
-     * @return commit parameters
-     * @see    #setCommitParameters(ISVNCommitParameters)
-     */
-    public ISVNCommitParameters getCommitParameters() {
-        if (myCommitParameters == null) {
-            myCommitParameters = new DefaultSVNCommitParameters();
-        }
-        return myCommitParameters;
-    }
-    
-    /**
      * Committs removing specified URL-paths from the repository. 
      *   
      * @param  urls				an array containing URL-strings that represent
@@ -219,7 +187,7 @@ public class SVNCommitClient extends SVNBasicClient {
         List paths = new ArrayList();
         SVNURL rootURL = SVNURLUtil.condenceURLs(urls, paths, true);
         if (rootURL == null) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.RA_ILLEGAL_URL, "Can not compute common root URL for specified URLs");
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.RA_ILLEGAL_URL, "Cannot compute common root URL for specified URLs");
             SVNErrorManager.error(err);
         }
         if (paths.isEmpty()) {
@@ -298,7 +266,7 @@ public class SVNCommitClient extends SVNBasicClient {
         List paths = new ArrayList();
         SVNURL rootURL = SVNURLUtil.condenceURLs(urls, paths, false);
         if (rootURL == null) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.RA_ILLEGAL_URL, "Can not compute common root URL for specified URLs");
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.RA_ILLEGAL_URL, "Cannot compute common root URL for specified URLs");
             SVNErrorManager.error(err);
         }
         if (paths.isEmpty()) {
@@ -769,20 +737,11 @@ public class SVNCommitClient extends SVNBasicClient {
         }
         Set targets = new TreeSet();
         SVNStatusClient statusClient = new SVNStatusClient(getRepositoryPool(), getOptions());
-        statusClient.setEventHandler(new ISVNEventHandler() {
-            public void handleEvent(SVNEvent event, double progress) throws SVNException {
-            }
-            public void checkCancelled() throws SVNCancelException {
-                SVNCommitClient.this.checkCancelled();
-            }
-        });
         SVNWCAccess wcAccess = SVNCommitUtil.createCommitWCAccess(paths, recursive, force, targets, statusClient);
         try {
             Map lockTokens = new HashMap();
-            checkCancelled();
-            SVNCommitItem[] commitItems = SVNCommitUtil.harvestCommitables(wcAccess, targets, lockTokens, !keepLocks, recursive, force, getCommitParameters());
+            SVNCommitItem[] commitItems = SVNCommitUtil.harvestCommitables(wcAccess, targets, lockTokens, !keepLocks, recursive, force);
             boolean hasModifications = false;
-            checkCancelled();
             for (int i = 0; commitItems != null && i < commitItems.length; i++) {
                 SVNCommitItem commitItem = commitItems[i];
                 if (commitItem.isAdded() || commitItem.isDeleted()
@@ -845,23 +804,14 @@ public class SVNCommitClient extends SVNBasicClient {
         Collection packets = new ArrayList();
         Map targets = new HashMap();
         SVNStatusClient statusClient = new SVNStatusClient(getRepositoryPool(), getOptions());
-        statusClient.setEventHandler(new ISVNEventHandler() {
-            public void handleEvent(SVNEvent event, double progress) throws SVNException {
-            }
-            public void checkCancelled() throws SVNCancelException {
-                SVNCommitClient.this.checkCancelled();
-            }
-        });
         SVNWCAccess[] wcAccesses = SVNCommitUtil.createCommitWCAccess2(paths, recursive, force, targets, statusClient);
 
         for (int i = 0; i < wcAccesses.length; i++) {
             SVNWCAccess wcAccess = wcAccesses[i];
             Collection targetPaths = (Collection) targets.get(wcAccess);
             try {
-                checkCancelled();
                 Map lockTokens = new HashMap();
-                SVNCommitItem[] commitItems = SVNCommitUtil.harvestCommitables(wcAccess, targetPaths, lockTokens, !keepLocks, recursive, force, getCommitParameters());
-                checkCancelled();
+                SVNCommitItem[] commitItems = SVNCommitUtil.harvestCommitables(wcAccess, targetPaths, lockTokens, !keepLocks, recursive, force);
                 boolean hasModifications = false;
                 for (int j = 0; commitItems != null && j < commitItems.length; j++) {
                     SVNCommitItem commitItem = commitItems[j];
@@ -897,14 +847,12 @@ public class SVNCommitClient extends SVNBasicClient {
             // get wc root for each packet and uuid for each root.
             // group items by uuid.
             for (int i = 0; i < packetsArray.length; i++) {
-                checkCancelled();
                 SVNCommitPacket packet = packetsArray[i];
                 File wcRoot = SVNWCUtil.getWorkingCopyRoot(packet.getCommitItems()[0].getWCAccess().getAnchor().getRoot(), true);
                 SVNWCAccess rootWCAccess = SVNWCAccess.create(wcRoot);
                 String uuid = rootWCAccess.getTargetEntry().getUUID();
                 SVNURL url = rootWCAccess.getTargetEntry().getSVNURL();
                 rootWCAccess.close(false);
-                checkCancelled();
                 if (uuid == null) {
                     if (url != null) {
                         SVNRepository repos = createRepository(url, true);
@@ -926,12 +874,10 @@ public class SVNCommitClient extends SVNBasicClient {
                 if (packet.getLockTokens() != null) {
                     lockTokens.putAll(packet.getLockTokens());
                 }
-                checkCancelled();
             }
             packetsArray = new SVNCommitPacket[repoUUIDs.size()];
             int index = 0;
             for (Iterator roots = repoUUIDs.keySet().iterator(); roots.hasNext();) {
-                checkCancelled();
                 String uuid = (String) roots.next();
                 Collection items = (Collection) repoUUIDs.get(uuid);
                 Map lockTokens = (Map) locktokensMap.get(uuid);
@@ -1064,12 +1010,7 @@ public class SVNCommitClient extends SVNBasicClient {
     }
     
     static String validateCommitMessage(String message) {
-        if (message == null) {
-            return message;
-        }
-        message = message.replaceAll("\r\n", "\n");
-        message = message.replace('\r', '\n');
-        return message;
+        return SVNTranslator.convertEOLs(message);
     }
 
 }

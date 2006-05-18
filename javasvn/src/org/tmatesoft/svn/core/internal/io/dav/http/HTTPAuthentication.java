@@ -11,7 +11,6 @@
  */
 package org.tmatesoft.svn.core.internal.io.dav.http;
 
-import java.io.UnsupportedEncodingException;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.Map;
@@ -30,22 +29,10 @@ import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 abstract class HTTPAuthentication {
 
     private Map myChallengeParameters;
-    private String myUserName;
-    private String myPassword;
+    private SVNPasswordAuthentication myOriginalCredentials;
     
-    protected HTTPAuthentication (SVNPasswordAuthentication credentials) {
-        if (credentials != null) {
-            myUserName = credentials.getUserName();
-            myPassword = credentials.getPassword();
-        }
-    }
-
-    protected HTTPAuthentication (String name, String password) {
-        myUserName = name;
-        myPassword = password;
-    }
-
-    protected HTTPAuthentication () {
+    public HTTPAuthentication (SVNPasswordAuthentication credentials) {
+        myOriginalCredentials = credentials;
     }
 
     public void setChallengeParameter(String name, String value) {
@@ -67,30 +54,29 @@ abstract class HTTPAuthentication {
         return myChallengeParameters;
     }
     
-    public void setCredentials(SVNPasswordAuthentication credentials) {
-        if (credentials != null) {
-            myUserName = credentials.getUserName();
-            myPassword = credentials.getPassword();
-        }
+    public SVNPasswordAuthentication getCredentials() {
+        return myOriginalCredentials;
+    }
+    
+    public void setCredentials(SVNPasswordAuthentication originalCredentials) {
+        myOriginalCredentials = originalCredentials;
     }
 
     public String getUserName() {
-        return myUserName;
+        if (myOriginalCredentials != null) {
+            return myOriginalCredentials.getUserName();
+        }
+        return null;
     }
     
     public String getPassword() {
-        return myPassword;
-    }
-
-    public void setUserName(String name) {
-        myUserName = name;
-    }
-    
-    public void setPassword(String password) {
-        myPassword = password;
+        if (myOriginalCredentials != null) {
+            return myOriginalCredentials.getPassword();
+        }
+        return null;
     }
     
-    public static HTTPAuthentication parseAuthParameters(Collection authHeaderValues, HTTPAuthentication prevResponse) throws SVNException {
+    public static HTTPAuthentication parseAuthParameters(Collection authHeaderValues) throws SVNException {
         if (authHeaderValues == null) {
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.UNSUPPORTED_FEATURE, "Missing HTTP authorization method"); 
             SVNErrorManager.error(err);
@@ -112,10 +98,11 @@ abstract class HTTPAuthentication {
                 }
             }
             String method = source.substring(0, index);
+            //parameters.put("", method);
         
             source = source.substring(index).trim();
             if ("Basic".equalsIgnoreCase(method)) {
-                auth = new HTTPBasicAuthentication();
+                auth = new HTTPBasicAuthentication(null);
                 
                 if (source.indexOf("realm=") >= 0) {
                     source = source.substring(source.indexOf("realm=") + "realm=".length());
@@ -131,7 +118,7 @@ abstract class HTTPAuthentication {
                 }
                 break;
             } else if ("Digest".equalsIgnoreCase(method)) {
-                auth = new HTTPDigestAuthentication();
+                auth = new HTTPDigestAuthentication(null);
                 
                 char[] chars = source.toCharArray();
                 int tokenIndex = 0;
@@ -169,19 +156,9 @@ abstract class HTTPAuthentication {
                 digestAuth.init();
                 
                 break;
-            } else if ("NTLM".equalsIgnoreCase(method)) {
-                HTTPNTLMAuthentication ntlmAuth = null;
-                if (source.length() == 0) {
-                    ntlmAuth = new HTTPNTLMAuthentication();
-                    ntlmAuth.setType1State();
-                } else {
-                    ntlmAuth = (HTTPNTLMAuthentication)prevResponse;
-                    ntlmAuth.parseChallenge(source);
-                    ntlmAuth.setType3State();
-                }
-                auth = ntlmAuth;
-                break;
             }
+            //TODO: add NTLM authentication
+
         }
 
         if (auth == null) {
@@ -189,51 +166,9 @@ abstract class HTTPAuthentication {
             SVNErrorManager.error(err);
         }
         
-        if (prevResponse != null) {
-            auth.setUserName(prevResponse.getUserName());
-            auth.setPassword(prevResponse.getPassword());
-        }
-        
         return auth;
     }
     
-    public static boolean isSchemeSupportedByServer(String scheme, Collection authHeaderValues) throws SVNException {
-        if (authHeaderValues == null) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.UNSUPPORTED_FEATURE, "Missing HTTP authorization method"); 
-            SVNErrorManager.error(err);
-        }
-
-        String authHeader = null;
-        for (Iterator authSchemes = authHeaderValues.iterator(); authSchemes.hasNext();) {
-            authHeader = (String)authSchemes.next();
-            String source = authHeader.trim();
-            int index = source.indexOf(' ');
-            
-            if (index <= 0) {
-                index = source.length();
-            }
-            String method = source.substring(0, index);
-            if (method.equalsIgnoreCase(scheme)) {
-                return true;
-            }
-        }   
-        return false;
-    }
-    
-    public abstract String getAuthenticationScheme();
-    
     public abstract String authenticate() throws SVNException;
-
-    protected static byte[] getASCIIBytes(final String data) {
-        return getBytes(data, "US-ASCII");
-    }
-
-    protected static byte[] getBytes(final String data, String charset) {
-        try {
-            return data.getBytes(charset);
-        } catch (UnsupportedEncodingException e) {
-            return data.getBytes();
-        }
-    }
 
 }

@@ -12,11 +12,13 @@
 
 package org.tmatesoft.svn.core.internal.io.dav.handlers;
 
+import java.io.ByteArrayInputStream;
+
 import org.tmatesoft.svn.core.SVNException;
-import org.tmatesoft.svn.core.internal.delta.SVNDeltaReader;
 import org.tmatesoft.svn.core.internal.io.dav.DAVElement;
 import org.tmatesoft.svn.core.internal.util.SVNBase64;
-import org.tmatesoft.svn.core.io.ISVNDeltaConsumer;
+import org.tmatesoft.svn.core.io.ISVNEditor;
+import org.tmatesoft.svn.core.io.diff.SVNDiffWindowBuilder;
 import org.xml.sax.SAXException;
 
 
@@ -29,26 +31,30 @@ public abstract class BasicDAVDeltaHandler extends BasicDAVHandler {
     protected static final DAVElement TX_DELTA = DAVElement.getElement(DAVElement.SVN_NAMESPACE, "txdelta");
 
     private boolean myIsDeltaProcessing;
-    private SVNDeltaReader myDeltaReader;
+    private SVNDiffWindowBuilder myDiffBuilder;
     private StringBuffer myDeltaOutputStream;
-    private int eolCount;
+    private SequenceIntputStream myPreviousStream;
 
     protected void setDeltaProcessing(boolean processing) throws SVNException {
         myIsDeltaProcessing = processing;
+        myPreviousStream = null;
 
         if (!myIsDeltaProcessing) {
-            myDeltaReader.reset(getCurrentPath(), getDeltaConsumer());
-            getDeltaConsumer().textDeltaEnd(getCurrentPath());
+            getEditor().textDeltaEnd(getCurrentPath());
         } else {
+            myDiffBuilder.reset();
             myDeltaOutputStream.delete(0, myDeltaOutputStream.length());
+            myPreviousStream = null;
         }
     }
     
     protected void init() {
-        myDeltaReader = new SVNDeltaReader();
+        myDiffBuilder = SVNDiffWindowBuilder.newInstance();
         myDeltaOutputStream = new StringBuffer();
         super.init();
     }
+    
+    private int eolCount;
 
     public void characters(char[] ch, int start, int length) throws SAXException {
         if (myIsDeltaProcessing) {
@@ -79,6 +85,7 @@ public abstract class BasicDAVDeltaHandler extends BasicDAVHandler {
             StringBuffer toDecode = new StringBuffer();
             toDecode.append(myDeltaOutputStream);
             toDecode.delete(myDeltaOutputStream.length() - remains, myDeltaOutputStream.length());
+            // trim spaces.
             
             int index = 0;
             while(index < toDecode.length() && Character.isWhitespace(toDecode.charAt(index))) {
@@ -92,10 +99,18 @@ public abstract class BasicDAVDeltaHandler extends BasicDAVHandler {
                 toDecode.delete(index, toDecode.length());
                 index--;
             }
-            byte[] buffer = allocateBuffer(toDecode.length());
-            int decodedLength = SVNBase64.base64ToByteArray(toDecode, buffer);
+            
+            byte[] decoded = SVNBase64.base64ToByteArray(toDecode, null);
+            myPreviousStream = new SequenceIntputStream(decoded, myPreviousStream);
             try {
-                myDeltaReader.nextWindow(buffer, 0, decodedLength, getCurrentPath(), getDeltaConsumer());
+                while(true) {
+                    boolean needsMore = myDiffBuilder.accept(myPreviousStream, getEditor(), getCurrentPath());
+                    if (needsMore && myPreviousStream.available() > 0) {
+                        continue;
+                    }
+                    break;
+                }
+                // delete saved bytes.
             } catch (SVNException e) {
                 throw new SAXException(e);
             }
@@ -107,5 +122,19 @@ public abstract class BasicDAVDeltaHandler extends BasicDAVHandler {
 
     protected abstract String getCurrentPath();
 
-    protected abstract ISVNDeltaConsumer getDeltaConsumer();
+    protected abstract ISVNEditor getEditor();
+    
+    private static class SequenceIntputStream extends ByteArrayInputStream {
+        SequenceIntputStream(byte[] bytes, SequenceIntputStream previous) {
+            super(bytes);
+            if (previous != null && previous.available() > 0) {
+                byte[] realBytes = new byte[bytes.length + previous.available()];
+                System.arraycopy(previous.buf, previous.pos, realBytes, 0, previous.available());
+                System.arraycopy(bytes, 0, realBytes, previous.available(), bytes.length);
+                buf = realBytes;
+                count = buf.length;
+                pos = 0;
+            }
+        }
+    }
 }

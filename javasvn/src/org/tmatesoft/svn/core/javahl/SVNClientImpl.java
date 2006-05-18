@@ -54,7 +54,6 @@ import org.tmatesoft.svn.core.SVNURL;
 import org.tmatesoft.svn.core.auth.ISVNAuthenticationManager;
 import org.tmatesoft.svn.core.auth.ISVNAuthenticationStorage;
 import org.tmatesoft.svn.core.internal.io.dav.DAVRepositoryFactory;
-import org.tmatesoft.svn.core.internal.io.fs.FSRepositoryFactory;
 import org.tmatesoft.svn.core.internal.io.svn.SVNGanymedSession;
 import org.tmatesoft.svn.core.internal.io.svn.SVNRepositoryFactoryImpl;
 import org.tmatesoft.svn.core.internal.util.SVNFormatUtil;
@@ -88,8 +87,7 @@ import org.tmatesoft.svn.core.wc.SVNWCUtil;
 import org.tmatesoft.svn.util.Version;
 
 /**
- * @version 1.0
- * @author  TMate Software Ltd.
+ * @author evgeny
  */
 public class SVNClientImpl implements SVNClientInterface {
 
@@ -124,7 +122,6 @@ public class SVNClientImpl implements SVNClientInterface {
     protected SVNClientImpl(SVNClient owner) {
         DAVRepositoryFactory.setup();
         SVNRepositoryFactoryImpl.setup();
-        FSRepositoryFactory.setup();
         myConfigDir = SVNWCUtil.getDefaultConfigurationDirectory().getAbsolutePath();
         myOwner = owner == null ? (SVNClientInterface) this : (SVNClientInterface) owner;
     }
@@ -148,6 +145,7 @@ public class SVNClientImpl implements SVNClientInterface {
         final Collection statuses = new ArrayList();
         SVNStatusClient stClient = getSVNStatusClient();
         try {
+            stClient.setIgnoreExternals(ignoreExternals);
             stClient.doStatus(new File(path).getAbsoluteFile(), descend, onServer, getAll, noIgnore, !ignoreExternals, new ISVNStatusHandler(){
                 public void handleStatus(SVNStatus status) {
                     statuses.add(JavaHLObjectFactory.createStatus(status.getFile().getPath(), status));
@@ -169,6 +167,8 @@ public class SVNClientImpl implements SVNClientInterface {
                 err = err.getChildErrorMessage();
             }
             return new Status[] {};
+        } finally {
+            stClient.setIgnoreExternals(false);
         }
         return (Status[]) statuses.toArray(new Status[statuses.size()]);
     }
@@ -1006,7 +1006,7 @@ public class SVNClientImpl implements SVNClientInterface {
 
     public void dispose() {
         SVNGanymedSession.shutdown();
-        new DefaultSVNRepositoryPool(null, null).shutdownConnections(true);
+        new DefaultSVNRepositoryPool(null).shutdownConnections(true);
     }
 
     public void setConfigDirectory(String configDir) throws ClientException {
@@ -1182,7 +1182,7 @@ public class SVNClientImpl implements SVNClientInterface {
     protected SVNClientManager getClientManager() {
         if (myClientManager == null) {
             updateClientManager();
-            myClientManager = SVNClientManager.newInstance(myOptions, new DefaultSVNRepositoryPool(myAuthenticationManager, myOptions));
+            myClientManager = SVNClientManager.newInstance(myOptions, new DefaultSVNRepositoryPool(myAuthenticationManager));
             myClientManager.setEventHandler(getEventListener());
         }
         return myClientManager;
@@ -1230,8 +1230,7 @@ public class SVNClientImpl implements SVNClientInterface {
                 && (pathOrUrl.startsWith("http://")
                         || pathOrUrl.startsWith("https://")
                         || pathOrUrl.startsWith("svn://") 
-                        || (pathOrUrl.startsWith("svn+") && pathOrUrl.indexOf("://") > 4)
-                        || pathOrUrl.startsWith("file://"));
+                        || pathOrUrl.startsWith("svn+ssh://"));
     }
 
     public String getAdminDirectoryName() {

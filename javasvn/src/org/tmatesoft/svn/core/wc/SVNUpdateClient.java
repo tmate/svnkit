@@ -81,7 +81,7 @@ import org.tmatesoft.svn.util.SVNDebugLog;
  * </tr>
  * </table>
  * 
- * @version 1.1
+ * @version 1.0
  * @author  TMate Software Ltd.
  * @see     <a target="_top" href="http://tmate.org/svn/kb/examples/">Examples</a>
  */
@@ -183,10 +183,6 @@ public class SVNUpdateClient extends SVNBasicClient {
      * @throws SVNException 
      */
     public long doSwitch(File file, SVNURL url, SVNRevision revision, boolean recursive) throws SVNException {
-        return doSwitch(file, url, SVNRevision.UNDEFINED, revision, recursive);
-    }
-
-    public long doSwitch(File file, SVNURL url, SVNRevision pegRevision, SVNRevision revision, boolean recursive) throws SVNException {
         SVNWCAccess wcAccess = createWCAccess(file);
         final SVNReporter reporter = new SVNReporter(wcAccess, true, recursive);
         try {
@@ -203,10 +199,6 @@ public class SVNUpdateClient extends SVNBasicClient {
             }
             SVNRepository repository = createRepository(sourceURL, true);
             long revNumber = getRevisionNumber(revision, repository, file);
-            if (pegRevision != null && pegRevision.isValid()) {
-                SVNRepositoryLocation[] locs = getLocations(url, null, pegRevision, SVNRevision.create(revNumber), SVNRevision.UNDEFINED);
-                url = locs[0].getURL();
-            }
 
             SVNUpdateEditor editor = new SVNUpdateEditor(wcAccess, url.toString(), recursive, isLeaveConflictsUnresolved());
             
@@ -699,13 +691,11 @@ public class SVNUpdateClient extends SVNBasicClient {
             }
             return;
         }
-        if (!isIgnoreExternals()) {
-            String externalsValue = dir.getProperties("", false).getPropertyValue(SVNProperty.EXTERNALS);
-            dir.getWCAccess().addExternals(dir, externalsValue);
-            if (externalsValue != null) {
-                externalsValue = canonicalizeExtenrals(externalsValue, omitDefaultPort);
-                dir.getProperties("", false).setPropertyValue(SVNProperty.EXTERNALS, externalsValue);
-            }
+        String externalsValue = dir.getProperties("", false).getPropertyValue(SVNProperty.EXTERNALS);
+        dir.getWCAccess().addExternals(dir, externalsValue);
+        if (externalsValue != null) {
+            externalsValue = canonicalizeExtenrals(externalsValue, omitDefaultPort);
+            dir.getProperties("", false).setPropertyValue(SVNProperty.EXTERNALS, externalsValue);
         }
         
         SVNEntry rootEntry = dir.getEntries().getEntry("", true);

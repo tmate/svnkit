@@ -19,11 +19,6 @@ import java.util.Calendar;
 import java.util.Date;
 import java.util.TimeZone;
 
-import org.tmatesoft.svn.core.SVNException;
-import org.tmatesoft.svn.core.SVNErrorMessage;
-import org.tmatesoft.svn.core.SVNErrorCode;
-import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
-
 /**
  * @version 1.0
  * @author TMate Software Ltd.
@@ -65,20 +60,6 @@ public class SVNTimeUtil {
             return new Date(parseDateAsLong(str));
         } catch (Throwable th) {
             //
-        }
-        return NULL;        
-    }
-
-    public static Date parseDateString(String str) throws SVNException {
-        if (str == null) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.BAD_DATE);
-            SVNErrorManager.error(err);
-        }
-        try {
-            return new Date(parseDateAsLong(str));
-        } catch (Throwable th) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.BAD_DATE);
-            SVNErrorManager.error(err, th);
         }
         return NULL;        
     }

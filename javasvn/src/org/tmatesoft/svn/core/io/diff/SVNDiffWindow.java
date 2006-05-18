@@ -13,9 +13,7 @@
 package org.tmatesoft.svn.core.io.diff;
 
 import java.io.IOException;
-import java.io.OutputStream;
-import java.nio.ByteBuffer;
-import java.util.Iterator;
+import java.io.InputStream;
 
 import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
@@ -28,45 +26,37 @@ import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
  * The <b>SVNDiffWindow</b> class represents a diff window that
  * contains instructions and new data of a delta to apply to a file.
  * 
- * <p>
- * Instructions are not immediately contained in a window. A diff window 
- * provides an iterator that reads and constructs one <b>SVNDiffInstruction</b> 
- * from provided raw bytes per one iteration. There is even an ability to 
- * use a single <b>SVNDiffInstruction</b> object for read and decoded instructions: 
- * for subsequent iterations an iterator simply uses the same instruction object 
- * to return as a newly read and decoded instruction.      
- * 
- * @version 1.1
+ * @version 1.0
  * @author  TMate Software Ltd.
- * @see     SVNDiffInstruction
  */
 public class SVNDiffWindow {
     
-    /**
-     * Delta header bytes. Every sequence of delta windows should 
-     * start with this header. 
-     */
-    public static final byte[] SVN_HEADER = new byte[] {'S', 'V', 'N', '\0'};
-    
-    /**
-     * An empty window (in particular, its instructions length = 0). Corresponds 
-     * to the case of an empty delta, so, it's passed to a delta consumer to 
-     * create an empty file. 
-     */
-    public static final SVNDiffWindow EMPTY = new SVNDiffWindow(0,0,0,0,0);
-    
     private final long mySourceViewOffset;
-    private final int mySourceViewLength;
-    private final int myTargetViewLength;
-    private final int myNewDataLength;
-    private int myInstructionsLength;
+    private final long mySourceViewLength;
+    private final long myTargetViewLength;
+    private SVNDiffInstruction[] myInstructions;
+    private final long myNewDataLength;
+    private long myInstructionsLength;
     
-    private SVNDiffInstruction myTemplateInstruction = new SVNDiffInstruction(0,0,0);
-    private SVNDiffInstruction myTemplateNextInstruction = new SVNDiffInstruction(0,0,0);
-    
-    private byte[] myData;
-    private int myDataOffset;
-    private int myInstructionsCount;
+    /**
+     * Constructs an <b>SVNDiffWindow</b> object.
+     * 
+     * @param sourceViewOffset    an offset in the source view
+     * @param sourceViewLength    a number of bytes to read from the
+     *                            source view
+     * @param targetViewLength    a length in bytes of the target view 
+     *                            it must have after copying bytes
+     * @param instructions        diff instructions to copy bytes
+     * @param newDataLength       a number of bytes of new data
+     */
+    public SVNDiffWindow(long sourceViewOffset, long sourceViewLength, long targetViewLength, 
+            SVNDiffInstruction[] instructions, long newDataLength) {
+        mySourceViewOffset = sourceViewOffset;
+        mySourceViewLength = sourceViewLength;
+        myTargetViewLength = targetViewLength;
+        myInstructions = instructions;
+        myNewDataLength = newDataLength;
+    }
     
     /**
      * Constructs an <b>SVNDiffWindow</b> object. This constructor is
@@ -83,7 +73,8 @@ public class SVNDiffWindow {
      * @param newDataLength       a number of bytes of new data
      * @see                       SVNDiffInstruction
      */
-    public SVNDiffWindow(long sourceViewOffset, int sourceViewLength, int targetViewLength, int instructionsLength, int newDataLength) {
+    public SVNDiffWindow(long sourceViewOffset, long sourceViewLength, long targetViewLength, long instructionsLength, 
+            long newDataLength) {
         mySourceViewOffset = sourceViewOffset;
         mySourceViewLength = sourceViewLength;
         myTargetViewLength = targetViewLength;
@@ -96,7 +87,7 @@ public class SVNDiffWindow {
      * 
      * @return a number of instructions bytes
      */
-    public int getInstructionsLength() {
+    public long getInstructionsLength() {
         return myInstructionsLength;
     }
     
@@ -115,7 +106,7 @@ public class SVNDiffWindow {
      * 
      * @return a number of source bytes to copy
      */
-    public int getSourceViewLength() {
+    public long getSourceViewLength() {
         return mySourceViewLength;
     }
     
@@ -126,8 +117,29 @@ public class SVNDiffWindow {
      * 
      * @return a length in bytes of the target view
      */
-    public int getTargetViewLength() {
+    public long getTargetViewLength() {
         return myTargetViewLength;
+    }
+    
+    /**
+     * Returns the number of instructions contained in this
+     * diff window.
+     *  
+     * @return an instructions number
+     */
+    public int getInstructionsCount() {
+        return myInstructions.length;
+    }
+    
+    /**
+     * Gets a definite diff instruction from an array of instructions. 
+     * 
+     * @param  index a zero based instruction index
+     * @return       an instrucion at <code>index</code>
+     */
+    public SVNDiffInstruction getInstructionAt(int index) {
+        return myInstructions[index];
+        
     }
     
     /**
@@ -135,58 +147,8 @@ public class SVNDiffWindow {
      * 
      * @return a number of new data bytes
      */
-    public int getNewDataLength() {
+    public long getNewDataLength() {
         return myNewDataLength;
-    }
-    
-    /**
-     * Returns an iterator to read instructions in series. 
-     * Objects returned by an iterator's <code>next()</code> method 
-     * are separate <b>SVNDiffInstruction</b> objects.
-     * 
-     * <p>
-     * Instructions as well as new data are read from a byte 
-     * buffer that is passed to this window object via the 
-     * {@link #setData(ByteBuffer) setData()} method.   
-     * 
-     * <p>
-     * A call to this routine is equivalent to a call 
-     * <code>instructions(false)</code>.
-     * 
-     * @return an instructions iterator
-     * @see    #instructions(boolean)
-     * @see    SVNDiffInstruction 
-     */
-    public Iterator instructions() {
-        return instructions(false);
-    }
-
-    /**
-     * Returns an iterator to read instructions in series. 
-     * 
-     * <p>
-     * If <code>template</code> is <span class="javakeyword">true</span> 
-     * then each instruction returned by the iterator is actually the 
-     * same <b>SVNDiffInstruction</b> object, but with proper options. 
-     * This prevents from allocating new memory.  
-     * 
-     * <p>
-     * On the other hand, if <code>template</code> is <span class="javakeyword">false</span> 
-     * then the iterator returns a new allocated <b>SVNDiffInstruction</b> object per 
-     * each instruction read and decoded.
-     * 
-     * <p>
-     * Instructions as well as new data are read from a byte buffer that is 
-     * passed to this window object via the 
-     * {@link #setData(ByteBuffer) setData()} method.   
-     * 
-     * @param  template  to use a single/multiple instruction objects
-     * @return           an instructions iterator
-     * @see              #instructions()
-     * @see              SVNDiffInstruction 
-     */
-    public Iterator instructions(boolean template) {
-        return new InstructionsIterator(template);
     }
     
     /**
@@ -200,36 +162,34 @@ public class SVNDiffWindow {
      *     of <code>applyBaton</code> to the baton's inner source buffer.  
      *    {@link SVNDiffInstruction#COPY_FROM_SOURCE} instructions of this window are 
      *    relative to the bounds of that source buffer (source view, in other words).
-     * <li>Second, according to instructions, copies source bytes from the source buffer
-     *     to the baton's target buffer (or target view, in other words). 
+     * <li>Second, according to instructions copies source bytes from the source buffer
+     *     to the baton's target buffer (target view, in other words). 
      * <li>Then, if <code>applyBaton</code> is supplied with an MD5 digest, updates it with those bytes
      *     in the target buffer. So, after instructions applying completes, it will be the checksum for
-     *     the full text expanded.
+     *     the full text.
      * <li>The last step - appends the target buffer bytes to the baton's 
      *     target stream.        
      * </ol> 
      * 
      * <p>
-     * {@link SVNDiffInstruction#COPY_FROM_NEW_DATA} instructions rule to copy bytes from 
-     * the instructions & new data buffer provided to this window object via a call to the 
-     * {@link #setData(ByteBuffer) setData()} method.
+     * {@link SVNDiffInstruction#COPY_FROM_NEW_DATA} instructions are relative to the bounds of
+     * the provided <code>newData</code> stream.
      * 
      * <p>
      * {@link SVNDiffInstruction#COPY_FROM_TARGET} instructions are relative to the bounds of
      * the target buffer. 
      * 
      * @param  applyBaton    a baton that provides the source and target 
-     *                       views as well as holds the source and targed 
-     *                       streams 
+     *                       views
+     * @param  newData       an input stream to read new data bytes from
      * @throws SVNException
-     * @see                  #apply(byte[], byte[])
      */
-    public void apply(SVNDiffWindowApplyBaton applyBaton) throws SVNException {
+    public void apply(SVNDiffWindowApplyBaton applyBaton, InputStream newData) throws SVNException {
         // here we have streams and buffer from the previous calls (or nulls).
         
         // 1. buffer for target.
         if (applyBaton.myTargetBuffer == null || applyBaton.myTargetViewSize < getTargetViewLength()) {
-            applyBaton.myTargetBuffer = new byte[getTargetViewLength()];
+            applyBaton.myTargetBuffer = new byte[(int) getTargetViewLength()];
         }
         applyBaton.myTargetViewSize = getTargetViewLength();
         
@@ -238,19 +198,19 @@ public class SVNDiffWindow {
         if (getSourceViewOffset() != applyBaton.mySourceViewOffset || getSourceViewLength() > applyBaton.mySourceViewLength) {
             byte[] oldSourceBuffer = applyBaton.mySourceBuffer;
             // create a new buffer
-            applyBaton.mySourceBuffer = new byte[getSourceViewLength()];
+            applyBaton.mySourceBuffer = new byte[(int) getSourceViewLength()];
             // copy from the old buffer.
             if (applyBaton.mySourceViewOffset + applyBaton.mySourceViewLength > getSourceViewOffset()) {
                 // copy overlapping part to the new buffer
                 int start = (int) (getSourceViewOffset() - applyBaton.mySourceViewOffset);
-                System.arraycopy(oldSourceBuffer, start, applyBaton.mySourceBuffer, 0, (applyBaton.mySourceViewLength - start));
-                length = (applyBaton.mySourceViewLength - start);
+                System.arraycopy(oldSourceBuffer, start, applyBaton.mySourceBuffer, 0, (int) (applyBaton.mySourceViewLength - start));
+                length = (int) (applyBaton.mySourceViewLength - start);
             }            
         }
         if (length < getSourceViewLength()) {
             // fill what remains.
             try {
-                int toSkip = (int) (getSourceViewOffset() - (applyBaton.mySourceViewOffset + applyBaton.mySourceViewLength));
+                long toSkip = getSourceViewOffset() - (applyBaton.mySourceViewOffset + applyBaton.mySourceViewLength);
                 if (toSkip > 0) {
                     applyBaton.mySourceStream.skip(toSkip);
                 }
@@ -264,21 +224,28 @@ public class SVNDiffWindow {
         applyBaton.mySourceViewLength = getSourceViewLength();
         applyBaton.mySourceViewOffset = getSourceViewOffset();
         
-        // apply instructions.
+        // apply instructions. 
+        if (myInstructions == null) {
+            byte[] instrBytes = new byte[(int) getInstructionsLength()];
+            try {
+                newData.read(instrBytes);
+            } catch (IOException e) {
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, e.getLocalizedMessage());
+                SVNErrorManager.error(err, e);
+            }
+            myInstructions = SVNDiffWindowBuilder.createInstructions(instrBytes);
+        }
         int tpos = 0;
-        int npos = myInstructionsLength;
         try {
-            for (Iterator instructions = instructions(true); instructions.hasNext();) {
-                SVNDiffInstruction instruction = (SVNDiffInstruction) instructions.next();
-                int iLength = instruction.length < getTargetViewLength() - tpos ? (int) instruction.length : getTargetViewLength() - tpos; 
-                switch (instruction.type) {
+            for(int i = 0; i < myInstructions.length; i++) {
+                int iLength = myInstructions[i].length < getTargetViewLength() - tpos ? (int) myInstructions[i].length : (int) getTargetViewLength() - tpos; 
+                switch (myInstructions[i].type) {
                     case SVNDiffInstruction.COPY_FROM_NEW_DATA:
-                        System.arraycopy(myData, myDataOffset + npos, applyBaton.myTargetBuffer, tpos, iLength);
-                        npos += iLength;
+                        newData.read(applyBaton.myTargetBuffer, tpos, iLength);
                         break;
                     case SVNDiffInstruction.COPY_FROM_TARGET:
-                        int start = instruction.offset;
-                        int end = instruction.offset + iLength;
+                        int start = (int) myInstructions[i].offset;
+                        int end = (int) myInstructions[i].offset + iLength;
                         int tIndex = tpos;
                         for(int j = start; j < end; j++) {
                             applyBaton.myTargetBuffer[tIndex] = applyBaton.myTargetBuffer[j];
@@ -286,98 +253,26 @@ public class SVNDiffWindow {
                         }
                         break;
                     case SVNDiffInstruction.COPY_FROM_SOURCE:
-                        System.arraycopy(applyBaton.mySourceBuffer, instruction.offset, applyBaton.myTargetBuffer, tpos, iLength);
+                        System.arraycopy(applyBaton.mySourceBuffer, (int) myInstructions[i].offset, 
+                                applyBaton.myTargetBuffer, tpos, iLength);
                         break;
                     default:
                 }
-                tpos += instruction.length;
+                tpos += myInstructions[i].length;
                 if (tpos >= getTargetViewLength()) {
                     break;
                 }
             }
+            myInstructions = null;
             // save tbuffer.
             if (applyBaton.myDigest != null) {
-                applyBaton.myDigest.update(applyBaton.myTargetBuffer, 0, getTargetViewLength());
+                applyBaton.myDigest.update(applyBaton.myTargetBuffer, 0, (int) getTargetViewLength());
             }
-            applyBaton.myTargetStream.write(applyBaton.myTargetBuffer, 0, getTargetViewLength());
+            applyBaton.myTargetStream.write(applyBaton.myTargetBuffer, 0, (int) getTargetViewLength());
         } catch (IOException e) {
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, e.getLocalizedMessage());
             SVNErrorManager.error(err, e);
         }
-    }
-
-    /**
-     * Applies this window's instructions provided source and target view buffers. 
-     * 
-     * <p>
-     * If this window has got any {@link SVNDiffInstruction#COPY_FROM_SOURCE} instructions, then 
-     * appropriate bytes described by such an instruction are copied from the <code>sourceBuffer</code> 
-     * to the <code>targetBuffer</code>.
-     *   
-     * <p>
-     * {@link SVNDiffInstruction#COPY_FROM_NEW_DATA} instructions rule to copy bytes from 
-     * the instructions & new data buffer provided to this window object via a call to the 
-     * {@link #setData(ByteBuffer) setData()} method.
-     * 
-     * <p>
-     * {@link SVNDiffInstruction#COPY_FROM_TARGET} instructions are relative to the bounds of
-     * the <code>targetBuffer</code> itself. 
-     * 
-     * @param sourceBuffer  a buffer containing a source view
-     * @param targetBuffer  a buffer to get a target view
-     * @return              the size of the resultant target view
-     * @see                 #apply(SVNDiffWindowApplyBaton)
-     */
-    public int apply(byte[] sourceBuffer, byte[] targetBuffer) {
-        int dataOffset = myInstructionsLength;
-        int tpos = 0;
-        for (Iterator instructions = instructions(true); instructions.hasNext();) {
-            SVNDiffInstruction instruction = (SVNDiffInstruction) instructions.next();
-            int iLength = instruction.length < getTargetViewLength() - tpos ? (int) instruction.length : getTargetViewLength() - tpos;
-            switch (instruction.type) {
-                case SVNDiffInstruction.COPY_FROM_NEW_DATA:
-                    System.arraycopy(myData, myDataOffset + dataOffset, targetBuffer, tpos, iLength);
-                    dataOffset += iLength;
-                    break;
-                case SVNDiffInstruction.COPY_FROM_TARGET:
-                    int start = instruction.offset;
-                    int end = instruction.offset + iLength;
-                    int tIndex = tpos;
-                    for(int j = start; j < end; j++) {
-                        targetBuffer[tIndex] = targetBuffer[j];
-                        tIndex++;
-                    }
-                    break;
-                case SVNDiffInstruction.COPY_FROM_SOURCE:
-                    System.arraycopy(sourceBuffer, instruction.offset, targetBuffer, tpos, iLength);
-                    break;
-                default:
-            }
-            tpos += instruction.length;
-            if (tpos >= getTargetViewLength()) {
-                break;
-            }
-        }
-        return getTargetViewLength();
-    }
-    
-    /**
-     * Sets a byte buffer containing instruction and new data bytes 
-     * of this window. 
-     * 
-     * <p>
-     * Instructions will go before new data within the buffer and should start 
-     * at <code>buffer.position() + buffer.arrayOffset()</code>.
-     * 
-     * <p>
-     * Applying a diff window prior to setting instruction and new data bytes 
-     * may cause a NPE.  
-     * 
-     * @param buffer an input data buffer
-     */
-    public void setData(ByteBuffer buffer) {
-        myData = buffer.array();
-        myDataOffset = buffer.position() + buffer.arrayOffset();
     }
     
     /**
@@ -389,238 +284,18 @@ public class SVNDiffWindow {
         StringBuffer sb = new StringBuffer();
         sb.append(getSourceViewOffset());
         sb.append(":");
-        sb.append(getSourceViewLength());
+        sb.append(getSourceViewOffset());
         sb.append(":");
         sb.append(getTargetViewLength());
         sb.append(":");
-        sb.append(getInstructionsLength());
+        sb.append(getInstructionsCount());
         sb.append(":");
         sb.append(getNewDataLength());
+        sb.append("::");
+        for(int i = 0; i < getInstructionsCount(); i++) {
+            sb.append(getInstructionAt(i).toString());
+        }
         sb.append(":");
-        sb.append(getDataLength());
-        sb.append(":");
-        sb.append(myDataOffset);
         return sb.toString();
     }
-    
-    /**
-     * Tells if this window is not empty, i.e. has got any instructions.
-     * 
-     * @return <span class="javakeyword">true</span> if has instructions, 
-     *         <span class="javakeyword">false</span> if has not 
-     */
-    public boolean hasInstructions() {
-        return myInstructionsLength > 0;
-    }
-    
-    /**
-     * Writes this window object to the provided stream.
-     * 
-     * <p>
-     * If <code>writeHeader</code> is <span class="javakeyword">true</span> 
-     * then writes {@link #SVN_HEADER} bytes also.
-     * 
-     * @param os             an output stream to write to 
-     * @param writeHeader    controls whether the header should be written 
-     *                       or not
-     * @throws IOException   if an I/O error occurs
-     */
-    public void writeTo(OutputStream os, boolean writeHeader) throws IOException {
-        if (writeHeader) {
-            os.write(SVN_HEADER);
-        }
-        if (!hasInstructions()) {
-            return;
-        }
-        ByteBuffer offsets = ByteBuffer.allocate(100);
-        SVNDiffInstruction.writeLong(offsets, mySourceViewOffset);
-        SVNDiffInstruction.writeInt(offsets, mySourceViewLength);
-        SVNDiffInstruction.writeInt(offsets, myTargetViewLength);
-        SVNDiffInstruction.writeInt(offsets, myInstructionsLength);
-        SVNDiffInstruction.writeInt(offsets, myNewDataLength);
-        os.write(offsets.array(), 0, offsets.position());
-        // write instructions
-        os.write(myData, myDataOffset, myInstructionsLength);
-        if (myNewDataLength > 0) {
-            os.write(myData, myDataOffset + myInstructionsLength, myNewDataLength);
-        }
-    }
-    
-    /**
-     * Returns the total amount of new data and instruction bytes.
-     * 
-     * @return new data length + instructions length
-     */
-    public int getDataLength() {
-        return myNewDataLength + myInstructionsLength;
-    }
-
-    /**
-     * Tells whether this window contains any copy-from-source 
-     * instructions. 
-     * 
-     * @return <span class="javakeyword">true</span> if this window 
-     *         has got at least one {@link SVNDiffInstruction#COPY_FROM_SOURCE} 
-     *         instruction
-     */
-    public boolean hasCopyFromSourceInstructions() {
-        for(Iterator instrs = instructions(true); instrs.hasNext();) {
-            SVNDiffInstruction instruction = (SVNDiffInstruction) instrs.next();
-            if (instruction.type == SVNDiffInstruction.COPY_FROM_SOURCE) {
-                return true;
-            }
-        }
-        return false;
-    }
-    
-    /**
-     * Creates an exact copy of this window object. 
-     * 
-     * <p> 
-     * <code>targetData</code> is written instruction & new data bytes and 
-     * then is set to a new window object via a call to its {@link #setData(ByteBuffer) setData()} 
-     * method.
-     * 
-     * @param  targetData a byte buffer to receive a copy of this wondow data
-     * @return            a new window object that is an exact copy of this one
-     */
-    public SVNDiffWindow clone(ByteBuffer targetData) {
-        int targetOffset = targetData.position() + targetData.arrayOffset();
-        int position = targetData.position();
-        targetData.put(myData, myDataOffset, myInstructionsLength + myNewDataLength);
-        targetData.position(position);
-        SVNDiffWindow clone = new SVNDiffWindow(getSourceViewOffset(), getSourceViewLength(), getTargetViewLength(), 
-                getInstructionsLength(), getNewDataLength());
-        clone.setData(targetData);
-        clone.myDataOffset = targetOffset;
-        return clone;
-    }
-    
-    private class InstructionsIterator implements Iterator {
-        
-        private SVNDiffInstruction myNextInsruction;
-        private int myOffset;
-        private int myNewDataOffset;
-        private boolean myIsTemplate;
-        
-        public InstructionsIterator(boolean useTemplate) {
-            myIsTemplate = useTemplate;
-            myNextInsruction = readNextInstruction();
-        }
-
-        public boolean hasNext() {
-            return myNextInsruction != null;
-        }
-
-        public Object next() {
-            if (myNextInsruction == null) {
-                return null;
-            }
-        
-            if (myIsTemplate) {
-                myTemplateNextInstruction.type = myNextInsruction.type;
-                myTemplateNextInstruction.length = myNextInsruction.length;
-                myTemplateNextInstruction.offset = myNextInsruction.offset;
-                myNextInsruction = readNextInstruction();
-                return myTemplateNextInstruction;
-            } 
-            Object next = myNextInsruction;
-            myNextInsruction = readNextInstruction();
-            return next;
-        }
-
-        public void remove() {
-        }
-        
-        private SVNDiffInstruction readNextInstruction() {
-            if (myData == null || myOffset >= myInstructionsLength) {
-                return null;
-            }
-            SVNDiffInstruction instruction = myIsTemplate ? myTemplateInstruction : new SVNDiffInstruction();
-            instruction.type = (myData[myDataOffset + myOffset] & 0xC0) >> 6;
-            instruction.length = myData[myDataOffset + myOffset] & 0x3f;
-            myOffset++;
-            if (instruction.length == 0) {
-                // read length from next byte                
-                instruction.length = readInt();
-            } 
-            if (instruction.type == 0 || instruction.type == 1) {
-                // read offset from next byte (no offset without length).
-                instruction.offset = readInt();
-            } else { 
-                // set offset to offset in newdata.
-                instruction.offset = myNewDataOffset;
-                myNewDataOffset += instruction.length;
-            }
-            return instruction;
-        }
-        
-        private int readInt() {
-            int result = 0;
-            while(true) {
-                byte b = myData[myDataOffset + myOffset];
-                result = result << 7;
-                result = result | (b & 0x7f);
-                if ((b & 0x80) != 0) {
-                    myOffset++;
-                    if (myOffset >= myInstructionsLength) {
-                        return -1;
-                    }
-                    continue;
-                }
-                myOffset++;
-                return result;
-            }
-        }
-    }
-    
-    /**
-     * Returns an array of instructions of this window.
-     * 
-     * <p>
-     * If <code>target</code> is large enough to receive all instruction 
-     * objects, then it's simply filled up to the end of instructions.
-     * However if it's not, it will be expanded to receive all instructions. 
-     * 
-     * @param  target  an instructions receiver 
-     * @return         an array  containing all instructions
-     */
-    public SVNDiffInstruction[] loadDiffInstructions(SVNDiffInstruction[] target) {
-        int index = 0;
-        for (Iterator instructions = instructions(); instructions.hasNext();) {
-            if (index >= target.length) {
-                SVNDiffInstruction[] newTarget = new SVNDiffInstruction[index*3/2];
-                System.arraycopy(target, 0, newTarget, 0, index);
-                target = newTarget;
-            }
-            target[index] = (SVNDiffInstruction) instructions.next();
-            index++;
-        }
-        myInstructionsCount = index;
-        return target;
-    }
-    
-    /**
-     * Returns the amount of instructions of this window object.
-     * 
-     * @return a total number of instructions
-     */
-    public int getInstructionsCount() {
-        return myInstructionsCount;
-    }
-
-    /**
-     * Fills a target buffer with the specified number of new data bytes 
-     * of this window object taken at the specified offset.  
-     * 
-     * @param target a buffer to copy to
-     * @param offset an offset relative to the position of the first 
-     *               new data byte of this window object 
-     * @param length a number of new data bytes to copy
-     */
-    public void writeNewData(ByteBuffer target, int offset, int length) {
-        offset += myDataOffset + myInstructionsLength;
-        target.put(myData, offset, length);
-    }
-
 }

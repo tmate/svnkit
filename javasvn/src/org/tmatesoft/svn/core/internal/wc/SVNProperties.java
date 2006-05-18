@@ -24,7 +24,6 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.TreeSet;
-import java.util.Arrays;
 
 import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
@@ -35,8 +34,7 @@ import org.tmatesoft.svn.core.SVNException;
  * @author TMate Software Ltd.
  */
 public class SVNProperties {
-    public static final String SVN_HASH_TERMINATOR = "END";
-    
+
     private File myFile;
 
     private String myPath;
@@ -344,69 +342,6 @@ public class SVNProperties {
         SVNFileUtil.deleteFile(getFile());
     }
 
-    public static void setProperties(Map namesToValues, File target) throws SVNException {
-        OutputStream dst = null;
-        File tmpFile = null;
-        try {
-            tmpFile = SVNFileUtil.createUniqueFile(target.getParentFile(),
-                    target.getName(), ".tmp");
-            dst = SVNFileUtil.openFileForWriting(tmpFile);
-            setProperties(namesToValues, dst, SVN_HASH_TERMINATOR);
-        } finally {
-            SVNFileUtil.closeFile(dst);
-        }
-        if (tmpFile != null) {
-            SVNFileUtil.rename(tmpFile, target);
-            SVNFileUtil.setReadonly(target, true);
-        }
-    }
-
-    public static void setProperties(Map namesToValues, OutputStream target, String terminator) throws SVNException {
-        try {
-            Object[] keys = namesToValues.keySet().toArray();
-            Arrays.sort(keys);
-            for(int i = 0; i < keys.length; i++){
-                String propertyName = (String)keys[i];
-                writeProperty(target, 'K', propertyName.getBytes("UTF-8"));
-                String propertyValue = (String)namesToValues.get(propertyName);
-                writeProperty(target, 'V', propertyValue.getBytes("UTF-8"));
-            }
-            if(terminator != null){
-                target.write(terminator.getBytes("UTF-8"));
-                target.write('\n');
-            }
-        }catch(IOException ioe){    
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, ioe.getLocalizedMessage());
-            SVNErrorManager.error(err, ioe);
-        }
-    }
-    
-    public static void appendProperty(String name, String value, OutputStream target) throws SVNException {
-        if(name == null || value == null){
-            return;
-        }
-        try {
-            writeProperty(target, 'K', name.getBytes("UTF-8"));
-            writeProperty(target, 'V', value.getBytes("UTF-8"));
-        }catch(IOException ioe){    
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, ioe.getLocalizedMessage());
-            SVNErrorManager.error(err, ioe);
-        }
-    }
-    
-    //only for commit txns
-    public static void appendPropertyDeleted(String name, OutputStream target) throws SVNException {
-        if(name == null){
-            return;
-        }
-        try {
-            writeProperty(target, 'D', name.getBytes("UTF-8"));
-        }catch(IOException ioe){    
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, ioe.getLocalizedMessage());
-            SVNErrorManager.error(err, ioe);
-        }
-    }
-    
     /** @noinspection ResultOfMethodCallIgnored */
     private static boolean copyProperties(InputStream is, OutputStream os,
             String name, InputStream value, int length) throws SVNException {
