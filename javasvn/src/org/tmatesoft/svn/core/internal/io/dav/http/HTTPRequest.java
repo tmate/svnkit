@@ -21,6 +21,7 @@ import java.net.HttpURLConnection;
 import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNURL;
+import org.tmatesoft.svn.core.internal.util.IMeasurable;
 import org.tmatesoft.svn.util.Version;
 import org.xml.sax.helpers.DefaultHandler;
 
@@ -49,10 +50,7 @@ class HTTPRequest {
 
     private byte[] myRequestBody;
     private InputStream myRequestStream;
-
     private boolean myIsProxyAuthForced;
-
-    private boolean myIsKeepAlive;
 
     public HTTPRequest() {
     }
@@ -142,11 +140,10 @@ class HTTPRequest {
             length = myRequestBody.length;
         } else if (myRequestStream instanceof ByteArrayInputStream) {
             length = ((ByteArrayInputStream) myRequestStream).available();
-        } else if (header != null && header.hasHeader(HTTPHeader.CONTENT_LENGTH_HEADER)) {
-            length = Long.parseLong(header.getFirstHeaderValue(HTTPHeader.CONTENT_LENGTH_HEADER));
-            header.removeHeader(HTTPHeader.CONTENT_LENGTH_HEADER);
+        } else if (myRequestStream instanceof IMeasurable) {
+            length = ((IMeasurable) myRequestStream).getLength();
         }
-        StringBuffer headerText = composeHTTPHeader(request, path, header, length, myIsKeepAlive);
+        StringBuffer headerText = composeHTTPHeader(request, path, header, length);
         myConnection.sendData(headerText.toString().getBytes());
         if (myRequestBody != null && length > 0) {
             myConnection.sendData(myRequestBody);
@@ -162,8 +159,7 @@ class HTTPRequest {
         if (myStatus.getCode() == HttpURLConnection.HTTP_MOVED_PERM || 
                 myStatus.getCode() == HttpURLConnection.HTTP_MOVED_TEMP ||
                 myStatus.getCode() == HttpURLConnection.HTTP_FORBIDDEN ||
-                myStatus.getCode() == HttpURLConnection.HTTP_UNAUTHORIZED ||
-                myStatus.getCode() == HttpURLConnection.HTTP_PROXY_AUTH) {
+                myStatus.getCode() == HttpURLConnection.HTTP_UNAUTHORIZED) {
             // these errors are always processed by the caller, to allow retry.
             myErrorMessage = createDefaultErrorMessage(myConnection.getHost(), myStatus, context.getMessageTemplate(), context.getRelatedObjects());
             myConnection.skipData(this);
@@ -237,7 +233,7 @@ class HTTPRequest {
         return myErrorMessage;
     }
 
-    private StringBuffer composeHTTPHeader(String request, String path, HTTPHeader header, long length, boolean keepAlive) {
+    private StringBuffer composeHTTPHeader(String request, String path, HTTPHeader header, long length) {
         StringBuffer sb = new StringBuffer();
         sb.append(request);
         sb.append(' ');
@@ -267,12 +263,10 @@ class HTTPRequest {
         sb.append("User-Agent: ");
         sb.append(Version.getVersionString());
         sb.append(HTTPRequest.CRLF);
-        if (keepAlive) {
-            sb.append("Keep-Alive:");
-            sb.append(HTTPRequest.CRLF);
-            sb.append("Connection: TE, Keep-Alive");
-            sb.append(HTTPRequest.CRLF);
-        }
+        sb.append("Keep-Alive:");
+        sb.append(HTTPRequest.CRLF);
+        sb.append("Connection: TE, Keep-Alive");
+        sb.append(HTTPRequest.CRLF);
         sb.append("TE: trailers");
         sb.append(HTTPRequest.CRLF);
         if (myAuthentication != null) {
@@ -318,10 +312,6 @@ class HTTPRequest {
             System.arraycopy(contextObjects, 0, messageObjects, 0, contextObjects.length);
         }
         return SVNErrorMessage.create(errorCode, context + ": " + message + " ({" + index + "})", messageObjects);
-    }
-
-    public void setKeepAlive(boolean isKeepAlive) {
-        myIsKeepAlive = isKeepAlive;
     }
     
 }

@@ -60,7 +60,7 @@ import org.tmatesoft.svn.core.io.SVNRepository;
  * methods are called non-recursively and allow to get status info on a single 
  * item. 
  * 
- * @version 1.1
+ * @version 1.0
  * @author  TMate Software Ltd.
  * @see		ISVNStatusHandler
  * @see		SVNStatus
@@ -239,7 +239,7 @@ public class SVNStatusClient extends SVNBasicClient {
                         throw e;
                     }
                 } finally {
-                    setEventPathPrefix(externalPath);
+                    setEventPathPrefix(null);
                 }
             }
         }
@@ -277,15 +277,14 @@ public class SVNStatusClient extends SVNBasicClient {
      * 									for the item
      * @throws SVNException
      */
-    public SVNStatus doStatus(File path, boolean remote, boolean collectParentExternals) throws SVNException {
+    public SVNStatus doStatus(final File path, boolean remote, boolean collectParentExternals) throws SVNException {
         final SVNStatus[] result = new SVNStatus[] { null };
-        final File absPath = path.getAbsoluteFile();
         ISVNStatusHandler handler = new ISVNStatusHandler() {
             public void handleStatus(SVNStatus status) {
-                if (absPath.equals(status.getFile())) {
+                if (path.equals(status.getFile())) {
                     if (result[0] != null
                         && result[0].getContentsStatus() == SVNStatusType.STATUS_EXTERNAL
-                        && absPath.isDirectory()) {
+                        && path.isDirectory()) {
                         result[0] = status;
                         result[0].markExternal();
                     } else if (result[0] == null) {

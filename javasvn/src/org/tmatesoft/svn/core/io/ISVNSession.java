@@ -48,7 +48,7 @@ package org.tmatesoft.svn.core.io;
  *         ...
  *     }</pre><br />
  * 
- * @version 1.1
+ * @version 1.0
  * @author  TMate Software Ltd.
  * @see     SVNRepository
  * @see     SVNRepositoryFactory
@@ -108,11 +108,6 @@ public interface ISVNSession {
      */
     public boolean hasCommitMessage(SVNRepository repository, long revision);
     
-    /**
-     * A session options implementation that simply allows to keep 
-     * a single connection alive for all data i/o. This implementation 
-     * does not cache commit messages. 
-     */
     public ISVNSession KEEP_ALIVE = new ISVNSession() {
         public boolean keepConnection(SVNRepository repository) {
             return true;
@@ -128,8 +123,8 @@ public interface ISVNSession {
     };
 
     /**
-     * The same as {@link #KEEP_ALIVE}. Left for backward 
-     * compatibility. 
+     * A default implementation of the <b>ISVNSession</b> interface that does not allow
+     * to use a single socket connection and does not cache commit messages. 
      */
     public ISVNSession DEFAULT = KEEP_ALIVE;
 }

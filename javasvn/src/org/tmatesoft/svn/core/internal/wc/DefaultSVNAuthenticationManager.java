@@ -30,7 +30,7 @@ import org.tmatesoft.svn.core.auth.ISVNSSLManager;
 import org.tmatesoft.svn.core.auth.SVNAuthentication;
 import org.tmatesoft.svn.core.auth.SVNPasswordAuthentication;
 import org.tmatesoft.svn.core.auth.SVNSSHAuthentication;
-import org.tmatesoft.svn.core.auth.SVNUserNameAuthentication;
+import org.tmatesoft.svn.core.auth.SVNSSLAuthentication;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
 import org.tmatesoft.svn.core.wc.SVNWCUtil;
 
@@ -50,7 +50,6 @@ public class DefaultSVNAuthenticationManager implements ISVNAuthenticationManage
     private ISVNAuthenticationStorage myRuntimeAuthStorage;
     private int myLastProviderIndex;
     private SVNConfigFile myConfigFile;
-    private boolean myIsAuthenticationForced;
 
     public DefaultSVNAuthenticationManager(File configDirectory, boolean storeAuth, String userName, String password) {
         password = password == null ? "" : password;
@@ -331,11 +330,6 @@ public class DefaultSVNAuthenticationManager implements ISVNAuthenticationManage
                         return null;
                     }
                     return new SVNPasswordAuthentication(myUserName, myPassword, myIsStore);
-                } else if (ISVNAuthenticationManager.USERNAME.equals(kind)) {
-                    if (myUserName == null) {
-                        return null;
-                    }
-                    return new SVNUserNameAuthentication(myUserName, myIsStore);
                 }
             }
             return null;
@@ -370,7 +364,8 @@ public class DefaultSVNAuthenticationManager implements ISVNAuthenticationManage
             if (auth == null || realm == null) {
                 return;
             }
-            String kind = auth.getKind();
+            String kind = auth instanceof SVNSSHAuthentication ? 
+                    ISVNAuthenticationManager.SSH : (auth instanceof SVNSSLAuthentication) ? ISVNAuthenticationManager.SSL : ISVNAuthenticationManager.PASSWORD;
             getRuntimeAuthStorage().putData(kind, realm, auth);
         }
         
@@ -433,8 +428,6 @@ public class DefaultSVNAuthenticationManager implements ISVNAuthenticationManage
                         } else if (password != null) {
                             return new SVNSSHAuthentication(userName, password, portNumber, authMayBeStored);
                         }                    
-                    } else if (ISVNAuthenticationManager.USERNAME.equals(kind)) {
-                        return new SVNUserNameAuthentication(userName, authMayBeStored);
                     }
                 } catch (SVNException e) {
                     //
@@ -488,7 +481,7 @@ public class DefaultSVNAuthenticationManager implements ISVNAuthenticationManage
                 for (Iterator names = values.keySet().iterator(); names.hasNext();) {
                     String name = (String) names.next();
                     props.setPropertyValue(name, (String) values.get(name));
-                } 
+                }
                 SVNFileUtil.setReadonly(props.getFile(), false);
             } catch (SVNException e) {
                 props.delete();
@@ -542,10 +535,6 @@ public class DefaultSVNAuthenticationManager implements ISVNAuthenticationManage
     }
 
     public boolean isAuthenticationForced() {
-        return myIsAuthenticationForced;
-    }
-
-    public void setAuthenticationForced(boolean forced) {
-        myIsAuthenticationForced = forced;
+        return false;
     }
 }

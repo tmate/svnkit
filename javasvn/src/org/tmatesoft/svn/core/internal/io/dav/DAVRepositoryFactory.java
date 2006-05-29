@@ -30,9 +30,11 @@ public class DAVRepositoryFactory extends SVNRepositoryFactory {
     }
 
     public static void setup(IHTTPConnectionFactory connectionFactory) {
-        connectionFactory = connectionFactory == null ? IHTTPConnectionFactory.DEFAULT : connectionFactory;
-        DAVRepositoryFactory factory = new DAVRepositoryFactory(connectionFactory);
-        SVNRepositoryFactory.registerRepositoryFactory("^https?://.*$", factory);
+        if (!SVNRepositoryFactory.hasRepositoryFactory("^https?://.*$")) {
+            connectionFactory = connectionFactory == null ? IHTTPConnectionFactory.DEFAULT : connectionFactory;
+            DAVRepositoryFactory factory = new DAVRepositoryFactory(connectionFactory);
+            SVNRepositoryFactory.registerRepositoryFactory("^https?://.*$", factory);
+        }
     }
 
     private IHTTPConnectionFactory myConnectionFactory;

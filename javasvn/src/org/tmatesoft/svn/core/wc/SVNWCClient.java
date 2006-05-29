@@ -129,7 +129,7 @@ import org.tmatesoft.svn.util.SVNDebugLog;
  * </tr>
  * </table>
  * 
- * @version 1.1
+ * @version 1.0
  * @author  TMate Software Ltd.
  * @see     <a target="_top" href="http://tmate.org/svn/kb/examples/">Examples</a>
  */
@@ -1953,20 +1953,19 @@ public class SVNWCClient extends SVNBasicClient {
         File file = dir.getFile(name);
         dir.add(name, false, false);
 
+        String mimeType;
         SVNProperties properties = dir.getProperties(name, false);
         if (SVNFileType.getType(file) == SVNFileType.SYMLINK) {
             properties.setPropertyValue(SVNProperty.SPECIAL, "*");
         } else {
             Map props = new HashMap();
-	        String mimeType = SVNFileUtil.detectMimeType(file);
-	        if (mimeType != null) {
-	            props.put(SVNProperty.MIME_TYPE, mimeType);
-	        }
             boolean executable;
             props = getOptions().applyAutoProperties(name, props);
-            if (props.get(SVNProperty.MIME_TYPE) == null && mimeType != null) {
-                props.put(SVNProperty.MIME_TYPE, mimeType);
-                if (SVNProperty.isBinaryMimeType(mimeType)) {
+            mimeType = (String) props.get(SVNProperty.MIME_TYPE);
+            if (mimeType == null) {
+                mimeType = SVNFileUtil.detectMimeType(file);
+                if (mimeType != null) {
+                    props.put(SVNProperty.MIME_TYPE, mimeType);
                     props.remove(SVNProperty.EOL_STYLE);
                 }
             }
@@ -1976,7 +1975,7 @@ public class SVNWCClient extends SVNBasicClient {
                     props.put(SVNProperty.EXECUTABLE, "*");
                 }
             }
-            if (SVNProperty.isBinaryMimeType((String) props.get(SVNProperty.MIME_TYPE)) && props.get(SVNProperty.EOL_STYLE) != null) {
+            if (props.get(SVNProperty.MIME_TYPE) != null && props.get(SVNProperty.EOL_STYLE) != null) {
                 props.remove(SVNProperty.EOL_STYLE);
             }
             
@@ -2237,8 +2236,7 @@ public class SVNWCClient extends SVNBasicClient {
             return value;
         }
         if (SVNProperty.isSVNProperty(name)) {
-            value = value.replaceAll("\r\n", "\n");
-            value = value.replace('\r', '\n');
+            value = SVNTranslator.convertEOLs(value);
         }
         if (!force && SVNProperty.EOL_STYLE.equals(name)) {
             value = value.trim();

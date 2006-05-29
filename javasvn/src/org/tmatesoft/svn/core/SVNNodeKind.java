@@ -23,7 +23,7 @@ package org.tmatesoft.svn.core;
  * <li>unknown     - the node kind can not be recognized
  * </ul>
  *  
- * @version 1.1
+ * @version 1.0
  * @author 	TMate Software Ltd.
  * @see 	SVNDirEntry
  */

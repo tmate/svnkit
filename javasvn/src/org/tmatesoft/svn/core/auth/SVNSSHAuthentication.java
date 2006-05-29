@@ -18,12 +18,12 @@ import java.io.File;
  * to authenticate a user over an SSH tunnel.
  * 
  * <p> 
- * To obtain an ssh user credential, specify the {@link ISVNAuthenticationManager#SSH SSH} 
- * kind to credentials getter method of <b>ISVNAuthenticationManager</b>: 
- * {@link ISVNAuthenticationManager#getFirstAuthentication(String, String, SVNURL) getFirstAuthentication()}, 
+ * To obtain an ssh user credential, specify the {@link ISVNAuthenticationManager#SSH} 
+ * kind to credentials getter method of <b>ISVNAuthenticationManager</b> - either 
+ * {@link ISVNAuthenticationManager#getFirstAuthentication(String, String, SVNURL) getFirstAuthentication()} or
  * {@link ISVNAuthenticationManager#getNextAuthentication(String, String, SVNURL) getNextAuthentication()}.
  * 
- * @version 1.1
+ * @version 1.0
  * @author  TMate Software Ltd.
  * @see     ISVNAuthenticationManager  
  */
@@ -47,7 +47,7 @@ public class SVNSSHAuthentication extends SVNAuthentication {
      *                         global auth cache, otherwise not
      */
     public SVNSSHAuthentication(String userName, String password, int portNumber, boolean storageAllowed) {
-        super(ISVNAuthenticationManager.SSH, userName, storageAllowed);
+        super(userName, storageAllowed);
         myPassword = password;
         myPortNumber = portNumber;
     }
@@ -66,7 +66,7 @@ public class SVNSSHAuthentication extends SVNAuthentication {
      *                         global auth cache, otherwise not
      */
     public SVNSSHAuthentication(String userName, File keyFile, String passphrase, int portNumber, boolean storageAllowed) {
-        super(ISVNAuthenticationManager.SSH, userName, storageAllowed);
+        super(userName, storageAllowed);
         myPrivateKey = keyFile;
         myPassphrase = passphrase;
         myPortNumber = portNumber;
@@ -112,4 +112,5 @@ public class SVNSSHAuthentication extends SVNAuthentication {
     public int getPortNumber() {
         return myPortNumber;
     }
+
 }

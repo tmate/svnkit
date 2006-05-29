@@ -12,35 +12,37 @@
 
 package org.tmatesoft.svn.core.io.diff;
 
-import java.nio.ByteBuffer;
-
 
 /**
- * The <b>SVNDiffInstruction</b> class represents instructions used as delta 
- * applying rules. 
- * 
+ * The <b>SVNDiffInstruction</b> class represents instructions used to
+ * apply delta. 
  * <p>
  * For now there are three types of copy instructions:
  * <ul>
  * <li>
  * {@link SVNDiffInstruction#COPY_FROM_SOURCE}: that is when bytes are copied from
- * a source view (for example, existing revision of a file) to the target 
- * one.    
+ * the source (for example, existing revision of a file) to the target 
+ * what means that those bytes are left the same as in the source    
  * </li>
  * <li>
- * {@link SVNDiffInstruction#COPY_FROM_NEW_DATA}: new data bytes (e.g. new 
- * text) are copied to the target view.
+ * {@link SVNDiffInstruction#COPY_FROM_NEW_DATA}: new data is some new bytes that a user
+ * has added to an existing revision of a file, i.e. bytes of the user's
+ * changes, in other words 
  * </li>
  * <li>
  * {@link SVNDiffInstruction#COPY_FROM_TARGET}: that is, when a sequence of bytes in the 
- * target must be repeated.
+ * target must be repeated
  * </li>
  * </ul>
  * 
- * These are three different ways how full text representation bytes are 
- * obtained. 
+ * <p>
+ * When a new file is added to a repository in a particular revision,
+ * its contents are entirely new data. But all the further changed 
+ * revisions of this file may be got as copying some source bytes
+ * from a previous revision and some new bytes that were added only 
+ * in the latest (at any point) revision.
  *  
- * @version 1.1
+ * @version 1.0
  * @author  TMate Software Ltd.
  */
 public class SVNDiffInstruction {
@@ -75,7 +77,7 @@ public class SVNDiffInstruction {
      *           the bytes are to be copied
      * @see      SVNDiffWindow
      */
-    public SVNDiffInstruction(int t, int l, int o) {
+    public SVNDiffInstruction(int t, long l, long o) {
         type = t;
         length = l;
         offset = o;        
@@ -99,7 +101,7 @@ public class SVNDiffInstruction {
     /**
      * A length bytes to copy.    
      */
-    public int length;
+    public long length;
     
     /**
      * An offset in the source from where the bytes
@@ -108,7 +110,7 @@ public class SVNDiffInstruction {
      * diff window) in the source/target stream (this can be a file, a buffer).
      *  
      */
-    public int offset;
+    public long offset;
     
     /**
      * Gives a string representation of this object.
@@ -131,83 +133,10 @@ public class SVNDiffInstruction {
         if (type == 0 || type == 1) {
             b.append(offset);
         } else {
-            b.append(offset);
+            b.append("x");
         }
         b.append(":");
         b.append(length);
         return b.toString();
-    }
-    
-    /**
-     * Wirtes this instruction to a byte buffer.
-     * 
-     * @param target a byte buffer to write to
-     */
-    public void writeTo(ByteBuffer target) {
-        byte first = (byte) (type << 6);
-        if (length <= 0x3f && length > 0) {
-            // single-byte lenght;
-            first |= (length & 0x3f);
-            target.put((byte) (first & 0xff));
-        } else {
-            target.put((byte) (first & 0xff));
-            writeInt(target, length);
-        }
-        if (type == 0 || type == 1) {
-            writeInt(target, offset);
-        }
-    }
-    
-    /**
-     * Writes an integer to a byte buffer.
-     * 
-     * @param os a byte buffer to write to 
-     * @param i  an integer to write 
-     */
-    public static void writeInt(ByteBuffer os, int i) {
-        if (i == 0) {
-            os.put((byte) 0);
-            return;
-        }
-        int count = 1;
-        long v = i >> 7;
-        while(v > 0) {
-            v = v >> 7;
-            count++;
-        }
-        byte b;
-        int r;
-        while(--count >= 0) {
-            b = (byte) ((count > 0 ? 0x1 : 0x0) << 7);
-            r = ((byte) ((i >> (7 * count)) & 0x7f)) | b;
-            os.put((byte) r);
-        }
-    }
-
-    /**
-     * Writes a long to a byte buffer. 
-     * 
-     * @param os a byte buffer to write to 
-     * @param i  a long number to write 
-     */
-    public static void writeLong(ByteBuffer os, long i) {
-        if (i == 0) {
-            os.put((byte) 0);
-            return;
-        }
-        // how many bytes there are:
-        int count = 1;
-        long v = i >> 7;
-        while(v > 0) {
-            v = v >> 7;
-            count++;
-        }
-        byte b;
-        int r;
-        while(--count >= 0) {
-            b = (byte) ((count > 0 ? 0x1 : 0x0) << 7);
-            r = ((byte) ((i >> (7 * count)) & 0x7f)) | b;
-            os.put((byte) r);
-        }
     }
 }

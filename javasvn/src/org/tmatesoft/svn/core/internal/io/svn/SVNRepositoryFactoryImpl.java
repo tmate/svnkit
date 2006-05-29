@@ -30,8 +30,14 @@ public final class SVNRepositoryFactoryImpl extends SVNRepositoryFactory {
     }
 
     public static void setup(ISVNConnectorFactory connectorFactory) {
-        ourConnectorFactory = connectorFactory == null ? ISVNConnectorFactory.DEFAULT : connectorFactory;
-        SVNRepositoryFactory.registerRepositoryFactory("^svn(\\+.+)?://.*$", new SVNRepositoryFactoryImpl());
+        if (ourConnectorFactory == null) {
+            ourConnectorFactory = connectorFactory == null ? ISVNConnectorFactory.DEFAULT
+                    : connectorFactory;
+        }
+        if (!SVNRepositoryFactory.hasRepositoryFactory("^svn(\\+ssh)?://.*$")) {
+            SVNRepositoryFactory.registerRepositoryFactory(
+                    "^svn(\\+ssh)?://.*$", new SVNRepositoryFactoryImpl());
+        }
     }
 
     public SVNRepository createRepositoryImpl(SVNURL location, ISVNSession options) {

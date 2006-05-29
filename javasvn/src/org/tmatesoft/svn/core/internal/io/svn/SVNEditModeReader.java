@@ -12,16 +12,19 @@
 
 package org.tmatesoft.svn.core.internal.io.svn;
 
+import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.HashMap;
 import java.util.Map;
 
 import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
-import org.tmatesoft.svn.core.internal.delta.SVNDeltaReader;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
+import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 import org.tmatesoft.svn.core.io.ISVNEditor;
+import org.tmatesoft.svn.core.io.diff.SVNDiffWindowBuilder;
 
 /**
  * @version 1.0
@@ -51,12 +54,18 @@ public class SVNEditModeReader {
     }
 
     private ISVNEditor myEditor;
-    private SVNDeltaReader myDeltaReader;
+
+    private SVNDiffWindowBuilder myBuilder;
+
+    private OutputStream myDiffStream;
+
+    private long myLenght;
+
     private String myFilePath;
 
     public void setEditor(ISVNEditor editor) {
         myEditor = editor;
-        myDeltaReader = new SVNDeltaReader();
+        myBuilder = SVNDiffWindowBuilder.newInstance();
     }
 
     public boolean processCommand(String commandName, InputStream parameters) throws SVNException {
@@ -65,13 +74,52 @@ public class SVNEditModeReader {
             SVNErrorManager.error(SVNErrorMessage.create(SVNErrorCode.RA_SVN_UNKNOWN_CMD));
         }
         if ("textdelta-chunk".equals(commandName)) {
-            Object[] items = SVNReader.parse(parameters, "(SB))", null);
-            byte[] bytes = (byte[]) items[1];
-            myDeltaReader.nextWindow(bytes, 0, bytes.length, myFilePath, myEditor);
+            if (myBuilder.getDiffWindow() == null) {
+                Object[] items = null;
+                try {
+                    items = SVNReader.parse(parameters, "(SB))", null);
+                } catch (Throwable th) {
+                    SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.RA_SVN_MALFORMED_DATA, "Cannot read editor command: {0}", th.getLocalizedMessage());
+                    SVNErrorManager.error(err, th);
+                } 
+                byte[] bytes = (byte[]) items[1];
+                myBuilder.accept(bytes, 0);
+                if (myBuilder.getDiffWindow() != null) {
+                    myLenght = myBuilder.getDiffWindow().getNewDataLength();
+                    myDiffStream = myEditor.textDeltaChunk(myFilePath, myBuilder.getDiffWindow());
+                    if (myDiffStream == null) {
+                        myDiffStream = SVNFileUtil.DUMMY_OUT;
+                    }
+                    try {
+                        myDiffStream.write(myBuilder.getInstructionsData());
+                    } catch (IOException e) {
+                        SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.RA_SVN_IO_ERROR, e.getLocalizedMessage());
+                        SVNErrorManager.error(err, e);
+                    }
+                    if (myLenght == 0) {
+                        closeDiffStream();
+                    }
+                }
+            } else if (myDiffStream != null) {
+                if (myLenght > 0) {
+                    byte[] line;
+                    line = (byte[]) SVNReader.parse(parameters, "(sB))", null)[0];
+                    myLenght -= line.length;
+                    try {
+                        myDiffStream.write(line);
+                    } catch (IOException e) {
+                        SVNErrorManager.error(SVNErrorMessage.create(SVNErrorCode.RA_SVN_IO_ERROR, e.getMessage()), e);
+                    }
+                }
+                if (myLenght == 0) {
+                    closeDiffStream();
+                }
+            }
             return true;
         }
 
-        boolean last = "close-edit".equals(commandName) || "abort-edit".equals(commandName);
+        boolean last = "close-edit".equals(commandName)
+                || "abort-edit".equals(commandName);
         Object[] items = SVNReader.parse(parameters, pattern, new Object[10]);
         if ("target-rev".equals(commandName)) {
             myEditor.targetRevision(SVNReader.getLong(items, 0));
@@ -102,11 +150,11 @@ public class SVNEditModeReader {
         } else if ("close-file".equals(commandName)) {
             myEditor.closeFile(myFilePath, (String) items[1]);
         } else if ("apply-textdelta".equals(commandName)) {
+            myBuilder.reset();
+            myLenght = 0;
+            myDiffStream = null;
             myEditor.applyTextDelta(myFilePath, (String) items[1]);
         } else if ("textdelta-end".equals(commandName)) {
-            // reset delta reader, 
-            // this should send empty window when diffstream contained only header. 
-            myDeltaReader.reset(myFilePath, myEditor);
             myEditor.textDeltaEnd(myFilePath);
         } else if ("close-edit".equals(commandName)) {
             myEditor.closeEdit();
@@ -115,4 +163,16 @@ public class SVNEditModeReader {
         }
         return !last;
     }
+
+    private void closeDiffStream() throws SVNException {
+        try {
+            myDiffStream.close();
+        } catch (IOException e) {
+            SVNErrorManager.error(SVNErrorMessage.create(SVNErrorCode.RA_SVN_IO_ERROR, e.getMessage()), e);
+        }
+        myBuilder.reset(SVNDiffWindowBuilder.OFFSET);
+        myDiffStream = null;
+        myLenght = -1;
+    }
+
 }

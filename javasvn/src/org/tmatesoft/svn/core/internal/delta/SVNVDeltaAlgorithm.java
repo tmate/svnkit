@@ -20,18 +20,19 @@ import java.util.Arrays;
 public class SVNVDeltaAlgorithm extends SVNDeltaAlgorithm {
     
     private static final int VD_KEY_SIZE = 4;
+
     
     private SlotsTable mySlotsTable; 
     
     public void computeDelta(byte[] a, int aLength, byte[] b, int bLength) {
+        byte[] data = null;
         int dataLength;
-        byte[] data;
         if (aLength > 0 && bLength > 0) {
             // both are non-empty (reuse some local array).
-            data = new byte[(aLength + bLength)];
+            data = new byte[aLength + bLength];
             System.arraycopy(a, 0, data, 0, aLength);
             System.arraycopy(b, 0, data, aLength, bLength);
-            dataLength = aLength + bLength;
+            dataLength = data.length;
         } else if (aLength == 0) {
             // a is empty
             data = b;
@@ -79,7 +80,6 @@ public class SVNVDeltaAlgorithm extends SVNDeltaAlgorithm {
             do {
                 progress = false;
                 for(slot = table.getBucket(table.getBucketIndex(data, key)); slot >= 0; slot = table.mySlots[slot]) {
-                    
                     if (slot < key - here) {
                         continue;
                     }
@@ -128,7 +128,7 @@ public class SVNVDeltaAlgorithm extends SVNDeltaAlgorithm {
             
     }
     
-
+    
     private int findMatchLength(byte[] data, int match, int from, int end) {
         int here = from;
         while(here < end && data[match] == data[here]) {
@@ -139,7 +139,6 @@ public class SVNVDeltaAlgorithm extends SVNDeltaAlgorithm {
     }
     
     private static class SlotsTable {
-        
         private int[] mySlots;
         private int[] myBuckets;
         private int myBucketsCount;
@@ -155,7 +154,7 @@ public class SVNVDeltaAlgorithm extends SVNDeltaAlgorithm {
             Arrays.fill(mySlots, 0, dataLength, -1);
             Arrays.fill(myBuckets, 0, myBucketsCount, -1);
         }
-
+        
         public int getBucketIndex(byte[] data, int index) {
             int hash = 0;
             hash += (data[index] & 0xFF);

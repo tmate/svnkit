@@ -12,6 +12,7 @@
 
 package org.tmatesoft.svn.core.internal.io.svn;
 
+import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Collection;
 import java.util.Date;
@@ -32,7 +33,6 @@ import org.tmatesoft.svn.core.SVNNodeKind;
 import org.tmatesoft.svn.core.SVNProperty;
 import org.tmatesoft.svn.core.SVNRevisionProperty;
 import org.tmatesoft.svn.core.SVNURL;
-import org.tmatesoft.svn.core.internal.delta.SVNDeltaReader;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.io.ISVNEditor;
@@ -46,6 +46,8 @@ import org.tmatesoft.svn.core.io.ISVNWorkspaceMediator;
 import org.tmatesoft.svn.core.io.SVNFileRevision;
 import org.tmatesoft.svn.core.io.SVNLocationEntry;
 import org.tmatesoft.svn.core.io.SVNRepository;
+import org.tmatesoft.svn.core.io.diff.SVNDiffWindow;
+import org.tmatesoft.svn.core.io.diff.SVNDiffWindowBuilder;
 import org.tmatesoft.svn.util.SVNDebugLog;
 
 /**
@@ -317,11 +319,11 @@ public class SVNRepositoryImpl extends SVNRepository implements ISVNReporter {
         return parentEntry;
     }
 
-    public int getFileRevisions(String path, long sRevision, long eRevision, ISVNFileRevisionHandler handler) throws SVNException {
+    public int getFileRevisions(String path, long sRevision, long eRevision,
+            ISVNFileRevisionHandler handler) throws SVNException {
         Long srev = getRevisionObject(sRevision);
         Long erev = getRevisionObject(eRevision);
         int count = 0;
-        SVNDeltaReader deltaReader = new SVNDeltaReader();
         try {
             openConnection();
             Object[] buffer = new Object[] { "get-file-revs",
@@ -368,7 +370,7 @@ public class SVNRepositoryImpl extends SVNRepository implements ISVNReporter {
                     }
                     continue;
                 }
-//                SVNDiffWindowBuilder builder = SVNDiffWindowBuilder.newInstance();
+                SVNDiffWindowBuilder builder = SVNDiffWindowBuilder.newInstance();
                 boolean windowRead = false;
                 while (true) {
                     byte[] line = (byte[]) read("?W?B", buffer)[1];
@@ -383,13 +385,44 @@ public class SVNRepositoryImpl extends SVNRepository implements ISVNReporter {
                     // apply delta here.
                     if (!windowRead) {
                         if (handler != null) {
-                            handler.applyTextDelta(name == null ? path : name, null);
+                            handler.applyTextDelta(name == null ? path : name);
                             windowRead = true;
                         }
                     }
-                    deltaReader.nextWindow(line, 0, line.length, name == null ? path : name, handler);
+                    builder.accept(line, 0);
+                    SVNDiffWindow window = builder.getDiffWindow();
+                    if (window != null) {
+                        OutputStream os = handler.textDeltaChunk(name == null ? path : name, window);
+                        if (os != null) {
+                            try {
+                                os.write(builder.getInstructionsData());
+                            } catch (IOException e) {
+                                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, e.getLocalizedMessage());
+                                SVNErrorManager.error(err, e);
+                            }
+                        }
+                        builder.reset(SVNDiffWindowBuilder.OFFSET);
+                        long length = window.getNewDataLength();
+                        while (length > 0) {
+                            byte[] contents = (byte[]) myConnection.read("B", null)[0];
+                            length -= contents.length;
+                            try {
+                                if (os != null) {
+                                    os.write(contents);
+                                }
+                            } catch (IOException th) {
+                                SVNDebugLog.logInfo(th);
+                            }
+                        }
+                        try {
+                            if (os != null) {
+                                os.close();
+                            }
+                        } catch (IOException th) {
+                            SVNDebugLog.logInfo(th);
+                        }
+                    }
                 }
-                deltaReader.reset(name == null ? path : name, handler);
                 if (windowRead) {
                     handler.textDeltaEnd(name == null ? path : name);
                 }
@@ -411,12 +444,8 @@ public class SVNRepositoryImpl extends SVNRepository implements ISVNReporter {
         long count = 0;
         try {
             openConnection();
-            String[] repositoryPaths = getRepositoryPaths(targetPaths);
-            if (repositoryPaths == null || repositoryPaths.length == 0) {
-                repositoryPaths = new String[]{""};
-            }
             Object[] buffer = new Object[] { "log",
-                    repositoryPaths,
+                    getRepositoryPaths(targetPaths),
                     getRevisionObject(startRevision),
                     getRevisionObject(endRevision),
                     Boolean.valueOf(changedPaths), Boolean.valueOf(strictNode),

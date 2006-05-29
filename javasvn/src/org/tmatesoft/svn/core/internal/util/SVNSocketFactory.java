@@ -51,27 +51,27 @@ public class SVNSocketFactory {
     public static Socket createPlainSocket(String host, int port) throws IOException {
         InetAddress address = createAddres(host);
         Socket socket = new Socket(address, port);
-        socket.setReuseAddress(true);
         socket.setTcpNoDelay(true);
         socket.setKeepAlive(true);
+        socket.setReuseAddress(true);
         return socket;
     }
 
     public static Socket createSSLSocket(ISVNSSLManager manager, String host, int port) throws IOException {
         manager = manager == null ? DEFAULT_SSL_MANAGER : manager;
         Socket sslSocket = manager.getSSLContext().getSocketFactory().createSocket(createAddres(host), port);
-        sslSocket.setReuseAddress(true);
         sslSocket.setTcpNoDelay(true);
         sslSocket.setKeepAlive(true);
+        sslSocket.setReuseAddress(true);
         return sslSocket;
     }
 
     public static Socket createSSLSocket(ISVNSSLManager manager, String host, int port, Socket socket) throws IOException {
         manager = manager == null ? DEFAULT_SSL_MANAGER : manager;
         Socket sslSocket = manager.getSSLContext().getSocketFactory().createSocket(socket, host, port, true);
-        sslSocket.setReuseAddress(true);
         sslSocket.setTcpNoDelay(true);
         sslSocket.setKeepAlive(true);
+        sslSocket.setReuseAddress(true);
         return sslSocket;
     }
 

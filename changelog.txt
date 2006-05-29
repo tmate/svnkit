@@ -1,19 +1,34 @@
-= version 1.1.0.beta2
+= version 1.0.6
 
-+ NTLM authentication method support.
-+ Javadoc updated to match new JavaSVN features.
-+ Minor bugfixes.
++ Broken cross-wc commit fixed.
++ svn:externals property were not set when externals directory included dots.
++ Remote status reported newly added working copy resources as remotely deleted.
 
-= version 1.1.0.beta
+= version 1.0.5
 
-+ 'file' protocol support (for 'fsfs' repositories).
++ Error 502 on COPY operation fixed.
++ Move operation now moves ignored resources.
++ Error on accessing repository located at host root (http://host) fixed.
++ Error on attempt to copy URLs with username included fixed.
++ Problems with committing of "special" files on windows resolved.
++ Other minor bugfixes
+
+= version 1.0.4
+
++ Subversion 1.3.1 compatibilty bugfixes.
++ SSH port number was not saved properly when JavaSVN is used within Eclipse.
++ HTTP (DAV) protocol implementation improvements.
++ XML output support for list operation.
++ javasvn.ssh.author system property could be used to ovveride SSH username.
++ commit hook error now properly reported in JavaSVN error message.
++ OS/2 support
 
 = version 1.0.3
 
-+ improved cancellation support
-+ improved versioned symlinks handling
-+ improved HTTP proxies support
-+ bugfixes
++ improved cancellation support.
++ improved versioned symlinks handling.
++ improved HTTP proxies support.
++ bugfixes.
 
 = version 1.0.2
 

@@ -26,7 +26,7 @@ import org.tmatesoft.svn.core.auth.SVNAuthentication;
 import org.tmatesoft.svn.core.auth.SVNPasswordAuthentication;
 import org.tmatesoft.svn.core.auth.SVNSSHAuthentication;
 import org.tmatesoft.svn.core.auth.SVNSSLAuthentication;
-import org.tmatesoft.svn.core.auth.SVNUserNameAuthentication;
+import org.tmatesoft.svn.util.SVNDebugLog;
 
 class JavaHLAuthenticationProvider implements ISVNAuthenticationProvider {
     
@@ -55,10 +55,13 @@ class JavaHLAuthenticationProvider implements ISVNAuthenticationProvider {
                 port = prompt4.getSSHPort();
                 if (port < 0 && url != null) {
                     port = url.getPort();
+                    SVNDebugLog.logInfo("using URL port: " + port);
                 }
                 if (port < 0) {
                     port = 22;
+                    SVNDebugLog.logInfo("using default port: " + port);
                 }
+                SVNDebugLog.logInfo("port number from user's prompt is: " + port);
                 boolean save = prompt4.userAllowedSave();
                 if (keyPath != null && !"".equals(keyPath)) {
                     return new SVNSSHAuthentication(userName, new File(keyPath), passphrase, port, save);
@@ -98,25 +101,6 @@ class JavaHLAuthenticationProvider implements ISVNAuthenticationProvider {
                 return new SVNSSHAuthentication(userName, new File(keyPath), passPhrase, -1, true);
             }
             // try to get password for ssh from the user.
-        } else if(ISVNAuthenticationManager.USERNAME.equals(kind)) {
-            String userName = previousAuth != null && previousAuth.getUserName() != null ? previousAuth.getUserName() : System.getProperty("user.name");
-            if (myPrompt instanceof PromptUserPasswordUser) {
-                PromptUserPasswordUser prompt3 = (PromptUserPasswordUser) myPrompt;
-                if (prompt3.promptUser(realm, userName, authMayBeStored))  {
-                    return new SVNUserNameAuthentication(prompt3.getUsername(), prompt3.userAllowedSave());
-                }
-                return null;
-            } else if (myPrompt instanceof PromptUserPassword3) {
-                PromptUserPassword3 prompt3 = (PromptUserPassword3) myPrompt;
-                if (prompt3.prompt(realm, userName, authMayBeStored))  {
-                    return new SVNUserNameAuthentication(prompt3.getUsername(), prompt3.userAllowedSave());
-                }
-                return null;
-            } 
-            if (myPrompt.prompt(realm, userName)) {
-                return new SVNUserNameAuthentication(myPrompt.getUsername(), false);
-            }
-            return null;            
         } else if(!ISVNAuthenticationManager.PASSWORD.equals(kind)){
             return null;
         }

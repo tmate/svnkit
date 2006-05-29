@@ -55,7 +55,7 @@ import org.tmatesoft.svn.util.SVNDebugLog;
  * that allow you to set your {@link ISVNEventHandler event handler}, 
  * obtain run-time configuration options, and others. 
  * 
- * @version 1.1
+ * @version 1.0
  * @author TMate Software Ltd.
  */
 public class SVNBasicClient implements ISVNEventHandler {
@@ -68,7 +68,7 @@ public class SVNBasicClient implements ISVNEventHandler {
     private boolean myIsLeaveConflictsUnresolved;
 
     protected SVNBasicClient(final ISVNAuthenticationManager authManager, ISVNOptions options) {
-        this(new DefaultSVNRepositoryPool(authManager == null ? SVNWCUtil.createDefaultAuthenticationManager() : authManager, options, 
+        this(new DefaultSVNRepositoryPool(authManager == null ? SVNWCUtil.createDefaultAuthenticationManager() : authManager, 
                 true, DefaultSVNRepositoryPool.RUNTIME_POOL), options);
     }
 
@@ -499,7 +499,7 @@ public class SVNBasicClient implements ISVNEventHandler {
         String prevPath = null;
         SVNLogEntryPath logPath = (SVNLogEntryPath) logEntry.getChangedPaths().get(path);
         if (logPath != null) {
-            if (logPath.getType() != SVNLogEntryPath.TYPE_ADDED && logPath.getType() != SVNLogEntryPath.TYPE_REPLACED) {
+            if (logPath.getType() != 'A' && logPath.getType() != 'R') {
                 return logPath.getPath();
             }
             if (logPath.getCopyPath() != null) {

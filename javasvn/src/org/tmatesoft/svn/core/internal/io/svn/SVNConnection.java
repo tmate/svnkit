@@ -89,9 +89,6 @@ class SVNConnection {
             return;
         }
         ISVNAuthenticationManager authManager = myRepository.getAuthenticationManager();
-        if (authManager != null && authManager.isAuthenticationForced() && mechs.contains("ANONYMOUS") && mechs.contains("CRAM-MD5")) {
-            mechs.remove("ANONYMOUS");
-        }
         SVNURL location = myRepository.getLocation();        
         SVNPasswordAuthentication auth = null;
         if (repository.getExternalUserName() != null && mechs.contains("EXTERNAL")) {
@@ -143,7 +140,7 @@ class SVNConnection {
                         break;
                     } else if (STEP.equals(items[0])) {
                         try {
-                            byte[] response = authenticator.buildChallengeResponse((byte[]) items[1]);
+                            byte[] response = authenticator.buildChallengeReponse((byte[]) items[1]);
                             getOutputStream().write(response);
                             getOutputStream().flush();
                         } catch (IOException e) {

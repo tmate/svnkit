@@ -29,7 +29,7 @@ import org.xml.sax.SAXException;
  * that writes XML formatted annotation information to a specified 
  * <b>ContentHandler</b>. 
  * 
- * @version 1.1
+ * @version 1.0
  * @author  TMate Software Ltd.
  */
 public class SVNXMLAnnotateHandler extends AbstractXMLHandler implements ISVNAnnotateHandler {
@@ -77,7 +77,7 @@ public class SVNXMLAnnotateHandler extends AbstractXMLHandler implements ISVNAnn
     }
     
     /**
-     * Closes the formatted XML output. 
+     * Closes the formatted XML. 
      *
      */
     public void endTarget() {

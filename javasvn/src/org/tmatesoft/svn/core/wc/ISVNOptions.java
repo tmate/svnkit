@@ -13,8 +13,6 @@ package org.tmatesoft.svn.core.wc;
 
 import java.util.Map;
 
-import org.tmatesoft.svn.core.io.ISVNTunnelProvider;
-
 /**
  * The <b>ISVNOptions</b> interface should be implemented to manage
  * global run-time configuration options. 
@@ -70,13 +68,13 @@ import org.tmatesoft.svn.core.io.ISVNTunnelProvider;
  * <p>
  * Read also this <a href="http://svnbook.red-bean.com/nightly/en/svn-book.html#svn.advanced">Subversion book chapter</a> on runtime configuration area.
  * 
- * @version 1.1
+ * @version 1.0
  * @author  TMate Software Ltd.
  * @see     SVNWCUtil
  * @see     <a target="_top" href="http://tmate.org/svn/kb/examples/">Examples</a>
  * 
  */
-public interface ISVNOptions extends ISVNTunnelProvider {
+public interface ISVNOptions {
     
     /**
      * Determines if the commit-times option is enabled.  

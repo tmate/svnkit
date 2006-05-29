@@ -42,7 +42,6 @@
                destdir="javasvn/bin"
                srcdir="javasvn/src"
                classpathref="library.classpath">
-            <exclude name="org/tmatesoft/svn/util/SVNTest.java" />
         </javac>
         	
     </target>
@@ -143,7 +142,6 @@
             <fileset dir="contrib/sequence/bin" />
             <fileset dir="javasvn/src">
                 <include name="org/tmatesoft/svn/core/internal/wc/config/**" />
-                <include name="org/tmatesoft/svn/core/io/repository/**" />
             </fileset>
         </jar>
         <jar destfile="build/lib/javasvn-javahl.jar">
@@ -510,7 +508,6 @@
             <fileset dir="contrib/sequence/bin" />
             <fileset dir="javasvn/src">
                 <include name="org/tmatesoft/svn/core/internal/wc/config/**" />
-                <include name="org/tmatesoft/svn/core/io/repository/**" />
             </fileset>
         </jar>
         <jar destfile="build/lib/javasvn-javahl.jar"  >

@@ -89,7 +89,8 @@ public class SVNEventFactory {
     public static SVNEvent createAddedEvent(SVNWCAccess source, SVNDirectory dir, SVNEntry entry) {
         String mimeType = null;
         try {
-            mimeType = dir.getProperties(entry.getName(), false).getPropertyValue(SVNProperty.MIME_TYPE);
+            mimeType = dir.getProperties(entry.getName(), false)
+                    .getPropertyValue(SVNProperty.MIME_TYPE);
         } catch (SVNException e) {
             //
         }
@@ -161,10 +162,11 @@ public class SVNEventFactory {
                 null, null, null, null, null, null);
     }
 
-    public static SVNEvent createUpdateDeleteEvent(SVNWCAccess source, 
-            SVNDirectory dir, SVNNodeKind kind, String name) {
+    public static SVNEvent createUpdateDeleteEvent(SVNWCAccess source,
+            SVNDirectory dir, String name) {
+        // kind should be 'unknown' for deleted entries
         return new SVNEvent(source, dir, name, SVNEventAction.UPDATE_DELETE,
-                kind, -1, null, null, null, null, null, null);
+                SVNNodeKind.UNKNOWN, -1, null, null, null, null, null, null);
     }
 
     public static SVNEvent createRestoredEvent(SVNWCAccess source,

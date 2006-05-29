@@ -11,7 +11,10 @@
  */
 package org.tmatesoft.svn.core.internal.delta;
 
-import java.nio.ByteBuffer;
+import java.io.ByteArrayOutputStream;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Iterator;
 
 import org.tmatesoft.svn.core.io.diff.SVNDiffInstruction;
 
@@ -22,81 +25,45 @@ import org.tmatesoft.svn.core.io.diff.SVNDiffInstruction;
  */
 public abstract class SVNDeltaAlgorithm {
 
-    private ByteBuffer myNewData;
-    private ByteBuffer myData;
-    private int myNewDataLength;
-    private int myInstructionsLength;
-    private SVNDiffInstruction myTemplateInstruction;
-    
-    public SVNDeltaAlgorithm() {
-        myNewData = ByteBuffer.allocate(1024);
-        myData = ByteBuffer.allocate(2048);
-        myTemplateInstruction = new SVNDiffInstruction(0,0,0);
-    }
-    
+    private Collection myDiffInstructions = new ArrayList();
+    private ByteArrayOutputStream myNewData = new ByteArrayOutputStream();
+
     public void reset() {
-        myNewData.clear();
-        myData.clear();
-        myInstructionsLength = 0;
-        myNewDataLength = 0;
+        myDiffInstructions.clear();
+        myNewData.reset();
     }
 
     public abstract void computeDelta(byte[] a, int aLength, byte[] b, int bLength);
     
-    public ByteBuffer getData() {
-        if (myNewData.position() > 0) {
-            myData = ensureBufferSize(myData, myNewData.position());
-            myData.put(myNewData.array(), 0, myNewData.position());
-            myNewData.clear();
-        }
-        myData.flip();
-        return myData;
+    public SVNDiffInstruction[] getDiffInstructions() {
+        return (SVNDiffInstruction[]) myDiffInstructions.toArray(new SVNDiffInstruction[myDiffInstructions.size()]);
+    }
+    
+    public ByteArrayOutputStream getNewDataStream() {
+        return myNewData;
     }
 
-    public int getInstructionsLength() {
-        return myInstructionsLength;
+    public Iterator diffInstructions() {
+        return myDiffInstructions.iterator();
     }
 
-    public int getNewDataLength() {
-        return myNewDataLength;
+    public byte[] getNewData() {
+        return myNewData.toByteArray();
     }
 
     protected void copyFromSource(int position, int length) {
-        myTemplateInstruction.type = SVNDiffInstruction.COPY_FROM_SOURCE;
-        myTemplateInstruction.offset = position;
-        myTemplateInstruction.length = length;
-        myData = ensureBufferSize(myData, 10);
-        myTemplateInstruction.writeTo(myData);
-        myInstructionsLength = myData.position();
+        SVNDiffInstruction instruction = new SVNDiffInstruction(SVNDiffInstruction.COPY_FROM_SOURCE, length, position);
+        myDiffInstructions.add(instruction);
     }
 
     protected void copyFromTarget(int position, int length) {
-        myTemplateInstruction.type = SVNDiffInstruction.COPY_FROM_TARGET;
-        myTemplateInstruction.offset = position;
-        myTemplateInstruction.length = length;
-        myData = ensureBufferSize(myData, 10);
-        myTemplateInstruction.writeTo(myData);
-        myInstructionsLength = myData.position();
+        SVNDiffInstruction instruction = new SVNDiffInstruction(SVNDiffInstruction.COPY_FROM_TARGET, length, position);
+        myDiffInstructions.add(instruction);
     }
 
     protected void copyFromNewData(byte[] data, int offset, int length) {
-        myTemplateInstruction.type = SVNDiffInstruction.COPY_FROM_NEW_DATA;
-        myTemplateInstruction.offset = 0;
-        myTemplateInstruction.length = length;
-        myData = ensureBufferSize(myData, 10);
-        myTemplateInstruction.writeTo(myData);
-        myInstructionsLength = myData.position();
-        myNewData = ensureBufferSize(myNewData, length);
-        myNewData.put(data, offset, length);
-        myNewDataLength += length;
-    }
-    
-    private static ByteBuffer ensureBufferSize(ByteBuffer buffer, int size) {
-        if (buffer.remaining() < size) {
-            ByteBuffer newBuffer = ByteBuffer.allocate((buffer.position() + size)*3/2);
-            newBuffer.put(buffer.array(), 0, buffer.position());
-            buffer = newBuffer;
-        }
-        return buffer;
+        SVNDiffInstruction instruction = new SVNDiffInstruction(SVNDiffInstruction.COPY_FROM_NEW_DATA, length, 0);
+        myDiffInstructions.add(instruction);
+        myNewData.write(data, offset, length);
     }
 }

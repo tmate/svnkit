@@ -16,12 +16,12 @@ package org.tmatesoft.svn.core.auth;
  * user credential pair - a username and password.
  * 
  * <p> 
- * To obtain a password credential, specify the {@link ISVNAuthenticationManager#PASSWORD PASSWORD} 
- * kind to credentials getter method of <b>ISVNAuthenticationManager</b>: 
- * {@link ISVNAuthenticationManager#getFirstAuthentication(String, String, SVNURL) getFirstAuthentication()}, 
+ * To obtain a password credential, specify the {@link ISVNAuthenticationManager#PASSWORD} 
+ * kind to credentials getter method of <b>ISVNAuthenticationManager</b> - either 
+ * {@link ISVNAuthenticationManager#getFirstAuthentication(String, String, SVNURL) getFirstAuthentication()} or
  * {@link ISVNAuthenticationManager#getNextAuthentication(String, String, SVNURL) getNextAuthentication()}.
  * 
- * @version 1.1
+ * @version 1.0
  * @author  TMate Software Ltd.
  */
 public class SVNPasswordAuthentication extends SVNAuthentication {
@@ -38,7 +38,7 @@ public class SVNPasswordAuthentication extends SVNAuthentication {
      *                         global auth cache, otherwise not
      */
     public SVNPasswordAuthentication(String userName, String password, boolean storageAllowed) {
-        super(ISVNAuthenticationManager.PASSWORD, userName, storageAllowed);
+        super(userName, storageAllowed);
         myPassword = password == null ? "" : password;
     }
     

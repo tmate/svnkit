@@ -16,7 +16,7 @@ package org.tmatesoft.svn.core;
  * The <b>SVNCancelException</b> is used to signal about an operation 
  * cancel event.
  * 
- * @version 1.1
+ * @version 1.0
  * @author 	TMate Software Ltd.
  * @see		SVNException
  *
