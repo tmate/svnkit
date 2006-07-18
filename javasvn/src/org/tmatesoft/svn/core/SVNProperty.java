@@ -87,6 +87,15 @@ public class SVNProperty {
      */
     public static final String COMMITTED_DATE = SVN_ENTRY_PREFIX
             + "committed-date";
+
+    public static final String HAS_PROPS = "has-props"; 
+
+    public static final String HAS_PROP_MODS = "has-prop-mods"; 
+    
+    public static final String CACHABLE_PROPS = "cachable-props";
+    
+    public static final String PRESENT_PROPS = "present-props";
+    
     /**
      * An <span class="javastring">"svn:entry:checksum"</span> SVN untweakable metaproperty.
      */

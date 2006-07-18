@@ -84,7 +84,7 @@ public class SVNWCAccess implements ISVNEventHandler {
         if (target != null && anchor != null) {
             // both are versioned dirs,
             // check whether target is switched.
-            SVNEntry targetInAnchor = anchor.getEntries().getEntry(name, false);
+            SVNEntry targetInAnchor = anchor.getAdminArea().getEntry(name, false);
             SVNDirectory anchorCopy = anchor;
             try {
                 if (targetInAnchor == null) {
@@ -94,8 +94,8 @@ public class SVNWCAccess implements ISVNEventHandler {
                         target.setWCAccess(null, "");
                     }
                 } else {
-                    SVNEntry anchorEntry = anchor.getEntries().getEntry("", false);
-                    SVNEntry targetEntry = target.getEntries().getEntry("", false);
+                    SVNEntry anchorEntry = anchor.getAdminArea().getEntry("", false);
+                    SVNEntry targetEntry = target.getAdminArea().getEntry("", false);
                     String anchorURL = anchorEntry != null ? anchorEntry.getURL() : null;
                     String targetURL = targetEntry != null ? targetEntry.getURL() : null;
                     if (anchorURL != null && targetURL != null) {
@@ -112,7 +112,7 @@ public class SVNWCAccess implements ISVNEventHandler {
             } finally {
                 // close entries.
                 if (anchor == null && anchorCopy != null) {
-                    anchorCopy.getEntries().close();
+                    anchorCopy.getAdminArea().close();
                     anchorCopy.dispose();
                     anchorCopy = null;
                 }
@@ -172,12 +172,12 @@ public class SVNWCAccess implements ISVNEventHandler {
 
     public SVNEntry getTargetEntry() throws SVNException {
         if (getAnchor() != getTarget()) {
-            SVNEntry entry = getTarget().getEntries().getEntry("", false);
+            SVNEntry entry = getTarget().getAdminArea().getEntry("", false);
             if (entry != null) {
                 return entry;
             }
         }
-        return getAnchor().getEntries().getEntry(getTargetName(), false);
+        return getAnchor().getAdminArea().getEntry(getTargetName(), false);
     }
 
     public SVNDirectory getDirectory(String path) {
@@ -238,14 +238,14 @@ public class SVNWCAccess implements ISVNEventHandler {
         try {
             if (lock) {
                 if (!(stealLock && myAnchor.isLocked())) {
-                    myAnchor.innerLock();
+                    myAnchor.innerLock(0);
                 }
             }
             myDirectories.put("", myAnchor);
             if (myTarget != myAnchor) {
                 if (lock) {
                     if (!(stealLock && myTarget.isLocked())) {
-                        myTarget.innerLock();
+                        myTarget.innerLock(0);
                     }
                 }
                 myDirectories.put(myName, myTarget);
@@ -259,7 +259,7 @@ public class SVNWCAccess implements ISVNEventHandler {
                             public void visit(String path, SVNDirectory dir) throws SVNException {
                                 checkCancelled();
                                 if (lock && (!dir.isLocked() || !stealLock)) {
-                                    dir.innerLock();
+                                    dir.innerLock(0);
                                 }
                                 myDirectories.put(path, dir);
                             }
@@ -414,7 +414,7 @@ public class SVNWCAccess implements ISVNEventHandler {
 
     private void visitDirectories(String parentPath, SVNDirectory root,
             ISVNDirectoryVisitor visitor) throws SVNException {
-        Iterator entries = root.getEntries().entries(true);
+        Iterator entries = root.getAdminArea().entries(true);
         while (entries.hasNext()) {
             SVNEntry entry = (SVNEntry) entries.next();
             if ("".equals(entry.getName())) {
@@ -452,7 +452,7 @@ public class SVNWCAccess implements ISVNEventHandler {
                 return null;
             }
             if (myDirectories.put(path, dir) == null && lock && !dir.isLocked()) {
-                dir.lock();
+                dir.lock(0);
             }
             if (recursive) {
                 File[] dirs = file.listFiles();

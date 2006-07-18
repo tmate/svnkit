@@ -459,7 +459,7 @@ public class SVNDiffClient extends SVNBasicClient {
         File anchorPath = wcAccess.getAnchor().getRoot();
         String target = "".equals(wcAccess.getTargetName()) ? null : wcAccess.getTargetName();
         
-        SVNEntry anchorEntry = wcAccess.getAnchor().getEntries().getEntry("", false);
+        SVNEntry anchorEntry = wcAccess.getAnchor().getAdminArea().getEntry("", false);
         if (anchorEntry == null) {
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_NOT_FOUND, "''{0}'' is not under version control", anchorPath);
             SVNErrorManager.error(err);
@@ -496,7 +496,7 @@ public class SVNDiffClient extends SVNBasicClient {
         File anchorPath = wcAccess.getAnchor().getRoot();
         String target = "".equals(wcAccess.getTargetName()) ? null : wcAccess.getTargetName();
         
-        SVNEntry anchorEntry = wcAccess.getAnchor().getEntries().getEntry("", false);
+        SVNEntry anchorEntry = wcAccess.getAnchor().getAdminArea().getEntry("", false);
         if (anchorEntry == null) {
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_NOT_FOUND, "''{0}'' is not under version control", anchorPath);
             SVNErrorManager.error(err);
