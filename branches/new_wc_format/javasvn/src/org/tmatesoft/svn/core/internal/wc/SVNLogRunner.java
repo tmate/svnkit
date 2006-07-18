@@ -43,10 +43,10 @@ public class SVNLogRunner {
             // check if it is not disjoint entry not to delete another wc?
             dir.destroy(fileName, true);
         } else if (SVNLog.MODIFY_ENTRY.equals(name)) {
-            SVNEntries entries = dir.getEntries();
+            SVNAdminArea adminArea = dir.getAdminArea();
             boolean modified = false;
-            if (entries.getEntry(fileName, true) == null) {
-                entries.addEntry(fileName);
+            if (adminArea.getEntry(fileName, true) == null) {
+                adminArea.addEntry(fileName);
                 modified = true;
             }
             for (Iterator atts = attributes.keySet().iterator(); atts.hasNext();) {
@@ -71,7 +71,7 @@ public class SVNLogRunner {
                     }
                 }
 
-                entries.setPropertyValue(fileName, attName, value);
+                adminArea.setPropertyValue(fileName, attName, value);
                 modified = true;
             }
             setEntriesChanged(modified);
@@ -83,8 +83,8 @@ public class SVNLogRunner {
                     .get(SVNLog.PROPERTY_VALUE_ATTR);
             props.setPropertyValue(propName, propValue);
         } else if (SVNLog.DELETE_LOCK.equals(name)) {
-            SVNEntries entries = dir.getEntries();
-            SVNEntry entry = entries.getEntry(fileName, true);
+            SVNAdminArea adminArea = dir.getAdminArea();
+            SVNEntry entry = adminArea.getEntry(fileName, true);
             if (entry != null) {
                 entry.setLockToken(null);
                 entry.setLockOwner(null);
@@ -131,9 +131,9 @@ public class SVNLogRunner {
                     .get(SVNLog.TIMESTAMP_ATTR));
             file.setLastModified(time.getTime());
         } else if (SVNLog.MAYBE_READONLY.equals(name)) {
-            SVNEntries entries = dir.getEntries();
-            if (entries.getEntry(fileName, true) != null
-                    && entries.getEntry(fileName, true).getLockToken() == null) {
+            SVNAdminArea adminArea = dir.getAdminArea();
+            if (adminArea.getEntry(fileName, true) != null
+                    && adminArea.getEntry(fileName, true).getLockToken() == null) {
                 SVNFileUtil
                         .setReadonly(new File(dir.getRoot(), fileName), true);
             }
@@ -148,7 +148,7 @@ public class SVNLogRunner {
             if (executable) {
                 SVNFileUtil.setExecutable(dst, true);
             }
-            SVNEntry entry = dir.getEntries().getEntry(dstName, true);
+            SVNEntry entry = dir.getAdminArea().getEntry(dstName, true);
             if (entry.getLockToken() == null && props.getPropertyValue(SVNProperty.NEEDS_LOCK) != null) {
                 SVNFileUtil.setReadonly(dst, true);
             }
@@ -168,7 +168,7 @@ public class SVNLogRunner {
             targetLabel = targetLabel == null ? ".working" : targetLabel;
 
             SVNProperties props = dir.getProperties(fileName, false);
-            SVNEntry entry = dir.getEntries().getEntry(fileName, true);
+            SVNEntry entry = dir.getAdminArea().getEntry(fileName, true);
 
             String leaveConglictsAttr = (String) attributes.get(SVNLog.ATTR6);
             boolean leaveConflicts = Boolean.TRUE.toString().equals(leaveConglictsAttr);
@@ -189,7 +189,7 @@ public class SVNLogRunner {
                 SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_BAD_ADM_LOG, "Missing revision attribute for ''{0}''", fileName);
                 SVNErrorManager.error(err);
             }
-            SVNEntry entry = dir.getEntries().getEntry(fileName, true);
+            SVNEntry entry = dir.getAdminArea().getEntry(fileName, true);
             if (entry == null || (!"".equals(fileName) && entry.getKind() != SVNNodeKind.FILE)) {
                 SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_BAD_ADM_LOG, "Log command for directory ''{0}'' is mislocated", dir.getRoot()); 
                 SVNErrorManager.error(err);
@@ -212,9 +212,9 @@ public class SVNLogRunner {
                     }
                 } else {
                     dir.destroy(fileName, false);
-                    SVNEntry parentEntry = dir.getEntries().getEntry("", true);
+                    SVNEntry parentEntry = dir.getAdminArea().getEntry("", true);
                     if (revisionNumber > parentEntry.getRevision()) {
-                        SVNEntry fileEntry = dir.getEntries().addEntry(fileName);
+                        SVNEntry fileEntry = dir.getAdminArea().addEntry(fileName);
                         fileEntry.setKind(SVNNodeKind.FILE);
                         fileEntry.setDeleted(true);
                         fileEntry.setRevision(revisionNumber);
@@ -224,7 +224,7 @@ public class SVNLogRunner {
             }
 
             if (!implicit && entry.isScheduledForReplacement() && "".equals(fileName)) {
-                for (Iterator ents = dir.getEntries().entries(true); ents.hasNext();) {
+                for (Iterator ents = dir.getAdminArea().entries(true); ents.hasNext();) {
                     SVNEntry currentEntry = (SVNEntry) ents.next();
                     if (!currentEntry.isScheduledForDeletion()) {
                         continue;
@@ -383,7 +383,7 @@ public class SVNLogRunner {
                 parentAccess.open(true, false);
             }
             String nameInParent = dirFile.getName();
-            SVNEntry entryInParent = parentDir.getEntries().getEntry(nameInParent, false);
+            SVNEntry entryInParent = parentDir.getAdminArea().getEntry(nameInParent, false);
             if (entryInParent != null) {
                 if (!implicit) {
                     entryInParent.unschedule();
@@ -393,7 +393,7 @@ public class SVNLogRunner {
                 entryInParent.setCopyFromURL(null);
                 entryInParent.setDeleted(false);
             }
-            parentDir.getEntries().save(false);
+            parentDir.getAdminArea().save(false);
             if (parentAccess != null) {
                 parentAccess.close(true);
             }
@@ -406,19 +406,19 @@ public class SVNLogRunner {
     
     public void logFailed(SVNDirectory dir) throws SVNException {
         if (myIsEntriesChanged) {
-            dir.getEntries().save(true);
+            dir.getAdminArea().save(true);
         } else {
-            dir.getEntries().close();
+            dir.getAdminArea().close();
         }
     }
 
     public void logCompleted(SVNDirectory dir) throws SVNException {
         boolean killMe = dir.getAdminFile("KILLME").isFile();
-        long dirRevision = killMe ? dir.getEntries().getEntry("", true).getRevision() : -1;
+        long dirRevision = killMe ? dir.getAdminArea().getEntry("", true).getRevision() : -1;
         if (myIsEntriesChanged) {
-            dir.getEntries().save(false);
+            dir.getAdminArea().save(false);
         } else {
-            dir.getEntries().close();
+            dir.getAdminArea().close();
         }
         if (killMe) {
             // deleted dir, files and entry in parent.
@@ -438,15 +438,15 @@ public class SVNLogRunner {
             }
             String nameInParent = dirFile.getName();
 
-            SVNEntry parentEntry = parentDir.getEntries().getEntry("", false);
+            SVNEntry parentEntry = parentDir.getAdminArea().getEntry("", false);
             if (parentEntry != null && parentEntry.getRevision() <= dirRevision) {
                 // create 'deleted' entry
-                SVNEntry entryInParent = parentDir.getEntries().addEntry(
+                SVNEntry entryInParent = parentDir.getAdminArea().addEntry(
                         nameInParent);
                 entryInParent.setDeleted(true);
                 entryInParent.setKind(SVNNodeKind.DIR);
                 entryInParent.setRevision(dirRevision);
-                parentDir.getEntries().save(false);
+                parentDir.getAdminArea().save(false);
             }
             if (parentAccess != null) {
                 parentAccess.close(true);

@@ -544,7 +544,7 @@ public class SVNBasicClient implements ISVNEventHandler {
         SVNWCAccess wcAccess = createWCAccess(path);
         SVNEntry entry;
         if (wcAccess.getTarget() != wcAccess.getAnchor()) {
-            entry = wcAccess.getTarget().getEntries().getEntry("", false);
+            entry = wcAccess.getTarget().getAdminArea().getEntry("", false);
         } else {
             entry = wcAccess.getTargetEntry();
         }

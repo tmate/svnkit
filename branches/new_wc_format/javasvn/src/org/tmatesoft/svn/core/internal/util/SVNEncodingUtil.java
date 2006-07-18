@@ -295,7 +295,7 @@ public class SVNEncodingUtil {
         return result.toString();
     }
 
-    private static boolean isHexDigit(char ch) {
+    public static boolean isHexDigit(char ch) {
         return Character.isDigit(ch) ||
                (Character.toUpperCase(ch) >= 'A' && Character.toUpperCase(ch) <= 'F');
     }

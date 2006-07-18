@@ -37,6 +37,7 @@ import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNProperty;
+import org.tmatesoft.svn.core.internal.util.SVNEncodingUtil;
 import org.tmatesoft.svn.core.wc.ISVNEventHandler;
 import org.tmatesoft.svn.util.SVNDebugLog;
 
@@ -600,7 +601,7 @@ public class SVNFileUtil {
         
         byte[] digest = new byte[digestLength];
         for(int i = 0; i < hexMD5Digest.length()/2; i++){
-            if(!isHex(hexMD5Digest.charAt(2*i)) || !isHex(hexMD5Digest.charAt(2*i + 1))){
+            if(!SVNEncodingUtil.isHexDigit(hexMD5Digest.charAt(2*i)) || !SVNEncodingUtil.isHexDigit(hexMD5Digest.charAt(2*i + 1))){
                 return null;
             }
             
@@ -614,11 +615,6 @@ public class SVNFileUtil {
         }
         
         return digest; 
-    }
-    
-    private static boolean isHex(char ch){
-        return Character.isDigit(ch) || 
-              (Character.toUpperCase(ch) >= 'A' && Character.toUpperCase(ch) <= 'F');
     }
     
     public static String getNativeEOLMarker(){

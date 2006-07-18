@@ -78,7 +78,7 @@ public class SVNStatusEditor implements ISVNEditor {
     public void setStatusReporter(SVNStatusReporter reporter) throws SVNException {
         myStatusReporter = reporter;
         if (myStatusReporter != null) {
-            SVNEntry anchorEntry = myWCAccess.getAnchor().getEntries()
+            SVNEntry anchorEntry = myWCAccess.getAnchor().getAdminArea()
                     .getEntry("", false);
             boolean oldReportAll = myIsReportAll;
             myIsReportAll = true;
@@ -126,7 +126,7 @@ public class SVNStatusEditor implements ISVNEditor {
         if (dir == null) {
             return;
         }
-        if (dir.getEntries().getEntry(name, false) != null) {
+        if (dir.getAdminArea().getEntry(name, false) != null) {
             myCurrentDirectory.tweakStatus(path, kind, originalName,
                     SVNStatusType.STATUS_DELETED, SVNStatusType.STATUS_NONE,
                     null, SVNRevision.UNDEFINED, null, null);
@@ -256,8 +256,8 @@ public class SVNStatusEditor implements ISVNEditor {
             File childFile = new File(dirFile, name);
             SVNFileType currentFileType = SVNFileType.getType(childFile);
             if (currentFileType == SVNFileType.NONE
-                    && (dir != null && dir.getEntries().getEntry(name, false) != null)) {
-                SVNEntry currentEntry = dir.getEntries().getEntry(name, false);
+                    && (dir != null && dir.getAdminArea().getEntry(name, false) != null)) {
+                SVNEntry currentEntry = dir.getAdminArea().getEntry(name, false);
                 if (currentEntry != null
                         && !currentEntry.isScheduledForDeletion()) {
                     status.setContentsStatus(SVNStatusType.STATUS_MISSING);
@@ -341,10 +341,10 @@ public class SVNStatusEditor implements ISVNEditor {
         if (myTarget != null) {
             File file = myWCAccess.getAnchor().getFile(myTarget);
             // this could be a file from entries point of view.
-            SVNEntries entries = myWCAccess.getAnchor().getEntries();
-            SVNEntry entry = entries.getEntry(myTarget, false);
+            SVNAdminArea adminArea = myWCAccess.getAnchor().getAdminArea();
+            SVNEntry entry = adminArea.getEntry(myTarget, false);
             SVNNodeKind kind = entry == null ? null : entry.getKind();
-            entries.close();
+            adminArea.close();
             SVNFileType targetType = SVNFileType.getType(file);
             if (targetType == SVNFileType.DIRECTORY && (kind == null || kind == SVNNodeKind.DIR)) {
                 if (entry != null) {
@@ -383,7 +383,7 @@ public class SVNStatusEditor implements ISVNEditor {
     public void reportStatus(SVNDirectory dir, String entryName, boolean ignoreRootEntry, boolean recursive) throws SVNException {
         myWCAccess.checkCancelled();
 
-        SVNEntries entries = dir.getEntries();
+        SVNAdminArea adminArea = dir.getAdminArea();
         boolean anchorOfTarget = myTarget != null && dir == myWCAccess.getAnchor();
         if (!anchorOfTarget) {            
             SVNExternalInfo[] externals = SVNWCAccess.parseExternals(dir.getPath(), dir.getProperties("", false).getPropertyValue(SVNProperty.EXTERNALS));
@@ -393,7 +393,7 @@ public class SVNStatusEditor implements ISVNEditor {
             }
         }
         if (entryName != null) {
-            SVNEntry entry = entries.getEntry(entryName, false);
+            SVNEntry entry = adminArea.getEntry(entryName, false);
             if (entry != null) {
                 sendVersionedStatus(dir, entryName);
             } else if (SVNFileType.getType(dir.getFile(entryName)) != SVNFileType.NONE) {
@@ -410,7 +410,7 @@ public class SVNStatusEditor implements ISVNEditor {
             File ioFile = ioFiles[i];
             String fileName = ioFile.getName();
             String adminDir = SVNFileUtil.getAdminDirectoryName();
-            if (adminDir.equals(fileName) || entries.getEntry(fileName, false) != null) {
+            if (adminDir.equals(fileName) || adminArea.getEntry(fileName, false) != null) {
                 continue;
             }
             sendUnversionedStatus(dir, fileName);
@@ -418,7 +418,7 @@ public class SVNStatusEditor implements ISVNEditor {
         if (!ignoreRootEntry) {
             sendVersionedStatus(dir, "");
         }
-        for (Iterator ents = entries.entries(false); ents.hasNext();) {
+        for (Iterator ents = adminArea.entries(false); ents.hasNext();) {
             SVNEntry childEntry = (SVNEntry) ents.next();
             if ("".equals(childEntry.getName())) {
                 continue;
@@ -442,7 +442,7 @@ public class SVNStatusEditor implements ISVNEditor {
         File file;
         SVNEntry parentEntry;
         SVNDirectory parentDir = null;
-        SVNEntry entry = dir.getEntries().getEntry(name, false);
+        SVNEntry entry = dir.getAdminArea().getEntry(name, false);
 
         if (entry.isDirectory()) {
             if (!"".equals(name)) {
@@ -455,7 +455,7 @@ public class SVNStatusEditor implements ISVNEditor {
                     }
 
                 }
-                SVNEntry fullEntry = dir != null ? dir.getEntries().getEntry("", false) : null;
+                SVNEntry fullEntry = dir != null ? dir.getAdminArea().getEntry("", false) : null;
                 if (fullEntry != null) {
                     entry = fullEntry;
                 }
@@ -479,17 +479,17 @@ public class SVNStatusEditor implements ISVNEditor {
         SVNEntry entryInParent = entry;
         if (dir == parentDir) {
             file = dir.getFile(name);
-            entry = dir.getEntries().getEntry(name, false);
-            parentEntry = dir.getEntries().getEntry("", false);
+            entry = dir.getAdminArea().getEntry(name, false);
+            parentEntry = dir.getAdminArea().getEntry("", false);
         } else {
             file = dir.getRoot();
-            entry = dir.getEntries().getEntry("", false);
+            entry = dir.getAdminArea().getEntry("", false);
             if (entry == null) {
                 // probably missing dir.
                 entry = entryInParent;
                 dir = parentDir;
             }
-            parentEntry = parentDir != null ? parentDir.getEntries().getEntry("", true) : null;
+            parentEntry = parentDir != null ? parentDir.getAdminArea().getEntry("", true) : null;
         }
         SVNFileType fileType = SVNFileType.getType(file);
         SVNStatus status = createStatus(entry.getSVNURL(), file, dir, parentEntry,
@@ -506,9 +506,9 @@ public class SVNStatusEditor implements ISVNEditor {
         String path = "".equals(name) ? parent.getPath() : SVNPathUtil.append(
                 parent.getPath(), name);
         SVNURL url = null;
-        if (parent.getEntries() != null
-                && parent.getEntries().getEntry("", false) != null) {
-            url = parent.getEntries().getEntry("", false).getSVNURL();
+        if (parent.getAdminArea() != null
+                && parent.getAdminArea().getEntry("", false) != null) {
+            url = parent.getAdminArea().getEntry("", false).getSVNURL();
             if (url != null) {
                 url = url.appendPath(name, false);
             }
@@ -819,15 +819,15 @@ public class SVNStatusEditor implements ISVNEditor {
                 SVNEntry entry = null;
                 SVNEntry parentEntry = null;
                 if (dir != null) {
-                    entry = dir.getEntries().getEntry(target, false);
+                    entry = dir.getAdminArea().getEntry(target, false);
                     if (entry != null && !"".equals(dirPath)) {
                         if (!"".equals(target)) {
-                            parentEntry = dir.getEntries().getEntry("", false);
+                            parentEntry = dir.getAdminArea().getEntry("", false);
                         } else {
                             SVNDirectory parentDir = myWCAccess
                                     .getDirectory(SVNPathUtil.removeTail(dirPath));
                             if (parentDir != null) {
-                                parentEntry = parentDir.getEntries().getEntry("", false);
+                                parentEntry = parentDir.getAdminArea().getEntry("", false);
                             }
                         }
                     }

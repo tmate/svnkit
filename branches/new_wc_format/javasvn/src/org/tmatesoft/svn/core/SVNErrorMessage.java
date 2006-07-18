@@ -331,4 +331,10 @@ public class SVNErrorMessage implements Serializable {
         return parentError;
     }
     
+    public SVNErrorMessage wrap(String parentMessage, Object[] relatedObjects){
+        SVNErrorMessage parentError = SVNErrorMessage.create(this.getErrorCode(), parentMessage, relatedObjects);
+        parentError.setChildErrorMessage(this);
+        return parentError;
+    }
+
 }

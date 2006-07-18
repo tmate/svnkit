@@ -143,7 +143,7 @@ public class SVNCommitter implements ISVNCommitPathHandler {
 
             SVNDirectory dir = wcAccess.getDirectory(SVNPathUtil.removeTail(item.getPath()));
             String name = SVNPathUtil.tail(item.getPath());
-            SVNEntry entry = dir.getEntries().getEntry(name, false);
+            SVNEntry entry = dir.getAdminArea().getEntry(name, false);
 
             File tmpFile = dir.getBaseFile(name, true);
             myTmpFiles.add(tmpFile);
@@ -190,7 +190,7 @@ public class SVNCommitter implements ISVNCommitPathHandler {
             dir = wcAccess.getDirectory(SVNPathUtil.removeTail(item.getPath()));
             name = SVNPathUtil.tail(item.getPath());
         }
-        SVNEntry entry = dir.getEntries().getEntry(name, false);
+        SVNEntry entry = dir.getAdminArea().getEntry(name, false);
         boolean replaced = false;
         if (entry != null) {
             replaced = entry.isScheduledForReplacement();

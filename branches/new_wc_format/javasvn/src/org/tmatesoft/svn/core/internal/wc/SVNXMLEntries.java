@@ -20,11 +20,9 @@ import java.io.Writer;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.Map;
-import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 
@@ -40,37 +38,36 @@ import org.tmatesoft.svn.util.SVNDebugLog;
  * @version 1.0
  * @author TMate Software Ltd.
  */
-public class SVNEntries {
+public class SVNXMLEntries extends SVNAdminArea{
 
-    private File myFile;
-    private Map myData;
-    private Set myEntries;
-
-    private static final Set BOOLEAN_PROPERTIES = new HashSet();
-
-    static {
-        BOOLEAN_PROPERTIES.add(SVNProperty.COPIED);
-        BOOLEAN_PROPERTIES.add(SVNProperty.DELETED);
-        BOOLEAN_PROPERTIES.add(SVNProperty.ABSENT);
-        BOOLEAN_PROPERTIES.add(SVNProperty.INCOMPLETE);
+    public SVNXMLEntries(SVNDirectory parent) {
+        super(parent);
     }
 
-    public SVNEntries(File entriesFile) {
-        myFile = entriesFile;
+    public SVNProperties getBaseProperties(String name, boolean tmp) {
+        String path = !tmp ? "" : "tmp/";
+        path += "".equals(name) ? "dir-prop-base" : "prop-base/" + name + ".svn-base";
+        File propertiesFile = getParent().getAdminFile(path);
+        return new SVNProperties(propertiesFile, getParent().getAdminDirectory().getName() + "/" + path);
     }
 
-    public void open() throws SVNException {
-        if (myData != null) {
-            return;
-        }
-        if (!myFile.exists()) {
-            return;
-        }
-        myData = new TreeMap();
-        myEntries = new TreeSet();
+    public SVNProperties getWCProperties(String name) {
+        String path = "".equals(name) ? "dir-wcprops" : "wcprops/" + name + ".svn-work";
+        File propertiesFile = getParent().getAdminFile(path);
+        return new SVNProperties(propertiesFile, getParent().getAdminDirectory().getName() + "/" + path);
+    }
+
+    public SVNProperties getProperties(String name, boolean tmp) {
+        String path = !tmp ? "" : "tmp/";
+        path += "".equals(name) ? "dir-props" : "props/" + name + ".svn-work";
+        File propertiesFile = getParent().getAdminFile(path);
+        return new SVNProperties(propertiesFile, getParent().getAdminDirectory().getName() + "/" + path);
+    }
+
+    protected void fetchEntries() throws IOException, SVNException {
         BufferedReader reader = null;
         try {
-            reader = new BufferedReader(new InputStreamReader(SVNFileUtil.openFileForReading(myFile), "UTF-8"));
+            reader = new BufferedReader(new InputStreamReader(SVNFileUtil.openFileForReading(getParent().getEntriesFile()), "UTF-8"));
             String line;
             Map entry = null;
             while ((line = reader.readLine()) != null) {
@@ -92,7 +89,7 @@ public class SVNEntries {
                     if (line.charAt(line.length() - 1) == '>') {
                         String entryName = (String) entry.get(SVNProperty.NAME);
                         if (entryName == null) {
-                            SVNDebugLog.logInfo("svn: '" + myFile + "' file includes invalid entry with missing 'name' attribute");
+                            SVNDebugLog.logInfo("svn: '" + getParent().getEntriesFile() + "' file includes invalid entry with missing 'name' attribute");
                             myData.clear();
                             myEntries.clear();
                             return;
@@ -124,9 +121,6 @@ public class SVNEntries {
                     }
                 }
             }
-        } catch (IOException e) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, "Cannot read entries file ''{0}'': {1}", new Object[] {myFile, e.getLocalizedMessage()});
-            SVNErrorManager.error(err, e);
         } finally {
             SVNFileUtil.closeFile(reader);
         }
@@ -137,7 +131,7 @@ public class SVNEntries {
             return;
         }
         Writer os = null;
-        File tmpFile = new File(myFile.getParentFile(), "tmp/entries");
+        File tmpFile = new File(getParent().getEntriesFile().getParentFile(), "tmp/entries");
         Map rootEntry = (Map) myData.get("");
         try {
             os = new OutputStreamWriter(SVNFileUtil.openFileForWriting(tmpFile), "UTF-8");
@@ -198,14 +192,14 @@ public class SVNEntries {
         } catch (IOException e) {
             SVNFileUtil.closeFile(os);
             SVNFileUtil.deleteFile(tmpFile);
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, "Cannot wrtie entries file ''{0}'': {1}", new Object[] {myFile, e.getLocalizedMessage()});
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, "Cannot wrtie entries file ''{0}'': {1}", new Object[] {getParent().getEntriesFile(), e.getLocalizedMessage()});
             SVNErrorManager.error(err, e);
         } finally {
             SVNFileUtil.closeFile(os);
         }
         
-        SVNFileUtil.rename(tmpFile, myFile);
-        SVNFileUtil.setReadonly(myFile, true);
+        SVNFileUtil.rename(tmpFile, getParent().getEntriesFile());
+        SVNFileUtil.setReadonly(getParent().getEntriesFile(), true);
         if (close) {
             close();
         }
@@ -307,7 +301,7 @@ public class SVNEntries {
         }
     }
 
-    Map getEntryMap(String name) {
+    protected Map getEntryMap(String name) {
         if (myData != null && name != null) {
             return (Map) myData.get(name);
         }
