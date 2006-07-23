@@ -133,6 +133,10 @@ public class SVNEntry implements Comparable {
         return myName;
     }
 
+    public void setCachableProperties(String[] cachableProps) {
+        myAdminArea.setCachableProperties(myName, cachableProps);
+    }
+    
     public boolean setRevision(long revision) {
         return myAdminArea.setPropertyValue(myName, SVNProperty.REVISION, Long
                 .toString(revision));
@@ -320,19 +324,11 @@ public class SVNEntry implements Comparable {
     }
 
     public String getUUID() {
-        String uuid = myAdminArea.getPropertyValue(myName, SVNProperty.UUID);
-        if (uuid == null && !"".equals(myName)) {
-            uuid = myAdminArea.getPropertyValue("", SVNProperty.UUID);
-        }
-        return uuid; 
+        return myAdminArea.getPropertyValue(myName, SVNProperty.UUID);
     }
 
     public String getRepositoryRoot() {
-        String root = myAdminArea.getPropertyValue(myName, SVNProperty.REPOS);
-        if (root == null && !"".equals(myName)) {
-            root = myAdminArea.getPropertyValue("", SVNProperty.REPOS);
-        }
-        return root;
+        return myAdminArea.getPropertyValue(myName, SVNProperty.REPOS);
     }
 
     public SVNURL getRepositoryRootURL() throws SVNException {

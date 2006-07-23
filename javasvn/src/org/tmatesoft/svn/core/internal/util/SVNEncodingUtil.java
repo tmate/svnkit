@@ -300,7 +300,11 @@ public class SVNEncodingUtil {
                (Character.toUpperCase(ch) >= 'A' && Character.toUpperCase(ch) <= 'F');
     }
 
-    private static int hexValue(char ch) {
+    public static boolean isASCIIControlChar(char ch) {
+        return (ch >= 0x00 && ch <= 0x1f) || ch == 0x7f;
+    }
+    
+    public static int hexValue(char ch) {
         if (Character.isDigit(ch)) {
             return ch - '0';
         }

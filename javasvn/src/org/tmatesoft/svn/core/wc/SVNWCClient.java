@@ -215,7 +215,7 @@ public class SVNWCClient extends SVNBasicClient {
         if (revision == SVNRevision.WORKING || revision == SVNRevision.BASE) {
             File file = wcAccess.getAnchor().getBaseFile(name, false);
             boolean delete = false;
-            SVNEntry entry = wcAccess.getAnchor().getAdminArea().getEntry(wcAccess.getTargetName(), false);
+            SVNEntry entry = wcAccess.getAnchor().getAdminArea(false).getEntry(wcAccess.getTargetName(), false);
             if (entry == null) {
                 SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_NOT_FOUND, "''{0}'' is not under version control or doesn''t exist", path, SVNErrorMessage.TYPE_WARNING);
                 SVNErrorManager.error(err);
@@ -1007,7 +1007,7 @@ public class SVNWCClient extends SVNBasicClient {
         Collection recursiveFiles = new ArrayList();
         try {
             wcAccess.open(true, false);
-            SVNEntry entry = wcAccess.getAnchor().getAdminArea().getEntry(wcAccess.getTargetName(), true);
+            SVNEntry entry = wcAccess.getAnchor().getAdminArea(false).getEntry(wcAccess.getTargetName(), true);
             if (entry == null) {
                 SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_NOT_FOUND, "''{0}'' is not under version control", path);
                 SVNErrorManager.error(err);
@@ -1035,7 +1035,7 @@ public class SVNWCClient extends SVNBasicClient {
                         SVNErrorManager.error(err);
                     }
                     if (!file.exists()) {
-                        wcAccess.getAnchor().getAdminArea().deleteEntry(entry.getName());
+                        wcAccess.getAnchor().getAdminArea(false).deleteEntry(entry.getName());
                     } else {
                         wcAccess.open(true, true, true);
                         wcAccess.getAnchor().destroy(entry.getName(), false);
@@ -1044,7 +1044,7 @@ public class SVNWCClient extends SVNBasicClient {
                 reverted = true;
                 if (deleted && !"".equals(wcAccess.getTargetName())) {
                     // we are not in the root.
-                    SVNEntry replacement = wcAccess.getAnchor().getAdminArea().addEntry(entry.getName());
+                    SVNEntry replacement = wcAccess.getAnchor().getAdminArea(false).addEntry(entry.getName());
                     replacement.setDeleted(true);
                     replacement.setKind(kind);
                 }
@@ -1074,9 +1074,9 @@ public class SVNWCClient extends SVNBasicClient {
                     entry.setConflictWorking(null);
                     entry.setPropRejectFile(null);
                 }
-                wcAccess.getAnchor().getAdminArea().save(false);
+                wcAccess.getAnchor().getAdminArea(false).save(false);
                 if (kind == SVNNodeKind.DIR && wcAccess.getTarget() != wcAccess.getAnchor()) {
-                    SVNEntry inner = wcAccess.getTarget().getAdminArea().getEntry("", true);
+                    SVNEntry inner = wcAccess.getTarget().getAdminArea(false).getEntry("", true);
                     if (inner != null) {
                         // may be null if it was removed from wc.
                         inner.unschedule();
@@ -1086,7 +1086,7 @@ public class SVNWCClient extends SVNBasicClient {
                         inner.setPropRejectFile(null);
                     }
                 }
-                wcAccess.getTarget().getAdminArea().save(false);
+                wcAccess.getTarget().getAdminArea(false).save(false);
             }
             if (!"".equals(wcAccess.getTargetName()) && 
                     wcAccess.getTarget() == wcAccess.getAnchor()) {
@@ -1096,7 +1096,7 @@ public class SVNWCClient extends SVNBasicClient {
             if (kind == SVNNodeKind.DIR && recursive) {
                 // iterate over targets and revert
                 checkCancelled();
-                for (Iterator ents = wcAccess.getTarget().getAdminArea().entries(true); ents.hasNext();) {
+                for (Iterator ents = wcAccess.getTarget().getAdminArea(false).entries(true); ents.hasNext();) {
                     SVNEntry childEntry = (SVNEntry) ents.next();
                     if ("".equals(childEntry.getName())) {
                         continue;
@@ -1141,7 +1141,7 @@ public class SVNWCClient extends SVNBasicClient {
                 target = "";
                 dir = wcAccess.getTarget();
             }
-            SVNEntry entry = dir.getAdminArea().getEntry(target, false);
+            SVNEntry entry = dir.getAdminArea(false).getEntry(target, false);
             if (entry == null) {
                 SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_NOT_FOUND, "''{0}'' is not under version control", path);
                 SVNErrorManager.error(err);
@@ -1164,7 +1164,7 @@ public class SVNWCClient extends SVNBasicClient {
 
     private void doResolveAll(SVNWCAccess access, SVNDirectory dir) throws SVNException {
         checkCancelled();
-        SVNAdminArea adminArea = dir.getAdminArea();
+        SVNAdminArea adminArea = dir.getAdminArea(false);
         Collection childDirs = new ArrayList();
         for (Iterator ents = adminArea.entries(false); ents.hasNext();) {
             SVNEntry entry = (SVNEntry) ents.next();
@@ -1272,8 +1272,8 @@ public class SVNWCClient extends SVNBasicClient {
                         if (wcAccess.getAnchor().getProperties(entry.getName(), false).getPropertyValue(SVNProperty.EXECUTABLE) != null) {
                             SVNFileUtil.setExecutable(wcAccess.getAnchor().getFile(entry.getName()), true);
                         }
-                        wcAccess.getAnchor().getAdminArea().save(true);
-                        wcAccess.getAnchor().getAdminArea().close();
+                        wcAccess.getAnchor().getAdminArea(false).save(true);
+                        wcAccess.getAnchor().getAdminArea(false).close();
                         handleEvent(SVNEventFactory.createLockEvent(wcAccess, wcAccess.getTargetName(), SVNEventAction.LOCKED, lock, null),
                                 ISVNEventHandler.UNKNOWN);
                     } finally {
@@ -1367,7 +1367,7 @@ public class SVNWCClient extends SVNBasicClient {
                     SVNErrorManager.error(err);
                 }
                 entriesMap.put(entry.getSVNURL(),  new LockInfo(paths[i], lockToken));
-                wcAccess.getAnchor().getAdminArea().close();
+                wcAccess.getAnchor().getAdminArea(false).close();
             } finally {
                 wcAccess.close(true);
             }
@@ -1406,14 +1406,14 @@ public class SVNWCClient extends SVNBasicClient {
                 if (lock != null) {
                     try {
                         wcAccess.open(true, false);
-                        SVNEntry entry = wcAccess.getAnchor().getAdminArea().getEntry(
+                        SVNEntry entry = wcAccess.getAnchor().getAdminArea(false).getEntry(
                                 wcAccess.getTargetName(), true);
                         entry.setLockToken(null);
                         entry.setLockComment(null);
                         entry.setLockOwner(null);
                         entry.setLockCreationDate(null);
-                        wcAccess.getAnchor().getAdminArea().save(true);
-                        wcAccess.getAnchor().getAdminArea().close();
+                        wcAccess.getAnchor().getAdminArea(false).save(true);
+                        wcAccess.getAnchor().getAdminArea(false).close();
                         if (wcAccess.getAnchor().getProperties(entry.getName(), false).getPropertyValue(SVNProperty.NEEDS_LOCK) != null) {
                             SVNFileUtil.setReadonly(wcAccess.getAnchor().getFile(entry.getName()), true);
                         }
@@ -1842,7 +1842,7 @@ public class SVNWCClient extends SVNBasicClient {
 
     private static void collectInfo(SVNDirectory dir, String name,
             boolean recursive, ISVNInfoHandler handler) throws SVNException {
-        SVNAdminArea adminArea = dir.getAdminArea();
+        SVNAdminArea adminArea = dir.getAdminArea(false);
         SVNEntry entry = adminArea.getEntry(name, false);
         dir.getWCAccess().checkCancelled();
         try {
@@ -1935,7 +1935,7 @@ public class SVNWCClient extends SVNBasicClient {
             }
             SVNFileType fileType = SVNFileType.getType(childFile);
             if (fileType == SVNFileType.FILE || fileType == SVNFileType.SYMLINK) {
-                SVNEntry entry = childDir.getAdminArea().getEntry(childFile.getName(), true);
+                SVNEntry entry = childDir.getAdminArea(false).getEntry(childFile.getName(), true);
                 if (force && entry != null && !entry.isScheduledForDeletion() && !entry.isDeleted()) {
                     continue;
                 }
@@ -2051,7 +2051,7 @@ public class SVNWCClient extends SVNBasicClient {
             String propName, SVNRevision rev, boolean recursive,
             ISVNPropertyHandler handler) throws SVNException {
         checkCancelled();
-        SVNAdminArea adminArea = anchor.getAdminArea();
+        SVNAdminArea adminArea = anchor.getAdminArea(false);
         SVNEntry entry = adminArea.getEntry(name, true);
         if (entry == null
                 || (rev == SVNRevision.WORKING && entry
@@ -2122,7 +2122,7 @@ public class SVNWCClient extends SVNBasicClient {
         if (cancel) {
             checkCancelled();
         }
-        SVNAdminArea adminArea = anchor.getAdminArea();
+        SVNAdminArea adminArea = anchor.getAdminArea(false);
         if (!"".equals(name)) {
             SVNEntry entry = adminArea.getEntry(name, true);
             if (entry == null || (recursive && entry.isDeleted())) {

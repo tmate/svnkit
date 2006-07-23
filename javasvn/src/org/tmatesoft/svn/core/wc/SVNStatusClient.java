@@ -196,7 +196,7 @@ public class SVNStatusClient extends SVNBasicClient {
         };
         SVNStatusEditor statusEditor = new SVNStatusEditor(getOptions(), wcAccess, realHandler, parentExternals, includeIgnored, reportAll, recursive);
         if (remote) {
-            SVNURL url = wcAccess.getAnchor().getAdminArea().getEntry("", true).getSVNURL();
+            SVNURL url = wcAccess.getAnchor().getAdminArea(false).getEntry("", true).getSVNURL();
             SVNRepository repos = createRepository(url, true);
             SVNNodeKind kind = repos.checkPath("", -1);
             if (kind == SVNNodeKind.NONE) {

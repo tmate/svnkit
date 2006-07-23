@@ -179,7 +179,7 @@ public class SVNMerger {
         File file = parentDir.getFile(name);
         SVNFileType fileType = SVNFileType.getType(file);
         if (fileType == SVNFileType.NONE) {
-            SVNEntry entry = parentDir.getAdminArea().getEntry(name, true);
+            SVNEntry entry = parentDir.getAdminArea(false).getEntry(name, true);
             if (entry != null && !entry.isScheduledForDeletion()) {
                 // missing entry.
                 return SVNStatusType.OBSTRUCTED;
@@ -193,7 +193,7 @@ public class SVNMerger {
             }
             return SVNStatusType.CHANGED;
         } else if (fileType == SVNFileType.DIRECTORY) {
-            SVNEntry entry = parentDir.getAdminArea().getEntry(name, true);
+            SVNEntry entry = parentDir.getAdminArea(false).getEntry(name, true);
             if (entry == null || entry.isScheduledForDeletion()) {
                 if (myIsDryRun) {
                     myAddedPath = path + "/";
@@ -229,7 +229,7 @@ public class SVNMerger {
 
         String name = SVNPathUtil.tail(path);
         File mine = parentDir.getFile(name);
-        SVNEntry entry = parentDir.getAdminArea().getEntry(name, true);
+        SVNEntry entry = parentDir.getAdminArea(false).getEntry(name, true);
         SVNFileType mineType = SVNFileType.getType(mine);
         if (!mineType.isFile() || entry == null || entry.isHidden()) {
             result[0] = SVNStatusType.MISSING;
@@ -266,7 +266,7 @@ public class SVNMerger {
                 mergeResult = parentDir.mergeText(minePath, olderPath,
                         yoursPath, targetLabel, leftLabel, rightLabel,
                         myIsLeaveConflicts, myIsDryRun);
-                parentDir.getAdminArea().save(true);
+                parentDir.getAdminArea(false).save(true);
             }
 
             if (mergeResult == SVNStatusType.CONFLICTED || mergeResult == SVNStatusType.CONFLICTED_UNRESOLVED) {
@@ -303,7 +303,7 @@ public class SVNMerger {
         File mine = parentDir.getFile(name);
         SVNFileType mineType = SVNFileType.getType(mine);
         if (mineType == SVNFileType.NONE) {
-            SVNEntry entry = parentDir.getAdminArea().getEntry(name, true);
+            SVNEntry entry = parentDir.getAdminArea(false).getEntry(name, true);
             if (entry != null && !entry.isScheduledForDeletion()) {
                 result[0] = SVNStatusType.OBSTRUCTED;
                 return result;
@@ -320,7 +320,7 @@ public class SVNMerger {
         } else if (mineType == SVNFileType.DIRECTORY) {
             result[0] = SVNStatusType.OBSTRUCTED;
         } else if (mineType.isFile()) {
-            SVNEntry entry = parentDir.getAdminArea().getEntry(name, true);
+            SVNEntry entry = parentDir.getAdminArea(false).getEntry(name, true);
             if (entry == null || entry.isScheduledForDeletion()) {
                 result[0] = SVNStatusType.OBSTRUCTED;
             } else {
@@ -387,7 +387,7 @@ public class SVNMerger {
             String copyFromURL, long copyFromRev, Map entryProps)
             throws SVNException {
         // 1. update or create entry in parent
-        SVNAdminArea adminArea = parentDir.getAdminArea();
+        SVNAdminArea adminArea = parentDir.getAdminArea(false);
         SVNEntry entry = adminArea.getEntry(name, true);
         String url = null;
         String uuid = adminArea.getEntry("", true).getUUID();
@@ -399,7 +399,7 @@ public class SVNMerger {
             }
             url = entry.getURL();
         } else {
-            entry = parentDir.getAdminArea().addEntry(name);
+            entry = parentDir.getAdminArea(false).addEntry(name);
             entry.loadProperties(entryProps);
             entry.setKind(SVNNodeKind.DIR);
             entry.scheduleForAddition();
@@ -413,17 +413,17 @@ public class SVNMerger {
         SVNDirectory childDir = parentDir.getChildDirectory(name);
         if (childDir == null) {
             childDir = parentDir.createChildDirectory(name, url, reposRootURL, copyFromRev);
-            SVNEntry root = childDir.getAdminArea().getEntry("", true);
+            SVNEntry root = childDir.getAdminArea(false).getEntry("", true);
             root.scheduleForAddition();
             root.setUUID(uuid);
         } else {
             childDir.getWCProperties("").delete();
-            SVNEntry root = childDir.getAdminArea().getEntry("", true);
+            SVNEntry root = childDir.getAdminArea(false).getEntry("", true);
             if (root.isScheduledForDeletion()) {
                 root.scheduleForReplacement();
             }
         }
-        adminArea = childDir.getAdminArea();
+        adminArea = childDir.getAdminArea(false);
         SVNEntry rootEntry = adminArea.getEntry("", true);
         rootEntry.setCopyFromURL(copyFromURL);
         rootEntry.setCopyFromRevision(copyFromRev);
@@ -435,7 +435,7 @@ public class SVNMerger {
     private void addFile(SVNDirectory parentDir, String name, String filePath,
             Map baseProps, String copyFromURL, long copyFromRev, Map entryProps)
             throws SVNException {
-        SVNAdminArea entries = parentDir.getAdminArea();
+        SVNAdminArea entries = parentDir.getAdminArea(false);
         SVNEntry entry = entries.getEntry(name, true);
         if (entry != null) {
             if (entry.isScheduledForDeletion()) {
@@ -444,7 +444,7 @@ public class SVNMerger {
             // put all entry props.
             entry.loadProperties(entryProps);
         } else {
-            entry = parentDir.getAdminArea().addEntry(name);
+            entry = parentDir.getAdminArea(false).addEntry(name);
             entry.loadProperties(entryProps);
             entry.setKind(SVNNodeKind.FILE);
             entry.scheduleForAddition();

@@ -84,7 +84,7 @@ public class SVNWCAccess implements ISVNEventHandler {
         if (target != null && anchor != null) {
             // both are versioned dirs,
             // check whether target is switched.
-            SVNEntry targetInAnchor = anchor.getAdminArea().getEntry(name, false);
+            SVNEntry targetInAnchor = anchor.getAdminArea(false).getEntry(name, false);
             SVNDirectory anchorCopy = anchor;
             try {
                 if (targetInAnchor == null) {
@@ -94,8 +94,8 @@ public class SVNWCAccess implements ISVNEventHandler {
                         target.setWCAccess(null, "");
                     }
                 } else {
-                    SVNEntry anchorEntry = anchor.getAdminArea().getEntry("", false);
-                    SVNEntry targetEntry = target.getAdminArea().getEntry("", false);
+                    SVNEntry anchorEntry = anchor.getAdminArea(false).getEntry("", false);
+                    SVNEntry targetEntry = target.getAdminArea(false).getEntry("", false);
                     String anchorURL = anchorEntry != null ? anchorEntry.getURL() : null;
                     String targetURL = targetEntry != null ? targetEntry.getURL() : null;
                     if (anchorURL != null && targetURL != null) {
@@ -112,7 +112,7 @@ public class SVNWCAccess implements ISVNEventHandler {
             } finally {
                 // close entries.
                 if (anchor == null && anchorCopy != null) {
-                    anchorCopy.getAdminArea().close();
+                    anchorCopy.getAdminArea(false).close();
                     anchorCopy.dispose();
                     anchorCopy = null;
                 }
@@ -172,12 +172,12 @@ public class SVNWCAccess implements ISVNEventHandler {
 
     public SVNEntry getTargetEntry() throws SVNException {
         if (getAnchor() != getTarget()) {
-            SVNEntry entry = getTarget().getAdminArea().getEntry("", false);
+            SVNEntry entry = getTarget().getAdminArea(false).getEntry("", false);
             if (entry != null) {
                 return entry;
             }
         }
-        return getAnchor().getAdminArea().getEntry(getTargetName(), false);
+        return getAnchor().getAdminArea(false).getEntry(getTargetName(), false);
     }
 
     public SVNDirectory getDirectory(String path) {
@@ -414,7 +414,7 @@ public class SVNWCAccess implements ISVNEventHandler {
 
     private void visitDirectories(String parentPath, SVNDirectory root,
             ISVNDirectoryVisitor visitor) throws SVNException {
-        Iterator entries = root.getAdminArea().entries(true);
+        Iterator entries = root.getAdminArea(false).entries(true);
         while (entries.hasNext()) {
             SVNEntry entry = (SVNEntry) entries.next();
             if ("".equals(entry.getName())) {

@@ -71,7 +71,7 @@ public class SVNDiffEditor implements ISVNEditor {
     public void deleteEntry(String path, long revision) throws SVNException {
         SVNDirectory dir = myWCAccess.getDirectory(myCurrentDirectory.myPath);
         String name = SVNPathUtil.tail(path);
-        SVNEntry entry = dir.getAdminArea().getEntry(name, true);
+        SVNEntry entry = dir.getAdminArea(false).getEntry(name, true);
         String displayPath = dir.getFile(name).getAbsolutePath().replace(File.separatorChar, '/');
         if (entry != null && entry.isFile()) {
             SVNProperties baseProps = dir.getBaseProperties(name, false);
@@ -197,7 +197,7 @@ public class SVNDiffEditor implements ISVNEditor {
         SVNDirectory dir = myWCAccess.getDirectory(myCurrentDirectory.myPath);
         String fileName = SVNPathUtil.tail(myCurrentFile.myPath);
         if (dir != null) {
-            SVNEntry entry = dir.getAdminArea().getEntry(fileName, true);
+            SVNEntry entry = dir.getAdminArea(false).getEntry(fileName, true);
             if (entry != null && entry.getCopyFromURL() != null) {
                 myCurrentFile.myIsAdded = false;
             }
@@ -249,7 +249,7 @@ public class SVNDiffEditor implements ISVNEditor {
         }
         SVNEntry entry = null;
         if (dir != null) {
-            entry = dir.getAdminArea().getEntry(fileName, true);
+            entry = dir.getAdminArea(false).getEntry(fileName, true);
         }
         String displayPath = new File(myWCAccess.getAnchor().getRoot(), myCurrentFile.myPath).getAbsolutePath().replace(File.separatorChar, '/');
         if (myCurrentFile.myIsAdded) {
@@ -347,7 +347,7 @@ public class SVNDiffEditor implements ISVNEditor {
         if (myDiffGenerator.isDiffUnversioned()) {
             processedFiles = new HashSet();
         }
-        SVNAdminArea adminArea = dir.getAdminArea();
+        SVNAdminArea adminArea = dir.getAdminArea(false);
         for (Iterator entries = adminArea.entries(false); entries.hasNext();) {
             SVNEntry entry = (SVNEntry) entries.next();
             if (processedFiles != null && !"".equals(entry.getName())) {

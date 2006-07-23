@@ -32,7 +32,7 @@ public class SVNAdminUtil {
     
     static {
         String eol = System.getProperty("line.separator");
-        FORMAT_TEXT = new byte[] {'4', '\n'};
+        FORMAT_TEXT = new byte[] {'8', '\n'};
         README_TEXT = ("This is a Subversion working copy administrative directory." + eol
             + "Visit http://subversion.tigris.org/ for more information." + eol).getBytes();
         SKIP_README = Boolean.getBoolean("javasvn.skipReadme");

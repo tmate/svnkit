@@ -45,8 +45,8 @@ public class SVNReporter implements ISVNReporterBaton {
 
     public void report(ISVNReporter reporter) throws SVNException {
         try {
-            SVNAdminArea targetAdminArea = myWCAccess.getTarget().getAdminArea();
-            SVNAdminArea anchorAdminArea = myWCAccess.getAnchor().getAdminArea();
+            SVNAdminArea targetAdminArea = myWCAccess.getTarget().getAdminArea(false);
+            SVNAdminArea anchorAdminArea = myWCAccess.getAnchor().getAdminArea(false);
             SVNEntry targetEntry = anchorAdminArea.getEntry(myWCAccess.getTargetName(), true);
 
             if (targetEntry == null || targetEntry.isHidden() || (targetEntry.isDirectory() && targetEntry.isScheduledForAddition())) {
@@ -104,7 +104,7 @@ public class SVNReporter implements ISVNReporterBaton {
     }
 
     private void reportEntries(ISVNReporter reporter, SVNDirectory directory, String dirPath, boolean reportAll, boolean recursive) throws SVNException {
-        SVNAdminArea adminArea = directory.getAdminArea();
+        SVNAdminArea adminArea = directory.getAdminArea(false);
         long baseRevision = adminArea.getEntry("", true).getRevision();
 
         SVNExternalInfo[] externals = myWCAccess.addExternals(directory, directory.getProperties("", false).getPropertyValue(SVNProperty.EXTERNALS));
@@ -174,7 +174,7 @@ public class SVNReporter implements ISVNReporterBaton {
                     SVNErrorManager.error(err);
                 }
                 SVNDirectory childDir = directory.getChildDirectory(entry.getName());
-                SVNEntry childEntry = childDir.getAdminArea().getEntry("", true);
+                SVNEntry childEntry = childDir.getAdminArea(false).getEntry("", true);
                 String url = childEntry.getURL();
                 if (reportAll) {
                     if (!url.equals(entry.getURL())) {
@@ -199,7 +199,7 @@ public class SVNReporter implements ISVNReporterBaton {
             return;
         }
         SVNProperties props = dir.getProperties(name, false);
-        SVNEntry entry = dir.getAdminArea().getEntry(name, true);
+        SVNEntry entry = dir.getAdminArea(false).getEntry(name, true);
         boolean special = props.getPropertyValue(SVNProperty.SPECIAL) != null;
 
         File src = dir.getBaseFile(name, false);
@@ -225,7 +225,7 @@ public class SVNReporter implements ISVNReporterBaton {
 	    if (needsLock) {
 	        SVNFileUtil.setReadonly(dst, entry.getLockToken() == null);
 	    }
-        dir.getAdminArea().save(false);
+        dir.getAdminArea(false).save(false);
 
         myWCAccess.handleEvent(SVNEventFactory.createRestoredEvent(myWCAccess, dir, entry));
     }
