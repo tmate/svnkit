@@ -16,6 +16,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.Map;
 
 import org.tmatesoft.svn.core.SVNErrorCode;
@@ -24,10 +25,18 @@ import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNNodeKind;
 import org.tmatesoft.svn.core.SVNProperty;
 import org.tmatesoft.svn.core.internal.util.SVNEncodingUtil;
+import org.tmatesoft.svn.core.internal.util.SVNFormatUtil;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
 
 
 public class SVNPostXMLEntries extends SVNAdminArea {
+    public static final int WC_FORMAT = 8;
+    
+    private static final String ATTRIBUTE_COPIED = "copied";
+    private static final String ATTRIBUTE_DELETED = "deleted";
+    private static final String ATTRIBUTE_ABSENT = "absent";
+    private static final String ATTRIBUTE_INCOMPLETE = "incomplete";
+    private static final String THIS_DIR = "";
 
     public SVNPostXMLEntries(SVNDirectory parent) {
         super(parent);
@@ -84,7 +93,7 @@ public class SVNPostXMLEntries extends SVNAdminArea {
                         break;
                     }
                 } catch (SVNException svne) {
-                    SVNErrorMessage err = svne.getErrorMessage().wrap("Error at entry {0,number, integer} in entries file for ''{0}'':", new Object[]{new Integer(entryNumber), getParent().getRoot()});
+                    SVNErrorMessage err = svne.getErrorMessage().wrap("Error at entry {0,number,integer} in entries file for ''{1}'':", new Object[]{new Integer(entryNumber), getParent().getRoot()});
                     SVNErrorManager.error(err);
                 }
                 ++entryNumber;
@@ -96,7 +105,7 @@ public class SVNPostXMLEntries extends SVNAdminArea {
     }
 
     private void resolveToDefaults() throws SVNException {
-        Map defaultEntry = (Map)myData.get("");
+        Map defaultEntry = (Map)myData.get(getThisDirName());
         if (defaultEntry == null) {
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_NOT_FOUND, "Missing default entry");
             SVNErrorManager.error(err);
@@ -114,7 +123,7 @@ public class SVNPostXMLEntries extends SVNAdminArea {
 
         for (Iterator entries = myData.keySet().iterator(); entries.hasNext();) {
             String name = (String)entries.next();
-            if ("".equals(name)) {
+            if (getThisDirName().equals(name)) {
                 continue;
             }
             
@@ -153,7 +162,7 @@ public class SVNPostXMLEntries extends SVNAdminArea {
 
         Map entry = new HashMap();
         String name = parseString(line);
-        name = name != null ? name : "";
+        name = name != null ? name : getThisDirName();
         entry.put(SVNProperty.NAME, name);
 
         line = reader.readLine();
@@ -293,8 +302,9 @@ public class SVNPostXMLEntries extends SVNAdminArea {
             myData.put(name, entry);
             return entry;
         }
-        String cachableProps = parseValue(line);
-        if (cachableProps != null) {
+        String cachablePropsStr = parseValue(line);
+        if (cachablePropsStr != null) {
+            String[] cachableProps = fromString(cachablePropsStr, " ");
             entry.put(SVNProperty.CACHABLE_PROPS, cachableProps);
         }
         
@@ -303,8 +313,9 @@ public class SVNPostXMLEntries extends SVNAdminArea {
             myData.put(name, entry);
             return entry;
         }
-        String presentProps = parseValue(line);
-        if (presentProps != null) {
+        String presentPropsStr = parseValue(line);
+        if (presentPropsStr != null) {
+            String[] presentProps = fromString(presentPropsStr, " ");
             entry.put(SVNProperty.PRESENT_PROPS, presentProps);
         }
         
@@ -353,7 +364,7 @@ public class SVNPostXMLEntries extends SVNAdminArea {
             myData.put(name, entry);
             return entry;
         }
-        boolean isCopied = parseBoolean(line, "copied");
+        boolean isCopied = parseBoolean(line, ATTRIBUTE_COPIED);
         if (isCopied) {
             entry.put(SVNProperty.COPIED, SVNProperty.toString(isCopied));
         }
@@ -383,7 +394,7 @@ public class SVNPostXMLEntries extends SVNAdminArea {
             myData.put(name, entry);
             return entry;
         }
-        boolean isDeleted = parseBoolean(line, "deleted");
+        boolean isDeleted = parseBoolean(line, ATTRIBUTE_DELETED);
         if (isDeleted) {
             entry.put(SVNProperty.DELETED, SVNProperty.toString(isDeleted));
         }
@@ -393,7 +404,7 @@ public class SVNPostXMLEntries extends SVNAdminArea {
             myData.put(name, entry);
             return entry;
         }
-        boolean isAbsent = parseBoolean(line, "absent");
+        boolean isAbsent = parseBoolean(line, ATTRIBUTE_ABSENT);
         if (isAbsent) {
             entry.put(SVNProperty.ABSENT, SVNProperty.toString(isAbsent));
         }
@@ -403,7 +414,7 @@ public class SVNPostXMLEntries extends SVNAdminArea {
             myData.put(name, entry);
             return entry;
         }
-        boolean isIncomplete = parseBoolean(line, "incomplete");
+        boolean isIncomplete = parseBoolean(line, ATTRIBUTE_INCOMPLETE);
         if (isIncomplete) {
             entry.put(SVNProperty.INCOMPLETE, SVNProperty.toString(isIncomplete));
         }
@@ -538,11 +549,369 @@ public class SVNPostXMLEntries extends SVNAdminArea {
         return line;
     }
     
-    public void save(boolean close) throws SVNException {
+    public String getThisDirName() {
+        return THIS_DIR;
+    }
+    
+    protected String formatEntries() {
+        StringBuffer buffer = new StringBuffer();
+        Map rootEntry = (Map) myData.get(getThisDirName());
+
+        buffer.append(getFormatNumber());
+        buffer.append('\n');
+        writeEntry(buffer, getThisDirName(), rootEntry, null);
+
+        for (Iterator entries = myData.keySet().iterator(); entries.hasNext();) {
+            String name = (String) entries.next();
+            if (getThisDirName().equals(name)) {
+                continue;
+            }
+            Map entry = (Map) myData.get(name);
+            writeEntry(buffer, name, entry, rootEntry);
+        }
+        return buffer.toString();
     }
 
+    private void writeEntry(StringBuffer buffer, String name, Map entry, Map rootEntry) {
+        boolean isThisDir = getThisDirName().equals(name);
+        boolean isSubDir = !isThisDir && SVNProperty.KIND_DIR.equals(entry.get(SVNProperty.KIND)); 
+        int emptyFields = 0;
+        writeString(buffer, name, emptyFields);
+        
+        String kind = (String)entry.get(SVNProperty.KIND);
+        if (writeValue(buffer, kind, emptyFields)){
+            emptyFields = 0;
+        } else {
+            ++emptyFields;
+        }
+
+        String revision = null;
+        if (isThisDir){ 
+            revision = (String)entry.get(SVNProperty.REVISION);
+        } else if (!isSubDir){
+            revision = (String)entry.get(SVNProperty.REVISION);
+            if (revision != null && revision.equals(rootEntry.get(SVNProperty.REVISION))) {
+                revision = null;
+            }
+        }
+        if (writeRevision(buffer, revision, emptyFields)) {
+            emptyFields = 0;
+        } else {
+            ++emptyFields;
+        }
+        
+        String url = null;
+        if (isThisDir) {
+            url = (String)entry.get(SVNProperty.URL);
+        } else if (!isSubDir) {
+            url = (String)entry.get(SVNProperty.URL);
+            String expectedURL = SVNPathUtil.append((String)rootEntry.get(SVNProperty.URL), name);
+            if (url != null && url.equals(expectedURL)) {
+                url = null;
+            }
+        }
+        if (writeString(buffer, url, emptyFields)) {
+            emptyFields = 0;
+        } else {
+            ++emptyFields;
+        }
+        
+        String root = null;
+        if (isThisDir) {
+            root = (String)entry.get(SVNProperty.REPOS);
+        } else if (!isSubDir) {
+            String thisDirRoot = (String)rootEntry.get(SVNProperty.REPOS);
+            root = (String)entry.get(SVNProperty.REPOS);
+            if (root != null && root.equals(thisDirRoot)) {
+                root = null;
+            }
+        }
+        if (writeString(buffer, root, emptyFields)) {
+            emptyFields = 0;
+        } else {
+            ++emptyFields;
+        }
+        
+        String schedule = (String)entry.get(SVNProperty.SCHEDULE);
+        if (schedule != null && (!SVNProperty.SCHEDULE_ADD.equals(schedule) && !SVNProperty.SCHEDULE_DELETE.equals(schedule) && !SVNProperty.SCHEDULE_REPLACE.equals(schedule))) {
+            schedule = null;
+        }
+        if (writeValue(buffer, schedule, emptyFields)) {
+            emptyFields = 0;
+        } else {
+            ++emptyFields;
+        }
+        
+        String textTime = (String)entry.get(SVNProperty.TEXT_TIME);
+        if (writeValue(buffer, textTime, emptyFields)) {
+            emptyFields = 0;
+        } else {
+            ++emptyFields;
+        }
+        
+        String checksum = (String)entry.get(SVNProperty.CHECKSUM);
+        if (writeValue(buffer, checksum, emptyFields)) {
+            emptyFields = 0;
+        } else {
+            ++emptyFields;
+        }
+        
+        String committedDate = (String)entry.get(SVNProperty.COMMITTED_DATE);
+        if (writeValue(buffer, committedDate, emptyFields)) {
+            emptyFields = 0;
+        } else {
+            ++emptyFields;
+        }
+
+        String committedRevision = (String)entry.get(SVNProperty.COMMITTED_REVISION);
+        if (writeRevision(buffer, committedRevision, emptyFields)) {
+            emptyFields = 0;
+        } else {
+            ++emptyFields;
+        }
+        
+        String committedAuthor = (String)entry.get(SVNProperty.LAST_AUTHOR);
+        if (writeString(buffer, committedAuthor, emptyFields)) {
+            emptyFields = 0;
+        } else {
+            ++emptyFields;
+        }
+        
+        String hasProps = (String)entry.get(SVNProperty.HAS_PROPS);
+        if (writeValue(buffer, hasProps != null ? SVNProperty.HAS_PROPS : null, emptyFields)) {
+            emptyFields = 0;
+        } else {
+            ++emptyFields;
+        }
+
+        String hasPropMods = (String)entry.get(SVNProperty.HAS_PROP_MODS);
+        if (writeValue(buffer, hasPropMods != null ? SVNProperty.HAS_PROP_MODS : null, emptyFields)) {
+            emptyFields = 0;
+        } else {
+            ++emptyFields;
+        }
+        
+        String cachableProps = asString((String[])entry.get(SVNProperty.CACHABLE_PROPS), " ");
+        if (!isThisDir) {             
+            String thisDirCachableProps = asString((String[])rootEntry.get(SVNProperty.CACHABLE_PROPS), " ");
+            if (thisDirCachableProps != null && cachableProps != null && thisDirCachableProps.equals(cachableProps)) {
+                cachableProps = null;
+            }
+        }
+        if (writeValue(buffer, cachableProps, emptyFields)) {
+            emptyFields = 0;
+        } else {
+            ++emptyFields;
+        }
+
+        String presentProps = asString((String[])entry.get(SVNProperty.PRESENT_PROPS), " ");
+        if (writeValue(buffer, presentProps, emptyFields)) {
+            emptyFields = 0;
+        } else {
+            ++emptyFields;
+        }
+        
+        String propRejectFile = (String)entry.get(SVNProperty.PROP_REJECT_FILE);
+        if (writeString(buffer, propRejectFile, emptyFields)) {
+            emptyFields = 0;
+        } else {
+            ++emptyFields;
+        }
+        
+        String conflictOldFile = (String)entry.get(SVNProperty.CONFLICT_OLD);
+        if (writeString(buffer, conflictOldFile, emptyFields)) {
+            emptyFields = 0;
+        } else {
+            ++emptyFields;
+        }
+
+        String conflictNewFile = (String)entry.get(SVNProperty.CONFLICT_NEW);
+        if (writeString(buffer, conflictNewFile, emptyFields)) {
+            emptyFields = 0;
+        } else {
+            ++emptyFields;
+        }
+    
+        String conflictWrkFile = (String)entry.get(SVNProperty.CONFLICT_WRK);
+        if (writeString(buffer, conflictWrkFile, emptyFields)) {
+            emptyFields = 0;
+        } else {
+            ++emptyFields;
+        }
+
+        String copiedAttr = (String)entry.get(SVNProperty.COPIED);
+        if (writeValue(buffer, copiedAttr != null ? ATTRIBUTE_COPIED : null, emptyFields)) {
+            emptyFields = 0;
+        } else {
+            ++emptyFields;
+        }
+        
+        String copyfromURL = (String)entry.get(SVNProperty.COPYFROM_URL);
+        if (writeString(buffer, copyfromURL, emptyFields)) {
+            emptyFields = 0;
+        } else {
+            ++emptyFields;
+        }
+        
+        String copyfromRevision = (String)entry.get(SVNProperty.COPYFROM_REVISION);
+        if (writeRevision(buffer, copyfromRevision, emptyFields)) {
+            emptyFields = 0;
+        } else {
+            ++emptyFields;
+        }
+        
+        String deletedAttr = (String)entry.get(SVNProperty.DELETED);
+        if (writeValue(buffer, deletedAttr != null ? ATTRIBUTE_DELETED : null, emptyFields)) {
+            emptyFields = 0;
+        } else {
+            ++emptyFields;
+        }
+        
+        String absentAttr = (String)entry.get(SVNProperty.ABSENT);
+        if (writeValue(buffer, absentAttr != null ? ATTRIBUTE_ABSENT : null, emptyFields)) {
+            emptyFields = 0;
+        } else {
+            ++emptyFields;
+        }
+
+        String incompleteAttr = (String)entry.get(SVNProperty.INCOMPLETE);
+        if (writeValue(buffer, incompleteAttr != null ? ATTRIBUTE_INCOMPLETE : null, emptyFields)) {
+            emptyFields = 0;
+        } else {
+            ++emptyFields;
+        }
+        
+        String uuid = (String)entry.get(SVNProperty.UUID);
+        if (!isThisDir) {             
+            String thisDirUUID = (String)rootEntry.get(SVNProperty.UUID);
+            if (thisDirUUID != null && uuid != null && thisDirUUID.equals(uuid)) {
+                uuid = null;
+            }
+        }
+        if (writeValue(buffer, uuid, emptyFields)) {
+            emptyFields = 0;
+        } else {
+            ++emptyFields;
+        }
+        
+        String lockToken = (String)entry.get(SVNProperty.LOCK_TOKEN);
+        if (writeString(buffer, lockToken, emptyFields)) {
+            emptyFields = 0;
+        } else {
+            ++emptyFields;
+        }
+        
+        String lockOwner = (String)entry.get(SVNProperty.LOCK_OWNER);
+        if (writeString(buffer, lockOwner, emptyFields)) {
+            emptyFields = 0;
+        } else {
+            ++emptyFields;
+        }
+
+        String lockComment = (String)entry.get(SVNProperty.LOCK_COMMENT);
+        if (writeString(buffer, lockComment, emptyFields)) {
+            emptyFields = 0;
+        } else {
+            ++emptyFields;
+        }
+        
+        String lockCreationDate = (String)entry.get(SVNProperty.LOCK_CREATION_DATE);
+        writeValue(buffer, lockCreationDate, emptyFields);
+
+        buffer.append("\f\n");
+    }
+    
+    private String asString(String[] array, String delimiter) {
+        String str = null;
+        if (array != null) {
+            str = "";
+            for (int i = 0; i < array.length; i++) {
+                str += array[i];
+                if (i < array.length - 1) {
+                    str += delimiter;
+                }
+            }
+        }
+        return str;
+    }
+    
+    private String[] fromString(String str, String delimiter) {
+        LinkedList list = new LinkedList(); 
+        int startInd = 0;
+        int ind = -1;
+        while ((ind = str.indexOf(delimiter, startInd)) != -1) {
+            list.add(str.substring(startInd, ind));
+            startInd = ind;
+            while (startInd < str.length() && str.charAt(startInd) == ' '){
+                startInd++;
+            }
+        }
+        if (startInd < str.length()) {
+            list.add(str.substring(startInd));
+        }
+        return (String[])list.toArray(new String[list.size()]);
+    }
+
+    private boolean writeString(StringBuffer buffer, String str, int emptyFields) {
+        if (str != null && str.length() > 0) {
+            for (int i = 0; i < emptyFields; i++) {
+                buffer.append('\n');
+            }
+            for (int i = 0; i < str.length(); i++) {
+                char ch = str.charAt(i);
+                if (SVNEncodingUtil.isASCIIControlChar(ch) || ch == '\\') {
+                    buffer.append("\\x");
+                    buffer.append(SVNFormatUtil.getHexNumberFromByte((byte)ch));
+                } else {
+                    buffer.append(ch);
+                }
+            }
+            buffer.append('\n');
+            return true;
+        }
+        return false;
+    }
+    
+    private boolean writeValue(StringBuffer buffer, String val, int emptyFields) {
+        if (val != null && val.length() > 0) {
+            for (int i = 0; i < emptyFields; i++) {
+                buffer.append('\n');
+            }
+            buffer.append(val);
+            buffer.append('\n');
+            return true;
+        }
+        return false;
+    }
+    
+    private boolean writeRevision(StringBuffer buffer, String rev, int emptyFields) {
+        if (rev != null && rev.length() > 0 && Long.parseLong(rev) >= 0) {
+            for (int i = 0; i < emptyFields; i++) {
+                buffer.append('\n');
+            }
+            buffer.append(rev);
+            buffer.append('\n');
+            return true;
+        }
+        return false;
+    }
+    
     public boolean setPropertyValue(String name, String propertyName, String propertyValue) {
         return false;
+    }
+
+    public void setCachableProperties(String name, String[] cachableProps) {
+        if (myData == null) {
+            return;
+        }
+        Map entry = (Map) myData.get(name);
+        if (entry != null) {
+            entry.put(SVNProperty.CACHABLE_PROPS, cachableProps);
+        }
+    }
+    
+    protected int getFormatNumber() {
+        return WC_FORMAT;
     }
 
 }

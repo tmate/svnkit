@@ -62,7 +62,7 @@ public class SVNUpdateEditor implements ISVNEditor {
         myIsLeaveConflicts = leaveConflicts;
         myDeltaProcessor = new SVNDeltaProcessor();
 
-        SVNEntry entry = wcAccess.getAnchor().getAdminArea().getEntry("", true);
+        SVNEntry entry = wcAccess.getAnchor().getAdminArea(false).getEntry("", true);
         myTargetURL = entry.getURL();
         myRootURL = entry.getRepositoryRoot();
         if (myTarget != null) {
@@ -75,7 +75,7 @@ public class SVNUpdateEditor implements ISVNEditor {
                 SVNErrorManager.error(err);
             }
         }
-        wcAccess.getTarget().getAdminArea().close();
+        wcAccess.getTarget().getAdminArea(false).close();
 
         if ("".equals(myTarget)) {
             myTarget = null;
@@ -94,7 +94,7 @@ public class SVNUpdateEditor implements ISVNEditor {
         myIsRootOpen = true;
         myCurrentDirectory = createDirectoryInfo(null, "", false);
         if (myTarget == null) {
-            SVNAdminArea adminArea = myCurrentDirectory.getDirectory().getAdminArea();
+            SVNAdminArea adminArea = myCurrentDirectory.getDirectory().getAdminArea(false);
             SVNEntry entry = adminArea.getEntry("", true);
             entry.setRevision(myTargetRevision);
             entry.setURL(myCurrentDirectory.URL);
@@ -109,7 +109,7 @@ public class SVNUpdateEditor implements ISVNEditor {
     public void deleteEntry(String path, long revision) throws SVNException {
         String name = SVNPathUtil.tail(path);
 
-        SVNEntry entry = myCurrentDirectory.getDirectory().getAdminArea().getEntry(name, true);
+        SVNEntry entry = myCurrentDirectory.getDirectory().getAdminArea(false).getEntry(name, true);
         if (entry == null) {
             return;
         }
@@ -155,27 +155,27 @@ public class SVNUpdateEditor implements ISVNEditor {
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_OBSTRUCTED_UPDATE, "Failed to add directory ''{0}'':  object of the same name as the administrative directory", path);
             SVNErrorManager.error(err);
         }
-        SVNEntry entry = parentDir.getAdminArea().getEntry(name, true);
+        SVNEntry entry = parentDir.getAdminArea(false).getEntry(name, true);
         if (entry != null) {
             if (entry.isScheduledForAddition()) {
                 SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_OBSTRUCTED_UPDATE, "Failed to add directory ''{0}'': object of the same name already exists", path);
                 SVNErrorManager.error(err);
             }
         } else {
-            entry = parentDir.getAdminArea().addEntry(name);
+            entry = parentDir.getAdminArea(false).addEntry(name);
         }
         entry.setKind(SVNNodeKind.DIR);
         entry.setAbsent(false);
         entry.setDeleted(false);
-        parentDir.getAdminArea().save(true);
+        parentDir.getAdminArea(false).save(true);
 
         SVNDirectory dir = parentDir.createChildDirectory(name, myCurrentDirectory.URL, null, myTargetRevision);
         if (dir == null) {
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_NOT_LOCKED, "Working copy ''{0}'' is missing or not locked", parentDir.getFile(name));
             SVNErrorManager.error(err);
         } else {
-            dir.getAdminArea().getEntry("", false).setIncomplete(true);
-            dir.getAdminArea().save(true);
+            dir.getAdminArea(false).getEntry("", false).setIncomplete(true);
+            dir.getAdminArea(false).save(true);
             dir.lock(0);
         }
         myWCAccess.handleEvent(SVNEventFactory.createUpdateAddEvent(myWCAccess, parentDir, SVNNodeKind.DIR, entry));
@@ -187,7 +187,7 @@ public class SVNUpdateEditor implements ISVNEditor {
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_NOT_LOCKED, "Working copy ''{0}'' is missing or not locked", path);
             SVNErrorManager.error(err);
         }
-        SVNAdminArea adminArea = myCurrentDirectory.getDirectory().getAdminArea();
+        SVNAdminArea adminArea = myCurrentDirectory.getDirectory().getAdminArea(false);
         SVNEntry entry = adminArea.getEntry("", true);
         entry.setRevision(myTargetRevision);
         entry.setURL(myCurrentDirectory.URL);
@@ -208,7 +208,7 @@ public class SVNUpdateEditor implements ISVNEditor {
 
     private void absentEntry(String path, SVNNodeKind kind) throws SVNException {
         String name = SVNPathUtil.tail(path);
-        SVNAdminArea adminArea = myCurrentDirectory.getDirectory().getAdminArea();
+        SVNAdminArea adminArea = myCurrentDirectory.getDirectory().getAdminArea(false);
         SVNEntry entry = adminArea.getEntry(name, true);
         if (entry != null && entry.isScheduledForAddition()) {
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_OBSTRUCTED_UPDATE, "Failed to mark ''{0}'' absent: item of the same name is already scheduled for addition");
@@ -235,7 +235,7 @@ public class SVNUpdateEditor implements ISVNEditor {
         if (dir == null) {
             return;
         }
-        SVNAdminArea adminArea = dir.getAdminArea();
+        SVNAdminArea adminArea = dir.getAdminArea(false);
         for (Iterator ents = adminArea.entries(false); ents.hasNext();) {
             SVNEntry entry = (SVNEntry) ents.next();
             if (entry.isFile() || "".equals(entry.getName())) {
@@ -312,7 +312,7 @@ public class SVNUpdateEditor implements ISVNEditor {
 
     public void applyTextDelta(String commitPath, String baseChecksum) throws SVNException {
         SVNDirectory dir = myCurrentFile.getDirectory();
-        SVNAdminArea adminArea = dir.getAdminArea();
+        SVNAdminArea adminArea = dir.getAdminArea(false);
         SVNEntry entry = adminArea.getEntry(myCurrentFile.Name, true);
         File baseFile = dir.getBaseFile(myCurrentFile.Name, false);
         if (entry != null && entry.getChecksum() != null) {
@@ -453,7 +453,7 @@ public class SVNUpdateEditor implements ISVNEditor {
                 if (textStatus == SVNStatusType.UNCHANGED) {
                     textStatus = SVNStatusType.MERGED;
                 }
-                SVNAdminArea adminArea = dir.getAdminArea();
+                SVNAdminArea adminArea = dir.getAdminArea(false);
                 SVNEntry entry = adminArea.getEntry(name, true);
                 String oldRevisionStr = ".r" + entry.getRevision();
                 String newRevisionStr = ".r" + myTargetRevision;
@@ -535,12 +535,12 @@ public class SVNUpdateEditor implements ISVNEditor {
         SVNDirectory dir = myWCAccess.getAnchor();
         if (myTarget != null) {
             if (dir.getChildDirectory(myTarget) == null) {
-                SVNEntry entry = dir.getAdminArea().getEntry(myTarget, true);
-                boolean save = bumpEntry(dir.getAdminArea(), entry, mySwitchURL, myRootURL, myTargetRevision, false);
+                SVNEntry entry = dir.getAdminArea(false).getEntry(myTarget, true);
+                boolean save = bumpEntry(dir.getAdminArea(false), entry, mySwitchURL, myRootURL, myTargetRevision, false);
                 if (save) {
-                    dir.getAdminArea().save(true);
+                    dir.getAdminArea(false).save(true);
                 } else {
-                    dir.getAdminArea().close();
+                    dir.getAdminArea(false).close();
                 }
                 return;
             }
@@ -550,7 +550,7 @@ public class SVNUpdateEditor implements ISVNEditor {
     }
 
     private void bumpDirectory(SVNDirectory dir, String url, String rootURL) throws SVNException {
-        SVNAdminArea adminArea = dir.getAdminArea();
+        SVNAdminArea adminArea = dir.getAdminArea(false);
         boolean save = bumpEntry(adminArea, adminArea.getEntry("", true), url, rootURL, myTargetRevision, false);
         Map childDirectories = new HashMap();
         for (Iterator ents = adminArea.entries(true); ents.hasNext();) {
@@ -615,7 +615,7 @@ public class SVNUpdateEditor implements ISVNEditor {
             if (info.Parent == null && myTarget != null) {
                 return;
             }
-            SVNAdminArea adminArea = info.getDirectory().getAdminArea();
+            SVNAdminArea adminArea = info.getDirectory().getAdminArea(false);
             if (adminArea.getEntry("", true) == null) {
                 SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_NOT_FOUND, "No root entry found in ''{0}''", info.getDirectory().getPath());
                 SVNErrorManager.error(err);
@@ -658,7 +658,7 @@ public class SVNUpdateEditor implements ISVNEditor {
         }
         SVNAdminArea adminArea = null;
         try {
-            adminArea = dir.getAdminArea();
+            adminArea = dir.getAdminArea(false);
             SVNEntry entry = adminArea.getEntry(info.Name, true);
             if (added && entry != null && entry.isScheduledForAddition()) {
                 SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_OBSTRUCTED_UPDATE, "Failed to add file ''{0}'': object of the same name already exists and scheduled for addition", path);
@@ -691,8 +691,8 @@ public class SVNUpdateEditor implements ISVNEditor {
 
         if (mySwitchURL == null) {
             SVNDirectory dir = added ? null : info.getDirectory();
-            if (dir != null && dir.getAdminArea().getEntry("", true) != null) {
-                info.URL = dir.getAdminArea().getEntry("", true).getURL();
+            if (dir != null && dir.getAdminArea(false).getEntry("", true) != null) {
+                info.URL = dir.getAdminArea(false).getEntry("", true).getURL();
             }
             if (info.URL == null && parent != null) {
                 info.URL = SVNPathUtil.append(parent.URL, SVNEncodingUtil.uriEncode(name));

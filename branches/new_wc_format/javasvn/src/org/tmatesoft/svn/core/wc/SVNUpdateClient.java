@@ -141,7 +141,7 @@ public class SVNUpdateClient extends SVNBasicClient {
         final SVNReporter reporter = new SVNReporter(wcAccess, true, recursive);
         try {
             wcAccess.open(true, recursive);
-            SVNEntry entry = wcAccess.getAnchor().getAdminArea().getEntry("", false);
+            SVNEntry entry = wcAccess.getAnchor().getAdminArea(false).getEntry("", false);
             SVNURL url = entry.getSVNURL();
             SVNUpdateEditor editor = new SVNUpdateEditor(wcAccess, null, recursive, isLeaveConflictsUnresolved());
             SVNRepository repos = createRepository(url, true);
@@ -191,7 +191,7 @@ public class SVNUpdateClient extends SVNBasicClient {
         final SVNReporter reporter = new SVNReporter(wcAccess, true, recursive);
         try {
             wcAccess.open(true, recursive);
-            SVNEntry entry = wcAccess.getAnchor().getAdminArea().getEntry("", false);
+            SVNEntry entry = wcAccess.getAnchor().getAdminArea(false).getEntry("", false);
             if (entry == null) {
                 SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_NOT_FOUND, "''{0}'' is not under version control", file);
                 SVNErrorManager.error(err);
@@ -443,7 +443,7 @@ public class SVNUpdateClient extends SVNBasicClient {
                 SVNErrorManager.error(err);
             }
             // read entries
-            SVNAdminArea adminArea = wcAccess.getTarget().getAdminArea();
+            SVNAdminArea adminArea = wcAccess.getTarget().getAdminArea(false);
             for (Iterator ents = adminArea.entries(false); ents.hasNext();) {
                 SVNEntry entry = (SVNEntry) ents.next();
                 if (entry.isDirectory()) {
@@ -465,7 +465,7 @@ public class SVNUpdateClient extends SVNBasicClient {
     }
 
     private void copyVersionedFile(File dstPath, SVNDirectory dir, String fileName, SVNRevision revision, String eol) throws SVNException {
-        SVNAdminArea entries = dir.getAdminArea();
+        SVNAdminArea entries = dir.getAdminArea(false);
         SVNEntry entry = entries.getEntry(fileName, false);
         if (entry == null) {
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_NOT_FOUND, "''{0}'' is not under version control or doesn't exist", 
@@ -691,11 +691,11 @@ public class SVNUpdateClient extends SVNBasicClient {
         boolean save = false;
         checkCancelled();
         if (!"".equals(name)) {
-            SVNEntry entry = dir.getAdminArea().getEntry(name, true);
+            SVNEntry entry = dir.getAdminArea(false).getEntry(name, true);
             save = canonicalizeEntry(entry, omitDefaultPort);
             dir.getWCProperties(name).setPropertyValue(SVNProperty.WC_URL, null);
             if (save) {
-                dir.getAdminArea().save(true);
+                dir.getAdminArea(false).save(true);
             }
             return;
         }
@@ -708,11 +708,11 @@ public class SVNUpdateClient extends SVNBasicClient {
             }
         }
         
-        SVNEntry rootEntry = dir.getAdminArea().getEntry("", true);
+        SVNEntry rootEntry = dir.getAdminArea(false).getEntry("", true);
         save = canonicalizeEntry(rootEntry, omitDefaultPort);
         dir.getWCProperties("").setPropertyValue(SVNProperty.WC_URL, null);
         // now all child entries that doesn't has repos/url has new values.
-        for(Iterator ents = dir.getAdminArea().entries(true); ents.hasNext();) {
+        for(Iterator ents = dir.getAdminArea(false).entries(true); ents.hasNext();) {
             SVNEntry entry = (SVNEntry) ents.next();
             if ("".equals(entry.getName())) {
                 continue;
@@ -730,7 +730,7 @@ public class SVNUpdateClient extends SVNBasicClient {
             dir.getWCProperties(entry.getName()).setPropertyValue(SVNProperty.WC_URL, null);
         }
         if (save) {
-            dir.getAdminArea().save(true);
+            dir.getAdminArea(false).save(true);
         }
     }
     
@@ -898,10 +898,10 @@ public class SVNUpdateClient extends SVNBasicClient {
         SVNDirectory.createVersionedDirectory(dstPath);
         // add entry first.
         SVNDirectory dir = new SVNDirectory(null, "", dstPath);
-        SVNAdminArea adminArea = dir.getAdminArea();
-        SVNEntry entry = adminArea.getEntry("", true);
+        SVNAdminArea adminArea = dir.getAdminArea(true);
+        SVNEntry entry = adminArea.getEntry(dir.getAdminArea(true).getThisDirName(), true);
         if (entry == null) {
-            entry = adminArea.addEntry("");
+            entry = adminArea.addEntry(dir.getAdminArea(true).getThisDirName());
         }
         entry.setURL(url.toString());
         entry.setUUID(uuid);
@@ -909,7 +909,8 @@ public class SVNUpdateClient extends SVNBasicClient {
         entry.setKind(SVNNodeKind.DIR);
         entry.setRevision(revNumber);
         entry.setIncomplete(true);
-
+        entry.setCachableProperties(SVNDirectory.getCachableProperties());
+        
         adminArea.save(true);
         return dir;
     }
@@ -976,17 +977,17 @@ public class SVNUpdateClient extends SVNBasicClient {
     
     private Map doRelocate(SVNDirectory dir, String name, String from, String to, boolean recursive, Map validatedURLs) throws SVNException {
         if (!"".equals(name)) {
-            SVNEntry entry = dir.getAdminArea().getEntry(name, true);
+            SVNEntry entry = dir.getAdminArea(false).getEntry(name, true);
             relocateEntry(entry, from, to, validatedURLs);
             dir.getWCProperties(name).setPropertyValue(SVNProperty.WC_URL, null);
-            dir.getAdminArea().save(true);
+            dir.getAdminArea(false).save(true);
             return validatedURLs;
         }
-        SVNEntry rootEntry = dir.getAdminArea().getEntry("", true);
+        SVNEntry rootEntry = dir.getAdminArea(false).getEntry("", true);
         validatedURLs = relocateEntry(rootEntry, from, to, validatedURLs);
         dir.getWCProperties("").setPropertyValue(SVNProperty.WC_URL, null);
         // now all child entries that doesn't has repos/url has new values.
-        for(Iterator ents = dir.getAdminArea().entries(true); ents.hasNext();) {
+        for(Iterator ents = dir.getAdminArea(false).entries(true); ents.hasNext();) {
             SVNEntry entry = (SVNEntry) ents.next();
             if ("".equals(entry.getName())) {
                 continue;
@@ -1002,7 +1003,7 @@ public class SVNUpdateClient extends SVNBasicClient {
             validatedURLs = relocateEntry(entry, from, to, validatedURLs);
             dir.getWCProperties(entry.getName()).setPropertyValue(SVNProperty.WC_URL, null);
         }
-        dir.getAdminArea().save(true);
+        dir.getAdminArea(false).save(true);
         return validatedURLs;
         
     }

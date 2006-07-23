@@ -610,10 +610,10 @@ public class SVNCopyClient extends SVNBasicClient {
             if (sameRepositories) {
                 try {
                     
-                    SVNEntry newEntry = dstParentAccess.getTarget().getAdminArea().addEntry(dstPath.getName());
+                    SVNEntry newEntry = dstParentAccess.getTarget().getAdminArea(false).addEntry(dstPath.getName());
                     newEntry.setKind(SVNNodeKind.DIR);
                     newEntry.scheduleForAddition();
-                    dstParentAccess.getTarget().getAdminArea().save(true);
+                    dstParentAccess.getTarget().getAdminArea(false).save(true);
                     SVNURL newURL = dstParentAccess.getTargetEntry().getSVNURL();
                     newURL = newURL.appendPath(dstPath.getName(), false);
                     
@@ -746,7 +746,7 @@ public class SVNCopyClient extends SVNBasicClient {
             }
             // compare src entry repos with dst parent repos.
             String srcRepos = srcAccess.getTargetEntry().getRepositoryRoot();
-            String dstRepos = dstAccess.getAnchor().getAdminArea().getEntry("", true).getRepositoryRoot();
+            String dstRepos = dstAccess.getAnchor().getAdminArea(false).getEntry("", true).getRepositoryRoot();
             if (srcRepos != null && dstRepos != null && !srcRepos.equals(dstRepos)) {
                 SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_INVALID_SCHEDULE, "Cannot copy to ''{0}'', as it is not from repository ''{1}''; it is from ''{2}''",
                         new Object[] {dstPath, srcRepos, dstRepos});
@@ -764,7 +764,7 @@ public class SVNCopyClient extends SVNBasicClient {
             if (srcAccess != dstAccess) {
                 dstAccess.open(true, srcType == SVNFileType.DIRECTORY);
             }
-            SVNEntry dstParentEntry = dstAccess.getAnchor().getAdminArea().getEntry("", true);
+            SVNEntry dstParentEntry = dstAccess.getAnchor().getAdminArea(false).getEntry("", true);
             if (dstParentEntry.isScheduledForDeletion()) {
                 SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_INVALID_SCHEDULE, "Cannot copy to ''{0}'' as it is scheduled for deletion", dstPath);
                 SVNErrorManager.error(err);
@@ -828,7 +828,7 @@ public class SVNCopyClient extends SVNBasicClient {
     }
 
     private void copyFile(SVNWCAccess dstAccess, SVNWCAccess srcAccess,  String dstName) throws SVNException {
-        SVNEntry dstEntry = dstAccess.getAnchor().getAdminArea().getEntry(dstName, false);
+        SVNEntry dstEntry = dstAccess.getAnchor().getAdminArea(false).getEntry(dstName, false);
         File dstPath = new File(dstAccess.getAnchor().getRoot(), dstName);
         File srcPath = new File(srcAccess.getAnchor().getRoot(), srcAccess.getTargetName());
         if (dstEntry != null && dstEntry.isFile()) {
@@ -888,13 +888,13 @@ public class SVNCopyClient extends SVNBasicClient {
         entry.setCopyFromURL(copyFromURL);
         entry.setRevision(copyFromRevision);
         entry.scheduleForAddition();
-        dstAccess.getAnchor().getAdminArea().save(true);
+        dstAccess.getAnchor().getAdminArea(false).save(true);
     }
     
     private void addDir(SVNDirectory dir, String name, String copyFromURL, long copyFromRev) throws SVNException {
-        SVNEntry entry = dir.getAdminArea().getEntry(name, true);
+        SVNEntry entry = dir.getAdminArea(false).getEntry(name, true);
         if (entry == null) {
-            entry = dir.getAdminArea().addEntry(name);
+            entry = dir.getAdminArea(false).addEntry(name);
         }
         entry.setKind(SVNNodeKind.DIR);
         if (copyFromURL != null) {
@@ -906,7 +906,7 @@ public class SVNCopyClient extends SVNBasicClient {
         if ("".equals(name) && copyFromURL != null) {
             updateCopiedDirectory(dir, name, null, entry.getRepositoryRoot(), null, -1);
         }
-        dir.getAdminArea().save(true);
+        dir.getAdminArea(false).save(true);
     }
 
     private void copyDirectory(SVNWCAccess dstAccess, SVNWCAccess srcAccess, String dstName) throws SVNException {
@@ -921,8 +921,8 @@ public class SVNCopyClient extends SVNBasicClient {
         String copyFromURL = srcEntry.getURL();
         long copyFromRev = srcEntry.getRevision();
 
-        String newURL = dstAccess.getAnchor().getAdminArea().getEntry("", true).getURL();
-        String reposRootURL = dstAccess.getAnchor().getAdminArea().getEntry("", true).getRepositoryRoot();
+        String newURL = dstAccess.getAnchor().getAdminArea(false).getEntry("", true).getURL();
+        String reposRootURL = dstAccess.getAnchor().getAdminArea(false).getEntry("", true).getRepositoryRoot();
         newURL = SVNPathUtil.append(newURL, SVNEncodingUtil.uriEncode(dstName));
 
         File dstPath = new File(dstAccess.getAnchor().getRoot(), dstName);
@@ -931,7 +931,7 @@ public class SVNCopyClient extends SVNBasicClient {
 
         SVNDirectory newDir = dstAccess.addDirectory(dstName, dstPath, true, true, false);
 
-        SVNEntry entry = dstAccess.getAnchor().getAdminArea().addEntry(dstName);
+        SVNEntry entry = dstAccess.getAnchor().getAdminArea(false).addEntry(dstName);
         entry.setCopyFromRevision(copyFromRev);
         entry.setKind(SVNNodeKind.DIR);
         entry.scheduleForAddition();
@@ -940,19 +940,19 @@ public class SVNCopyClient extends SVNBasicClient {
 
         SVNEvent event = SVNEventFactory.createAddedEvent(dstAccess, dstAccess.getAnchor(), entry);
         dispatchEvent(event);
-        dstAccess.getTarget().getAdminArea().save(true);
+        dstAccess.getTarget().getAdminArea(false).save(true);
 
         updateCopiedDirectory(newDir, "", newURL, reposRootURL, null, -1);
-        SVNEntry newRoot = newDir.getAdminArea().getEntry("", true);
+        SVNEntry newRoot = newDir.getAdminArea(false).getEntry("", true);
         newRoot.scheduleForAddition();
         newRoot.setCopyFromRevision(copyFromRev);
         newRoot.setCopyFromURL(copyFromURL);
-        newDir.getAdminArea().save(true);
+        newDir.getAdminArea(false).save(true);
         // fire added event.
     }
 
     static void updateCopiedDirectory(SVNDirectory dir, String name, String newURL, String reposRootURL, String copyFromURL, long copyFromRevision) throws SVNException {
-        SVNAdminArea adminArea = dir.getAdminArea();
+        SVNAdminArea adminArea = dir.getAdminArea(false);
         SVNEntry entry = adminArea.getEntry(name, true);
         if (entry != null) {
             entry.setCopied(true);

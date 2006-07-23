@@ -237,7 +237,7 @@ public class SVNCommitUtil {
                 for (int i = 0; i < lockedDirs.length; i++) {
                     statusClient.checkCancelled();
                     SVNDirectory dir = lockedDirs[i];
-                    SVNEntry rootEntry = dir.getAdminArea().getEntry("", true);
+                    SVNEntry rootEntry = dir.getAdminArea(false).getEntry("", true);
                     if (rootEntry.getCopyFromURL() != null) {
                         File dirRoot = dir.getRoot();
                         boolean keep = false;
@@ -318,7 +318,7 @@ public class SVNCommitUtil {
             String targetName = "".equals(target) ? "" : SVNPathUtil.tail(target);
             String parentPath = SVNPathUtil.removeTail(target);
             SVNDirectory dir = baseAccess.getDirectory(parentPath);
-            SVNEntry entry = dir == null ? null : dir.getAdminArea().getEntry(
+            SVNEntry entry = dir == null ? null : dir.getAdminArea(false).getEntry(
                     targetName, false);
             String url = null;
             if (entry == null) {
@@ -337,11 +337,11 @@ public class SVNCommitUtil {
                 // dir and get "".
                 SVNEntry parentEntry;
                 if (!"".equals(targetName)) {
-                    parentEntry = dir.getAdminArea().getEntry("", false);
+                    parentEntry = dir.getAdminArea(false).getEntry("", false);
                 } else {
                     File parentFile = targetFile.getParentFile();
                     SVNWCAccess parentAccess = SVNWCAccess.create(parentFile);
-                    parentEntry = parentAccess.getTarget().getAdminArea()
+                    parentEntry = parentAccess.getTarget().getAdminArea(false)
                             .getEntry("", false);
                 }
                 if (parentEntry == null) {
@@ -380,11 +380,11 @@ public class SVNCommitUtil {
                     // if parent is also deleted -> skip this entry
                     SVNEntry parentEntry;
                     if (!"".equals(targetName)) {
-                        parentEntry = dir.getAdminArea().getEntry("", false);
+                        parentEntry = dir.getAdminArea(false).getEntry("", false);
                     } else {
                         File parentFile = targetFile.getParentFile();
                         SVNWCAccess parentAccess = SVNWCAccess.create(parentFile);
-                        parentEntry = parentAccess.getTarget().getAdminArea()
+                        parentEntry = parentAccess.getTarget().getAdminArea(false)
                                 .getEntry("", false);
                     }
                     if (parentEntry != null && parentEntry.isScheduledForDeletion() &&
@@ -537,8 +537,8 @@ public class SVNCommitUtil {
         SVNAdminArea adminArea = null;
         if (entry.getKind() == SVNNodeKind.DIR) {
             SVNDirectory childDir = dir.getChildDirectory(entry.getName());
-            if (childDir != null && childDir.getAdminArea() != null) {
-                adminArea = childDir.getAdminArea();
+            if (childDir != null && childDir.getAdminArea(false) != null) {
+                adminArea = childDir.getAdminArea(false);
                 if (adminArea.getEntry("", false) != null) {
                     entry = adminArea.getEntry("", false);
                     dir = childDir;
@@ -571,7 +571,7 @@ public class SVNCommitUtil {
             } else if (action == ISVNCommitParameters.DELETE) {
                 commitDeletion = true;
                 entry.scheduleForDeletion();
-                dir.getAdminArea().save(false);
+                dir.getAdminArea(false).save(false);
             }
         }
         boolean commitAddition = false;
@@ -747,7 +747,7 @@ public class SVNCommitUtil {
 
     private static void collectLocks(SVNDirectory dir, Map lockTokens)
             throws SVNException {
-        SVNAdminArea adminArea = dir.getAdminArea();
+        SVNAdminArea adminArea = dir.getAdminArea(false);
         if (adminArea == null) {
             return;
         }

@@ -679,11 +679,11 @@ public class SVNCommitClient extends SVNBasicClient {
                             if (parentPath != null) {
                                 SVNDirectory parentDir = wcAccess.getDirectory(parentPath);
                                 if (parentDir != null) {
-                                    SVNEntry entryInParent = parentDir.getAdminArea().getEntry(nameInParent, true);
+                                    SVNEntry entryInParent = parentDir.getAdminArea(false).getEntry(nameInParent, true);
                                     if (entryInParent != null) {
                                         entryInParent.unschedule();
                                         entryInParent.setDeleted(true);
-                                        parentDir.getAdminArea().save(false);
+                                        parentDir.getAdminArea(false).save(false);
                                     }
                                 }
                             }
@@ -692,7 +692,7 @@ public class SVNCommitClient extends SVNBasicClient {
                         }
 
                     }
-                    SVNEntry entry = dir.getAdminArea().getEntry(target, true);
+                    SVNEntry entry = dir.getAdminArea(false).getEntry(target, true);
                     if (entry == null && hasProcessedParents(processedItems, path)) {
                         processedItems.add(path);
                         continue;

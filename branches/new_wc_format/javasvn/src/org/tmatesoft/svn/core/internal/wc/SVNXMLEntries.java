@@ -15,19 +15,10 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.io.OutputStreamWriter;
-import java.io.Writer;
-import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
-import java.util.LinkedList;
 import java.util.Map;
-import java.util.TreeMap;
-import java.util.TreeSet;
 
-import org.tmatesoft.svn.core.SVNErrorCode;
-import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNProperty;
 import org.tmatesoft.svn.core.internal.util.SVNEncodingUtil;
@@ -39,6 +30,8 @@ import org.tmatesoft.svn.util.SVNDebugLog;
  * @author TMate Software Ltd.
  */
 public class SVNXMLEntries extends SVNAdminArea{
+    public static final int WC_FORMAT = 4;
+    private static final String THIS_DIR = "";
 
     public SVNXMLEntries(SVNDirectory parent) {
         super(parent);
@@ -126,185 +119,76 @@ public class SVNXMLEntries extends SVNAdminArea{
         }
     }
 
-    public void save(boolean close) throws SVNException {
-        if (myData == null) {
-            return;
-        }
-        Writer os = null;
-        File tmpFile = new File(getParent().getEntriesFile().getParentFile(), "tmp/entries");
-        Map rootEntry = (Map) myData.get("");
-        try {
-            os = new OutputStreamWriter(SVNFileUtil.openFileForWriting(tmpFile), "UTF-8");
-            os.write("<?xml version=\"1.0\" encoding=\"utf-8\"?>\n");
-            os.write("<wc-entries\n");
-            os.write("   xmlns=\"svn:\">\n");
-            for (Iterator entries = myData.keySet().iterator(); entries
-                    .hasNext();) {
-                String name = (String) entries.next();
-                Map entry = (Map) myData.get(name);
-                os.write("<entry");
-                for (Iterator names = entry.keySet().iterator(); names
-                        .hasNext();) {
-                    String propName = (String) names.next();
-                    String propValue = (String) entry.get(propName);
-                    if (propValue == null) {
-                        continue;
-                    }
-                    if (BOOLEAN_PROPERTIES.contains(propName)
-                            && !Boolean.TRUE.toString().equals(propValue)) {
-                        continue;
-                    }
-                    if (!"".equals(name)) {
-                        Object expectedValue;
-                        if (SVNProperty.KIND_DIR.equals(entry.get(SVNProperty.KIND))) {
-                            if (SVNProperty.UUID.equals(propName)
-                                    || SVNProperty.REVISION.equals(propName)
-                                    || SVNProperty.URL.equals(propName) 
-                                    || SVNProperty.REPOS.equals(propName)) {
-                                continue;
-                            }
+    public String getThisDirName() {
+        return THIS_DIR;
+    }
+
+    protected String formatEntries() {
+        StringBuffer buffer = new StringBuffer();
+        Map rootEntry = (Map) myData.get(getThisDirName());
+
+        buffer.append("<?xml version=\"1.0\" encoding=\"utf-8\"?>\n");
+        buffer.append("<wc-entries\n");
+        buffer.append("   xmlns=\"svn:\">\n");
+        for (Iterator entries = myData.keySet().iterator(); entries.hasNext();) {
+            String name = (String) entries.next();
+            Map entry = (Map) myData.get(name);
+            buffer.append("<entry");
+            for (Iterator names = entry.keySet().iterator(); names.hasNext();) {
+                String propName = (String) names.next();
+                String propValue = (String) entry.get(propName);
+                if (propValue == null) {
+                    continue;
+                }
+                if (BOOLEAN_PROPERTIES.contains(propName) && !Boolean.TRUE.toString().equals(propValue)) {
+                    continue;
+                }
+                if (!getThisDirName().equals(name)) {
+                    Object expectedValue;
+                    if (SVNProperty.KIND_DIR.equals(entry.get(SVNProperty.KIND))) {
+                        if (SVNProperty.UUID.equals(propName)
+                                || SVNProperty.REVISION.equals(propName)
+                                || SVNProperty.URL.equals(propName) 
+                                || SVNProperty.REPOS.equals(propName)) {
+                            continue;
+                        }
+                    } else {
+                        if (SVNProperty.URL.equals(propName)) {
+                            expectedValue = SVNPathUtil.append((String) rootEntry.get(propName), SVNEncodingUtil.uriEncode(name));
+                        } else if (SVNProperty.UUID.equals(propName) || SVNProperty.REVISION.equals(propName)) {
+                            expectedValue = rootEntry.get(propName);
+                        } else if (SVNProperty.REPOS.equals(propName)) {
+                            expectedValue = rootEntry.get(propName);
                         } else {
-                            if (SVNProperty.URL.equals(propName)) {
-                                expectedValue = SVNPathUtil.append((String) rootEntry.get(propName), SVNEncodingUtil.uriEncode(name));
-                            } else if (SVNProperty.UUID.equals(propName) || SVNProperty.REVISION.equals(propName)) {
-                                expectedValue = rootEntry.get(propName);
-                            } else if (SVNProperty.REPOS.equals(propName)) {
-                                expectedValue = rootEntry.get(propName);
-                            } else {
-                                expectedValue = null;
-                            }
-                            if (propValue.equals(expectedValue)) {
-                                continue;
-                            }
+                            expectedValue = null;
+                        }
+                        if (propValue.equals(expectedValue)) {
+                            continue;
                         }
                     }
-                    propName = propName.substring(SVNProperty.SVN_ENTRY_PREFIX.length());
-                    propValue = SVNEncodingUtil.xmlEncodeAttr(propValue);
-                    os.write("\n   ");
-                    os.write(propName);
-                    os.write("=\"");
-                    os.write(propValue);
-                    os.write("\"");
                 }
-                os.write("/>\n");
+                propName = propName.substring(SVNProperty.SVN_ENTRY_PREFIX.length());
+                propValue = SVNEncodingUtil.xmlEncodeAttr(propValue);
+                buffer.append("\n   ");
+                buffer.append(propName);
+                buffer.append("=\"");
+                buffer.append(propValue);
+                buffer.append("\"");
             }
-            os.write("</wc-entries>\n");
-        } catch (IOException e) {
-            SVNFileUtil.closeFile(os);
-            SVNFileUtil.deleteFile(tmpFile);
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, "Cannot wrtie entries file ''{0}'': {1}", new Object[] {getParent().getEntriesFile(), e.getLocalizedMessage()});
-            SVNErrorManager.error(err, e);
-        } finally {
-            SVNFileUtil.closeFile(os);
+            buffer.append("/>\n");
         }
-        
-        SVNFileUtil.rename(tmpFile, getParent().getEntriesFile());
-        SVNFileUtil.setReadonly(getParent().getEntriesFile(), true);
-        if (close) {
-            close();
-        }
+        buffer.append("</wc-entries>\n");
+        return buffer.toString();
     }
 
     public void close() {
-        myData = null;
-        myEntries = null;
+        super.close();
     }
 
-    public String getPropertyValue(String name, String propertyName) {
-        if (myData == null) {
-            return null;
-        }
-        Map entry = (Map) myData.get(name);
-        if (entry != null) {
-            return (String) entry.get(propertyName);
-        }
-        return null;
+    public void setCachableProperties(String name, String[] cachableProps) {
     }
 
-    public boolean setPropertyValue(String name, String propertyName,
-            String propertyValue) {
-        if (myData == null) {
-            return false;
-        }
-        Map entry = (Map) myData.get(name);
-        if (entry != null) {
-            if (SVNProperty.SCHEDULE.equals(propertyName)) {
-                if (SVNProperty.SCHEDULE_DELETE.equals(propertyValue)) {
-                    if (SVNProperty.SCHEDULE_ADD.equals(entry
-                            .get(SVNProperty.SCHEDULE))) {
-                        if (entry.get(SVNProperty.DELETED) == null) {
-                            deleteEntry(name);
-                        } else {
-                            entry.remove(SVNProperty.SCHEDULE);
-                        }
-                        return true;
-                    }
-                }
-            }
-            if (propertyValue == null) {
-                return entry.remove(propertyName) != null;
-            }
-            Object oldValue = entry.put(propertyName, propertyValue);
-            return !propertyValue.equals(oldValue);            
-        }
-        return false;
-    }
-
-    public Iterator entries(boolean hidden) {
-        if (myEntries == null) {
-            return Collections.EMPTY_LIST.iterator();
-        }
-        Collection copy = new LinkedList(myEntries);
-        if (!hidden) {
-            for (Iterator iterator = copy.iterator(); iterator.hasNext();) {
-                SVNEntry entry = (SVNEntry) iterator.next();
-                if (entry.isHidden()) {
-                    iterator.remove();
-                }
-            }
-        }
-        return copy.iterator();
-    }
-
-    public SVNEntry getEntry(String name, boolean hidden) {
-        if (myData != null && myData.containsKey(name)) {
-            SVNEntry entry = new SVNEntry(this, name);
-            if (!hidden && entry.isHidden()) {
-                return null;
-            }
-            return entry;
-        }
-        return null;
-    }
-
-    public SVNEntry addEntry(String name) {
-        if (myData == null) {
-            myData = new TreeMap();
-            myEntries = new TreeSet();
-        }
-        if (myData != null) {
-            Map map = myData.containsKey(name) ? (Map) myData.get(name)
-                    : new HashMap();
-            myData.put(name, map);
-            SVNEntry entry = new SVNEntry(this, name);
-            myEntries.add(entry);
-            setPropertyValue(name, SVNProperty.NAME, name);
-            return entry;
-        }
-        return null;
-    }
-
-    public void deleteEntry(String name) {
-        if (myData != null) {
-            myData.remove(name);
-            myEntries.remove(new SVNEntry(this, name));
-        }
-    }
-
-    protected Map getEntryMap(String name) {
-        if (myData != null && name != null) {
-            return (Map) myData.get(name);
-        }
-        return null;
+    protected int getFormatNumber() {
+        return WC_FORMAT;
     }
 }
