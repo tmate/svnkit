@@ -12,6 +12,7 @@
 package org.tmatesoft.svn.core.internal.wc;
 
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.HashMap;
@@ -24,6 +25,7 @@ import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNNodeKind;
 import org.tmatesoft.svn.core.SVNProperty;
+import org.tmatesoft.svn.core.internal.io.fs.FSFile;
 import org.tmatesoft.svn.core.internal.util.SVNEncodingUtil;
 import org.tmatesoft.svn.core.internal.util.SVNFormatUtil;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
@@ -42,42 +44,124 @@ public class SVNPostXMLEntries extends SVNAdminArea {
         super(parent);
     }
 
-    public SVNEntry addEntry(String name) {
+    protected FSFile getWCFile() {
+        File propertiesFile = getParent().getAdminFile("all-wcprops");
+        return new FSFile(propertiesFile);
+    }
+
+    public Map getProperties(String entryName, boolean tmp) throws SVNException {
+        if (hasPropModifications(entryName)) {
+            SVNProperties props = getSVNProperties(entryName, tmp);
+            return props.asMap();
+        }
+        return new HashMap();
+    }
+
+    public Map getBaseProperties(String entryName, boolean tmp) throws SVNException {
+        SVNProperties props = getBaseSVNProperties(entryName, tmp);
+        return props.asMap();
+    }
+
+    public String getBasePropertyValue(String entryName, boolean tmp, String propName) throws SVNException {
+        SVNProperties props = getBaseSVNProperties(entryName, tmp);
+        return props.getPropertyValue(propName);
+    }
+
+    public String getPropertyValue(String entryName, boolean tmp, String propName) throws SVNException {
+        String[] cachableProps = getCachableProperties(entryName); 
+        if (cachableProps != null && getIndex(cachableProps, propName) >= 0) {
+            String[] presentProps = getPresentProperties(entryName);
+            if (presentProps == null || getIndex(presentProps, propName) < 0) {
+                return null;
+            }
+            if (SVNProperty.isBooleanProperty(propName)) {
+                return SVNProperty.getValueOfBooleanProperty(propName);
+            }
+        }
+        if (hasPropModifications(entryName)) {
+            SVNProperties props = getSVNProperties(entryName, tmp);
+            return props.getPropertyValue(propName);
+        }
         return null;
     }
 
-    public void close() {
+    
+    //TODO: this is not a good approach, however don't want to
+    //sort the original array to use it with Arrays.binarySearch(), 
+    //since there's a risk to lose the order elements are stored in
+    //the array and written to the file. Maybe the storage order is 
+    //important for somewhat somewhere... 
+    private int getIndex(String[] array, String element) {
+        if (array == null || element == null) {
+            return -1;
+        }
+        for(int i = 0; i < array.length; i++){
+            if (element.equals(array[i])) {
+                return i;
+            }
+        }
+        return -1;
     }
+    
 
-    public void deleteEntry(String name) {
+    public Map getWCProperties(String entryName) throws SVNException {
+        SVNEntry entry = getEntry(entryName, false);
+        if (entry == null) {
+            return new HashMap();
+        }
+        
+        FSFile wcpropsFile = null;
+        try {
+            wcpropsFile = getWCFile();
+            Map props = wcpropsFile.readProperties(false);
+            if (getThisDirName().equals(entryName)) {
+                return props;
+            }
+            
+            String name = null;
+            StringBuffer buffer = new StringBuffer();
+            while(true) {
+                try {
+                    name = wcpropsFile.readLine(buffer);
+                } catch (SVNException e) {
+                    if (e.getErrorMessage().getErrorCode() == SVNErrorCode.STREAM_UNEXPECTED_EOF && buffer.length() > 0) {
+                        SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_CORRUPT, "Missing end of line in wcprops file for ''{0}''", getParent().getRoot());
+                        SVNErrorManager.error(err, e);
+                    }
+                    break;
+                }
+                props = wcpropsFile.readProperties(false);
+                if (name.equals(entryName)) {
+                    return props;
+                }
+                buffer.delete(0, buffer.length());
+            }
+        } finally {
+            wcpropsFile.close();
+        }
+        return new HashMap();
     }
-
-    public Iterator entries(boolean hidden) {
+    
+    public String getWCPropertyValue(String entryName, String propName) throws SVNException {
+        Map wcprops = null;
+        try {
+            wcprops = getWCProperties(entryName);
+        } catch (SVNException svne) {
+            SVNErrorMessage err = svne.getErrorMessage().wrap("Failed to load properties from disk");
+            SVNErrorManager.error(err);
+        }
+        if (wcprops != null) {
+            return (String)wcprops.get(propName);
+        }
         return null;
     }
 
-    public SVNProperties getBaseProperties(String name, boolean tmp) {
-        return null;
+    public void setWCPropertyValue(String entryName, String propName, String propValue) throws SVNException {
+        
     }
-
-    public SVNEntry getEntry(String name, boolean hidden) {
-        return null;
-    }
-
-    protected Map getEntryMap(String name) {
-        return null;
-    }
-
-    public SVNProperties getProperties(String name, boolean tmp) {
-        return null;
-    }
-
-    public String getPropertyValue(String name, String propertyName) {
-        return null;
-    }
-
-    public SVNProperties getWCProperties(String name) {
-        return null;
+    
+    public void deleteWCProperties(String entryName) throws SVNException {
+        
     }
 
     protected void fetchEntries() throws IOException, SVNException {
@@ -896,7 +980,7 @@ public class SVNPostXMLEntries extends SVNAdminArea {
         return false;
     }
     
-    public boolean setPropertyValue(String name, String propertyName, String propertyValue) {
+    public boolean setAttributeValue(String name, String propertyName, String propertyValue) {
         return false;
     }
 
@@ -909,7 +993,61 @@ public class SVNPostXMLEntries extends SVNAdminArea {
             entry.put(SVNProperty.CACHABLE_PROPS, cachableProps);
         }
     }
+
+    public String[] getCachableProperties(String entryName) {
+        if (myData == null) {
+            return null;
+        }
+        Map entry = (Map) myData.get(entryName);
+        if (entry != null) {
+            return (String[])entry.get(SVNProperty.CACHABLE_PROPS);
+        }
+        return null;
+    }
+
+    public void setPresentProperties(String name, String[] presentProps) {
+        if (myData == null) {
+            return;
+        }
+        Map entry = (Map) myData.get(name);
+        if (entry != null) {
+            entry.put(SVNProperty.PRESENT_PROPS, presentProps);
+        }
+    }
+
+    public String[] getPresentProperties(String entryName) {
+        if (myData == null) {
+            return null;
+        }
+        Map entry = (Map) myData.get(entryName);
+        if (entry != null) {
+            return (String[])entry.get(SVNProperty.PRESENT_PROPS);
+        }
+        return null;
+    }
+
+    public boolean hasPropModifications(String name) throws SVNException {
+        if (myData == null) {
+            return false;
+        }
+        Map entry = (Map)myData.get(name);
+        if (entry != null) {
+            return SVNProperty.booleanValue((String)entry.get(SVNProperty.HAS_PROP_MODS));
+        }
+        return false;
+    }
     
+    public boolean hasProperties(String name) throws SVNException {
+        if (myData == null) {
+            return false;
+        }
+        Map entry = (Map)myData.get(name);
+        if (entry != null) {
+            return SVNProperty.booleanValue((String)entry.get(SVNProperty.HAS_PROPS));
+        }
+        return false;
+    }
+
     protected int getFormatNumber() {
         return WC_FORMAT;
     }

@@ -20,6 +20,7 @@ import org.tmatesoft.svn.core.SVNNodeKind;
 import org.tmatesoft.svn.core.auth.ISVNAuthenticationManager;
 import org.tmatesoft.svn.core.internal.util.SVNEncodingUtil;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
+import org.tmatesoft.svn.core.internal.wc.SVNAdminArea;
 import org.tmatesoft.svn.core.internal.wc.SVNDirectory;
 import org.tmatesoft.svn.core.internal.wc.SVNEntry;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
@@ -169,13 +170,13 @@ public class SVNMoveClient extends SVNBasicClient {
             SVNEntry srcEntry = srcAccess.getTargetEntry();
             SVNEntry dstEntry = dstAccess.getTargetEntry();
 
-            SVNProperties srcProps = srcAccess.getAnchor().getProperties(
-                    srcAccess.getTargetName(), false);
-            SVNProperties dstProps = dstAccess.getAnchor().getProperties(
-                    dstAccess.getTargetName(), false);
-
-            SVNEntry dstParentEntry = dstAccess.getAnchor().getAdminArea(false)
-                    .getEntry("", false);
+//            SVNProperties srcProps = srcAccess.getAnchor().getProperties(srcAccess.getTargetName(), false);
+//            SVNProperties dstProps = dstAccess.getAnchor().getProperties(dstAccess.getTargetName(), false);
+            SVNAdminArea srcAnchorAdminArea = srcAccess.getAnchor().getAdminArea(false);
+            SVNAdminArea dstAnchorAdminArea = dstAccess.getAnchor().getAdminArea(false);
+            
+//            SVNEntry dstParentEntry = dstAccess.getAnchor().getAdminArea(false).getEntry("", false);
+            SVNEntry dstParentEntry = dstAnchorAdminArea.getEntry(dstAnchorAdminArea.getThisDirName(), false);
 
             File srcWCRoot = SVNWCUtil.getWorkingCopyRoot(src, true);
             File dstWCRoot = SVNWCUtil.getWorkingCopyRoot(dst, true);
@@ -209,8 +210,8 @@ public class SVNMoveClient extends SVNBasicClient {
                 }
             } else if (srcEntry.isFile()) {
                 if (dstEntry == null) {
-                    dstEntry = dstAccess.getAnchor().getAdminArea(false).addEntry(
-                            dst.getName());
+//                    dstEntry = dstAccess.getAnchor().getAdminArea(false).addEntry(dst.getName());
+                    dstEntry = dstAnchorAdminArea.addEntry(dst.getName());
                 }
 
                 String srcURL = srcEntry.getURL();
@@ -218,8 +219,8 @@ public class SVNMoveClient extends SVNBasicClient {
                 long srcRevision = srcEntry.getRevision();
                 long srcCFRevision = srcEntry.getCopyFromRevision();
                 // copy props!
-                srcProps.copyTo(dstProps);
-
+                //srcProps.copyTo(dstProps);
+                srcAnchorAdminArea.copyPropsTo(srcAccess.getTargetName(), false, false, dstAnchorAdminArea, dstAccess.getTargetName(), false, false);
                 if (srcEntry.isScheduledForAddition() && srcEntry.isCopied()) {
                     dstEntry.scheduleForAddition();
                     dstEntry.setCopyFromRevision(srcCFRevision);
@@ -241,16 +242,18 @@ public class SVNMoveClient extends SVNBasicClient {
                         dstEntry.setRevision(0);
                     }
                 }
-                dstAccess.getAnchor().getAdminArea(false).save(true);
+//                dstAccess.getAnchor().getAdminArea(false).save(true);
+                dstAnchorAdminArea.save(true);
 
             } else if (srcEntry.isDirectory()) {
                 if (dstEntry == null) {
-                    dstEntry = dstAccess.getAnchor().getAdminArea(false).addEntry(
-                            dst.getName());
+//                    dstEntry = dstAccess.getAnchor().getAdminArea(false).addEntry(dst.getName());
+                    dstEntry = dstAnchorAdminArea.addEntry(dst.getName());
                 }
 
-                srcEntry = srcAccess.getTarget().getAdminArea(false).getEntry("",
-                        false);
+//                srcEntry = srcAccess.getTarget().getAdminArea(false).getEntry("", false);
+                SVNAdminArea srcTargetAdminArea = srcAccess.getTarget().getAdminArea(false);
+                srcEntry = srcTargetAdminArea.getEntry(srcTargetAdminArea.getThisDirName(), false);
 
                 String srcURL = srcEntry.getURL();
                 String srcCFURL = srcEntry.getCopyFromURL();
@@ -262,14 +265,17 @@ public class SVNMoveClient extends SVNBasicClient {
                 dstURL = SVNPathUtil
                         .append(dstURL, SVNEncodingUtil.uriEncode(dst.getName()));
                 if (srcEntry.isScheduledForAddition() && srcEntry.isCopied()) {
-                    srcProps.copyTo(dstProps);
+//                    srcProps.copyTo(dstProps);
+                    srcAnchorAdminArea.copyPropsTo(srcAccess.getTargetName(), false, false, dstAnchorAdminArea, dstAccess.getTargetName(), false, false);
                     dstEntry.scheduleForAddition();
                     dstEntry.setCopyFromRevision(srcCFRevision);
                     dstEntry.setCopyFromURL(srcCFURL);
                     dstEntry.setKind(SVNNodeKind.DIR);
                     dstEntry.setRevision(srcRevision);
                     dstEntry.setCopied(true);
-                    dstAccess.getAnchor().getAdminArea(false).save(true);
+//                    dstAccess.getAnchor().getAdminArea(false).save(true);
+                    dstAnchorAdminArea.save(true);
+  
                     // update URL in children.
                     try {
                         dstAccess = SVNWCAccess.create(dst);
@@ -282,19 +288,26 @@ public class SVNMoveClient extends SVNBasicClient {
                 } else if (!srcEntry.isCopied()
                         && !srcEntry.isScheduledForAddition()) {
                     // versioned (deleted, replaced, or normal).
-                    srcProps.copyTo(dstProps);
+//                    srcProps.copyTo(dstProps);
+                    srcAnchorAdminArea.copyPropsTo(srcAccess.getTargetName(), false, false, dstAnchorAdminArea, dstAccess.getTargetName(), false, false);
+
                     dstEntry.setCopied(true);
                     dstEntry.scheduleForAddition();
                     dstEntry.setKind(SVNNodeKind.DIR);
                     dstEntry.setCopyFromRevision(srcRevision);
                     dstEntry.setCopyFromURL(srcURL);
-                    dstAccess.getAnchor().getAdminArea(false).save(true);
+//                    dstAccess.getAnchor().getAdminArea(false).save(true);
+                    dstAnchorAdminArea.save(true);
+
                     // update URL, CF-URL and CF-REV in children.
                     try {
                         dstAccess = SVNWCAccess.create(dst);
                         dstAccess.open(false, true);
                         SVNDirectory dstDir = dstAccess.getTarget();
-                        dstEntry = dstDir.getAdminArea(false).getEntry("", false);
+                        SVNAdminArea dstDirAdminArea = dstDir.getAdminArea(false);
+//                        dstEntry = dstDir.getAdminArea(false).getEntry("", false);
+                        dstEntry = dstDirAdminArea.getEntry(dstDirAdminArea.getThisDirName(), false);
+  
                         dstEntry.setCopied(true);
                         dstEntry.scheduleForAddition();
                         dstEntry.setKind(SVNNodeKind.DIR);
@@ -304,15 +317,18 @@ public class SVNMoveClient extends SVNBasicClient {
                         dstEntry.setRepositoryRoot(repositoryRootURL);
 
                         SVNCopyClient.updateCopiedDirectory(dstDir, "", dstURL, repositoryRootURL, null, -1);
-                        dstDir.getAdminArea(false).save(true);
+//                        dstDir.getAdminArea(false).save(true);
+                        dstDirAdminArea.save(true);
                     } finally {
                         dstAccess.close(false);
                     }
                 } else {
                     // unversioned entry (copied or added)
-                    dstAccess.getAnchor().getAdminArea(false).deleteEntry(
-                            dst.getName());
-                    dstAccess.getAnchor().getAdminArea(false).save(true);
+//                    dstAccess.getAnchor().getAdminArea(false).deleteEntry(dst.getName());
+                    dstAnchorAdminArea.deleteEntry(dst.getName());
+//                    dstAccess.getAnchor().getAdminArea(false).save(true);
+                    dstAnchorAdminArea.save(true);
+
                     SVNFileUtil.deleteAll(dst, this);
                     SVNFileUtil.copy(src, dst, false, false);
                     myWCClient.doAdd(dst, false, false, false, true);

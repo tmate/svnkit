@@ -74,7 +74,7 @@ public class SVNCommitter implements ISVNCommitPathHandler {
             String mimeType = null;
             if (item.getKind() == SVNNodeKind.FILE) {
                 SVNWCAccess tmpWCAccess = SVNWCAccess.create(item.getFile());
-                mimeType = tmpWCAccess.getAnchor().getProperties(tmpWCAccess.getTargetName(), false).getPropertyValue(SVNProperty.MIME_TYPE);
+                mimeType = tmpWCAccess.getAnchor().getAdminArea(false).getPropertyValue(tmpWCAccess.getTargetName(), false, SVNProperty.MIME_TYPE);//getProperties(tmpWCAccess.getTargetName(), false).getPropertyValue(SVNProperty.MIME_TYPE);
             }
             event = SVNEventFactory.createCommitEvent(wcAccess.getAnchor().getRoot(), item.getFile(), SVNEventAction.COMMIT_ADDED, item.getKind(), mimeType);
         } else if (item.isDeleted()) {
@@ -190,23 +190,31 @@ public class SVNCommitter implements ISVNCommitPathHandler {
             dir = wcAccess.getDirectory(SVNPathUtil.removeTail(item.getPath()));
             name = SVNPathUtil.tail(item.getPath());
         }
-        SVNEntry entry = dir.getAdminArea(false).getEntry(name, false);
+        
+        SVNAdminArea adminArea = dir.getAdminArea(false);
+        SVNEntry entry = adminArea.getEntry(name, false);
         boolean replaced = false;
         if (entry != null) {
             replaced = entry.isScheduledForReplacement();
         }
-        SVNProperties props = dir.getProperties(name, false);
-        SVNProperties baseProps = replaced ? null : dir.getBaseProperties(name,
-                false);
-        Map diff = replaced ? props.asMap() : baseProps.compareTo(props);
+//        SVNProperties props = dir.getProperties(name, false);
+//        SVNProperties baseProps = replaced ? null : dir.getBaseProperties(name, false);
+        Map diff = replaced ? adminArea.getProperties(name, false) : adminArea.comparePropsTo(name, true, false, adminArea, name, false, false);//props.asMap() : baseProps.compareTo(props);
         if (diff != null && !diff.isEmpty()) {
-            SVNProperties tmpProps = dir.getBaseProperties(name, true);
-            props.copyTo(tmpProps);
-            if (!tmpProps.getFile().exists()) {
+//            SVNProperties tmpProps = dir.getBaseProperties(name, true);
+//            props.copyTo(tmpProps);
+//            if (!tmpProps.getFile().exists()) {
                 // create empty tmp (!) file just to make sure it will be used on post-commit.
-                SVNFileUtil.createEmptyFile(tmpProps.getFile());
+//                SVNFileUtil.createEmptyFile(tmpProps.getFile());
+//            }
+            adminArea.copyPropsTo(name, false, false, adminArea, name, true, true);
+            File tmpPropertiesFile = adminArea.getPropsFile(name, true, true); 
+            if (!tmpPropertiesFile.exists()) {
+                // create empty tmp (!) file just to make sure it will be used on post-commit.
+                SVNFileUtil.createEmptyFile(tmpPropertiesFile);
             }
-            myTmpFiles.add(tmpProps.getFile());
+//            myTmpFiles.add(tmpProps.getFile());
+            myTmpFiles.add(tmpPropertiesFile);
 
             for (Iterator names = diff.keySet().iterator(); names.hasNext();) {
                 String propName = (String) names.next();

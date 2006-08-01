@@ -16,7 +16,6 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
-import java.io.UnsupportedEncodingException;
 import java.io.Writer;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
@@ -35,7 +34,6 @@ import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNProperty;
-import org.tmatesoft.svn.core.internal.util.SVNEncodingUtil;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
 
 /**
@@ -52,6 +50,7 @@ public abstract class SVNAdminArea {
         ourAreas.put(new Integer(SVNXMLEntries.WC_FORMAT), SVNXMLEntries.class);
     }
     
+    //TODO: maybe move it to XML-aware format realization
     protected static final Set BOOLEAN_PROPERTIES = new HashSet();
     static {
         BOOLEAN_PROPERTIES.add(SVNProperty.COPIED);
@@ -89,6 +88,39 @@ public abstract class SVNAdminArea {
         myEntries = null;
     }
 
+    protected SVNProperties getPropsByType(boolean isBase, String entryName, boolean tmp) {
+        if (isBase) {
+            return getBaseSVNProperties(entryName, tmp);
+        }
+        return getSVNProperties(entryName, tmp);
+    }
+
+    protected SVNProperties getBaseSVNProperties(String name, boolean tmp) {
+        return new SVNProperties(getPropsFile(name, true, tmp), getAdministrativePropsPath(name, true, tmp));
+    }
+
+    protected SVNProperties getSVNProperties(String name, boolean tmp) {
+        return new SVNProperties(getPropsFile(name, false, tmp), getAdministrativePropsPath(name, false, tmp));
+    }
+    
+    public File getPropsFile(String entryName, boolean isBase, boolean tmp) {
+        return getParent().getAdminFile(getPropsPath(entryName, isBase, tmp));
+    }
+
+    public String getPropsPath(String entryName, boolean isBase, boolean tmp) {
+        String path = !tmp ? "" : "tmp/";
+        if (isBase) {
+            path += getThisDirName().equals(entryName) ? "dir-prop-base" : "prop-base/" + entryName + ".svn-base";
+        } else {
+            path += getThisDirName().equals(entryName) ? "dir-props" : "props/" + entryName + ".svn-work";
+        }
+        return path;
+    }
+    
+    public String getAdministrativePropsPath(String entryName, boolean isBase, boolean tmp) {
+        return getParent().getAdminDirectory().getName() + "/" + getPropsPath(entryName, isBase, tmp); 
+    }
+    
     public SVNEntry addEntry(String name) {
         if (myData == null) {
             myData = new TreeMap();
@@ -100,7 +132,7 @@ public abstract class SVNAdminArea {
         myData.put(name, map);
         SVNEntry entry = new SVNEntry(this, name);
         myEntries.add(entry);
-        setPropertyValue(name, SVNProperty.NAME, name);
+        setAttributeValue(name, SVNProperty.NAME, name);
         return entry;
     }
 
@@ -164,8 +196,9 @@ public abstract class SVNAdminArea {
     }
 
     protected abstract String formatEntries();
-        
-    public boolean setPropertyValue(String name, String propertyName, String propertyValue) {
+
+    //TODO: rename to setAttributeValue     
+    public boolean setAttributeValue(String name, String propertyName, String propertyValue) {
         if (myData == null) {
             return false;
         }
@@ -192,8 +225,6 @@ public abstract class SVNAdminArea {
         return false;
     }
 
-    public abstract void setCachableProperties(String name, String[] cachableProps);
-    
     public Iterator entries(boolean hidden) {
         if (myEntries == null) {
             return Collections.EMPTY_LIST.iterator();
@@ -307,13 +338,117 @@ public abstract class SVNAdminArea {
         return ourAreas.get(new Integer(formatVersion)) != null;
     }
     
-    public abstract SVNProperties getProperties(String name, boolean tmp);
-    
-    public abstract SVNProperties getBaseProperties(String name, boolean tmp);
+//    public abstract String getPropertyValue(String entryName, boolean tmp, String propName) throws SVNException;
 
-    public abstract SVNProperties getWCProperties(String name);
+//    public abstract Map getProperties(String entryName, boolean tmp) throws SVNException;
+
+//    public abstract void setPropertyValue(String entryName, boolean tmp, String propName, String propValue) throws SVNException;
+
+    public void deleteProperties(String entryName, boolean tmp) throws SVNException {
+        SVNProperties props = getSVNProperties(entryName, tmp);
+        props.delete();
+    }
     
-    public String getPropertyValue(String name, String propertyName){
+    public String getPropertyValue(String entryName, boolean tmp, String propName) throws SVNException {
+        SVNProperties props = getSVNProperties(entryName, tmp);
+        return props.getPropertyValue(propName);
+    }
+
+    public Map getProperties(String entryName, boolean tmp) throws SVNException {
+        SVNProperties props = getSVNProperties(entryName, tmp);
+        return props.asMap();
+    }
+
+    public void setPropertyValue(String entryName, boolean tmp, String propName, String propValue) throws SVNException {
+        SVNProperties props = getSVNProperties(entryName, tmp);
+        props.setPropertyValue(propName, propValue);
+    }
+
+    public Map getBaseProperties(String entryName, boolean tmp) throws SVNException {
+        SVNProperties props = getBaseSVNProperties(entryName, tmp);
+        return props.asMap();
+    }
+
+    public String getBasePropertyValue(String entryName, boolean tmp, String propName) throws SVNException {
+        SVNProperties props = getBaseSVNProperties(entryName, tmp);
+        return props.getPropertyValue(propName);
+    }
+
+    public void setBasePropertyValue(String entryName, boolean tmp, String propName, String propValue) throws SVNException {
+        SVNProperties baseProps = getBaseSVNProperties(entryName, tmp);
+        baseProps.setPropertyValue(propName, propValue);
+    }
+
+    public void deleteBaseProperties(String entryName, boolean tmp) {
+        SVNProperties props = getBaseSVNProperties(entryName, tmp);
+        props.delete();
+    }
+
+//    public abstract Map getBaseProperties(String entryName, boolean tmp) throws SVNException;
+
+//    public abstract String getBasePropertyValue(String entryName, boolean tmp, String propName) throws SVNException;
+
+//    public abstract void setBasePropertyValue(String entryName, boolean tmp, String propName, String propValue) throws SVNException;
+
+//    public abstract void deleteBaseProperties(String entryName, boolean tmp) throws SVNException;
+
+    public abstract void deleteWCProperties(String entryName) throws SVNException;
+
+    public abstract Map getWCProperties(String entryName) throws SVNException;
+    
+    public abstract String getWCPropertyValue(String entryName, String propName) throws SVNException;
+
+    public abstract void setWCPropertyValue(String entryName, String propName, String propValue) throws SVNException;
+
+//    public abstract Map comparePropsTo(String entryName1, boolean isBase1, boolean tmp1, SVNAdminArea adminArea, String entryName2, boolean isBase2, boolean tmp2) throws SVNException;
+    
+//    public abstract void copyPropsTo(String entryName1, boolean isBase1, boolean tmp1, SVNAdminArea adminArea, String entryName2, boolean isBase2, boolean tmp2) throws SVNException;
+
+    public Map comparePropsTo(String entryName1, boolean isBase1, boolean tmp1, SVNAdminArea adminArea, String entryName2, boolean isBase2, boolean tmp2) throws SVNException {
+        SVNProperties props1 = getPropsByType(isBase1, entryName1, tmp1);
+        SVNProperties props2 = adminArea.getPropsByType(isBase2, entryName2, tmp2);//getSVNProperties(entryName, false);
+        //SVNProperties baseProps = getBaseSVNProperties(entryName, false);
+        if (props1 != null) {
+            return props1.compareTo(props2);
+        }
+        return new HashMap();
+    }
+    
+    public void copyPropsTo(String entryName1, boolean isBase1, boolean tmp1, SVNAdminArea adminArea, String entryName2, boolean isBase2, boolean tmp2) throws SVNException {
+        SVNProperties props1 = getPropsByType(isBase1, entryName1, tmp1);
+        SVNProperties props2 = adminArea.getPropsByType(isBase2, entryName2, tmp2);
+        props1.copyTo(props2);
+    }
+
+    public boolean isPropsFileEmpty(String entryName, boolean isBase, boolean tmp) {
+        SVNProperties props = getPropsByType(isBase, entryName, tmp);
+        return props.isEmpty();
+    }
+    
+    public abstract boolean hasPropModifications(String entryName) throws SVNException;
+
+    public abstract void setCachableProperties(String name, String[] cachableProps);
+
+    public abstract String[] getCachableProperties(String entryName);
+
+    public abstract void setPresentProperties(String name, String[] presentProps);
+
+    public abstract String[] getPresentProperties(String entryName);
+    
+/*    public File preparePropertiesForCommit(String entryName) throws SVNException {
+        SVNProperties props = getSVNProperties(entryName, false);
+        SVNProperties tmpProps = getBaseSVNProperties(entryName, true);
+        props.copyTo(tmpProps);
+        if (!tmpProps.getFile().exists()) {
+            // create empty tmp (!) file just to make sure it will be used on post-commit.
+            SVNFileUtil.createEmptyFile(tmpProps.getFile());
+        }
+        return tmpProps.getFile();
+    }
+*/
+    //TODO: rename it to getAttributeValue not to confuse it with
+    //the versioned property getter
+    public String getAttributeValue(String name, String propertyName){
         if (myData == null) {
             return null;
         }

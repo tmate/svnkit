@@ -15,6 +15,7 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -23,6 +24,7 @@ import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNProperty;
 import org.tmatesoft.svn.core.internal.util.SVNEncodingUtil;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
+import org.tmatesoft.svn.core.internal.util.SVNTimeUtil;
 import org.tmatesoft.svn.util.SVNDebugLog;
 
 /**
@@ -37,24 +39,30 @@ public class SVNXMLEntries extends SVNAdminArea{
         super(parent);
     }
 
-    public SVNProperties getBaseProperties(String name, boolean tmp) {
-        String path = !tmp ? "" : "tmp/";
-        path += "".equals(name) ? "dir-prop-base" : "prop-base/" + name + ".svn-base";
+    protected SVNProperties getWCSVNProperties(String name) {
+        String path = getThisDirName().equals(name) ? "dir-wcprops" : "wcprops/" + name + ".svn-work";
         File propertiesFile = getParent().getAdminFile(path);
         return new SVNProperties(propertiesFile, getParent().getAdminDirectory().getName() + "/" + path);
     }
 
-    public SVNProperties getWCProperties(String name) {
-        String path = "".equals(name) ? "dir-wcprops" : "wcprops/" + name + ".svn-work";
-        File propertiesFile = getParent().getAdminFile(path);
-        return new SVNProperties(propertiesFile, getParent().getAdminDirectory().getName() + "/" + path);
+    public Map getWCProperties(String entryName) throws SVNException {
+        SVNProperties props = getWCSVNProperties(entryName);
+        return props.asMap();
+    }
+    
+    public String getWCPropertyValue(String entryName, String propName) throws SVNException {
+        SVNProperties props = getWCSVNProperties(entryName);
+        return props.getPropertyValue(propName);
     }
 
-    public SVNProperties getProperties(String name, boolean tmp) {
-        String path = !tmp ? "" : "tmp/";
-        path += "".equals(name) ? "dir-props" : "props/" + name + ".svn-work";
-        File propertiesFile = getParent().getAdminFile(path);
-        return new SVNProperties(propertiesFile, getParent().getAdminDirectory().getName() + "/" + path);
+    public void setWCPropertyValue(String entryName, String propName, String propValue) throws SVNException {
+        SVNProperties props = getWCSVNProperties(entryName);
+        props.setPropertyValue(propName, propValue);
+    }
+
+    public void deleteWCProperties(String entryName) throws SVNException {
+        SVNProperties wcprops = getWCSVNProperties(entryName);
+        wcprops.delete();
     }
 
     protected void fetchEntries() throws IOException, SVNException {
@@ -181,11 +189,66 @@ public class SVNXMLEntries extends SVNAdminArea{
         return buffer.toString();
     }
 
-    public void close() {
-        super.close();
+    public boolean hasPropModifications(String name) throws SVNException {
+        File propFile;
+        File baseFile;
+        if ("".equals(name)) {
+            propFile = getParent().getAdminFile("dir-props");
+            baseFile = getParent().getAdminFile("dir-prop-base");
+        } else {
+            propFile = getParent().getAdminFile("props/" + name + ".svn-work");
+            baseFile = getParent().getAdminFile("prop-base/" + name + ".svn-base");
+        }
+        SVNEntry entry = getEntry(name, true);
+        long propLength = propFile.length();
+        boolean propEmtpy = propLength <= 4;
+        if (entry.isScheduledForReplacement()) {
+            return !propEmtpy;
+        }
+        if (propEmtpy) {
+            boolean baseEmtpy = baseFile.length() <= 4;
+            if (baseEmtpy) {
+                return !propEmtpy;
+            }
+            return true;
+        }
+        if (propLength != baseFile.length()) {
+            return true;
+        }
+        String realTimestamp = SVNTimeUtil.formatDate(new Date(propFile.lastModified()));
+        String fullRealTimestamp = realTimestamp;
+        realTimestamp = realTimestamp.substring(0, 23);
+        String timeStamp = entry.getPropTime();
+        if (timeStamp != null) {
+            timeStamp = timeStamp.substring(0, 23);
+            if (realTimestamp.equals(timeStamp)) {
+                return false;
+            }
+        }
+        Map m1 = getProperties(name, false);
+        Map m2 = getBaseProperties(name, false);
+        if (m1.equals(m2)) {
+            if (getParent().isLocked()) {
+                entry.setPropTime(fullRealTimestamp);
+                save(false);
+            }
+            return false;
+        }
+        return true;
     }
 
     public void setCachableProperties(String name, String[] cachableProps) {
+    }
+    
+    public String[] getCachableProperties(String entryName) {
+        return null;
+    }
+
+    public void setPresentProperties(String name, String[] presentProps) {
+    }
+    
+    public String[] getPresentProperties(String entryName) {
+        return null;
     }
 
     protected int getFormatNumber() {

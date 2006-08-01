@@ -52,10 +52,15 @@ public class SVNTranslator {
         File src = dir.getFile(srcPath);
         File dst = safe ? SVNFileUtil.createUniqueFile(dir.getRoot(), dstPath, ".tmp") : dir.getFile(dstPath);
         
-        SVNProperties props = dir.getProperties(name, false);
-        String keywords = props.getPropertyValue(SVNProperty.KEYWORDS);
-        String eolStyle = props.getPropertyValue(SVNProperty.EOL_STYLE);
-        boolean special = props.getPropertyValue(SVNProperty.SPECIAL) != null;
+//        SVNProperties props = dir.getProperties(name, false);
+        SVNAdminArea adminArea = dir.getAdminArea(false);
+//        String keywords = props.getPropertyValue(SVNProperty.KEYWORDS);
+        String keywords = adminArea.getPropertyValue(name, false, SVNProperty.KEYWORDS);
+//        String eolStyle = props.getPropertyValue(SVNProperty.EOL_STYLE);
+        String eolStyle = adminArea.getPropertyValue(name, false, SVNProperty.EOL_STYLE);
+//        boolean special = props.getPropertyValue(SVNProperty.SPECIAL) != null;
+        boolean special = adminArea.getPropertyValue(name, false, SVNProperty.SPECIAL) != null;
+        
         Map keywordsMap = null;
         byte[] eols;
         if (keywords != null) {

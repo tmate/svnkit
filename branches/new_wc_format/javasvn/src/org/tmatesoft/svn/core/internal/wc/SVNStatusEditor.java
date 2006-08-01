@@ -386,7 +386,9 @@ public class SVNStatusEditor implements ISVNEditor {
         SVNAdminArea adminArea = dir.getAdminArea(false);
         boolean anchorOfTarget = myTarget != null && dir == myWCAccess.getAnchor();
         if (!anchorOfTarget) {            
-            SVNExternalInfo[] externals = SVNWCAccess.parseExternals(dir.getPath(), dir.getProperties("", false).getPropertyValue(SVNProperty.EXTERNALS));
+//            SVNExternalInfo[] externals = SVNWCAccess.parseExternals(dir.getPath(), dir.getProperties("", false).getPropertyValue(SVNProperty.EXTERNALS));
+            SVNExternalInfo[] externals = SVNWCAccess.parseExternals(dir.getPath(), adminArea.getPropertyValue(adminArea.getThisDirName(), false, SVNProperty.EXTERNALS));
+
             for (int i = 0; i < externals.length; i++) {
                 SVNExternalInfo external = externals[i];
                 myExternalsMap.put(external.getPath(), external);
@@ -587,12 +589,15 @@ public class SVNStatusEditor implements ISVNEditor {
             }
         }
         if (textStatus != SVNStatusType.OBSTRUCTED) {
-            SVNProperties props = entryDir.getProperties(entry.getName(), false);
-            if (props != null && !props.isEmpty()) {
+//            SVNProperties props = entryDir.getProperties(entry.getName(), false);
+//            if (props != null && !props.isEmpty()) {
+            if (!entryDir.getAdminArea(false).isPropsFileEmpty(entry.getName(), false, false)) {
                 propStatus = SVNStatusType.STATUS_NORMAL;
             }
+            
             boolean propsModified = entryDir.hasPropModifications(entry.getName());
-            boolean special = !SVNFileUtil.isWindows && !isDir && props.getPropertyValue(SVNProperty.SPECIAL) != null;
+//            boolean special = !SVNFileUtil.isWindows && !isDir && props.getPropertyValue(SVNProperty.SPECIAL) != null;
+            boolean special = !SVNFileUtil.isWindows && !isDir && entryDir.getAdminArea(false).getPropertyValue(entry.getName(), false, SVNProperty.SPECIAL) != null;
             boolean textModified = false;
             if (!isDir && special == (pathKind == SVNFileType.SYMLINK)) {
                 textModified = entryDir.hasTextModifications(entry.getName(), false);

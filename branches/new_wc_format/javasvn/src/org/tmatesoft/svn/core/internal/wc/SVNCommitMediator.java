@@ -61,8 +61,9 @@ public class SVNCommitMediator implements ISVNWorkspaceMediator {
             dir = wcAccess.getDirectory(SVNPathUtil.removeTail(item.getPath()));
             target = SVNPathUtil.tail(item.getPath());
         }
-        SVNProperties wcProps = dir.getWCProperties(target);
-        return wcProps.getPropertyValue(name);
+        return dir.getAdminArea(false).getWCPropertyValue(target, name);
+//        SVNProperties wcProps = dir.getWCProperties(target);
+//        return wcProps.getPropertyValue(name);
     }
 
     public void setWorkspaceProperty(String path, String name, String value)
