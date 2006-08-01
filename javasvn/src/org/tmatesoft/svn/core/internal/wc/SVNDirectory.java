@@ -49,7 +49,7 @@ import org.tmatesoft.svn.core.wc.SVNWCUtil;
  */
 public class SVNDirectory {
 
-    private static String[] ourCachableProperties = new String[] {
+    private static final String[] ourCachableProperties = new String[] {
         SVNProperty.SPECIAL,
         SVNProperty.EXTERNALS, 
         SVNProperty.NEEDS_LOCK
@@ -207,47 +207,50 @@ public class SVNDirectory {
         }
     }
     
-    public SVNProperties getProperties(String name, boolean tmp) throws SVNException {
-        return getAdminArea(false).getProperties(name, tmp);
+//    public SVNProperties getProperties(String name, boolean tmp) throws SVNException {
+//        return getAdminArea(false).getProperties(name, tmp);
 /*        
         String path = !tmp ? "" : "tmp/";
         path += "".equals(name) ? "dir-props" : "props/" + name + ".svn-work";
         File propertiesFile = getAdminFile(path);
         return new SVNProperties(propertiesFile, getAdminDirectory().getName() + "/" + path);
 */        
-    }
+//    }
 
-    public SVNProperties getBaseProperties(String name, boolean tmp) throws SVNException {
-        return getAdminArea(false).getBaseProperties(name, tmp);
+//    public SVNProperties getBaseProperties(String name, boolean tmp) throws SVNException {
+//        return getAdminArea(false).getBaseProperties(name, tmp);
 /*        String path = !tmp ? "" : "tmp/";
         path += "".equals(name) ? "dir-prop-base" : "prop-base/" + name + ".svn-base";
         File propertiesFile = getAdminFile(path);
         return new SVNProperties(propertiesFile, getAdminDirectory().getName() + "/" + path);
 */        
-    }
+//  }
 
-    public SVNProperties getWCProperties(String name) throws SVNException {
-        return getAdminArea(false).getWCProperties(name);
+//    public SVNProperties getWCProperties(String name) throws SVNException {
+//        return getAdminArea(false).getWCProperties(name);
         
 /*        String path = "".equals(name) ? "dir-wcprops" : "wcprops/" + name + ".svn-work";
         File propertiesFile = getAdminFile(path);
         return new SVNProperties(propertiesFile, getAdminDirectory().getName() + "/" + path);
 */       
-    }
+//    }
 
     public SVNStatusType mergeProperties(String name, Map serverBaseProps, Map propDiff, boolean baseMerge, SVNLog log) throws SVNException {
         serverBaseProps = serverBaseProps == null ? Collections.EMPTY_MAP : serverBaseProps;
         propDiff = propDiff == null ? Collections.EMPTY_MAP : propDiff;
+        SVNAdminArea adminArea = getAdminArea(false);
         
-        SVNProperties working = getProperties(name, false);
-        Map workingProps = working.asMap();
-        SVNProperties workingTmp = getProperties(name, true);
-        SVNProperties base = getBaseProperties(name, false);
-        SVNProperties baseTmp = getBaseProperties(name, true);
+//        SVNProperties working = getProperties(name, false);
+        Map workingProps = adminArea.getProperties(name, false);//working.asMap();
+//        SVNProperties workingTmp = getProperties(name, true);
+//        SVNProperties base = getBaseProperties(name, false);
+//        SVNProperties baseTmp = getBaseProperties(name, true);
 
-        working.copyTo(workingTmp);
+//        working.copyTo(workingTmp);
+        adminArea.copyPropsTo(name, false, false, adminArea, name, false, true);
         if (baseMerge) {
-            base.copyTo(baseTmp);
+//            base.copyTo(baseTmp);
+            adminArea.copyPropsTo(name, true, false, adminArea, name, true, true);
         }
 
         Collection conflicts = new ArrayList();
@@ -260,7 +263,8 @@ public class SVNDirectory {
             String fromValue = (String) serverBaseProps.get(propName);
             String workingValue = (String) workingProps.get(propName);
             if (baseMerge) {
-                baseTmp.setPropertyValue(propName, toValue);
+//                baseTmp.setPropertyValue(propName, toValue);
+                adminArea.setBasePropertyValue(name, true, propName, toValue);
             }
             if (fromValue == null) {
                 if (workingValue != null) {
@@ -272,7 +276,8 @@ public class SVNDirectory {
                         result = SVNStatusType.CONFLICTED;                            
                     }
                 } else {
-                    workingTmp.setPropertyValue(propName, toValue);
+//                    workingTmp.setPropertyValue(propName, toValue);
+                    adminArea.setPropertyValue(name, true, propName, toValue);
                 }
             } else {
                 if (workingValue == null) {
@@ -285,7 +290,8 @@ public class SVNDirectory {
                     }
                 } else {
                     if (workingValue.equals(fromValue)) {
-                        workingTmp.setPropertyValue(propName, toValue);
+//                        workingTmp.setPropertyValue(propName, toValue);
+                        adminArea.setPropertyValue(name, true, propName, toValue);
                     } else if (toValue == null && !workingValue.equals(fromValue)) {
                         result = SVNStatusType.CONFLICTED;
                         conflicts.add(MessageFormat.format("Trying to delete property ''{0}'' but value has been modified from ''{1}'' to ''{2}''.",
@@ -302,18 +308,25 @@ public class SVNDirectory {
         }
         Map command = new HashMap();
         if (log != null) {
-            command.put(SVNLog.NAME_ATTR, workingTmp.getPath());
-            command.put(SVNLog.DEST_ATTR, working.getPath());
+//            command.put(SVNLog.NAME_ATTR, workingTmp.getPath());
+            command.put(SVNLog.NAME_ATTR, adminArea.getAdministrativePropsPath(name, false, true));
+//            command.put(SVNLog.DEST_ATTR, working.getPath());
+            command.put(SVNLog.DEST_ATTR, adminArea.getAdministrativePropsPath(name, false, false));
             log.addCommand(SVNLog.MOVE, command, false);
             command.clear();
-            command.put(SVNLog.NAME_ATTR, working.getPath());
+//            command.put(SVNLog.NAME_ATTR, working.getPath());
+            command.put(SVNLog.NAME_ATTR, adminArea.getAdministrativePropsPath(name, false, false));
+  
             log.addCommand(SVNLog.READONLY, command, false);
             if (baseMerge) {
-                command.put(SVNLog.NAME_ATTR, baseTmp.getPath());
-                command.put(SVNLog.DEST_ATTR, base.getPath());
+//                command.put(SVNLog.NAME_ATTR, baseTmp.getPath());
+                command.put(SVNLog.NAME_ATTR, adminArea.getAdministrativePropsPath(name, true, true));
+//                command.put(SVNLog.DEST_ATTR, base.getPath());
+                command.put(SVNLog.DEST_ATTR, adminArea.getAdministrativePropsPath(name, true, false));
                 log.addCommand(SVNLog.MOVE, command, false);
                 command.clear();
-                command.put(SVNLog.NAME_ATTR, base.getPath());
+//                command.put(SVNLog.NAME_ATTR, base.getPath());
+                command.put(SVNLog.NAME_ATTR, adminArea.getAdministrativePropsPath(name, true, false));
                 log.addCommand(SVNLog.READONLY, command, false);
             }
         }
@@ -365,8 +378,10 @@ public class SVNDirectory {
             }
         }
         if (log == null) {
-            workingTmp.delete();
-            baseTmp.delete();
+//            workingTmp.delete();
+//            baseTmp.delete();
+            adminArea.deleteProperties(name, true);
+            adminArea.deleteBaseProperties(name, true);
         }
         return result;
     }
@@ -374,8 +389,11 @@ public class SVNDirectory {
     public SVNStatusType mergeText(String localPath, String basePath,
             String latestPath, String localLabel, String baseLabel,
             String latestLabel, boolean leaveConflict, boolean dryRun) throws SVNException {
-        String mimeType = getProperties(localPath, false).getPropertyValue(SVNProperty.MIME_TYPE);
-        SVNEntry entry = getAdminArea(false).getEntry(localPath, true);
+        SVNAdminArea adminArea = getAdminArea(false);
+//        String mimeType = getProperties(localPath, false).getPropertyValue(SVNProperty.MIME_TYPE);
+        String mimeType = adminArea.getPropertyValue(localPath, false, SVNProperty.MIME_TYPE);
+  
+        SVNEntry entry = adminArea.getEntry(localPath, true);
         if (SVNProperty.isBinaryMimeType(mimeType)) {
             // binary
             if (!dryRun) {
@@ -495,15 +513,18 @@ public class SVNDirectory {
         boolean magicPropsChanged = false;
         boolean wasReverted = false;
 
-        SVNEntry entry = getAdminArea(false).getEntry(name, true);
+        SVNAdminArea adminArea = getAdminArea(false);
+        SVNEntry entry = adminArea.getEntry(name, true);
         if (entry == null || entry.isHidden()) {
             return wasReverted;
         }
 
-        SVNProperties baseProps = getBaseProperties(name, false);
-        SVNProperties wcProps = getProperties(name, false);
+//        SVNProperties baseProps = getBaseProperties(name, false);
+//        SVNProperties wcProps = getProperties(name, false);
+  
         if (hasPropModifications(name)) {
-            Map propDiff = baseProps.compareTo(wcProps);
+//            Map propDiff = baseProps.compareTo(wcProps);
+            Map propDiff = adminArea.comparePropsTo(name, true, false, adminArea, name, false, false);
             if (propDiff != null && !propDiff.isEmpty()) {
                 magicPropsChanged = propDiff
                         .containsKey(SVNProperty.EXECUTABLE)
@@ -513,19 +534,24 @@ public class SVNDirectory {
                         || propDiff.containsKey(SVNProperty.SPECIAL);
             }
             // copy base over wc
-            if (baseProps.getFile().isFile()) {
-                baseProps.copyTo(wcProps);
-                entry.setPropTime(SVNTimeUtil.formatDate(new Date(wcProps
-                        .getFile().lastModified())));
+//            if (baseProps.getFile().isFile()) {
+            if (adminArea.getPropsFile(name, true, false).isFile()) {
+//                baseProps.copyTo(wcProps);
+                adminArea.copyPropsTo(name, true, false, adminArea, name, false, false);
+//                entry.setPropTime(SVNTimeUtil.formatDate(new Date(wcProps.getFile().lastModified())));
+                entry.setPropTime(SVNTimeUtil.formatDate(new Date(adminArea.getPropsFile(name, false, false).lastModified())));
+  
             } else {
-                wcProps.delete();
+//                wcProps.delete();
                 entry.setPropTime(null);
             }
-            getAdminArea(false).save(false);
+            adminArea.save(false);
             wasReverted = true;
         } else if (entry.isScheduledForReplacement()) {
-            baseProps.copyTo(wcProps);
-            entry.setPropTime(SVNTimeUtil.formatDate(new Date(wcProps.getFile().lastModified())));
+//            baseProps.copyTo(wcProps);
+            adminArea.copyPropsTo(name, true, false, adminArea, name, true, false);
+//            entry.setPropTime(SVNTimeUtil.formatDate(new Date(wcProps.getFile().lastModified())));
+            entry.setPropTime(SVNTimeUtil.formatDate(new Date(adminArea.getPropsFile(name, false, false).lastModified())));
             wasReverted = true;
         }
 
@@ -537,7 +563,8 @@ public class SVNDirectory {
             File file = getFile(entry.getName());
             if (textModified || magicPropsChanged || !file.exists()) {
                 // copy base to wc and expand.
-                boolean special = wcProps.getPropertyValue(SVNProperty.SPECIAL) != null;
+//                boolean special = wcProps.getPropertyValue(SVNProperty.SPECIAL) != null;
+                boolean special = adminArea.getPropertyValue(name, false, SVNProperty.SPECIAL) != null;
 
                 File src = getBaseFile(name, false);
                 File dst = getFile(name);
@@ -547,8 +574,11 @@ public class SVNDirectory {
                 }
                 SVNTranslator.translate(this, name, SVNFileUtil.getBasePath(src), SVNFileUtil.getBasePath(dst), true, true);
 
-                boolean executable = wcProps.getPropertyValue(SVNProperty.EXECUTABLE) != null;
-                boolean needsLock = wcProps.getPropertyValue(SVNProperty.NEEDS_LOCK) != null;
+//                boolean executable = wcProps.getPropertyValue(SVNProperty.EXECUTABLE) != null;
+//                boolean needsLock = wcProps.getPropertyValue(SVNProperty.NEEDS_LOCK) != null;
+                boolean executable = adminArea.getPropertyValue(name, false, SVNProperty.EXECUTABLE) != null;
+                boolean needsLock = adminArea.getPropertyValue(name, false, SVNProperty.NEEDS_LOCK) != null;
+
                 if (executable) {
                     SVNFileUtil.setExecutable(dst, true);
                 }
@@ -565,7 +595,8 @@ public class SVNDirectory {
                 if (needsLock) {
                     SVNFileUtil.setReadonly(dst, entry.getLockToken() == null);
                 }
-                getAdminArea(false).save(false);
+                //getAdminArea(false).save(false);
+                adminArea.save(false);
                 wasReverted |= true;
             }
             wasReverted |= markResolved(name, true, false);
@@ -639,51 +670,8 @@ public class SVNDirectory {
     }
 
     public boolean hasPropModifications(String name) throws SVNException {
-        File propFile;
-        File baseFile;
-        if ("".equals(name)) {
-            propFile = getAdminFile("dir-props");
-            baseFile = getAdminFile("dir-prop-base");
-        } else {
-            propFile = getAdminFile("props/" + name + ".svn-work");
-            baseFile = getAdminFile("prop-base/" + name + ".svn-base");
-        }
-        SVNEntry entry = getAdminArea(false).getEntry(name, true);
-        long propLength = propFile.length();
-        boolean propEmtpy = propLength <= 4;
-        if (entry.isScheduledForReplacement()) {
-            return !propEmtpy;
-        }
-        if (propEmtpy) {
-            boolean baseEmtpy = baseFile.length() <= 4;
-            if (baseEmtpy) {
-                return !propEmtpy;
-            }
-            return true;
-        }
-        if (propLength != baseFile.length()) {
-            return true;
-        }
-        String realTimestamp = SVNTimeUtil.formatDate(new Date(propFile.lastModified()));
-        String fullRealTimestamp = realTimestamp;
-        realTimestamp = realTimestamp.substring(0, 23);
-        String timeStamp = entry.getPropTime();
-        if (timeStamp != null) {
-            timeStamp = timeStamp.substring(0, 23);
-            if (realTimestamp.equals(timeStamp)) {
-                return false;
-            }
-        }
-        Map m1 = getProperties(name, false).asMap();
-        Map m2 = getBaseProperties(name, false).asMap();
-        if (m1.equals(m2)) {
-            if (isLocked()) {
-                entry.setPropTime(fullRealTimestamp);
-                getAdminArea(false).save(false);
-            }
-            return false;
-        }
-        return true;
+        SVNAdminArea adminArea = getAdminArea(false);
+        return adminArea.hasPropModifications(name);
     }
 
     public void cleanup() throws SVNException {
@@ -911,7 +899,7 @@ public class SVNDirectory {
         for (int i = 0; i < tmp.length; i++) {
             tmp[i].mkdir();
         }
-        
+        // for backward compatibility 
         SVNAdminUtil.createFormatFile(adminDir);
         // unlock dir.
         SVNFileUtil.deleteFile(lock);
@@ -1081,7 +1069,8 @@ public class SVNDirectory {
         }
         entry.setKind(fileKind);
         if (replace) {
-            getProperties(name, false).delete();
+            //getProperties(name, false).delete();
+            getAdminArea(false).deleteProperties(name, false);
         }
         if (fileKind == SVNNodeKind.DIR) {
             // compose new url
@@ -1126,7 +1115,7 @@ public class SVNDirectory {
                     childDir.updateEntryProperty(propertyName, value, recursive);
                 }
             }
-            adminArea.setPropertyValue(entry.getName(), propertyName, value);
+            adminArea.setAttributeValue(entry.getName(), propertyName, value);
             if (SVNProperty.SCHEDULE_DELETE.equals(value)) {
                 SVNEvent event = SVNEventFactory.createDeletedEvent(myWCAccess, this, entry.getName());
                 myWCAccess.handleEvent(event);
@@ -1151,7 +1140,7 @@ public class SVNDirectory {
                 }
                 continue;
             }
-            area.setPropertyValue(entry.getName(), SVNProperty.URL, ""
+            area.setAttributeValue(entry.getName(), SVNProperty.URL, ""
                     .equals(entry.getName()) ? rootURL : SVNPathUtil.append(
                     rootURL, SVNEncodingUtil.uriEncode(entry.getName())));
         }
@@ -1197,18 +1186,21 @@ public class SVNDirectory {
 
     private void destroyFile(String name, boolean deleteWorkingFile)
             throws SVNException {
-        SVNAdminArea entries = getAdminArea(false);
-        if (entries.getEntry(name, true) != null) {
+        SVNAdminArea adminArea = getAdminArea(false);
+        if (adminArea.getEntry(name, true) != null) {
             if (deleteWorkingFile && !hasTextModifications(name, false)) {
                 getFile(name).delete();
             }
         }
-        entries.deleteEntry(name);
+        adminArea.deleteEntry(name);
 
-        getBaseProperties(name, false).delete();
-        getWCProperties(name).delete();
-
-        getProperties(name, false).delete();
+//        getBaseProperties(name, false).delete();
+//        getWCProperties(name).delete();
+        adminArea.deleteBaseProperties(name, false);
+        adminArea.deleteWCProperties(name);
+        
+//        getProperties(name, false).delete();
+        adminArea.deleteProperties(name, false);
         File baseFile = getBaseFile(name, false);
         baseFile.delete();
     }
@@ -1348,7 +1340,9 @@ public class SVNDirectory {
     }
     
     public boolean isIgnored(String fileName) throws SVNException {
-        String ignoredProperty = getProperties("", false).getPropertyValue(SVNProperty.IGNORE);
+//        String ignoredProperty = getProperties("", false).getPropertyValue(SVNProperty.IGNORE);
+        SVNAdminArea adminArea = getAdminArea(false);
+        String ignoredProperty = adminArea.getPropertyValue(adminArea.getThisDirName(), false, SVNProperty.IGNORE);
         if (ignoredProperty == null) {
             return false;
         }

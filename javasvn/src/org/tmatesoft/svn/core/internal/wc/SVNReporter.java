@@ -107,7 +107,9 @@ public class SVNReporter implements ISVNReporterBaton {
         SVNAdminArea adminArea = directory.getAdminArea(false);
         long baseRevision = adminArea.getEntry("", true).getRevision();
 
-        SVNExternalInfo[] externals = myWCAccess.addExternals(directory, directory.getProperties("", false).getPropertyValue(SVNProperty.EXTERNALS));
+//        SVNExternalInfo[] externals = myWCAccess.addExternals(directory, directory.getProperties("", false).getPropertyValue(SVNProperty.EXTERNALS));
+        SVNExternalInfo[] externals = myWCAccess.addExternals(directory, adminArea.getPropertyValue(adminArea.getThisDirName(), false, SVNProperty.EXTERNALS));
+
         for (int i = 0; externals != null && i < externals.length; i++) {
             externals[i].setOldExternal(externals[i].getNewURL(), externals[i].getNewRevision());
         }
@@ -135,7 +137,8 @@ public class SVNReporter implements ISVNReporterBaton {
                     // local file could be of different kind. 
                     // if so report as deleted.
                     // check svn:special files -> symlinks that could be directory.
-                    boolean special = !SVNFileUtil.isWindows && directory.getProperties(entry.getName(), false).getPropertyValue(SVNProperty.SPECIAL) != null;
+//                    boolean special = !SVNFileUtil.isWindows && directory.getProperties(entry.getName(), false).getPropertyValue(SVNProperty.SPECIAL) != null;
+                    boolean special = !SVNFileUtil.isWindows && adminArea.getPropertyValue(entry.getName(), false, SVNProperty.SPECIAL) != null;
                     SVNFileType expectedType = special ? SVNFileType.SYMLINK : SVNFileType.FILE;
                     if (fileType != expectedType) {
                         reporter.deletePath(path);
@@ -146,7 +149,7 @@ public class SVNReporter implements ISVNReporterBaton {
                     restoreFile(directory, entry.getName());
                 }
                 String url = entry.getURL();
-                String parentURL = adminArea.getPropertyValue("", SVNProperty.URL);
+                String parentURL = adminArea.getAttributeValue("", SVNProperty.URL);
                 String expectedURL = SVNPathUtil.append(parentURL, SVNEncodingUtil.uriEncode(entry.getName()));
                 if (reportAll) {
                     if (!url.equals(expectedURL) && !entry.isScheduledForAddition() && !entry.isScheduledForReplacement()) {
@@ -198,17 +201,24 @@ public class SVNReporter implements ISVNReporterBaton {
         if (!myIsRestore) {
             return;
         }
-        SVNProperties props = dir.getProperties(name, false);
-        SVNEntry entry = dir.getAdminArea(false).getEntry(name, true);
-        boolean special = props.getPropertyValue(SVNProperty.SPECIAL) != null;
-
+        SVNAdminArea adminArea = dir.getAdminArea(false);
+        //SVNProperties props = dir.getProperties(name, false);
+        //SVNEntry entry = dir.getAdminArea(false).getEntry(name, true);
+        SVNEntry entry = adminArea.getEntry(name, true);
+        //boolean special = props.getPropertyValue(SVNProperty.SPECIAL) != null;
+        boolean special = adminArea.getPropertyValue(name, false, SVNProperty.SPECIAL) != null;
+        
         File src = dir.getBaseFile(name, false);
         File dst = dir.getFile(name);
         SVNTranslator.translate(dir, name, SVNFileUtil.getBasePath(src), SVNFileUtil.getBasePath(dst), true, true);
         dir.markResolved(name, true, false);
 
-        boolean executable = props.getPropertyValue(SVNProperty.EXECUTABLE) != null;
-        boolean needsLock = props.getPropertyValue(SVNProperty.NEEDS_LOCK) != null;
+//        boolean executable = props.getPropertyValue(SVNProperty.EXECUTABLE) != null;
+        boolean executable = adminArea.getPropertyValue(name, false, SVNProperty.EXECUTABLE) != null;
+
+//        boolean needsLock = props.getPropertyValue(SVNProperty.NEEDS_LOCK) != null;
+        boolean needsLock = adminArea.getPropertyValue(name, false, SVNProperty.NEEDS_LOCK) != null;
+        
         if (executable) {
             SVNFileUtil.setExecutable(dst, true);
         }
@@ -225,8 +235,8 @@ public class SVNReporter implements ISVNReporterBaton {
 	    if (needsLock) {
 	        SVNFileUtil.setReadonly(dst, entry.getLockToken() == null);
 	    }
-        dir.getAdminArea(false).save(false);
-
+        //dir.getAdminArea(false).save(false);
+	    adminArea.save(false);
         myWCAccess.handleEvent(SVNEventFactory.createRestoredEvent(myWCAccess, dir, entry));
     }
 }

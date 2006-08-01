@@ -21,6 +21,7 @@ import org.tmatesoft.svn.core.SVNProperty;
 import org.tmatesoft.svn.core.auth.ISVNAuthenticationManager;
 import org.tmatesoft.svn.core.internal.wc.DefaultSVNAuthenticationManager;
 import org.tmatesoft.svn.core.internal.wc.DefaultSVNOptions;
+import org.tmatesoft.svn.core.internal.wc.SVNAdminArea;
 import org.tmatesoft.svn.core.internal.wc.SVNExternalInfo;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNProperties;
@@ -311,10 +312,11 @@ public class SVNWCUtil {
             while (parent != null) {
                 try {
                     SVNWCAccess parentAccess = SVNWCAccess.create(parent);
-                    SVNProperties props = parentAccess.getTarget()
-                            .getProperties("", false);
-                    SVNExternalInfo[] externals = SVNWCAccess.parseExternals(
-                            "", props.getPropertyValue(SVNProperty.EXTERNALS));
+//                    SVNProperties props = parentAccess.getTarget().getProperties("", false);
+//                    SVNExternalInfo[] externals = SVNWCAccess.parseExternals("", props.getPropertyValue(SVNProperty.EXTERNALS));
+                    SVNAdminArea parentAdminArea = parentAccess.getTarget().getAdminArea(false);
+                    SVNExternalInfo[] externals = SVNWCAccess.parseExternals("", parentAdminArea.getPropertyValue(parentAdminArea.getThisDirName(), false, SVNProperty.EXTERNALS));
+
                     // now externals could point to our dir.
                     for (int i = 0; i < externals.length; i++) {
                         SVNExternalInfo external = externals[i];

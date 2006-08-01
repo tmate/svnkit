@@ -239,8 +239,9 @@ public class SVNUpdateEditor implements ISVNEditor {
         for (Iterator ents = adminArea.entries(false); ents.hasNext();) {
             SVNEntry entry = (SVNEntry) ents.next();
             if (entry.isFile() || "".equals(entry.getName())) {
-                SVNProperties props = dir.getWCProperties(entry.getName());
-                props.setPropertyValue(SVNProperty.WC_URL, null);
+//                SVNProperties props = dir.getWCProperties(entry.getName());
+//                props.setPropertyValue(SVNProperty.WC_URL, null);
+                adminArea.setWCPropertyValue(entry.getName(), SVNProperty.WC_URL, null);
             } else {
                 clearWCProperty(dir.getChildDirectory(entry.getName()));
             }
@@ -260,7 +261,8 @@ public class SVNUpdateEditor implements ISVNEditor {
             if (modifiedProps != null && !modifiedProps.isEmpty()) {
                 myWCAccess.addExternals(dir, (String) modifiedProps.get(SVNProperty.EXTERNALS));
 
-                Map oldBaseProps = dir.getBaseProperties("", false).asMap();
+                SVNAdminArea adminArea = dir.getAdminArea(false); 
+                Map oldBaseProps = adminArea.getBaseProperties(adminArea.getThisDirName(), false);//dir.getBaseProperties("", false).asMap();
                 propStatus = dir.mergeProperties("", oldBaseProps, modifiedProps, true, log);
                 if (myCurrentDirectory.IsAdded && !dir.hasPropModifications("")) {
                     Map command = new HashMap();
@@ -376,7 +378,11 @@ public class SVNUpdateEditor implements ISVNEditor {
             modifiedProps.containsKey(SVNProperty.EOL_STYLE) || 
             modifiedProps.containsKey(SVNProperty.SPECIAL);
         }
-        Map oldBaseProps = dir.getBaseProperties(name, false).asMap();
+        
+        SVNAdminArea adminArea = dir.getAdminArea(false);
+//        Map oldBaseProps = dir.getBaseProperties(name, false).asMap();
+        Map oldBaseProps = adminArea.getBaseProperties(name, false);
+
         boolean isLocalPropsModified = !myCurrentFile.IsAdded && dir.hasPropModifications(name);
         SVNStatusType propStatus = dir.mergeProperties(name, oldBaseProps, modifiedProps, true, log);
         if (modifiedEntryProps != null) {
@@ -431,29 +437,39 @@ public class SVNUpdateEditor implements ISVNEditor {
                 // do test merge.
                 String oldEolStyle = null;
                 String oldKeywords = null;
-                SVNProperties props = dir.getProperties(myCurrentFile.Name, false);
+//                SVNProperties props = dir.getProperties(myCurrentFile.Name, false);
                 try {
                     if (magicPropsChanged && 
                             (modifiedProps.containsKey(SVNProperty.EOL_STYLE) || modifiedProps.containsKey(SVNProperty.KEYWORDS))) {
                         // use new valuse to let dry-run merge use the same input as real merge will use.
-                        oldKeywords = props.getPropertyValue(SVNProperty.KEYWORDS);
-                        oldEolStyle = props.getPropertyValue(SVNProperty.EOL_STYLE);
-                        props.setPropertyValue(SVNProperty.EOL_STYLE, (String) modifiedProps.get(SVNProperty.EOL_STYLE));
-                        props.setPropertyValue(SVNProperty.KEYWORDS, (String) modifiedProps.get(SVNProperty.KEYWORDS));
+//                        oldKeywords = props.getPropertyValue(SVNProperty.KEYWORDS);
+                        oldKeywords = adminArea.getPropertyValue(myCurrentFile.Name, false, SVNProperty.KEYWORDS);
+
+//                        oldEolStyle = props.getPropertyValue(SVNProperty.EOL_STYLE);
+                        oldEolStyle = adminArea.getPropertyValue(myCurrentFile.Name, false, SVNProperty.EOL_STYLE);
+//                        props.setPropertyValue(SVNProperty.EOL_STYLE, (String) modifiedProps.get(SVNProperty.EOL_STYLE));
+                        adminArea.setPropertyValue(myCurrentFile.Name, false, SVNProperty.EOL_STYLE, (String) modifiedProps.get(SVNProperty.EOL_STYLE));
+  
+//                        props.setPropertyValue(SVNProperty.KEYWORDS, (String) modifiedProps.get(SVNProperty.KEYWORDS));
+                        adminArea.setPropertyValue(myCurrentFile.Name, false, SVNProperty.KEYWORDS, (String) modifiedProps.get(SVNProperty.KEYWORDS));
+  
                     }
                     textStatus = dir.mergeText(name, basePath, tmpPath, "", "", "", myIsLeaveConflicts, true);
                 } finally {
                     if (magicPropsChanged && 
                             (modifiedProps.containsKey(SVNProperty.EOL_STYLE) || modifiedProps.containsKey(SVNProperty.KEYWORDS))) {
                         // restore original values.
-                        props.setPropertyValue(SVNProperty.EOL_STYLE, oldEolStyle);
-                        props.setPropertyValue(SVNProperty.KEYWORDS, oldKeywords);
+//                        props.setPropertyValue(SVNProperty.EOL_STYLE, oldEolStyle);
+                        adminArea.setPropertyValue(myCurrentFile.Name, false, SVNProperty.EOL_STYLE, oldEolStyle);
+//                        props.setPropertyValue(SVNProperty.KEYWORDS, oldKeywords);
+                        adminArea.setPropertyValue(myCurrentFile.Name, false, SVNProperty.KEYWORDS, oldKeywords);
+                        
                     }
                 }
                 if (textStatus == SVNStatusType.UNCHANGED) {
                     textStatus = SVNStatusType.MERGED;
                 }
-                SVNAdminArea adminArea = dir.getAdminArea(false);
+
                 SVNEntry entry = adminArea.getEntry(name, true);
                 String oldRevisionStr = ".r" + entry.getRevision();
                 String newRevisionStr = ".r" + myTargetRevision;

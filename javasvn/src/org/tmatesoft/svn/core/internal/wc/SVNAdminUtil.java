@@ -26,13 +26,11 @@ import org.tmatesoft.svn.core.SVNException;
  */
 public class SVNAdminUtil {
     
-    private static final byte[] FORMAT_TEXT;
     private static final byte[] README_TEXT;
     private static final boolean SKIP_README;
     
     static {
         String eol = System.getProperty("line.separator");
-        FORMAT_TEXT = new byte[] {'8', '\n'};
         README_TEXT = ("This is a Subversion working copy administrative directory." + eol
             + "Visit http://subversion.tigris.org/ for more information." + eol).getBytes();
         SKIP_README = Boolean.getBoolean("javasvn.skipReadme");
@@ -59,7 +57,8 @@ public class SVNAdminUtil {
         OutputStream os = null;
         try {
             os = SVNFileUtil.openFileForWriting(new File(adminDir, "format"));
-            os.write(FORMAT_TEXT);            
+            os.write(String.valueOf(SVNAdminArea.getLatestFormatVersion()).getBytes("UTF-8"));
+            os.write('\n');            
         } catch (IOException e) {
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, e.getLocalizedMessage());
             SVNErrorManager.error(err, e);

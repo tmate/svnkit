@@ -477,6 +477,9 @@ public class SVNWCClient extends SVNBasicClient {
         } else if (propName.startsWith(SVNProperty.SVN_WC_PREFIX)) {
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.CLIENT_PROPERTY_NAME, "''{0}'' is a wcprop , thus not accessible to clients", propName);
             SVNErrorManager.error(err);
+        } else if (SVNProperty.isEntryProperty(propName)) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.BAD_PROP_KIND, "Property ''{0}'' is an entry property", propName);
+            SVNErrorManager.error(err);
         }
         propValue = validatePropertyValue(propName, propValue, force);
         SVNWCAccess wcAccess = createWCAccess(path);
@@ -1266,12 +1269,20 @@ public class SVNWCClient extends SVNBasicClient {
                         entry.setLockComment(lock.getComment());
                         entry.setLockOwner(lock.getOwner());
                         entry.setLockCreationDate(SVNTimeUtil.formatDate(lock.getCreationDate()));
-                        if (wcAccess.getAnchor().getProperties(entry.getName(), false).getPropertyValue(SVNProperty.NEEDS_LOCK) != null) {
+                        SVNAdminArea adminArea = wcAccess.getAnchor().getAdminArea(false);
+//                        if (wcAccess.getAnchor().getProperties(entry.getName(), false).getPropertyValue(SVNProperty.NEEDS_LOCK) != null) {
+//                            SVNFileUtil.setReadonly(wcAccess.getAnchor().getFile(entry.getName()), false);
+//                        }
+//                        if (wcAccess.getAnchor().getProperties(entry.getName(), false).getPropertyValue(SVNProperty.EXECUTABLE) != null) {
+//                            SVNFileUtil.setExecutable(wcAccess.getAnchor().getFile(entry.getName()), true);
+//                        }
+                        if (adminArea.getPropertyValue(entry.getName(), false, SVNProperty.NEEDS_LOCK) != null) {
                             SVNFileUtil.setReadonly(wcAccess.getAnchor().getFile(entry.getName()), false);
                         }
-                        if (wcAccess.getAnchor().getProperties(entry.getName(), false).getPropertyValue(SVNProperty.EXECUTABLE) != null) {
+                        if (adminArea.getPropertyValue(entry.getName(), false, SVNProperty.EXECUTABLE) != null) {
                             SVNFileUtil.setExecutable(wcAccess.getAnchor().getFile(entry.getName()), true);
                         }
+
                         wcAccess.getAnchor().getAdminArea(false).save(true);
                         wcAccess.getAnchor().getAdminArea(false).close();
                         handleEvent(SVNEventFactory.createLockEvent(wcAccess, wcAccess.getTargetName(), SVNEventAction.LOCKED, lock, null),
@@ -1406,15 +1417,18 @@ public class SVNWCClient extends SVNBasicClient {
                 if (lock != null) {
                     try {
                         wcAccess.open(true, false);
-                        SVNEntry entry = wcAccess.getAnchor().getAdminArea(false).getEntry(
-                                wcAccess.getTargetName(), true);
+                        SVNAdminArea adminArea = wcAccess.getAnchor().getAdminArea(false); 
+//                        SVNEntry entry = wcAccess.getAnchor().getAdminArea(false).getEntry(wcAccess.getTargetName(), true);
+                        SVNEntry entry = adminArea.getEntry(wcAccess.getTargetName(), true);
                         entry.setLockToken(null);
                         entry.setLockComment(null);
                         entry.setLockOwner(null);
                         entry.setLockCreationDate(null);
-                        wcAccess.getAnchor().getAdminArea(false).save(true);
-                        wcAccess.getAnchor().getAdminArea(false).close();
-                        if (wcAccess.getAnchor().getProperties(entry.getName(), false).getPropertyValue(SVNProperty.NEEDS_LOCK) != null) {
+//                        wcAccess.getAnchor().getAdminArea(false).save(true);
+//                        wcAccess.getAnchor().getAdminArea(false).close();
+                        adminArea.save(true);
+//                        if (wcAccess.getAnchor().getProperties(entry.getName(), false).getPropertyValue(SVNProperty.NEEDS_LOCK) != null) {
+                        if (adminArea.getPropertyValue(entry.getName(), false, SVNProperty.NEEDS_LOCK) != null) {
                             SVNFileUtil.setReadonly(wcAccess.getAnchor().getFile(entry.getName()), true);
                         }
                         handleEvent(SVNEventFactory.createLockEvent(wcAccess, wcAccess.getTargetName(), SVNEventAction.UNLOCKED, lock, null),
@@ -1951,9 +1965,10 @@ public class SVNWCClient extends SVNBasicClient {
         File file = dir.getFile(name);
         dir.add(name, false, false);
 
-        SVNProperties properties = dir.getProperties(name, false);
+//        SVNProperties properties = dir.getProperties(name, false);
         if (SVNFileType.getType(file) == SVNFileType.SYMLINK) {
-            properties.setPropertyValue(SVNProperty.SPECIAL, "*");
+//            properties.setPropertyValue(SVNProperty.SPECIAL, "*");
+            dir.getAdminArea(false).setPropertyValue(name, false, SVNProperty.SPECIAL, "*");
         } else {
             Map props = new HashMap();
 	        String mimeType = SVNFileUtil.detectMimeType(file);
@@ -2051,13 +2066,14 @@ public class SVNWCClient extends SVNBasicClient {
             String propName, SVNRevision rev, boolean recursive,
             ISVNPropertyHandler handler) throws SVNException {
         checkCancelled();
-        SVNAdminArea adminArea = anchor.getAdminArea(false);
-        SVNEntry entry = adminArea.getEntry(name, true);
+        SVNAdminArea anchorAdminArea = anchor.getAdminArea(false);
+        SVNEntry entry = anchorAdminArea.getEntry(name, true);
         if (entry == null
                 || (rev == SVNRevision.WORKING && entry
                         .isScheduledForDeletion())) {
             return;
         }
+
         if (!"".equals(name)) {
             if (entry.getKind() == SVNNodeKind.DIR) {
                 SVNDirectory dir = anchor.getChildDirectory(name);
@@ -2066,37 +2082,40 @@ public class SVNWCClient extends SVNBasicClient {
                             handler);
                 }
             } else if (entry.getKind() == SVNNodeKind.FILE) {
-                SVNProperties props = rev == SVNRevision.WORKING ? anchor
-                        .getProperties(name, false) : anchor.getBaseProperties(
-                        name, false);
+//                SVNProperties props = rev == SVNRevision.WORKING ? anchor.getProperties(name, false) : anchor.getBaseProperties(name, false);
                 if (propName != null) {
-                    String value = props.getPropertyValue(propName);
+//                    String value = props.getPropertyValue(propName);
+                    String value = rev == SVNRevision.WORKING ? anchorAdminArea.getPropertyValue(name, false, propName) : anchorAdminArea.getBasePropertyValue(name, false, propName); 
                     if (value != null) {
                         handler.handleProperty(anchor.getFile(name), new SVNPropertyData(propName, value));
                     }
                 } else {
-                    Map propsMap = props.asMap();
-                    for (Iterator names = propsMap.keySet().iterator(); names
-                            .hasNext();) {
+//                    Map propsMap = props.asMap();
+                    Map propsMap = rev == SVNRevision.WORKING ? anchorAdminArea.getProperties(name, false) : anchorAdminArea.getBaseProperties(name, false); 
+  
+                    for (Iterator names = propsMap.keySet().iterator(); names.hasNext();) {
                         String pName = (String) names.next();
                         String value = (String) propsMap.get(pName);
                         handler.handleProperty(anchor.getFile(name), new SVNPropertyData(pName, value));
                     }
                 }
             }
-            adminArea.close();
+            anchorAdminArea.close();
             return;
         }
-        SVNProperties props = rev == SVNRevision.WORKING ? anchor
-                .getProperties(name, false) : anchor.getBaseProperties(name,
-                false);
+//        SVNProperties props = rev == SVNRevision.WORKING ? anchor.getProperties(name, false) : anchor.getBaseProperties(name, false);
+  
         if (propName != null) {
-            String value = props.getPropertyValue(propName);
+//            String value = props.getPropertyValue(propName);
+            String value = rev == SVNRevision.WORKING ? anchorAdminArea.getPropertyValue(name, false, propName) : anchorAdminArea.getBasePropertyValue(name, false, propName); 
+  
             if (value != null) {
                 handler.handleProperty(anchor.getFile(name), new SVNPropertyData(propName, value));
             }
         } else {
-            Map propsMap = props.asMap();
+//            Map propsMap = props.asMap();
+            Map propsMap = rev == SVNRevision.WORKING ? anchorAdminArea.getProperties(name, false) : anchorAdminArea.getBaseProperties(name, false); 
+  
             for (Iterator names = propsMap.keySet().iterator(); names.hasNext();) {
                 String pName = (String) names.next();
                 String value = (String) propsMap.get(pName);
@@ -2106,7 +2125,7 @@ public class SVNWCClient extends SVNBasicClient {
         if (!recursive) {
             return;
         }
-        for (Iterator ents = adminArea.entries(true); ents.hasNext();) {
+        for (Iterator ents = anchorAdminArea.entries(true); ents.hasNext();) {
             SVNEntry childEntry = (SVNEntry) ents.next();
             if ("".equals(childEntry.getName())) {
                 continue;
@@ -2143,12 +2162,14 @@ public class SVNWCClient extends SVNBasicClient {
                     }
                     return;
                 }
-                SVNProperties props = anchor.getProperties(name, false);
+//                SVNProperties props = anchor.getProperties(name, false);
+  
                 if (SVNProperty.EXECUTABLE.equals(propName)) {
                     SVNFileUtil.setExecutable(wcFile, propValue != null);
                 }
                 if (!force && SVNProperty.EOL_STYLE.equals(propName) && propValue != null) {
-                    if (SVNProperty.isBinaryMimeType(props.getPropertyValue(SVNProperty.MIME_TYPE))) {
+//                    if (SVNProperty.isBinaryMimeType(props.getPropertyValue(SVNProperty.MIME_TYPE))) {
+                    if (SVNProperty.isBinaryMimeType(adminArea.getPropertyValue(name, false, SVNProperty.MIME_TYPE))) {
                         if (!recursive) {
                             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ILLEGAL_TARGET, "File ''{0}'' has binary mime type property", wcFile);
                             SVNErrorManager.error(err);
@@ -2160,7 +2181,8 @@ public class SVNWCClient extends SVNBasicClient {
                         SVNErrorManager.error(err);
                     } 
                 }
-                props.setPropertyValue(propName, propValue);
+//                props.setPropertyValue(propName, propValue);
+                adminArea.setPropertyValue(name, false, propName, propValue);
 
                 if (SVNProperty.EOL_STYLE.equals(propName) || SVNProperty.KEYWORDS.equals(propName)) {
                     entry.setTextTime(null);
@@ -2175,7 +2197,8 @@ public class SVNWCClient extends SVNBasicClient {
             adminArea.close();
             return;
         }
-        SVNProperties props = anchor.getProperties(name, false);
+//        SVNProperties props = anchor.getProperties(name, false);
+  
         if ((SVNProperty.KEYWORDS.equals(propName)
                 || SVNProperty.EOL_STYLE.equals(propName)
                 || SVNProperty.MIME_TYPE.equals(propName)
@@ -2186,7 +2209,8 @@ public class SVNWCClient extends SVNBasicClient {
                 SVNErrorManager.error(err);
             }
         } else {
-            props.setPropertyValue(propName, propValue);
+//            props.setPropertyValue(propName, propValue);
+            adminArea.setPropertyValue(name, false, propName, propValue);
             if (handler != null) {
                 handler.handleProperty(anchor.getFile(name), new SVNPropertyData(propName, propValue));
             }

@@ -56,9 +56,9 @@ public class SVNEntry implements Comparable {
     }
 
     public String getURL() {
-        String url = myAdminArea.getPropertyValue(myName, SVNProperty.URL);
+        String url = myAdminArea.getAttributeValue(myName, SVNProperty.URL);
         if (url == null && !"".equals(myName)) {
-            url = myAdminArea.getPropertyValue("", SVNProperty.URL);
+            url = myAdminArea.getAttributeValue("", SVNProperty.URL);
             url = SVNPathUtil.append(url, SVNEncodingUtil.uriEncode(myName));
         }
         return url;
@@ -77,13 +77,13 @@ public class SVNEntry implements Comparable {
     }
 
     public boolean isDirectory() {
-        return SVNProperty.KIND_DIR.equals(myAdminArea.getPropertyValue(myName, SVNProperty.KIND));
+        return SVNProperty.KIND_DIR.equals(myAdminArea.getAttributeValue(myName, SVNProperty.KIND));
     }
 
     public long getRevision() {
-        String revStr = myAdminArea.getPropertyValue(myName, SVNProperty.REVISION);
+        String revStr = myAdminArea.getAttributeValue(myName, SVNProperty.REVISION);
         if (revStr == null && !"".equals(myName)) {
-            revStr = myAdminArea.getPropertyValue("", SVNProperty.REVISION);
+            revStr = myAdminArea.getAttributeValue("", SVNProperty.REVISION);
         }
         if (revStr == null) {
             return -1;
@@ -92,17 +92,17 @@ public class SVNEntry implements Comparable {
     }
 
     public boolean isScheduledForAddition() {
-        return SVNProperty.SCHEDULE_ADD.equals(myAdminArea.getPropertyValue(
+        return SVNProperty.SCHEDULE_ADD.equals(myAdminArea.getAttributeValue(
                 myName, SVNProperty.SCHEDULE));
     }
 
     public boolean isScheduledForDeletion() {
-        return SVNProperty.SCHEDULE_DELETE.equals(myAdminArea.getPropertyValue(
+        return SVNProperty.SCHEDULE_DELETE.equals(myAdminArea.getAttributeValue(
                 myName, SVNProperty.SCHEDULE));
     }
 
     public boolean isScheduledForReplacement() {
-        return SVNProperty.SCHEDULE_REPLACE.equals(myAdminArea.getPropertyValue(
+        return SVNProperty.SCHEDULE_REPLACE.equals(myAdminArea.getAttributeValue(
                 myName, SVNProperty.SCHEDULE));
     }
 
@@ -112,21 +112,21 @@ public class SVNEntry implements Comparable {
     }
 
     public boolean isFile() {
-        return SVNProperty.KIND_FILE.equals(myAdminArea.getPropertyValue(myName,
+        return SVNProperty.KIND_FILE.equals(myAdminArea.getAttributeValue(myName,
                 SVNProperty.KIND));
     }
 
     public String getLockToken() {
-        return myAdminArea.getPropertyValue(myName, SVNProperty.LOCK_TOKEN);
+        return myAdminArea.getAttributeValue(myName, SVNProperty.LOCK_TOKEN);
     }
 
     public boolean isDeleted() {
-        return Boolean.TRUE.toString().equals(myAdminArea.getPropertyValue(myName, SVNProperty.DELETED));
+        return Boolean.TRUE.toString().equals(myAdminArea.getAttributeValue(myName, SVNProperty.DELETED));
     }
 
     public boolean isAbsent() {
         return Boolean.TRUE.toString().equals(
-                myAdminArea.getPropertyValue(myName, SVNProperty.ABSENT));
+                myAdminArea.getAttributeValue(myName, SVNProperty.ABSENT));
     }
 
     public String toString() {
@@ -136,68 +136,80 @@ public class SVNEntry implements Comparable {
     public void setCachableProperties(String[] cachableProps) {
         myAdminArea.setCachableProperties(myName, cachableProps);
     }
-    
+
+    public String[] getCachableProperties() {
+        return myAdminArea.getCachableProperties(myName);
+    }
+
+    public void setPresentProperties(String[] presentProps) {
+        myAdminArea.setPresentProperties(myName, presentProps);
+    }
+
+    public String[] getPresentProperties() {
+        return myAdminArea.getPresentProperties(myName);
+    }
+
     public boolean setRevision(long revision) {
-        return myAdminArea.setPropertyValue(myName, SVNProperty.REVISION, Long
+        return myAdminArea.setAttributeValue(myName, SVNProperty.REVISION, Long
                 .toString(revision));
     }
 
     public boolean setURL(String url) {
-        return myAdminArea.setPropertyValue(myName, SVNProperty.URL, url);
+        return myAdminArea.setAttributeValue(myName, SVNProperty.URL, url);
     }
 
     public void setIncomplete(boolean incomplete) {
-        myAdminArea.setPropertyValue(myName, SVNProperty.INCOMPLETE,
+        myAdminArea.setAttributeValue(myName, SVNProperty.INCOMPLETE,
                 incomplete ? Boolean.TRUE.toString() : null);
     }
 
     public boolean isIncomplete() {
         return Boolean.TRUE.toString().equals(
-                myAdminArea.getPropertyValue(myName, SVNProperty.INCOMPLETE));
+                myAdminArea.getAttributeValue(myName, SVNProperty.INCOMPLETE));
     }
 
     public String getConflictOld() {
-        return myAdminArea.getPropertyValue(myName, SVNProperty.CONFLICT_OLD);
+        return myAdminArea.getAttributeValue(myName, SVNProperty.CONFLICT_OLD);
     }
 
     public void setConflictOld(String name) {
-        myAdminArea.setPropertyValue(myName, SVNProperty.CONFLICT_OLD, name);
+        myAdminArea.setAttributeValue(myName, SVNProperty.CONFLICT_OLD, name);
     }
 
     public String getConflictNew() {
-        return myAdminArea.getPropertyValue(myName, SVNProperty.CONFLICT_NEW);
+        return myAdminArea.getAttributeValue(myName, SVNProperty.CONFLICT_NEW);
     }
 
     public void setConflictNew(String name) {
-        myAdminArea.setPropertyValue(myName, SVNProperty.CONFLICT_NEW, name);
+        myAdminArea.setAttributeValue(myName, SVNProperty.CONFLICT_NEW, name);
     }
 
     public String getConflictWorking() {
-        return myAdminArea.getPropertyValue(myName, SVNProperty.CONFLICT_WRK);
+        return myAdminArea.getAttributeValue(myName, SVNProperty.CONFLICT_WRK);
     }
 
     public void setConflictWorking(String name) {
-        myAdminArea.setPropertyValue(myName, SVNProperty.CONFLICT_WRK, name);
+        myAdminArea.setAttributeValue(myName, SVNProperty.CONFLICT_WRK, name);
     }
 
     public String getPropRejectFile() {
-        return myAdminArea.getPropertyValue(myName, SVNProperty.PROP_REJECT_FILE);
+        return myAdminArea.getAttributeValue(myName, SVNProperty.PROP_REJECT_FILE);
     }
 
     public void setPropRejectFile(String name) {
-        myAdminArea.setPropertyValue(myName, SVNProperty.PROP_REJECT_FILE, name);
+        myAdminArea.setAttributeValue(myName, SVNProperty.PROP_REJECT_FILE, name);
     }
 
     public String getAuthor() {
-        return myAdminArea.getPropertyValue(myName, SVNProperty.LAST_AUTHOR);
+        return myAdminArea.getAttributeValue(myName, SVNProperty.LAST_AUTHOR);
     }
 
     public String getCommittedDate() {
-        return myAdminArea.getPropertyValue(myName, SVNProperty.COMMITTED_DATE);
+        return myAdminArea.getAttributeValue(myName, SVNProperty.COMMITTED_DATE);
     }
 
     public long getCommittedRevision() {
-        String rev = myAdminArea.getPropertyValue(myName,
+        String rev = myAdminArea.getAttributeValue(myName,
                 SVNProperty.COMMITTED_REVISION);
         if (rev == null) {
             return -1;
@@ -206,91 +218,91 @@ public class SVNEntry implements Comparable {
     }
 
     public void setTextTime(String time) {
-        myAdminArea.setPropertyValue(myName, SVNProperty.TEXT_TIME, time);
+        myAdminArea.setAttributeValue(myName, SVNProperty.TEXT_TIME, time);
     }
 
     public void setKind(SVNNodeKind kind) {
         String kindStr = kind == SVNNodeKind.DIR ? SVNProperty.KIND_DIR : (kind == SVNNodeKind.FILE ? SVNProperty.KIND_FILE : null);
-        myAdminArea.setPropertyValue(myName, SVNProperty.KIND, kindStr);
+        myAdminArea.setAttributeValue(myName, SVNProperty.KIND, kindStr);
     }
 
     public void setAbsent(boolean absent) {
-        myAdminArea.setPropertyValue(myName, SVNProperty.ABSENT,
+        myAdminArea.setAttributeValue(myName, SVNProperty.ABSENT,
                 absent ? Boolean.TRUE.toString() : null);
     }
 
     public void setDeleted(boolean deleted) {
-        myAdminArea.setPropertyValue(myName, SVNProperty.DELETED,
+        myAdminArea.setAttributeValue(myName, SVNProperty.DELETED,
                 deleted ? Boolean.TRUE.toString() : null);
     }
 
     public SVNNodeKind getKind() {
-        String kind = myAdminArea.getPropertyValue(myName, SVNProperty.KIND);
+        String kind = myAdminArea.getAttributeValue(myName, SVNProperty.KIND);
         return SVNNodeKind.parseKind(kind);
     }
     
     public String getTextTime() {
-        return myAdminArea.getPropertyValue(myName, SVNProperty.TEXT_TIME);
+        return myAdminArea.getAttributeValue(myName, SVNProperty.TEXT_TIME);
     }
 
     public String getChecksum() {
-        return myAdminArea.getPropertyValue(myName, SVNProperty.CHECKSUM);
+        return myAdminArea.getAttributeValue(myName, SVNProperty.CHECKSUM);
     }
 
     public void setLockComment(String comment) {
-        myAdminArea.setPropertyValue(myName, SVNProperty.LOCK_COMMENT, comment);
+        myAdminArea.setAttributeValue(myName, SVNProperty.LOCK_COMMENT, comment);
     }
 
     public void setLockOwner(String owner) {
-        myAdminArea.setPropertyValue(myName, SVNProperty.LOCK_OWNER, owner);
+        myAdminArea.setAttributeValue(myName, SVNProperty.LOCK_OWNER, owner);
     }
 
     public void setLockCreationDate(String date) {
-        myAdminArea.setPropertyValue(myName, SVNProperty.LOCK_CREATION_DATE, date);
+        myAdminArea.setAttributeValue(myName, SVNProperty.LOCK_CREATION_DATE, date);
     }
 
     public void setLockToken(String token) {
-        myAdminArea.setPropertyValue(myName, SVNProperty.LOCK_TOKEN, token);
+        myAdminArea.setAttributeValue(myName, SVNProperty.LOCK_TOKEN, token);
     }
 
     public void setUUID(String uuid) {
-        myAdminArea.setPropertyValue(myName, SVNProperty.UUID, uuid);
+        myAdminArea.setAttributeValue(myName, SVNProperty.UUID, uuid);
     }
 
     public void unschedule() {
-        myAdminArea.setPropertyValue(myName, SVNProperty.SCHEDULE, null);
+        myAdminArea.setAttributeValue(myName, SVNProperty.SCHEDULE, null);
     }
 
     public void scheduleForAddition() {
-        myAdminArea.setPropertyValue(myName, SVNProperty.SCHEDULE,
+        myAdminArea.setAttributeValue(myName, SVNProperty.SCHEDULE,
                 SVNProperty.SCHEDULE_ADD);
     }
 
     public void scheduleForDeletion() {
-        myAdminArea.setPropertyValue(myName, SVNProperty.SCHEDULE,
+        myAdminArea.setAttributeValue(myName, SVNProperty.SCHEDULE,
                 SVNProperty.SCHEDULE_DELETE);
     }
 
     public void scheduleForReplacement() {
-        myAdminArea.setPropertyValue(myName, SVNProperty.SCHEDULE,
+        myAdminArea.setAttributeValue(myName, SVNProperty.SCHEDULE,
                 SVNProperty.SCHEDULE_REPLACE);
     }
 
     public void setCopyFromRevision(long revision) {
-        myAdminArea.setPropertyValue(myName, SVNProperty.COPYFROM_REVISION,
+        myAdminArea.setAttributeValue(myName, SVNProperty.COPYFROM_REVISION,
                 revision >= 0 ? Long.toString(revision) : null);
     }
 
     public boolean setCopyFromURL(String url) {
-        return myAdminArea.setPropertyValue(myName, SVNProperty.COPYFROM_URL, url);
+        return myAdminArea.setAttributeValue(myName, SVNProperty.COPYFROM_URL, url);
     }
 
     public void setCopied(boolean copied) {
-        myAdminArea.setPropertyValue(myName, SVNProperty.COPIED, copied ? Boolean.TRUE.toString() : null);
+        myAdminArea.setAttributeValue(myName, SVNProperty.COPIED, copied ? Boolean.TRUE.toString() : null);
     }
 
     public String getCopyFromURL() {
-        return myAdminArea.getPropertyValue(myName, SVNProperty.COPYFROM_URL);
+        return myAdminArea.getAttributeValue(myName, SVNProperty.COPYFROM_URL);
     }
 
     public SVNURL getCopyFromSVNURL() throws SVNException {
@@ -302,7 +314,7 @@ public class SVNEntry implements Comparable {
     }
 
     public long getCopyFromRevision() {
-        String rev = myAdminArea.getPropertyValue(myName,
+        String rev = myAdminArea.getAttributeValue(myName,
                 SVNProperty.COPYFROM_REVISION);
         if (rev == null) {
             return -1;
@@ -311,24 +323,24 @@ public class SVNEntry implements Comparable {
     }
 
     public String getPropTime() {
-        return myAdminArea.getPropertyValue(myName, SVNProperty.PROP_TIME);
+        return myAdminArea.getAttributeValue(myName, SVNProperty.PROP_TIME);
     }
 
     public void setPropTime(String time) {
-        myAdminArea.setPropertyValue(myName, SVNProperty.PROP_TIME, time);
+        myAdminArea.setAttributeValue(myName, SVNProperty.PROP_TIME, time);
     }
 
     public boolean isCopied() {
         return Boolean.TRUE.toString().equals(
-                myAdminArea.getPropertyValue(myName, SVNProperty.COPIED));
+                myAdminArea.getAttributeValue(myName, SVNProperty.COPIED));
     }
 
     public String getUUID() {
-        return myAdminArea.getPropertyValue(myName, SVNProperty.UUID);
+        return myAdminArea.getAttributeValue(myName, SVNProperty.UUID);
     }
 
     public String getRepositoryRoot() {
-        return myAdminArea.getPropertyValue(myName, SVNProperty.REPOS);
+        return myAdminArea.getAttributeValue(myName, SVNProperty.REPOS);
     }
 
     public SVNURL getRepositoryRootURL() throws SVNException {
@@ -340,7 +352,7 @@ public class SVNEntry implements Comparable {
     }
     
     public boolean setRepositoryRoot(String url) {
-        return myAdminArea.setPropertyValue(myName, SVNProperty.REPOS, url);
+        return myAdminArea.setAttributeValue(myName, SVNProperty.REPOS, url);
     }
 
     public boolean setRepositoryRootURL(SVNURL url) {
@@ -353,25 +365,25 @@ public class SVNEntry implements Comparable {
         }
         for (Iterator propNames = entryProps.keySet().iterator(); propNames.hasNext();) {
             String propName = (String) propNames.next();
-            myAdminArea.setPropertyValue(myName, propName, (String) entryProps.get(propName));
+            myAdminArea.setAttributeValue(myName, propName, (String) entryProps.get(propName));
         }
     }
 
     public String getLockOwner() {
-        return myAdminArea.getPropertyValue(myName, SVNProperty.LOCK_OWNER);
+        return myAdminArea.getAttributeValue(myName, SVNProperty.LOCK_OWNER);
     }
 
     public String getLockComment() {
-        return myAdminArea.getPropertyValue(myName, SVNProperty.LOCK_COMMENT);
+        return myAdminArea.getAttributeValue(myName, SVNProperty.LOCK_COMMENT);
     }
 
     public String getLockCreationDate() {
-        return myAdminArea.getPropertyValue(myName,
+        return myAdminArea.getAttributeValue(myName,
                 SVNProperty.LOCK_CREATION_DATE);
     }
 
     public String getSchedule() {
-        return myAdminArea.getPropertyValue(myName, SVNProperty.SCHEDULE);
+        return myAdminArea.getAttributeValue(myName, SVNProperty.SCHEDULE);
     }
 
     public Map asMap() {

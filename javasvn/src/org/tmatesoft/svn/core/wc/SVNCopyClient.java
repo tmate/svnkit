@@ -46,7 +46,6 @@ import org.tmatesoft.svn.core.internal.wc.SVNEventFactory;
 import org.tmatesoft.svn.core.internal.wc.SVNFileType;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNLog;
-import org.tmatesoft.svn.core.internal.wc.SVNProperties;
 import org.tmatesoft.svn.core.internal.wc.SVNWCAccess;
 import org.tmatesoft.svn.core.io.ISVNEditor;
 import org.tmatesoft.svn.core.io.SVNRepository;
@@ -733,7 +732,7 @@ public class SVNCopyClient extends SVNBasicClient {
                 SVNErrorManager.error(err);
             }
         } else if (dstType != SVNFileType.NONE) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_EXISTS, "File ''{0}'' already exists", dstPath);
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_EXISTS, "File ''{0}'' already exists and is in the way", dstPath);
             SVNErrorManager.error(err);
         }
         // 5. if move -> check if dst could be deleted later.
@@ -858,23 +857,36 @@ public class SVNCopyClient extends SVNBasicClient {
             SVNFileUtil.copyFile(srcPath, dstPath, false);
         }
         // copy props, props base and text-base
+        SVNAdminArea srcAdminArea = srcAccess.getAnchor().getAdminArea(false);
+        SVNAdminArea dstAdminArea = dstAccess.getAnchor().getAdminArea(false);
         File srcTextBase = srcAccess.getAnchor().getBaseFile(srcAccess.getTargetName(), false);
-        SVNProperties srcProps = srcAccess.getAnchor().getProperties(srcAccess.getTargetName(), false);
-        boolean executable = srcProps.getPropertyValue(SVNProperty.EXECUTABLE) != null;
-        SVNProperties srcBaseProps = srcAccess.getAnchor().getBaseProperties(srcAccess.getTargetName(), false);
+//        SVNProperties srcProps = srcAccess.getAnchor().getProperties(srcAccess.getTargetName(), false);
+//        boolean executable = srcProps.getPropertyValue(SVNProperty.EXECUTABLE) != null;
+        boolean executable = srcAdminArea.getPropertyValue(srcAccess.getTargetName(), false, SVNProperty.EXECUTABLE) != null;
+
+//        SVNProperties srcBaseProps = srcAccess.getAnchor().getBaseProperties(srcAccess.getTargetName(), false);
 
         File dstTextBase = dstAccess.getAnchor().getBaseFile(dstName, false);
-        SVNProperties dstProps = dstAccess.getAnchor().getProperties(dstName, false);
-        SVNProperties dstBaseProps = srcAccess.getAnchor().getBaseProperties(dstName, false);
+//        SVNProperties dstProps = dstAccess.getAnchor().getProperties(dstName, false);
+//        SVNProperties dstBaseProps = srcAccess.getAnchor().getBaseProperties(dstName, false);
         if (srcTextBase.exists()) {
             SVNFileUtil.copyFile(srcTextBase, dstTextBase, false);
         }
-        if (srcProps.getFile().exists()) {
+  
+/*        if (srcProps.getFile().exists()) {
             srcProps.copyTo(dstProps);
         }
         if (srcBaseProps.getFile().exists()) {
             srcBaseProps.copyTo(dstBaseProps);
         }
+*/        
+        if (srcAdminArea.getPropsFile(srcAccess.getTargetName(), false, false).exists()) {
+            srcAdminArea.copyPropsTo(srcAccess.getTargetName(), false, false, dstAdminArea, dstName, false, false);
+        }
+        if (srcAdminArea.getPropsFile(srcAccess.getTargetName(), true, false).exists()) {
+            srcAdminArea.copyPropsTo(srcAccess.getTargetName(), true, false, dstAdminArea, dstName, true, false);
+        }
+        
         if (executable) {
             SVNFileUtil.setExecutable(dstPath, true);
         }
@@ -961,7 +973,8 @@ public class SVNCopyClient extends SVNBasicClient {
             }
             entry.setRepositoryRoot(reposRootURL);
             if (entry.isFile()) {
-                dir.getWCProperties(name).delete();
+//                dir.getWCProperties(name).delete();
+                adminArea.deleteWCProperties(name);
                 if (copyFromURL != null) {
                     entry.setCopyFromURL(copyFromURL);
                     entry.setCopyFromRevision(copyFromRevision);
@@ -983,14 +996,15 @@ public class SVNCopyClient extends SVNBasicClient {
                 entry.setLockComment(null);
                 entry.setLockCreationDate(null);
             }
-            if (!"".equals(name) && entry.isDirectory() && !deleted) {
+            if (!adminArea.getThisDirName().equals(name) && entry.isDirectory() && !deleted) {
                 SVNDirectory childDir = dir.getChildDirectory(name);
                 if (childDir != null) {
                     String childCopyFromURL = copyFromURL == null ? null : SVNPathUtil.append(copyFromURL, SVNEncodingUtil.uriEncode(entry.getName()));
-                    updateCopiedDirectory(childDir, "", newURL, reposRootURL, childCopyFromURL, copyFromRevision);
+                    updateCopiedDirectory(childDir, adminArea.getThisDirName(), newURL, reposRootURL, childCopyFromURL, copyFromRevision);
                 }
-            } else if ("".equals(name)) {
-                dir.getWCProperties("").delete();
+            } else if (adminArea.getThisDirName().equals(name)) {
+//                dir.getWCProperties("").delete();
+                adminArea.deleteWCProperties(adminArea.getThisDirName());
                 if (copyFromURL != null) {
                     entry.setCopyFromURL(copyFromURL);
                     entry.setCopyFromRevision(copyFromRevision);

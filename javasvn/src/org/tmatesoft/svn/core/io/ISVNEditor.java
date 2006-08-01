@@ -143,6 +143,7 @@ public interface ISVNEditor extends ISVNDeltaConsumer {
     
 	/**
      * Changes the value of a property of the currently "opened"/"added" directory.
+     * To remove a property set <code>value</code> to <span class="javakeyword">null</span>.
      * 
      * @param  name				the name of a property to be changed
      * @param  value			new property value
@@ -195,6 +196,7 @@ public interface ISVNEditor extends ISVNDeltaConsumer {
     
     /**
      * Changes the value of a property of an opened file.
+     * To remove a property set <code>value</code> to <span class="javakeyword">null</span>.
      * 
      * @param  path			  a file path relative to the root       
      *                        directory opened by {@link #openRoot(long) openRoot()}

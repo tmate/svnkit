@@ -417,7 +417,9 @@ public class SVNMerger {
             root.scheduleForAddition();
             root.setUUID(uuid);
         } else {
-            childDir.getWCProperties("").delete();
+            //childDir.getWCProperties("").delete();
+            SVNAdminArea childAdminArea = childDir.getAdminArea(false);
+            childAdminArea.deleteWCProperties(childAdminArea.getThisDirName());
             SVNEntry root = childDir.getAdminArea(false).getEntry("", true);
             if (root.isScheduledForDeletion()) {
                 root.scheduleForReplacement();
@@ -435,8 +437,8 @@ public class SVNMerger {
     private void addFile(SVNDirectory parentDir, String name, String filePath,
             Map baseProps, String copyFromURL, long copyFromRev, Map entryProps)
             throws SVNException {
-        SVNAdminArea entries = parentDir.getAdminArea(false);
-        SVNEntry entry = entries.getEntry(name, true);
+        SVNAdminArea adminArea = parentDir.getAdminArea(false);
+        SVNEntry entry = adminArea.getEntry(name, true);
         if (entry != null) {
             if (entry.isScheduledForDeletion()) {
                 entry.scheduleForReplacement();
@@ -452,35 +454,44 @@ public class SVNMerger {
         entry.setCopied(true);
         entry.setCopyFromURL(copyFromURL);
         entry.setCopyFromRevision(copyFromRev);
-        String url = SVNPathUtil.append(entries.getEntry("", true).getURL(),
+        String url = SVNPathUtil.append(adminArea.getEntry("", true).getURL(),
                 SVNEncodingUtil.uriEncode(name));
-        entries.save(false);
-        parentDir.getWCProperties(name).delete();
-
+        //adminArea.save(false);
+        //parentDir.getWCProperties(name).delete();
+        adminArea.deleteWCProperties(name);
+        
         SVNLog log = parentDir.getLog(0);
         Map command = new HashMap();
 
         // 1. props.
-        SVNProperties wcPropsFile = parentDir.getProperties(name, false);
-        SVNProperties basePropsFile = parentDir.getBaseProperties(name, false);
-        for (Iterator propNames = baseProps.keySet().iterator(); propNames
-                .hasNext();) {
+        //SVNProperties wcPropsFile = parentDir.getProperties(name, false);
+        //SVNProperties basePropsFile = parentDir.getBaseProperties(name, false);
+        for (Iterator propNames = baseProps.keySet().iterator(); propNames.hasNext();) {
             String propName = (String) propNames.next();
-            wcPropsFile.setPropertyValue(propName, (String) baseProps
-                    .get(propName));
-            basePropsFile.setPropertyValue(propName, (String) baseProps
-                    .get(propName));
+            //wcPropsFile.setPropertyValue(propName, (String) baseProps.get(propName));
+            adminArea.setPropertyValue(name, false, propName, (String) baseProps.get(propName));
+            //basePropsFile.setPropertyValue(propName, (String) baseProps.get(propName));
+            adminArea.setBasePropertyValue(name, false, propName, (String) baseProps.get(propName));
         }
         if (baseProps.isEmpty()) {
             // force prop file creation.
-            wcPropsFile.setPropertyValue("x", "x");
-            basePropsFile.setPropertyValue("x", "x");
-            wcPropsFile.setPropertyValue("x", null);
-            basePropsFile.setPropertyValue("x", null);
+            //wcPropsFile.setPropertyValue("x", "x");
+            adminArea.setPropertyValue(name, false, "x", "x");
+            //basePropsFile.setPropertyValue("x", "x");
+            adminArea.setBasePropertyValue(name, false, "x", "x");
+            //wcPropsFile.setPropertyValue("x", null);
+            adminArea.setPropertyValue(name, false, "x", null);
+            //basePropsFile.setPropertyValue("x", null);
+            adminArea.setBasePropertyValue(name, false, "x", null);
         }
-        command.put(SVNLog.NAME_ATTR, wcPropsFile.getPath());
+        
+        adminArea.save(false);
+
+        //command.put(SVNLog.NAME_ATTR, wcPropsFile.getPath());
+        command.put(SVNLog.NAME_ATTR, adminArea.getAdministrativePropsPath(name, false, false));
         log.addCommand(SVNLog.READONLY, command, false);
-        command.put(SVNLog.NAME_ATTR, basePropsFile.getPath());
+        //command.put(SVNLog.NAME_ATTR, basePropsFile.getPath());
+        command.put(SVNLog.NAME_ATTR, adminArea.getAdministrativePropsPath(name, true, false));
         log.addCommand(SVNLog.READONLY, command, false);
 
         // 2. entry
@@ -518,7 +529,7 @@ public class SVNMerger {
         log.addCommand(SVNLog.COPY_AND_TRANSLATE, command, false);
         command.clear();
         if (myWCAccess.getOptions().isUseCommitTimes()
-                && wcPropsFile.getPropertyValue(SVNProperty.SPECIAL) == null) {
+                && adminArea.getPropertyValue(name, false, SVNProperty.SPECIAL) == null/*wcPropsFile.getPropertyValue(SVNProperty.SPECIAL) == null*/) {
             command.put(SVNLog.NAME_ATTR, name);
             command.put(SVNLog.TIMESTAMP_ATTR, entry.getCommittedDate());
             log.addCommand(SVNLog.SET_TIMESTAMP, command, false);

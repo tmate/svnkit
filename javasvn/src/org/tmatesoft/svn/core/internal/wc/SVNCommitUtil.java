@@ -523,7 +523,7 @@ public class SVNCommitUtil {
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.NODE_UNKNOWN_KIND, "Unknown entry kind for ''{0}''", path);                    
             SVNErrorManager.error(err);
         }
-        String specialPropertyValue = dir.getProperties(entry.getName(), false).getPropertyValue(SVNProperty.SPECIAL);
+        String specialPropertyValue = dir.getAdminArea(false).getPropertyValue(entry.getName(), false, SVNProperty.SPECIAL);//dir.getProperties(entry.getName(), false).getPropertyValue(SVNProperty.SPECIAL);
         boolean specialFile = fileType == SVNFileType.SYMLINK;
         if (SVNFileType.isSymlinkSupportEnabled()) {
             if (((specialPropertyValue == null && specialFile) || (!SVNFileUtil.isWindows && specialPropertyValue != null && !specialFile)) 
@@ -617,10 +617,9 @@ public class SVNCommitUtil {
         boolean commitLock;
 
         if (commitAddition) {
-            SVNProperties props = dir.getProperties(entry.getName(), false);
-            SVNProperties baseProps = dir.getBaseProperties(entry.getName(),
-                    false);
-            Map propDiff = baseProps.compareTo(props);
+//            SVNProperties props = dir.getProperties(entry.getName(), false);
+//            SVNProperties baseProps = dir.getBaseProperties(entry.getName(), false);
+            Map propDiff = dir.getAdminArea(false).comparePropsTo(entry.getName(), true, false, dir.getAdminArea(false), entry.getName(), false, false);//.getPropertiesDifference(entry.getName());
             boolean eolChanged = textModified = propDiff != null
                     && propDiff.containsKey(SVNProperty.EOL_STYLE);
             if (entry.getKind() == SVNNodeKind.FILE) {
@@ -636,10 +635,9 @@ public class SVNCommitUtil {
             }
             propsModified = propDiff != null && !propDiff.isEmpty();
         } else if (!commitDeletion) {
-            SVNProperties props = dir.getProperties(entry.getName(), false);
-            SVNProperties baseProps = dir.getBaseProperties(entry.getName(),
-                    false);
-            Map propDiff = baseProps.compareTo(props);
+//            SVNProperties props = dir.getProperties(entry.getName(), false);
+//            SVNProperties baseProps = dir.getBaseProperties(entry.getName(), false);
+            Map propDiff = dir.getAdminArea(false).comparePropsTo(entry.getName(), true, false, dir.getAdminArea(false), entry.getName(), false, false);//dir.getAdminArea(false).getPropertiesDifference(entry.getName());//baseProps.compareTo(props);
             boolean eolChanged = textModified = propDiff != null
                     && propDiff.containsKey(SVNProperty.EOL_STYLE);
             propsModified = propDiff != null && !propDiff.isEmpty();

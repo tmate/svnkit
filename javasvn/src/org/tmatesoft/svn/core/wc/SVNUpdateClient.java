@@ -465,8 +465,8 @@ public class SVNUpdateClient extends SVNBasicClient {
     }
 
     private void copyVersionedFile(File dstPath, SVNDirectory dir, String fileName, SVNRevision revision, String eol) throws SVNException {
-        SVNAdminArea entries = dir.getAdminArea(false);
-        SVNEntry entry = entries.getEntry(fileName, false);
+        SVNAdminArea adminArea = dir.getAdminArea(false);
+        SVNEntry entry = adminArea.getEntry(fileName, false);
         if (entry == null) {
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_NOT_FOUND, "''{0}'' is not under version control or doesn't exist", 
                     dir.getFile(fileName),
@@ -480,22 +480,41 @@ public class SVNUpdateClient extends SVNBasicClient {
             return;
         }
         boolean modified = false;
-        SVNProperties props = null;
+//        SVNProperties props = null;
+        boolean special = false;
+        boolean executable = false;
+        String keywords = null;
         long timestamp;
-        if (revision != SVNRevision.WORKING) {
-            props = dir.getBaseProperties(fileName, false);
-        } else {
-            props = dir.getProperties(fileName, false);
-            modified = dir.hasTextModifications(fileName, false);
-        }
-        boolean special = props.getPropertyValue(SVNProperty.SPECIAL) != null;
-        boolean executable = props.getPropertyValue(SVNProperty.EXECUTABLE) != null;
-        String keywords = props.getPropertyValue(SVNProperty.KEYWORDS);
         byte[] eols = eol != null ? SVNTranslator.getEOL(eol) : null;
-        if (eols == null) {
-            eol = props.getPropertyValue(SVNProperty.EOL_STYLE);
-            eols = SVNTranslator.getWorkingEOL(eol);
+
+        if (revision != SVNRevision.WORKING) {
+//            props = dir.getBaseProperties(fileName, false);
+            special = adminArea.getBasePropertyValue(fileName, false, SVNProperty.SPECIAL) != null;
+            executable = adminArea.getBasePropertyValue(fileName, false, SVNProperty.EXECUTABLE) != null;
+            keywords = adminArea.getBasePropertyValue(fileName, false, SVNProperty.KEYWORDS);
+            if (eols == null) {
+                eol = adminArea.getBasePropertyValue(fileName, false, SVNProperty.EOL_STYLE);
+                eols = SVNTranslator.getWorkingEOL(eol);
+            }
+        } else {
+//            props = dir.getProperties(fileName, false);
+            special = adminArea.getPropertyValue(fileName, false, SVNProperty.SPECIAL) != null;
+            executable = adminArea.getPropertyValue(fileName, false, SVNProperty.EXECUTABLE) != null;
+            keywords = adminArea.getPropertyValue(fileName, false, SVNProperty.KEYWORDS);
+            modified = dir.hasTextModifications(fileName, false);
+            if (eols == null) {
+                eol = adminArea.getPropertyValue(fileName, false, SVNProperty.EOL_STYLE);
+                eols = SVNTranslator.getWorkingEOL(eol);
+            }
         }
+//        boolean special = props.getPropertyValue(SVNProperty.SPECIAL) != null;
+//        boolean executable = props.getPropertyValue(SVNProperty.EXECUTABLE) != null;
+//        String keywords = props.getPropertyValue(SVNProperty.KEYWORDS);
+//        byte[] eols = eol != null ? SVNTranslator.getEOL(eol) : null;
+//        if (eols == null) {
+//            eol = props.getPropertyValue(SVNProperty.EOL_STYLE);
+//            eols = SVNTranslator.getWorkingEOL(eol);
+//        }
         if (modified && !special) {
             timestamp = dir.getFile(fileName).lastModified();
         } else {
@@ -690,27 +709,36 @@ public class SVNUpdateClient extends SVNBasicClient {
     private void doCanonicalizeURLs(SVNDirectory dir, String name, boolean omitDefaultPort, boolean recursive) throws SVNException {
         boolean save = false;
         checkCancelled();
+        SVNAdminArea adminArea = dir.getAdminArea(false);
         if (!"".equals(name)) {
-            SVNEntry entry = dir.getAdminArea(false).getEntry(name, true);
+//            SVNEntry entry = dir.getAdminArea(false).getEntry(name, true);
+            SVNEntry entry = adminArea.getEntry(name, true);
+  
             save = canonicalizeEntry(entry, omitDefaultPort);
-            dir.getWCProperties(name).setPropertyValue(SVNProperty.WC_URL, null);
+//            dir.getWCProperties(name).setPropertyValue(SVNProperty.WC_URL, null);
+            adminArea.setWCPropertyValue(name, SVNProperty.WC_URL, null);
+  
             if (save) {
-                dir.getAdminArea(false).save(true);
+//                dir.getAdminArea(false).save(true);
+                adminArea.save(true);
             }
             return;
         }
         if (!isIgnoreExternals()) {
-            String externalsValue = dir.getProperties("", false).getPropertyValue(SVNProperty.EXTERNALS);
+//            String externalsValue = dir.getProperties("", false).getPropertyValue(SVNProperty.EXTERNALS);
+            String externalsValue = adminArea.getPropertyValue(adminArea.getThisDirName(), false, SVNProperty.EXTERNALS);
             dir.getWCAccess().addExternals(dir, externalsValue);
             if (externalsValue != null) {
                 externalsValue = canonicalizeExtenrals(externalsValue, omitDefaultPort);
-                dir.getProperties("", false).setPropertyValue(SVNProperty.EXTERNALS, externalsValue);
+//                dir.getProperties("", false).setPropertyValue(SVNProperty.EXTERNALS, externalsValue);
+                adminArea.setPropertyValue(adminArea.getThisDirName(), false, SVNProperty.EXTERNALS, externalsValue);
             }
         }
         
         SVNEntry rootEntry = dir.getAdminArea(false).getEntry("", true);
         save = canonicalizeEntry(rootEntry, omitDefaultPort);
-        dir.getWCProperties("").setPropertyValue(SVNProperty.WC_URL, null);
+//        dir.getWCProperties("").setPropertyValue(SVNProperty.WC_URL, null);
+        adminArea.setWCPropertyValue(adminArea.getThisDirName(), SVNProperty.WC_URL, null);
         // now all child entries that doesn't has repos/url has new values.
         for(Iterator ents = dir.getAdminArea(false).entries(true); ents.hasNext();) {
             SVNEntry entry = (SVNEntry) ents.next();
@@ -727,10 +755,12 @@ public class SVNUpdateClient extends SVNBasicClient {
                 }
             }
             save |= canonicalizeEntry(entry, omitDefaultPort);
-            dir.getWCProperties(entry.getName()).setPropertyValue(SVNProperty.WC_URL, null);
+//            dir.getWCProperties(entry.getName()).setPropertyValue(SVNProperty.WC_URL, null);
+            adminArea.setWCPropertyValue(entry.getName(), SVNProperty.WC_URL, null);
         }
         if (save) {
-            dir.getAdminArea(false).save(true);
+//            dir.getAdminArea(false).save(true);
+            adminArea.save(true);
         }
     }
     
@@ -976,16 +1006,24 @@ public class SVNUpdateClient extends SVNBasicClient {
     }
     
     private Map doRelocate(SVNDirectory dir, String name, String from, String to, boolean recursive, Map validatedURLs) throws SVNException {
+        SVNAdminArea adminArea = dir.getAdminArea(false);
         if (!"".equals(name)) {
-            SVNEntry entry = dir.getAdminArea(false).getEntry(name, true);
+//            SVNEntry entry = dir.getAdminArea(false).getEntry(name, true);
+            SVNEntry entry = adminArea.getEntry(name, true);
             relocateEntry(entry, from, to, validatedURLs);
-            dir.getWCProperties(name).setPropertyValue(SVNProperty.WC_URL, null);
-            dir.getAdminArea(false).save(true);
+//            dir.getWCProperties(name).setPropertyValue(SVNProperty.WC_URL, null);
+            adminArea.setWCPropertyValue(name, SVNProperty.WC_URL, null);
+//            dir.getAdminArea(false).save(true);
+            adminArea.save(true);
             return validatedURLs;
         }
-        SVNEntry rootEntry = dir.getAdminArea(false).getEntry("", true);
+//        SVNEntry rootEntry = dir.getAdminArea(false).getEntry("", true);
+        SVNEntry rootEntry = adminArea.getEntry(adminArea.getThisDirName(), true);
+  
         validatedURLs = relocateEntry(rootEntry, from, to, validatedURLs);
-        dir.getWCProperties("").setPropertyValue(SVNProperty.WC_URL, null);
+//        dir.getWCProperties("").setPropertyValue(SVNProperty.WC_URL, null);
+        adminArea.setWCPropertyValue(adminArea.getThisDirName(), SVNProperty.WC_URL, null);
+  
         // now all child entries that doesn't has repos/url has new values.
         for(Iterator ents = dir.getAdminArea(false).entries(true); ents.hasNext();) {
             SVNEntry entry = (SVNEntry) ents.next();
@@ -1001,10 +1039,11 @@ public class SVNUpdateClient extends SVNBasicClient {
                 }
             }
             validatedURLs = relocateEntry(entry, from, to, validatedURLs);
-            dir.getWCProperties(entry.getName()).setPropertyValue(SVNProperty.WC_URL, null);
+//            dir.getWCProperties(entry.getName()).setPropertyValue(SVNProperty.WC_URL, null);
+            adminArea.setWCPropertyValue(entry.getName(), SVNProperty.WC_URL, null);
         }
-        dir.getAdminArea(false).save(true);
+//        dir.getAdminArea(false).save(true);
+        adminArea.save(true);
         return validatedURLs;
-        
     }
 }
