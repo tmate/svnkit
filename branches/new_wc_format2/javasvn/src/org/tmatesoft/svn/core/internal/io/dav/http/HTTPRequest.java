@@ -306,7 +306,7 @@ class HTTPRequest {
     public static SVNErrorMessage createDefaultErrorMessage(SVNURL host, HTTPStatus status, String context, Object[] contextObjects) {
         SVNErrorCode errorCode = SVNErrorCode.RA_DAV_REQUEST_FAILED;
         String message = status != null ? status.getCode() + " " + status.getReason() : "";
-        if (status != null && status.getCode() == HttpURLConnection.HTTP_FORBIDDEN || status.getCode() == HttpURLConnection.HTTP_UNAUTHORIZED) {
+        if (status != null && status.getCode() == HttpURLConnection.HTTP_FORBIDDEN || status.getCode() == HttpURLConnection.HTTP_UNAUTHORIZED || status.getCode() == HttpURLConnection.HTTP_PROXY_AUTH) {
             errorCode = SVNErrorCode.RA_NOT_AUTHORIZED;
             message = status.getCode() + " " + status.getReason();
         } else if (status != null && status.getCode() == HttpURLConnection.HTTP_NOT_FOUND) {

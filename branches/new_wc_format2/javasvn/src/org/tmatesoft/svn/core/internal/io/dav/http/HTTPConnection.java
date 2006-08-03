@@ -117,17 +117,72 @@ class HTTPConnection implements IHTTPConnection {
                 if (myIsSecured) {
                     HTTPRequest connectRequest = new HTTPRequest();
                     connectRequest.setConnection(this);
-                    connectRequest.setProxyAuthentication(myProxyAuthentication.authenticate());
+//                    connectRequest.setProxyAuthentication(myProxyAuthentication.authenticate());
                     connectRequest.setForceProxyAuth(true);
-                    connectRequest.dispatch("CONNECT", host + ":" + port, null, 0, 0, null);
-                    HTTPStatus status = connectRequest.getStatus();
-                    if (status.getCode() == HttpURLConnection.HTTP_OK) {
+//                    connectRequest.dispatch("CONNECT", host + ":" + port, null, 0, 0, null);
+//                    HTTPStatus status = connectRequest.getStatus();
+
+                    //TODO: there's a possible bug here concerning NTLM proxy authentication, 
+                    //it seems that NTLM authentication won't work correctly in case of secured connections
+                    while (true) {
+                        try {
+                            connectRequest.reset();
+                            connectRequest.setProxyAuthentication(myProxyAuthentication.authenticate());
+                            connectRequest.dispatch("CONNECT", host + ":" + port, null, 0, 0, null);
+                        } finally {
+                            finishResponse(connectRequest);                
+                        }
+
+                        HTTPStatus status = connectRequest.getStatus();
+                        if (status.getCode() == HttpURLConnection.HTTP_PROXY_AUTH) {
+                            Collection proxyAuthHeaders = connectRequest.getResponseHeader().getHeaderValues(HTTPHeader.PROXY_AUTHENTICATE_HEADER);
+                            boolean retry = false;
+                            if (!HTTPAuthentication.isSchemeSupportedByServer(myProxyAuthentication.getAuthenticationScheme(), proxyAuthHeaders)) {
+                                retry = true;
+                            }
+
+                            try {
+                                myProxyAuthentication = HTTPAuthentication.parseAuthParameters(proxyAuthHeaders, myProxyAuthentication); 
+                            } catch (SVNException svne) {
+                                break;
+                            }
+
+                            if (retry) {
+                                close();
+                                mySocket = SVNSocketFactory.createPlainSocket(proxyAuth.getProxyHost(), proxyAuth.getProxyPort());
+                                continue;
+                            }
+
+                            if (myProxyAuthentication instanceof HTTPNTLMAuthentication) {
+                                HTTPNTLMAuthentication ntlmProxyAuth = (HTTPNTLMAuthentication)myProxyAuthentication;
+                                if (ntlmProxyAuth.isInType3State()) {
+                                    if (mySocket == null) {
+                                        mySocket = SVNSocketFactory.createPlainSocket(proxyAuth.getProxyHost(), proxyAuth.getProxyPort());
+                                    }
+                                    continue;
+                                }
+                            }
+                            close();
+                            break;
+                        } else if (status.getCode() == HttpURLConnection.HTTP_OK) {
+                            myInputStream = null;
+                            myOutputStream = null;
+                            mySocket = SVNSocketFactory.createSSLSocket(sslManager, host, port, mySocket);
+                            proxyAuth.acknowledgeProxyContext(true, null);
+                            return;
+                        } else {
+                            break;
+                        }
+                    }
+                    
+/*                    if (status.getCode() == HttpURLConnection.HTTP_OK) {
                         myInputStream = null;
                         myOutputStream = null;
                         mySocket = SVNSocketFactory.createSSLSocket(sslManager, host, port, mySocket);
                         proxyAuth.acknowledgeProxyContext(true, null);
                         return;
                     }
+*/                    
                     SVNURL proxyURL = SVNURL.parseURIEncoded("http://" + proxyAuth.getProxyHost() + ":" + proxyAuth.getProxyPort()); 
                     SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.RA_DAV_REQUEST_FAILED, "{0} request failed on ''{1}''", new Object[] {"CONNECT", proxyURL});
                     proxyAuth.acknowledgeProxyContext(false, err);
