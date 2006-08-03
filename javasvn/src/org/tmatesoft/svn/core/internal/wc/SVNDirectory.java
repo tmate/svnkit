@@ -56,14 +56,15 @@ public class SVNDirectory {
     private File myAdminRoot;
     private File myLockFile;
     private File myEntriesFile;
-
-    public SVNDirectory(SVNWCAccess wcAccess, String path, File dir) {
+    
+    public SVNDirectory(SVNWCAccess wcAccess, String path, File dir, SVNAdminArea adminArea) {
         myDirectory = dir;
         myAdminRoot = new File(dir, SVNFileUtil.getAdminDirectoryName());
         myLockFile = new File(myAdminRoot, "lock");
         myEntriesFile = new File(myAdminRoot, "entries");
         myPath = path;
         myWCAccess = wcAccess;
+        myAdminArea = adminArea;
     }
 
     public SVNWCAccess getWCAccess() {
