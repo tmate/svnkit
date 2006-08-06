@@ -35,6 +35,8 @@ import org.tmatesoft.svn.core.SVNProperty;
 import org.tmatesoft.svn.core.internal.util.SVNEncodingUtil;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
 import org.tmatesoft.svn.core.internal.util.SVNTimeUtil;
+import org.tmatesoft.svn.core.internal.wc.admin.SVNEntries;
+import org.tmatesoft.svn.core.internal.wc.admin.SVNEntry;
 import org.tmatesoft.svn.core.wc.ISVNEventHandler;
 import org.tmatesoft.svn.core.wc.ISVNMerger;
 import org.tmatesoft.svn.core.wc.ISVNMergerFactory;
@@ -57,14 +59,13 @@ public class SVNDirectory {
     private File myLockFile;
     private File myEntriesFile;
     
-    public SVNDirectory(SVNWCAccess wcAccess, String path, File dir, SVNAdminArea adminArea) {
+    public SVNDirectory(SVNWCAccess wcAccess, String path, File dir) {
         myDirectory = dir;
         myAdminRoot = new File(dir, SVNFileUtil.getAdminDirectoryName());
         myLockFile = new File(myAdminRoot, "lock");
         myEntriesFile = new File(myAdminRoot, "entries");
         myPath = path;
         myWCAccess = wcAccess;
-        myAdminArea = adminArea;
     }
 
     public SVNWCAccess getWCAccess() {

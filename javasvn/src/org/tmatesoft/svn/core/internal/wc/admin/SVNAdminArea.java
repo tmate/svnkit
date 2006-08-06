@@ -9,7 +9,7 @@
  * newer version instead, at your option.
  * ====================================================================
  */
-package org.tmatesoft.svn.core.internal.wc;
+package org.tmatesoft.svn.core.internal.wc.admin;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -35,6 +35,9 @@ import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNProperty;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
+import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
+import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
+import org.tmatesoft.svn.core.internal.wc.SVNWCAccess;
 
 /**
  * @version 1.1
@@ -66,9 +69,7 @@ public abstract class SVNAdminArea {
     private File myLockFile;
     protected File myEntriesFile;
     protected Map myBaseProperties;
-    protected Map myTempBaseProperties;
     protected Map myProperties;
-    protected Map myTempProperties;
     protected Map myWCProperties;
     
     public SVNEntries getEntries() throws SVNException {
@@ -113,43 +114,13 @@ public abstract class SVNAdminArea {
     
     protected abstract void fetchEntries() throws IOException, SVNException;
 
-    protected SVNProperties getPropsByType(boolean isBase, String entryName, boolean tmp) {
-        if (isBase) {
-            return getBaseSVNProperties(entryName, tmp);
-        }
-        return getSVNProperties(entryName, tmp);
-    }
-
-    protected SVNProperties getBaseSVNProperties(String name, boolean tmp) {
-        return new SVNProperties(getPropsFile(name, true, tmp), getAdministrativePropsPath(name, true, tmp));
-    }
-
-    protected SVNProperties getSVNProperties(String name, boolean tmp) {
-        return new SVNProperties(getPropsFile(name, false, tmp), getAdministrativePropsPath(name, false, tmp));
-    }
-    
-    public File getPropsFile(String entryName, boolean isBase, boolean tmp) {
-        return getParent().getAdminFile(getPropsPath(entryName, isBase, tmp));
-    }
-
-    public String getPropsPath(String entryName, boolean isBase, boolean tmp) {
-        String path = !tmp ? "" : "tmp/";
-        if (isBase) {
-            path += getThisDirName().equals(entryName) ? "dir-prop-base" : "prop-base/" + entryName + ".svn-base";
-        } else {
-            path += getThisDirName().equals(entryName) ? "dir-props" : "props/" + entryName + ".svn-work";
-        }
-        return path;
-    }
-    
-    public String getAdministrativePropsPath(String entryName, boolean isBase, boolean tmp) {
-        return getParent().getAdminDirectory().getName() + "/" + getPropsPath(entryName, isBase, tmp); 
-    }
-    
     public abstract String getThisDirName();
     
     public void save() throws SVNException {
         saveEntries(true);
+        saveBaseProperties(true);
+        saveProperties(true);
+        saveWCProperties(true);
     }
 
     protected void saveEntries(boolean close) throws SVNException {
@@ -191,43 +162,58 @@ public abstract class SVNAdminArea {
         }
     }
     
+    protected abstract void saveProperties(boolean close) throws SVNException;
+    
+    protected abstract void saveBaseProperties(boolean close) throws SVNException;
+    
+    protected abstract void saveWCProperties(boolean close) throws SVNException;
+    
     protected abstract String formatEntries();
 
     protected abstract int getFormatNumber();
 
-    public SVNProperties2 getBaseProperties(String name, boolean tmp) {
-        Map basePropsCache = getBaseProperties(tmp);
-        SVNProperties2 props = (SVNProperties2)basePropsCache.get(name); 
-        if (props != null) {
-            return props;
+    public abstract ISVNProperties getBaseProperties(String name) throws SVNException;
+
+    public abstract ISVNProperties getWCProperties(String name) throws SVNException;
+
+    public abstract ISVNProperties getProperties(String name) throws SVNException;
+
+    protected Map getBasePropertiesStorage(boolean create) {
+        if (myBaseProperties == null && create) {
+            myBaseProperties = new HashMap();
         }
-        
-        Map baseProps = readBaseProperties(name, tmp);
-        props = new SVNProperties2(baseProps);
-        basePropsCache.put(name, props);
-        return props;
+        return myBaseProperties;
     }
 
-    protected Map getBasePropertiesStorage(boolean tmp) {
-        if (!tmp){
-            if (myBaseProperties == null) {
-                myBaseProperties = new HashMap();
-            }
-            return myBaseProperties;
-        } 
-
-        if (myTempBaseProperties == null) {
-            myTempBaseProperties = new HashMap();
+    protected Map getPropertiesStorage(boolean create) {
+        if (myProperties == null && create) {
+            myProperties = new HashMap();
         }
-        return myTempBaseProperties;
-        
+        return myProperties;
     }
-    protected abstract Map readBaseProperties(String name, boolean tmp) throws SVNException;
     
-    public static SVNAdminArea createAdminArea(SVNDirectory parent, boolean isUnderConstruction) throws SVNException {
-        File dir = parent.getRoot(); 
+    protected Map getWCPropertiesStorage(boolean create) {
+        if (myWCProperties == null && create) {
+            myWCProperties = new HashMap();
+        }
+        return myWCProperties;
+    }
+    
+    public static void checkWCFormat(int formatVersion, File dir) throws SVNException {
+        if (formatVersion > SVNAdminArea.getLatestFormatVersion()) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_UNSUPPORTED_FORMAT, "This client is too old to work with working copy ''{0}''; please get a newer JavaSVN client", dir);
+            SVNErrorManager.error(err);
+        }
+        
+        if (!SVNAdminArea.isFormatSupported(formatVersion)) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_UNSUPPORTED_FORMAT, "Working copy format of ''{0}'' is too old ''{1,number,integer}''; please check out your working copy again", dir);
+            SVNErrorManager.error(err);
+        }
+    }
+    
+    public static SVNAdminArea createAdminArea(SVNWCAccess wcAccess, String path, File dir, boolean isUnderConstruction) throws SVNException {
         File adminDir = new File(dir, SVNFileUtil.getAdminDirectoryName());
-        File entriesFile = parent.getEntriesFile();
+        File entriesFile = new File(adminDir, "entries");
         int formatVersion = isUnderConstruction ? getLatestFormatVersion() : -1;
 
         if (!isUnderConstruction) {
@@ -278,15 +264,15 @@ public abstract class SVNAdminArea {
                 }
             }
             
-            parent.checkWCFormat(formatVersion);
+            checkWCFormat(formatVersion, dir);
         }
 
         Class areaClass = (Class)ourAreas.get(new Integer(formatVersion));
         Constructor areaConstructor = null;
         SVNAdminArea adminArea = null;
         try {
-            areaConstructor = areaClass.getConstructor(new Class[]{SVNDirectory.class});
-            adminArea = (SVNAdminArea)areaConstructor.newInstance(new Object[]{parent});
+            areaConstructor = areaClass.getConstructor(new Class[]{SVNWCAccess.class, String.class, File.class});
+            adminArea = (SVNAdminArea)areaConstructor.newInstance(new Object[]{wcAccess, path, dir});
         } catch (SecurityException e) {
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.UNKNOWN, "Can't instantiate an admin area object for working copy ''{0}'': {1}", new Object[]{dir, e.getLocalizedMessage()});
             SVNErrorManager.error(err);
@@ -307,110 +293,19 @@ public abstract class SVNAdminArea {
         return adminArea;
     }
     
-    
-    public static boolean supportFormat(int formatVersion){
+    public static boolean isFormatSupported(int formatVersion){
         return ourAreas.get(new Integer(formatVersion)) != null;
-    }
-    
-//    public abstract String getPropertyValue(String entryName, boolean tmp, String propName) throws SVNException;
-
-//    public abstract Map getProperties(String entryName, boolean tmp) throws SVNException;
-
-//    public abstract void setPropertyValue(String entryName, boolean tmp, String propName, String propValue) throws SVNException;
-
-    public void deleteProperties(String entryName, boolean tmp) throws SVNException {
-        SVNProperties props = getSVNProperties(entryName, tmp);
-        props.delete();
-    }
-    
-    public String getPropertyValue(String entryName, boolean tmp, String propName) throws SVNException {
-        SVNProperties props = getSVNProperties(entryName, tmp);
-        return props.getPropertyValue(propName);
-    }
-
-    public Map getProperties(String entryName, boolean tmp) throws SVNException {
-        SVNProperties props = getSVNProperties(entryName, tmp);
-        return props.asMap();
-    }
-
-    public void setPropertyValue(String entryName, boolean tmp, String propName, String propValue) throws SVNException {
-        SVNProperties props = getSVNProperties(entryName, tmp);
-        props.setPropertyValue(propName, propValue);
-    }
-
-    public Map getBaseProperties(String entryName, boolean tmp) throws SVNException {
-        SVNProperties props = getBaseSVNProperties(entryName, tmp);
-        return props.asMap();
-    }
-
-    public String getBasePropertyValue(String entryName, boolean tmp, String propName) throws SVNException {
-        SVNProperties props = getBaseSVNProperties(entryName, tmp);
-        return props.getPropertyValue(propName);
-    }
-
-    public void setBasePropertyValue(String entryName, boolean tmp, String propName, String propValue) throws SVNException {
-        SVNProperties baseProps = getBaseSVNProperties(entryName, tmp);
-        baseProps.setPropertyValue(propName, propValue);
-    }
-
-    public void deleteBaseProperties(String entryName, boolean tmp) {
-        SVNProperties props = getBaseSVNProperties(entryName, tmp);
-        props.delete();
-    }
-
-//    public abstract Map getBaseProperties(String entryName, boolean tmp) throws SVNException;
-
-//    public abstract String getBasePropertyValue(String entryName, boolean tmp, String propName) throws SVNException;
-
-//    public abstract void setBasePropertyValue(String entryName, boolean tmp, String propName, String propValue) throws SVNException;
-
-//    public abstract void deleteBaseProperties(String entryName, boolean tmp) throws SVNException;
-
-    public abstract void deleteWCProperties(String entryName) throws SVNException;
-
-    public abstract Map getWCProperties(String entryName) throws SVNException;
-    
-    public abstract String getWCPropertyValue(String entryName, String propName) throws SVNException;
-
-    public abstract void setWCPropertyValue(String entryName, String propName, String propValue) throws SVNException;
-
-//    public abstract Map comparePropsTo(String entryName1, boolean isBase1, boolean tmp1, SVNAdminArea adminArea, String entryName2, boolean isBase2, boolean tmp2) throws SVNException;
-    
-//    public abstract void copyPropsTo(String entryName1, boolean isBase1, boolean tmp1, SVNAdminArea adminArea, String entryName2, boolean isBase2, boolean tmp2) throws SVNException;
-
-    public Map comparePropsTo(String entryName1, boolean isBase1, boolean tmp1, SVNAdminArea adminArea, String entryName2, boolean isBase2, boolean tmp2) throws SVNException {
-        SVNProperties props1 = getPropsByType(isBase1, entryName1, tmp1);
-        SVNProperties props2 = adminArea.getPropsByType(isBase2, entryName2, tmp2);//getSVNProperties(entryName, false);
-        //SVNProperties baseProps = getBaseSVNProperties(entryName, false);
-        if (props1 != null) {
-            return props1.compareTo(props2);
-        }
-        return new HashMap();
-    }
-    
-    public void copyPropsTo(String entryName1, boolean isBase1, boolean tmp1, SVNAdminArea adminArea, String entryName2, boolean isBase2, boolean tmp2) throws SVNException {
-        SVNProperties props1 = getPropsByType(isBase1, entryName1, tmp1);
-        SVNProperties props2 = adminArea.getPropsByType(isBase2, entryName2, tmp2);
-        props1.copyTo(props2);
-    }
-
-    public boolean isPropsFileEmpty(String entryName, boolean isBase, boolean tmp) {
-        SVNProperties props = getPropsByType(isBase, entryName, tmp);
-        return props.isEmpty();
     }
     
     public abstract boolean hasPropModifications(String entryName) throws SVNException;
 
-    public abstract void setCachableProperties(String name, String[] cachableProps) throws SVNException;
-
-    public abstract String[] getCachableProperties(String entryName) throws SVNException;
-
-    public abstract void setPresentProperties(String name, String[] presentProps) throws SVNException;
-
-    public abstract String[] getPresentProperties(String entryName) throws SVNException;
-    
-    protected SVNAdminArea(SVNDirectory parent){
-        myParent = parent;
+    protected SVNAdminArea(SVNWCAccess wcAccess, String path, File dir){
+        myDirectory = dir;
+        myAdminRoot = new File(dir, SVNFileUtil.getAdminDirectoryName());
+        myLockFile = new File(myAdminRoot, "lock");
+        myEntriesFile = new File(myAdminRoot, "entries");
+        myPath = path;
+        myWCAccess = wcAccess;
     }
 
     public static int getLatestFormatVersion() {
