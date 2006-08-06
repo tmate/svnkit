@@ -9,7 +9,7 @@
  * newer version instead, at your option.
  * ====================================================================
  */
-package org.tmatesoft.svn.core.internal.wc;
+package org.tmatesoft.svn.core.internal.wc.admin;
 
 import java.util.Collection;
 import java.util.HashMap;
@@ -17,57 +17,63 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.TreeSet;
 
-/**
- * @version 1.1
- * @author  TMate Software Ltd.
- */
-public class SVNProperties2 {
-    private Map myProperties;
-    
-    public SVNProperties2(Map properties) {
-        myProperties = properties;
-    }
-    
-    public String getPropertyValue(String name) {
-        if (!isEmpty()) {
-            return (String)myProperties.get(name); 
-        }
-        return null;
-    }
+import org.tmatesoft.svn.core.SVNException;
 
-    public boolean isEmpty() {
-        return myProperties == null || myProperties.isEmpty();
+public abstract class ISVNProperties {
+    protected Map myProperties;
+    private boolean myIsModified;
+    
+    protected ISVNProperties(Map props) {
+        myProperties = props;
+        myIsModified = false;
     }
     
-    public Collection properties(Collection target) {
+    public abstract String getPropertyValue(String name) throws SVNException;
+
+    protected abstract Map loadProperties() throws SVNException;
+
+    public boolean isModified() {
+        return myIsModified;
+    }
+    
+    public boolean isEmpty() throws SVNException {
+        Map props = loadProperties();
+        return props == null || props.isEmpty();
+    }
+    
+    public Collection properties(Collection target) throws SVNException {
+        Map props = loadProperties();
+
         target = target == null ? new TreeSet() : target;
         if (isEmpty()) {
             return target;
         }
-        for (Iterator names = myProperties.keySet().iterator(); names.hasNext();) {
+        for (Iterator names = props.keySet().iterator(); names.hasNext();) {
             target.add(names.next());
         }
         return target;
     }
 
-    public void setPropertyValue(String name, String value) {
-        if (myProperties == null) {
-            myProperties = new HashMap();
-        }
+    public void setPropertyValue(String name, String value) throws SVNException {
+        Map props = loadProperties();
         if (value != null) {
-            myProperties.put(name, value);
+            props.put(name, value);
         } else {
-            myProperties.remove(name);
+            props.remove(name);
         }
+        myIsModified = true;
     }
 
-    public SVNProperties2 compareTo(SVNProperties2 properties) {
+    protected abstract ISVNProperties wrap(Map properties);
+    
+    public ISVNProperties compareTo(ISVNProperties properties) throws SVNException {
+        Map thisProps = loadProperties();
         Map result = new HashMap();
         if (!isEmpty()) {
-            result.putAll(myProperties);
+            result.putAll(thisProps);
         } else {
-            result.putAll(properties.myProperties);
-            return new SVNProperties2(result);
+            result.putAll(properties.asMap());
+            return wrap(result);
         }
         
         Collection props1 = properties(null);
@@ -100,16 +106,38 @@ public class SVNProperties2 {
                 result.put(changed, value2);
             }
         }
-        return new SVNProperties2(result);
+        return wrap(result);
     }
     
-    public void copyTo(SVNProperties2 destination) {
-        if (!isEmpty()) {
-            destination.myProperties.putAll(myProperties);
+    public void copyTo(ISVNProperties destination) throws SVNException {
+        Map props = loadProperties();
+        if (isEmpty()) {
+            destination.removeAll();
+        } else {
+            destination.put(props);
         }
     }
     
-    public void removeAll(){
-        myProperties = null;
+    public void removeAll() throws SVNException {
+        Map props = loadProperties();
+        if (!isEmpty()) {
+            props.clear();
+            myIsModified = true;
+        }
+    }
+    
+    public boolean equals(ISVNProperties props) throws SVNException {
+        return compareTo(props).isEmpty();
+    }
+    
+    protected Map asMap() throws SVNException {
+        return loadProperties();
+    }
+    
+    protected void put(Map props) throws SVNException {
+        Map thisProps = loadProperties(); 
+        thisProps.clear();
+        thisProps.putAll(props);
+        myIsModified = true;
     }
 }

@@ -344,14 +344,12 @@ public class SVNProperties {
         SVNFileUtil.deleteFile(getFile());
     }
 
-    public static void setProperties(Map namesToValues, File target) throws SVNException {
+    public static void setProperties(Map namesToValues, File target, File tmpFile, String terminator) throws SVNException {
         OutputStream dst = null;
-        File tmpFile = null;
         try {
-            tmpFile = SVNFileUtil.createUniqueFile(target.getParentFile(),
-                    target.getName(), ".tmp");
+            //tmpFile = SVNFileUtil.createUniqueFile(target.getParentFile(), target.getName(), ".tmp");
             dst = SVNFileUtil.openFileForWriting(tmpFile);
-            setProperties(namesToValues, dst, SVN_HASH_TERMINATOR);
+            setProperties(namesToValues, dst, terminator);
         } finally {
             SVNFileUtil.closeFile(dst);
         }

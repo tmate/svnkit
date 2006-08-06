@@ -9,7 +9,7 @@
  * newer version instead, at your option.
  * ====================================================================
  */
-package org.tmatesoft.svn.core.internal.wc;
+package org.tmatesoft.svn.core.internal.wc.admin;
 
 import java.util.Collection;
 import java.util.Collections;

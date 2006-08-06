@@ -9,12 +9,14 @@
  * newer version instead, at your option.
  * ====================================================================
  */
-package org.tmatesoft.svn.core.internal.wc;
+package org.tmatesoft.svn.core.internal.wc.admin;
 
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -29,6 +31,10 @@ import org.tmatesoft.svn.core.internal.io.fs.FSFile;
 import org.tmatesoft.svn.core.internal.util.SVNEncodingUtil;
 import org.tmatesoft.svn.core.internal.util.SVNFormatUtil;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
+import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
+import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
+import org.tmatesoft.svn.core.internal.wc.SVNProperties;
+import org.tmatesoft.svn.core.internal.wc.SVNWCAccess;
 
 
 public class SVNPostXMLEntries extends SVNAdminArea {
@@ -40,125 +46,239 @@ public class SVNPostXMLEntries extends SVNAdminArea {
     private static final String ATTRIBUTE_INCOMPLETE = "incomplete";
     private static final String THIS_DIR = "";
 
-    public SVNPostXMLEntries(SVNDirectory parent) {
-        super(parent);
+    public SVNPostXMLEntries(SVNWCAccess wcAccess, String path, File dir) {
+        super(wcAccess, path, dir);
     }
 
-    public Map getProperties(String entryName, boolean tmp) throws SVNException {
-        if (hasPropModifications(entryName)) {
-            SVNProperties props = getSVNProperties(entryName, tmp);
+    protected void saveProperties(boolean close) throws SVNException {
+        Map propsCache = getPropertiesStorage(false);
+        if (propsCache == null) {
+            return;
+        }
+        
+        for(Iterator entries = propsCache.keySet().iterator(); entries.hasNext();) {
+            String name = (String)entries.next();
+            ISVNProperties props = (ISVNProperties)propsCache.get(name);
+            if (props.isModified()) {
+                String dstPath = getThisDirName().equals(name) ? "dir-props" : "props/" + name + ".svn-work";
+                String tmpPath = "tmp/";
+                tmpPath += getThisDirName().equals(name) ? "dir-props" : "props/" + name + ".svn-work";
+                File tmpFile = getAdminFile(tmpPath);
+                File dstFile = getAdminFile(dstPath);
+                String terminator = props.isEmpty() ? null : SVNProperties.SVN_HASH_TERMINATOR; 
+                SVNProperties.setProperties(props.asMap(), dstFile, tmpFile, terminator);
+            }
+        }
+        if (close) {
+            propsCache.clear();
+        }
+    }
+    
+    protected void saveBaseProperties(boolean close) throws SVNException {
+        Map basePropsCache = getBasePropertiesStorage(false);
+        if (basePropsCache == null) {
+            return;
+        }
+        
+        for(Iterator entries = basePropsCache.keySet().iterator(); entries.hasNext();) {
+            String name = (String)entries.next();
+            ISVNProperties props = (ISVNProperties)basePropsCache.get(name);
+            if (props.isModified()) {
+                String dstPath = getThisDirName().equals(name) ? "dir-prop-base" : "prop-base/" + name + ".svn-base";
+                File dstFile = getAdminFile(dstPath);
+                if (props.isEmpty()) {
+                    SVNFileUtil.deleteFile(dstFile);
+                } else {
+                    String tmpPath = "tmp/";
+                    tmpPath += getThisDirName().equals(name) ? "dir-prop-base" : "prop-base/" + name + ".svn-base";
+                    File tmpFile = getAdminFile(tmpPath);
+                    SVNProperties.setProperties(props.asMap(), dstFile, tmpFile, SVNProperties.SVN_HASH_TERMINATOR);
+                }
+            }
+        }
+        if (close) {
+            basePropsCache.clear();
+        }
+    }
+    
+    protected void saveWCProperties(boolean close) throws SVNException {
+        Map wcPropsCache = getWCPropertiesStorage(false);
+        if (wcPropsCache == null) {
+            return;
+        }
+        
+        boolean hasAnyProps = false;
+        File dstFile = getAdminFile("all-wcprops");
+        File tmpFile = getAdminFile("tmp/all-wcprops");
+
+        for(Iterator entries = wcPropsCache.keySet().iterator(); entries.hasNext();) {
+            String name = (String)entries.next();
+            ISVNProperties props = (ISVNProperties)wcPropsCache.get(name);
+            if (!props.isEmpty()) {
+                hasAnyProps = true;
+                break;
+            }
+        }
+
+        if (hasAnyProps) {
+            OutputStream target = null;
+            try {
+                target = SVNFileUtil.openFileForWriting(tmpFile);
+                ISVNProperties props = (ISVNProperties)wcPropsCache.get(getThisDirName());
+                if (props != null && !props.isEmpty()) {
+                    SVNProperties.setProperties(props.asMap(), target, SVNProperties.SVN_HASH_TERMINATOR);
+                } else {
+                    SVNProperties.setProperties(Collections.EMPTY_MAP, target, SVNProperties.SVN_HASH_TERMINATOR);
+                }
+    
+                for(Iterator entries = wcPropsCache.keySet().iterator(); entries.hasNext();) {
+                    String name = (String)entries.next();
+                    if (getThisDirName().equals(name)) {
+                        continue;
+                    }
+                    props = (ISVNProperties)wcPropsCache.get(name);
+                    if (!props.isEmpty()) {
+                        SVNProperties.setProperties(props.asMap(), target, SVNProperties.SVN_HASH_TERMINATOR);
+                    }
+                }
+            } finally {
+                SVNFileUtil.closeFile(target);
+            }
+            SVNFileUtil.rename(tmpFile, dstFile);
+            SVNFileUtil.setReadonly(dstFile, true);
+        } else {
+            SVNFileUtil.deleteFile(dstFile);
+        }
+        
+        if (close) {
+            wcPropsCache.clear();
+        }
+    }
+    
+    public ISVNProperties getBaseProperties(String name) throws SVNException {
+        Map basePropsCache = getBasePropertiesStorage(true);
+        ISVNProperties props = (ISVNProperties)basePropsCache.get(name); 
+        if (props != null) {
+            return props;
+        }
+        
+        Map baseProps = null;
+        try {
+            baseProps = readBaseProperties(name);
+        } catch (SVNException svne) {
+            SVNErrorMessage err = svne.getErrorMessage().wrap("Failed to load properties from disk");
+            SVNErrorManager.error(err);
+        }
+
+        props = new SVNProperties13(baseProps);
+        basePropsCache.put(name, props);
+        return props;
+    }
+
+    public ISVNProperties getProperties(String name) throws SVNException {
+        Map propsCache = getPropertiesStorage(true);
+        ISVNProperties props = (ISVNProperties)propsCache.get(name); 
+        if (props != null) {
+            return props;
+        }
+        
+        final String entryName = name;
+        props =  new SVNProperties14(this){
+
+            protected Map loadProperties() throws SVNException {
+                if (myProperties == null) {
+                    try {
+                        myProperties = readProperties(entryName);
+                    } catch (SVNException svne) {
+                        SVNErrorMessage err = svne.getErrorMessage().wrap("Failed to load properties from disk");
+                        SVNErrorManager.error(err);
+                    }
+                    myProperties = myProperties != null ? myProperties : new HashMap();
+                }
+                return myProperties;
+            }
+        };
+
+        propsCache.put(name, props);
+        return props;
+    }
+
+    public ISVNProperties getWCProperties(String entryName) throws SVNException {
+        Map wcPropsCache = getWCPropertiesStorage(true);
+        ISVNProperties props = (ISVNProperties)wcPropsCache.get(entryName); 
+        if (props != null) {
+            return props;
+        }
+        
+        SVNEntry entry = getEntries().getEntry(entryName, false);
+        if (entry == null) {
+            props = new SVNProperties13(new HashMap());
+            wcPropsCache.put(entryName, props);
+        } else {
+            File propertiesFile = getAdminFile("all-wcprops");
+            if (!propertiesFile.exists()) {
+                props = new SVNProperties13(new HashMap());
+                wcPropsCache.put(entryName, props);
+            } else {
+                FSFile wcpropsFile = null;
+                try {
+                    wcpropsFile = new FSFile(propertiesFile);
+                    Map wcProps = wcpropsFile.readProperties(false);
+                    ISVNProperties entryWCProps = new SVNProperties13(wcProps); 
+                    wcPropsCache.put(getThisDirName(), entryWCProps);
+                        
+                    String name = null;
+                    StringBuffer buffer = new StringBuffer();
+                    while(true) {
+                        try {
+                            name = wcpropsFile.readLine(buffer);
+                        } catch (SVNException e) {
+                            if (e.getErrorMessage().getErrorCode() == SVNErrorCode.STREAM_UNEXPECTED_EOF && buffer.length() > 0) {
+                                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_CORRUPT, "Missing end of line in wcprops file for ''{0}''", getRoot());
+                                SVNErrorManager.error(err, e);
+                            }
+                            break;
+                        }
+                        wcProps = wcpropsFile.readProperties(false);
+                        entryWCProps = new SVNProperties13(wcProps);
+                        wcPropsCache.put(name, entryWCProps);
+                        buffer.delete(0, buffer.length());
+                    }
+                } catch (SVNException svne) {
+                    SVNErrorMessage err = svne.getErrorMessage().wrap("Failed to load properties from disk");
+                    SVNErrorManager.error(err);
+                } finally {
+                    wcpropsFile.close();
+                }
+                props = (ISVNProperties)wcPropsCache.get(entryName); 
+                if (props == null) {
+                    props = new SVNProperties13(new HashMap());
+                    wcPropsCache.put(entryName, props);
+                }
+            }
+        }
+        return props;
+    }
+    
+    private Map readBaseProperties(String name) throws SVNException {
+        //String path = !tmp ? "" : "tmp/";
+        String path = getThisDirName().equals(name) ? "dir-prop-base" : "prop-base/" + name + ".svn-base";
+        File propertiesFile = getAdminFile(path);
+        SVNProperties props = new SVNProperties(propertiesFile, getAdminDirectory().getName() + "/" + path);
+        return props.asMap();
+    }
+    
+    private Map readProperties(String name) throws SVNException {
+        if (hasPropModifications(name)) {
+            //String path = !tmp ? "" : "tmp/";
+            String path = getThisDirName().equals(name) ? "dir-props" : "props/" + name + ".svn-work";
+            File propertiesFile = getAdminFile(path);
+            SVNProperties props = new SVNProperties(propertiesFile, getAdminDirectory().getName() + "/" + path);
             return props.asMap();
         }
         return new HashMap();
     }
 
-    public Map getBaseProperties(String entryName, boolean tmp) throws SVNException {
-        SVNProperties props = getBaseSVNProperties(entryName, tmp);
-        return props.asMap();
-    }
-
-    public String getBasePropertyValue(String entryName, boolean tmp, String propName) throws SVNException {
-        SVNProperties props = getBaseSVNProperties(entryName, tmp);
-        return props.getPropertyValue(propName);
-    }
-
-    public String getPropertyValue(String entryName, boolean tmp, String propName) throws SVNException {
-        String[] cachableProps = getCachableProperties(entryName); 
-        if (cachableProps != null && getIndex(cachableProps, propName) >= 0) {
-            String[] presentProps = getPresentProperties(entryName);
-            if (presentProps == null || getIndex(presentProps, propName) < 0) {
-                return null;
-            }
-            if (SVNProperty.isBooleanProperty(propName)) {
-                return SVNProperty.getValueOfBooleanProperty(propName);
-            }
-        }
-        if (hasPropModifications(entryName)) {
-            SVNProperties props = getSVNProperties(entryName, tmp);
-            return props.getPropertyValue(propName);
-        }
-        return null;
-    }
-
-    
-    //TODO: this is not a good approach, however don't want to
-    //sort the original array to use it with Arrays.binarySearch(), 
-    //since there's a risk to lose the order elements are stored in
-    //the array and written to the file. Maybe the storage order is 
-    //important for somewhat somewhere... 
-    private int getIndex(String[] array, String element) {
-        if (array == null || element == null) {
-            return -1;
-        }
-        for(int i = 0; i < array.length; i++){
-            if (element.equals(array[i])) {
-                return i;
-            }
-        }
-        return -1;
-    }
-    
-
-    public Map getWCProperties(String entryName) throws SVNException {
-        SVNEntry entry = getEntries().getEntry(entryName, false);
-        if (entry == null) {
-            return new HashMap();
-        }
-        
-        FSFile wcpropsFile = null;
-        try {
-            File propertiesFile = getAdminFile("all-wcprops");
-            wcpropsFile = new FSFile(propertiesFile);
-            Map props = wcpropsFile.readProperties(false);
-            if (getThisDirName().equals(entryName)) {
-                return props;
-            }
-            
-            String name = null;
-            StringBuffer buffer = new StringBuffer();
-            while(true) {
-                try {
-                    name = wcpropsFile.readLine(buffer);
-                } catch (SVNException e) {
-                    if (e.getErrorMessage().getErrorCode() == SVNErrorCode.STREAM_UNEXPECTED_EOF && buffer.length() > 0) {
-                        SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_CORRUPT, "Missing end of line in wcprops file for ''{0}''", getRoot());
-                        SVNErrorManager.error(err, e);
-                    }
-                    break;
-                }
-                props = wcpropsFile.readProperties(false);
-                if (name.equals(entryName)) {
-                    return props;
-                }
-                buffer.delete(0, buffer.length());
-            }
-        } finally {
-            wcpropsFile.close();
-        }
-        return new HashMap();
-    }
-    
-    public String getWCPropertyValue(String entryName, String propName) throws SVNException {
-        Map wcprops = null;
-        try {
-            wcprops = getWCProperties(entryName);
-        } catch (SVNException svne) {
-            SVNErrorMessage err = svne.getErrorMessage().wrap("Failed to load properties from disk");
-            SVNErrorManager.error(err);
-        }
-        if (wcprops != null) {
-            return (String)wcprops.get(propName);
-        }
-        return null;
-    }
-
-    public void setWCPropertyValue(String entryName, String propName, String propValue) throws SVNException {
-        
-    }
-    
-    public void deleteWCProperties(String entryName) throws SVNException {
-        
-    }
 
     protected void fetchEntries() throws IOException, SVNException {
         BufferedReader reader = null;
@@ -979,10 +1099,6 @@ public class SVNPostXMLEntries extends SVNAdminArea {
         return false;
     }
     
-    public boolean setAttributeValue(String name, String propertyName, String propertyValue) {
-        return false;
-    }
-
     public void setCachableProperties(String name, String[] cachableProps) throws SVNException {
         Map entry = getEntries().getEntryMap(name);
         if (entry != null) {
