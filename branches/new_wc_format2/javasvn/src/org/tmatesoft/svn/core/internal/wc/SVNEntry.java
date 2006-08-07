@@ -9,7 +9,7 @@
  * newer version instead, at your option.
  * ====================================================================
  */
-package org.tmatesoft.svn.core.internal.wc.admin;
+package org.tmatesoft.svn.core.internal.wc;
 
 import java.util.Iterator;
 import java.util.Map;
@@ -27,11 +27,11 @@ import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
  */
 public class SVNEntry implements Comparable {
 
-    private SVNEntries2 myEntries;
+    private SVNEntries myEntries;
 
     private String myName;
 
-    public SVNEntry(SVNEntries2 entries, String name) {
+    public SVNEntry(SVNEntries entries, String name) {
         myEntries = entries;
         myName = name;
     }
