@@ -26,7 +26,7 @@ import org.tmatesoft.svn.core.SVNProperty;
  * @version 1.0
  * @author TMate Software Ltd.
  */
-public class SVNEntries {
+public class SVNEntries2 {
 
     private Map myData;
     private Set myEntries;

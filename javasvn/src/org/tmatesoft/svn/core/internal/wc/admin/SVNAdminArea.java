@@ -68,7 +68,7 @@ public abstract class SVNAdminArea {
     }
     
     private File myDirectory;
-    protected SVNEntries myEntries;
+    protected SVNEntries2 myEntries;
     private SVNWCAccess myWCAccess;
     private String myPath;
     private File myAdminRoot;
@@ -133,9 +133,9 @@ public abstract class SVNAdminArea {
         SVNFileUtil.deleteFile(lock);
     }
 
-    public SVNEntries getEntries() throws SVNException {
+    public SVNEntries2 getEntries() throws SVNException {
         if (myEntries == null) {
-            myEntries = new SVNEntries();
+            myEntries = new SVNEntries2();
             load();
         }
         return myEntries;
