@@ -37,7 +37,13 @@ import org.tmatesoft.svn.core.internal.wc.SVNProperties;
 import org.tmatesoft.svn.core.internal.wc.SVNWCAccess;
 
 
-public class SVNPostXMLEntries extends SVNAdminArea {
+public class SVNAdminArea14 extends SVNAdminArea {
+    private static final String[] ourCachableProperties = new String[] {
+        SVNProperty.SPECIAL,
+        SVNProperty.EXTERNALS, 
+        SVNProperty.NEEDS_LOCK
+    };
+
     public static final int WC_FORMAT = 8;
     
     private static final String ATTRIBUTE_COPIED = "copied";
@@ -46,8 +52,12 @@ public class SVNPostXMLEntries extends SVNAdminArea {
     private static final String ATTRIBUTE_INCOMPLETE = "incomplete";
     private static final String THIS_DIR = "";
 
-    public SVNPostXMLEntries(SVNWCAccess wcAccess, String path, File dir) {
+    public SVNAdminArea14(SVNWCAccess wcAccess, String path, File dir) {
         super(wcAccess, path, dir);
+    }
+
+    public static String[] getCachableProperties() {
+        return ourCachableProperties;
     }
 
     protected void saveProperties(boolean close) throws SVNException {
@@ -138,9 +148,14 @@ public class SVNPostXMLEntries extends SVNAdminArea {
                     }
                     props = (ISVNProperties)wcPropsCache.get(name);
                     if (!props.isEmpty()) {
+                        target.write(name.getBytes("UTF-8"));
+                        target.write('\n');
                         SVNProperties.setProperties(props.asMap(), target, SVNProperties.SVN_HASH_TERMINATOR);
                     }
                 }
+            } catch (IOException ioe) {
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, ioe.getLocalizedMessage());
+                SVNErrorManager.error(err, ioe);
             } finally {
                 SVNFileUtil.closeFile(target);
             }
@@ -183,7 +198,7 @@ public class SVNPostXMLEntries extends SVNAdminArea {
         }
         
         final String entryName = name;
-        props =  new SVNProperties14(this){
+        props =  new SVNProperties14(this, name){
 
             protected Map loadProperties() throws SVNException {
                 if (myProperties == null) {
@@ -881,14 +896,14 @@ public class SVNPostXMLEntries extends SVNAdminArea {
         }
         
         String hasProps = (String)entry.get(SVNProperty.HAS_PROPS);
-        if (writeValue(buffer, hasProps != null ? SVNProperty.HAS_PROPS : null, emptyFields)) {
+        if (writeValue(buffer, hasProps != null && SVNProperty.booleanValue(hasProps) ? SVNProperty.HAS_PROPS : null, emptyFields)) {
             emptyFields = 0;
         } else {
             ++emptyFields;
         }
 
         String hasPropMods = (String)entry.get(SVNProperty.HAS_PROP_MODS);
-        if (writeValue(buffer, hasPropMods != null ? SVNProperty.HAS_PROP_MODS : null, emptyFields)) {
+        if (writeValue(buffer, hasPropMods != null && SVNProperty.booleanValue(hasPropMods)? SVNProperty.HAS_PROP_MODS : null, emptyFields)) {
             emptyFields = 0;
         } else {
             ++emptyFields;

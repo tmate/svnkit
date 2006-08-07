@@ -35,11 +35,11 @@ import org.tmatesoft.svn.core.internal.wc.SVNWCAccess;
  * @version 1.0
  * @author TMate Software Ltd.
  */
-public class SVNXMLEntries extends SVNAdminArea {
+public class SVNXMLAdminArea extends SVNAdminArea {
     public static final int WC_FORMAT = 4;
     private static final String THIS_DIR = "";
 
-    public SVNXMLEntries(SVNWCAccess wcAccess, String path, File dir) {
+    public SVNXMLAdminArea(SVNWCAccess wcAccess, String path, File dir) {
         super(wcAccess, path, dir);
     }
 
