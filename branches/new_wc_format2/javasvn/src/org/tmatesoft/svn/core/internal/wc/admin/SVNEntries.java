@@ -120,16 +120,13 @@ public class SVNEntries {
             myData = new TreeMap();
             myEntries = new TreeSet();
         }
-        if (myData != null) {
-            Map map = myData.containsKey(name) ? (Map) myData.get(name)
-                    : new HashMap();
-            myData.put(name, map);
-            SVNEntry entry = new SVNEntry(this, name);
-            myEntries.add(entry);
-            setPropertyValue(name, SVNProperty.NAME, name);
-            return entry;
-        }
-        return null;
+
+        Map map = myData.containsKey(name) ? (Map) myData.get(name) : new HashMap();
+        myData.put(name, map);
+        SVNEntry entry = new SVNEntry(this, name);
+        myEntries.add(entry);
+        setPropertyValue(name, SVNProperty.NAME, name);
+        return entry;
     }
 
     public void deleteEntry(String name) {

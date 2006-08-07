@@ -15,20 +15,16 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
-import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
-import java.util.LinkedList;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
-import java.util.TreeSet;
 
 import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
@@ -48,8 +44,8 @@ public abstract class SVNAdminArea {
 
     private static final Map ourAreas = new TreeMap();
     static {
-        ourAreas.put(new Integer(SVNPostXMLEntries.WC_FORMAT), SVNPostXMLEntries.class);
-        ourAreas.put(new Integer(SVNXMLEntries.WC_FORMAT), SVNXMLEntries.class);
+        ourAreas.put(new Integer(SVNAdminArea14.WC_FORMAT), SVNAdminArea14.class);
+        ourAreas.put(new Integer(SVNXMLAdminArea.WC_FORMAT), SVNXMLAdminArea.class);
     }
     
     //TODO: maybe move it to XML-aware format realization
@@ -61,6 +57,16 @@ public abstract class SVNAdminArea {
         BOOLEAN_PROPERTIES.add(SVNProperty.INCOMPLETE);
     }
 
+    private static final byte[] README_TEXT;
+    private static final boolean SKIP_README;
+    
+    static {
+        String eol = System.getProperty("line.separator");
+        README_TEXT = ("This is a Subversion working copy administrative directory." + eol
+            + "Visit http://subversion.tigris.org/ for more information." + eol).getBytes();
+        SKIP_README = Boolean.getBoolean("javasvn.skipReadme");
+    }
+    
     private File myDirectory;
     protected SVNEntries myEntries;
     private SVNWCAccess myWCAccess;
@@ -72,6 +78,61 @@ public abstract class SVNAdminArea {
     protected Map myProperties;
     protected Map myWCProperties;
     
+    public static void createReadmeFile(File adminDir) throws SVNException {
+        if (SKIP_README) {
+            return;
+        }
+        OutputStream os = null;
+        try {
+            os = SVNFileUtil.openFileForWriting(new File(adminDir, "README.txt"));
+            os.write(README_TEXT);            
+        } catch (IOException e) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, e.getLocalizedMessage());
+            SVNErrorManager.error(err, e);
+        } finally {
+            SVNFileUtil.closeFile(os);
+        }
+        
+    }
+
+    public static void createFormatFile(File adminDir) throws SVNException {
+        OutputStream os = null;
+        try {
+            os = SVNFileUtil.openFileForWriting(new File(adminDir, "format"));
+            os.write(String.valueOf(getLatestFormatVersion()).getBytes("UTF-8"));
+            os.write('\n');            
+        } catch (IOException e) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, e.getLocalizedMessage());
+            SVNErrorManager.error(err, e);
+        } finally {
+            SVNFileUtil.closeFile(os);
+        }
+    }
+
+    public static void createVersionedDirectory(File dir) throws SVNException {
+        dir.mkdirs();
+        File adminDir = new File(dir, SVNFileUtil.getAdminDirectoryName());
+        adminDir.mkdir();
+        SVNFileUtil.setHidden(adminDir, true);
+        // lock dir.
+        File lock = new File(adminDir, "lock"); 
+        SVNFileUtil.createEmptyFile(lock);
+        File[] tmp = {
+                new File(adminDir, "tmp"),
+                new File(adminDir, "tmp" + File.separatorChar + "props"),
+                new File(adminDir, "tmp" + File.separatorChar + "prop-base"),
+                new File(adminDir, "tmp" + File.separatorChar + "text-base"),
+                new File(adminDir, "props"), new File(adminDir, "prop-base"),
+                new File(adminDir, "text-base")};
+        for (int i = 0; i < tmp.length; i++) {
+            tmp[i].mkdir();
+        }
+        // for backward compatibility 
+        SVNAdminArea.createFormatFile(adminDir);
+        // unlock dir.
+        SVNFileUtil.deleteFile(lock);
+    }
+
     public SVNEntries getEntries() throws SVNException {
         if (myEntries == null) {
             myEntries = new SVNEntries();

@@ -36,6 +36,10 @@ public abstract class ISVNProperties {
         return myIsModified;
     }
     
+    protected void setModified(boolean modified) {
+        myIsModified = modified;
+    }
+    
     public boolean isEmpty() throws SVNException {
         Map props = loadProperties();
         return props == null || props.isEmpty();
@@ -61,9 +65,11 @@ public abstract class ISVNProperties {
         } else {
             props.remove(name);
         }
-        myIsModified = true;
+        handleModified();
     }
 
+    protected abstract void handleModified() throws SVNException;
+        
     protected abstract ISVNProperties wrap(Map properties);
     
     public ISVNProperties compareTo(ISVNProperties properties) throws SVNException {

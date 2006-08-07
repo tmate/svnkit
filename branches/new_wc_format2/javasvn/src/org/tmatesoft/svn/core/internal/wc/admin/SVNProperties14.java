@@ -11,6 +11,7 @@
  */
 package org.tmatesoft.svn.core.internal.wc.admin;
 
+import java.util.LinkedList;
 import java.util.Map;
 
 import org.tmatesoft.svn.core.SVNException;
@@ -19,13 +20,41 @@ import org.tmatesoft.svn.core.SVNProperty;
 
 public abstract class SVNProperties14 extends ISVNProperties {
 
-    private SVNPostXMLEntries myAdminArea;
+    private SVNAdminArea14 myAdminArea;
+    private String myEntryName;
     
-    public SVNProperties14(SVNPostXMLEntries adminArea) {
+    public SVNProperties14(SVNAdminArea14 adminArea, String entryName) {
         super(null);
         myAdminArea = adminArea;
+        myEntryName = entryName;
     }
     
+    protected void handleModified() throws SVNException {
+        ISVNProperties baseProps = myAdminArea.getBaseProperties(myEntryName);
+        ISVNProperties propsDiff = baseProps.compareTo(this);
+        Map entry = myAdminArea.getEntries().getEntryMap(myEntryName);
+
+        String[] cachableProps = SVNAdminArea14.getCachableProperties();
+        entry.put(SVNProperty.CACHABLE_PROPS, cachableProps);
+        Map props = loadProperties();
+        LinkedList presentProps = new LinkedList();
+        for (int i = 0; i < cachableProps.length; i++) {
+            if (props.containsKey(cachableProps[i])) {
+                presentProps.addLast(cachableProps[i]);
+            }
+        }
+        if (presentProps.size() > 0) {
+            entry.put(SVNProperty.PRESENT_PROPS, presentProps.toArray(new String[presentProps.size()]));
+        } else {
+            entry.remove(SVNProperty.PRESENT_PROPS);
+        }
+        
+        entry.put(SVNProperty.HAS_PROPS, SVNProperty.toString(!baseProps.isEmpty() || !isEmpty()));
+        boolean hasPropModifications = !propsDiff.isEmpty();
+        entry.put(SVNProperty.HAS_PROP_MODS, SVNProperty.toString(hasPropModifications));
+        setModified(hasPropModifications);
+    }
+
     public String getPropertyValue(String name) throws SVNException {
         String[] cachableProps = myAdminArea.getCachableProperties(name); 
         if (cachableProps != null && getIndex(cachableProps, name) >= 0) {
