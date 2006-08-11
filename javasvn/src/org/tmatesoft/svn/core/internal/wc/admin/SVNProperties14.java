@@ -32,10 +32,10 @@ public abstract class SVNProperties14 extends ISVNProperties {
     protected void handleModified() throws SVNException {
         ISVNProperties baseProps = myAdminArea.getBaseProperties(myEntryName);
         ISVNProperties propsDiff = baseProps.compareTo(this);
-        Map entry = myAdminArea.getEntries().getEntryMap(myEntryName);
-
+        SVNEntry entry = myAdminArea.getEntry(myEntryName, true);
+        
         String[] cachableProps = SVNAdminArea14.getCachableProperties();
-        entry.put(SVNProperty.CACHABLE_PROPS, cachableProps);
+        entry.setCachableProperties(cachableProps);
         Map props = loadProperties();
         LinkedList presentProps = new LinkedList();
         for (int i = 0; i < cachableProps.length; i++) {
@@ -44,21 +44,22 @@ public abstract class SVNProperties14 extends ISVNProperties {
             }
         }
         if (presentProps.size() > 0) {
-            entry.put(SVNProperty.PRESENT_PROPS, presentProps.toArray(new String[presentProps.size()]));
+            entry.setPresentProperties((String[])presentProps.toArray(new String[presentProps.size()]));
         } else {
-            entry.remove(SVNProperty.PRESENT_PROPS);
+            entry.setPresentProperties(null);
         }
         
-        entry.put(SVNProperty.HAS_PROPS, SVNProperty.toString(!baseProps.isEmpty() || !isEmpty()));
+        entry.setHasProperties(!baseProps.isEmpty() || !isEmpty());
         boolean hasPropModifications = !propsDiff.isEmpty();
-        entry.put(SVNProperty.HAS_PROP_MODS, SVNProperty.toString(hasPropModifications));
+        entry.setHasPropertyModifications(hasPropModifications);
         setModified(hasPropModifications);
     }
 
     public String getPropertyValue(String name) throws SVNException {
-        String[] cachableProps = myAdminArea.getCachableProperties(name); 
+        SVNEntry entry = myAdminArea.getEntry(name, true);
+        String[] cachableProps = entry.getCachableProperties(); 
         if (cachableProps != null && getIndex(cachableProps, name) >= 0) {
-            String[] presentProps = myAdminArea.getPresentProperties(name);
+            String[] presentProps = entry.getPresentProperties();
             if (presentProps == null || getIndex(presentProps, name) < 0) {
                 return null;
             }

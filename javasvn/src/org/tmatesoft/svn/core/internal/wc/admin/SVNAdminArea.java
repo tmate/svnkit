@@ -14,17 +14,23 @@ package org.tmatesoft.svn.core.internal.wc.admin;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.TreeSet;
 
 import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
@@ -32,6 +38,7 @@ import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNProperty;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
+import org.tmatesoft.svn.core.internal.wc.SVNFileType;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNWCAccess;
 
@@ -41,104 +48,94 @@ import org.tmatesoft.svn.core.internal.wc.SVNWCAccess;
  */
 public abstract class SVNAdminArea {
     private static final int LATEST_WC_FORMAT = 8;
-
     private static final Map ourAreas = new TreeMap();
+
     static {
         ourAreas.put(new Integer(SVNAdminArea14.WC_FORMAT), SVNAdminArea14.class);
         ourAreas.put(new Integer(SVNXMLAdminArea.WC_FORMAT), SVNXMLAdminArea.class);
     }
     
-    //TODO: maybe move it to XML-aware format realization
-    protected static final Set BOOLEAN_PROPERTIES = new HashSet();
-    static {
-        BOOLEAN_PROPERTIES.add(SVNProperty.COPIED);
-        BOOLEAN_PROPERTIES.add(SVNProperty.DELETED);
-        BOOLEAN_PROPERTIES.add(SVNProperty.ABSENT);
-        BOOLEAN_PROPERTIES.add(SVNProperty.INCOMPLETE);
-    }
-
-    private static final byte[] README_TEXT;
-    private static final boolean SKIP_README;
-    
-    static {
-        String eol = System.getProperty("line.separator");
-        README_TEXT = ("This is a Subversion working copy administrative directory." + eol
-            + "Visit http://subversion.tigris.org/ for more information." + eol).getBytes();
-        SKIP_README = Boolean.getBoolean("javasvn.skipReadme");
-    }
-    
     private File myDirectory;
-    protected SVNEntries2 myEntries;
+//    protected SVNEntries2 myEntries;
     private SVNWCAccess myWCAccess;
     private String myPath;
     private File myAdminRoot;
-    private File myLockFile;
-    protected File myEntriesFile;
     protected Map myBaseProperties;
     protected Map myProperties;
     protected Map myWCProperties;
+    protected Map myEntries;
+
     
-    public static void createReadmeFile(File adminDir) throws SVNException {
-        if (SKIP_README) {
-            return;
+    public abstract boolean isLocked();
+
+    public abstract boolean isVersioned();
+
+    public abstract boolean lock() throws SVNException;
+
+    public abstract ISVNProperties getBaseProperties(String name) throws SVNException;
+
+    public abstract ISVNProperties getWCProperties(String name) throws SVNException;
+
+    public abstract ISVNProperties getProperties(String name) throws SVNException;
+
+    public abstract void save() throws SVNException;
+
+    public abstract String getThisDirName();
+
+    public abstract boolean hasPropModifications(String entryName) throws SVNException;
+
+    public abstract boolean hasProperties(String entryName) throws SVNException;
+
+    public abstract InputStream getBaseFileForReading(String name, boolean tmp) throws SVNException;
+
+    public abstract OutputStream getBaseFileForWriting(String name, boolean tmp) throws SVNException;
+    
+    public void deleteEntry(String name) throws SVNException {
+        Map entries = loadEntries();
+        if (entries != null) {
+            entries.remove(name);
         }
-        OutputStream os = null;
-        try {
-            os = SVNFileUtil.openFileForWriting(new File(adminDir, "README.txt"));
-            os.write(README_TEXT);            
-        } catch (IOException e) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, e.getLocalizedMessage());
-            SVNErrorManager.error(err, e);
-        } finally {
-            SVNFileUtil.closeFile(os);
-        }
-        
     }
 
-    public static void createFormatFile(File adminDir) throws SVNException {
-        OutputStream os = null;
-        try {
-            os = SVNFileUtil.openFileForWriting(new File(adminDir, "format"));
-            os.write(String.valueOf(getLatestFormatVersion()).getBytes("UTF-8"));
-            os.write('\n');            
-        } catch (IOException e) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, e.getLocalizedMessage());
-            SVNErrorManager.error(err, e);
-        } finally {
-            SVNFileUtil.closeFile(os);
+    public SVNEntry getEntry(String name, boolean hidden) throws SVNException {
+        Map entries = loadEntries();
+        if (entries != null && entries.containsKey(name)) {
+            SVNEntry entry = (SVNEntry)entries.get(name);
+            if (!hidden && entry.isHidden()) {
+                return null;
+            }
+            return entry;
         }
+        return null;
     }
 
-    public static void createVersionedDirectory(File dir) throws SVNException {
-        dir.mkdirs();
-        File adminDir = new File(dir, SVNFileUtil.getAdminDirectoryName());
-        adminDir.mkdir();
-        SVNFileUtil.setHidden(adminDir, true);
-        // lock dir.
-        File lock = new File(adminDir, "lock"); 
-        SVNFileUtil.createEmptyFile(lock);
-        File[] tmp = {
-                new File(adminDir, "tmp"),
-                new File(adminDir, "tmp" + File.separatorChar + "props"),
-                new File(adminDir, "tmp" + File.separatorChar + "prop-base"),
-                new File(adminDir, "tmp" + File.separatorChar + "text-base"),
-                new File(adminDir, "props"), new File(adminDir, "prop-base"),
-                new File(adminDir, "text-base")};
-        for (int i = 0; i < tmp.length; i++) {
-            tmp[i].mkdir();
+    public SVNEntry addEntry(String name) throws SVNException {
+        Map entries = loadEntries();
+        if (entries == null) {
+            myEntries = new TreeMap(); 
+            entries = myEntries;
         }
-        // for backward compatibility 
-        SVNAdminArea.createFormatFile(adminDir);
-        // unlock dir.
-        SVNFileUtil.deleteFile(lock);
+
+        SVNEntry entry = entries.containsKey(name) ? (SVNEntry) entries.get(name) : new SVNEntry(new HashMap(), this, name);
+        entries.put(name, entry);
+        return entry;
     }
 
-    public SVNEntries2 getEntries() throws SVNException {
-        if (myEntries == null) {
-            myEntries = new SVNEntries2();
-            load();
+    public Iterator entries(boolean hidden) throws SVNException {
+        Map entries = loadEntries();
+        if (entries == null) {
+            return Collections.EMPTY_LIST.iterator();
         }
-        return myEntries;
+        Collection copy = new LinkedList(entries.values());
+        if (!hidden) {
+            for (Iterator iterator = copy.iterator(); iterator.hasNext();) {
+                SVNEntry entry = (SVNEntry) iterator.next();
+                if (entry.isHidden()) {
+                    iterator.remove();
+                }
+            }
+        }
+        return copy.iterator();
     }
 
     public File getRoot() {
@@ -153,91 +150,31 @@ public abstract class SVNAdminArea {
         return new File(getAdminDirectory(), name);
     }
 
-    public boolean isLocked() {
-        return getLockFile().isFile();
+    public void setWCAccess(SVNWCAccess wcAccess, String path) {
+        myWCAccess = wcAccess;
+        myPath = path;
     }
 
-    private File getLockFile() {
-        return myLockFile;
-    }
-
-    public void load() throws SVNException {
-        if (myEntries == null || !myEntriesFile.exists()) {
-            return;
-        }
-        try {
-            fetchEntries();
-        } catch (IOException e) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, "Cannot read entries file ''{0}'': {1}", new Object[] {myEntriesFile, e.getLocalizedMessage()});
-            SVNErrorManager.error(err, e);
-        }
-    }
-    
-    protected abstract void fetchEntries() throws IOException, SVNException;
-
-    public abstract String getThisDirName();
-    
-    public void save() throws SVNException {
-        saveEntries(true);
-        saveBaseProperties(true);
-        saveProperties(true);
-        saveWCProperties(true);
-    }
-
-    protected void saveEntries(boolean close) throws SVNException {
-        if (myEntries != null) {
-            Map rootEntry = myEntries.getEntryMap(getThisDirName());
-            if (rootEntry == null) {
-                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_NOT_FOUND, "No default entry in directory ''{0}''", getRoot());
-                SVNErrorManager.error(err);
-            }
-            
-            String reposURL = (String)rootEntry.get(SVNProperty.REPOS);
-            String url = (String)rootEntry.get(SVNProperty.URL);
-            if (reposURL != null && !SVNPathUtil.isAncestor(reposURL, url)) {
-                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.UNKNOWN, "Entry ''{0}'' has inconsistent repository root and url", getThisDirName());
-                SVNErrorManager.error(err);
-            }
-    
-            File tmpFile = new File(getAdminDirectory(), "tmp/entries");
-            Writer os = null;
-            try {
-                String formattedEntries = formatEntries(); 
-                os = new OutputStreamWriter(SVNFileUtil.openFileForWriting(tmpFile), "UTF-8");
-                os.write(formattedEntries);
-            } catch (IOException e) {
-                SVNFileUtil.closeFile(os);
-                SVNFileUtil.deleteFile(tmpFile);
-                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, "Cannot wrtie entries file ''{0}'': {1}", new Object[] {myEntriesFile, e.getLocalizedMessage()});
-                SVNErrorManager.error(err, e);
-            } finally {
-                SVNFileUtil.closeFile(os);
-            }
-            
-            SVNFileUtil.rename(tmpFile, myEntriesFile);
-            SVNFileUtil.setReadonly(myEntriesFile, true);
-            if (close) {
-                myEntries.close();
-                myEntries = null;
-            }
-        }
-    }
-    
-    protected abstract void saveProperties(boolean close) throws SVNException;
-    
-    protected abstract void saveBaseProperties(boolean close) throws SVNException;
-    
-    protected abstract void saveWCProperties(boolean close) throws SVNException;
-    
-    protected abstract String formatEntries();
+    protected abstract void writeEntries(Writer writer) throws IOException;
 
     protected abstract int getFormatNumber();
 
-    public abstract ISVNProperties getBaseProperties(String name) throws SVNException;
+    protected abstract Map fetchEntries() throws SVNException;
 
-    public abstract ISVNProperties getWCProperties(String name) throws SVNException;
+    protected SVNAdminArea(SVNWCAccess wcAccess, String path, File dir){
+        myDirectory = dir;
+        myAdminRoot = new File(dir, SVNFileUtil.getAdminDirectoryName());
+        myPath = path;
+        myWCAccess = wcAccess;
+    }
 
-    public abstract ISVNProperties getProperties(String name) throws SVNException;
+    protected Map loadEntries() throws SVNException {
+        if (myEntries != null) {
+            return myEntries;
+        }
+        myEntries = fetchEntries();
+        return myEntries;
+    }
 
     protected Map getBasePropertiesStorage(boolean create) {
         if (myBaseProperties == null && create) {
@@ -271,7 +208,18 @@ public abstract class SVNAdminArea {
             SVNErrorManager.error(err);
         }
     }
-    
+
+/*    public static boolean upgradeFormat(SVNAdminArea adminArea) {
+        if (adminArea.getFormatNumber() != getLatestFormatVersion()) {
+            File logFile = adminArea.getAdminFile("log");
+            SVNFileType type = SVNFileType.getType(logFile);
+            if (type == SVNFileType.FILE) {
+                return false;
+            }
+            
+        }
+    }
+*/
     public static SVNAdminArea createAdminArea(SVNWCAccess wcAccess, String path, File dir, boolean isUnderConstruction) throws SVNException {
         File adminDir = new File(dir, SVNFileUtil.getAdminDirectoryName());
         File entriesFile = new File(adminDir, "entries");
@@ -357,19 +305,47 @@ public abstract class SVNAdminArea {
     public static boolean isFormatSupported(int formatVersion){
         return ourAreas.get(new Integer(formatVersion)) != null;
     }
-    
-    public abstract boolean hasPropModifications(String entryName) throws SVNException;
-
-    protected SVNAdminArea(SVNWCAccess wcAccess, String path, File dir){
-        myDirectory = dir;
-        myAdminRoot = new File(dir, SVNFileUtil.getAdminDirectoryName());
-        myLockFile = new File(myAdminRoot, "lock");
-        myEntriesFile = new File(myAdminRoot, "entries");
-        myPath = path;
-        myWCAccess = wcAccess;
-    }
 
     public static int getLatestFormatVersion() {
         return LATEST_WC_FORMAT;
     }
+
+    public static void createFormatFile(File adminDir) throws SVNException {
+        OutputStream os = null;
+        try {
+            os = SVNFileUtil.openFileForWriting(new File(adminDir, "format"));
+            os.write(String.valueOf(getLatestFormatVersion()).getBytes("UTF-8"));
+            os.write('\n');            
+        } catch (IOException e) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, e.getLocalizedMessage());
+            SVNErrorManager.error(err, e);
+        } finally {
+            SVNFileUtil.closeFile(os);
+        }
+    }
+
+    public static void createVersionedDirectory(File dir) throws SVNException {
+        dir.mkdirs();
+        File adminDir = new File(dir, SVNFileUtil.getAdminDirectoryName());
+        adminDir.mkdir();
+        SVNFileUtil.setHidden(adminDir, true);
+        // lock dir.
+        File lock = new File(adminDir, "lock"); 
+        SVNFileUtil.createEmptyFile(lock);
+        File[] tmp = {
+                new File(adminDir, "tmp"),
+                new File(adminDir, "tmp" + File.separatorChar + "props"),
+                new File(adminDir, "tmp" + File.separatorChar + "prop-base"),
+                new File(adminDir, "tmp" + File.separatorChar + "text-base"),
+                new File(adminDir, "props"), new File(adminDir, "prop-base"),
+                new File(adminDir, "text-base")};
+        for (int i = 0; i < tmp.length; i++) {
+            tmp[i].mkdir();
+        }
+        // for backward compatibility 
+        SVNAdminArea.createFormatFile(adminDir);
+        // unlock dir.
+        SVNFileUtil.deleteFile(lock);
+    }
+    
 }
