@@ -8,4 +8,4 @@ ForceType rss
 </FilesMatch>
 <FilesMatch (rss2.xml)>
 ForceType rss2
-</FilesMatch>
+</FilesMatch>h>
