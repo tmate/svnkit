@@ -24,6 +24,8 @@ import org.tigris.subversion.javahl.BlameCallback;
 import org.tigris.subversion.javahl.ClientException;
 import org.tigris.subversion.javahl.CommitItem;
 import org.tigris.subversion.javahl.CommitMessage;
+import org.tigris.subversion.javahl.CopySource;
+import org.tigris.subversion.javahl.DiffSummaryReceiver;
 import org.tigris.subversion.javahl.DirEntry;
 import org.tigris.subversion.javahl.Info;
 import org.tigris.subversion.javahl.Info2;
@@ -32,6 +34,7 @@ import org.tigris.subversion.javahl.LogMessage;
 import org.tigris.subversion.javahl.Notify;
 import org.tigris.subversion.javahl.Notify2;
 import org.tigris.subversion.javahl.NotifyInformation;
+import org.tigris.subversion.javahl.ProgressListener;
 import org.tigris.subversion.javahl.PromptUserPassword;
 import org.tigris.subversion.javahl.PropertyData;
 import org.tigris.subversion.javahl.Revision;
@@ -1267,5 +1270,37 @@ public class SVNClientImpl implements SVNClientInterface {
 
     public org.tigris.subversion.javahl.Version getVersion() {        
         return SVNClientImplVersion.getInstance();
+    }
+
+    public long checkout(String moduleName, String destPath, Revision revision, Revision pegRevision, boolean recurse, boolean ignoreExternals, boolean allowUnverObstructions) throws ClientException {
+        return 0;
+    }
+
+    public void copy(CopySource[] sources, String destPath, String message, boolean copyAsChild) throws ClientException {
+    }
+
+    public void diffSummarize(String target1, Revision revision1, String target2, Revision revision2, boolean recurse, boolean ignoreAncestry, DiffSummaryReceiver receiver) throws ClientException {
+    }
+
+    public void diffSummarize(String target, Revision pegRevision, Revision startRevision, Revision endRevision, boolean recurse, boolean ignoreAncestry, DiffSummaryReceiver receiver)
+            throws ClientException {
+    }
+
+    public long doSwitch(String path, String url, Revision revision, boolean recurse, boolean allowUnverObstructions) throws ClientException {
+        return 0;
+    }
+
+    public void move(String[] srcPaths, String destPath, String message, boolean force, boolean moveAsChild) throws ClientException {
+    }
+
+    public void setProgressListener(ProgressListener listener) {
+    }
+
+    public long update(String path, Revision revision, boolean recurse, boolean ignoreExternals, boolean allowUnverObstructions) throws ClientException {
+        return 0;
+    }
+
+    public long[] update(String[] path, Revision revision, boolean recurse, boolean ignoreExternals, boolean allowUnverObstructions) throws ClientException {
+        return null;
     }
 }

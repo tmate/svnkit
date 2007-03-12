@@ -369,4 +369,41 @@ public class SVNClient implements SVNClientInterface {
     
     public static void initNative() {
     }
+
+    public long checkout(String moduleName, String destPath, Revision revision, Revision pegRevision, boolean recurse, boolean ignoreExternals, boolean allowUnverObstructions) throws ClientException {
+        return myDelegate.checkout(moduleName, destPath, revision, pegRevision, recurse, ignoreExternals, allowUnverObstructions);
+    }
+
+    public void copy(CopySource[] sources, String destPath, String message, boolean copyAsChild) throws ClientException {
+        myDelegate.copy(sources, destPath, message, copyAsChild);
+    }
+
+    public void diffSummarize(String target1, Revision revision1, String target2, Revision revision2, boolean recurse, boolean ignoreAncestry, DiffSummaryReceiver receiver) throws ClientException {
+        myDelegate.diffSummarize(target1, revision1, target2, revision2, recurse, ignoreAncestry, receiver);
+    }
+
+    public void diffSummarize(String target, Revision pegRevision, Revision startRevision, Revision endRevision, boolean recurse, boolean ignoreAncestry, DiffSummaryReceiver receiver)
+            throws ClientException {
+        myDelegate.diffSummarize(target, pegRevision, startRevision, endRevision, recurse, ignoreAncestry, receiver);
+    }
+
+    public long doSwitch(String path, String url, Revision revision, boolean recurse, boolean allowUnverObstructions) throws ClientException {
+        return myDelegate.doSwitch(path, url, revision, recurse, allowUnverObstructions);
+    }
+
+    public void move(String[] srcPaths, String destPath, String message, boolean force, boolean moveAsChild) throws ClientException {
+        myDelegate.move(srcPaths, destPath, message, force, moveAsChild);
+    }
+
+    public void setProgressListener(ProgressListener listener) {
+        myDelegate.setProgressListener(listener);
+    }
+
+    public long update(String path, Revision revision, boolean recurse, boolean ignoreExternals, boolean allowUnverObstructions) throws ClientException {
+        return myDelegate.update(path, revision, recurse, ignoreExternals, allowUnverObstructions);
+    }
+
+    public long[] update(String[] path, Revision revision, boolean recurse, boolean ignoreExternals, boolean allowUnverObstructions) throws ClientException {
+        return myDelegate.update(path, revision, recurse, ignoreExternals, allowUnverObstructions);
+    }
 }
