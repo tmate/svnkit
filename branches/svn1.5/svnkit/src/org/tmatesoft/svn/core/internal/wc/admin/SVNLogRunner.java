@@ -17,6 +17,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 
 import org.tmatesoft.svn.core.SVNErrorCode;
@@ -79,26 +80,36 @@ public class SVNLogRunner {
             }
         } else if (SVNLog.MODIFY_ENTRY.equals(name)) {
             try {
-                Map entryAttrs = new HashMap(attributes);
-                entryAttrs.remove("");
-                entryAttrs.remove(SVNLog.NAME_ATTR);
-                if (entryAttrs.containsKey(SVNProperty.shortPropertyName(SVNProperty.TEXT_TIME))) {
-                    String value = (String) entryAttrs.get(SVNProperty.shortPropertyName(SVNProperty.TEXT_TIME)); 
+                Map entryAttrs = new HashMap();
+                
+                for (Iterator attrtibutesIter = attributes.keySet().iterator(); attrtibutesIter.hasNext();) {
+                    String attrName = (String) attrtibutesIter.next();
+                    if ("".equals(attrName) || SVNLog.NAME_ATTR.equals(attrName)) {
+                        continue;
+                    }
+                    
+                    Object value = attributes.get(attrName); 
+                    attrName = SVNProperty.SVN_ENTRY_PREFIX + attrName;
+                    entryAttrs.put(attrName, value);
+                }
+                
+                if (entryAttrs.containsKey(SVNProperty.TEXT_TIME)) {
+                    String value = (String) entryAttrs.get(SVNProperty.TEXT_TIME); 
                     if (SVNLog.WC_TIMESTAMP.equals(value)) {
                         File file = adminArea.getFile(fileName);
                         value = SVNTimeUtil.formatDate(new Date(file.lastModified()));
-                        entryAttrs.put(SVNProperty.shortPropertyName(SVNProperty.TEXT_TIME), value);
+                        entryAttrs.put(SVNProperty.TEXT_TIME, value);
                     }
                 }
-                if (entryAttrs.containsKey(SVNProperty.shortPropertyName(SVNProperty.PROP_TIME))) {
-                    String value = (String) entryAttrs.get(SVNProperty.shortPropertyName(SVNProperty.PROP_TIME)); 
+                if (entryAttrs.containsKey(SVNProperty.PROP_TIME)) {
+                    String value = (String) entryAttrs.get(SVNProperty.PROP_TIME); 
                     if (SVNLog.WC_TIMESTAMP.equals(value)) {
                         SVNEntry entry = adminArea.getEntry(fileName, false);
                         if (entry == null) {
                             return;
                         }
                         value = adminArea.getPropertyTime(fileName); 
-                        entryAttrs.put(SVNProperty.shortPropertyName(SVNProperty.PROP_TIME), value);
+                        entryAttrs.put(SVNProperty.PROP_TIME, value);
                     }                
                 }
                 try {

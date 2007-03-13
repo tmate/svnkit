@@ -92,26 +92,30 @@ public class SVNProperty {
      * <span class="javastring">"has-props"</span> SVN untweakable metaproperty.
      * @since 1.1, new in Subversion 1.4
      */
-    public static final String HAS_PROPS = "has-props";
+    public static final String HAS_PROPS = SVN_ENTRY_PREFIX + "has-props";
 
     /**
      * <span class="javastring">"has-prop-mods"</span> SVN untweakable metaproperty.
      * @since 1.1, new in Subversion 1.4
      */
-    public static final String HAS_PROP_MODS = "has-prop-mods";
+    public static final String HAS_PROP_MODS = SVN_ENTRY_PREFIX + "has-prop-mods";
 
     /**
      * <span class="javastring">"cachable-props"</span> SVN untweakable metaproperty.
      * @since 1.1, new in Subversion 1.4
      */
-    public static final String CACHABLE_PROPS = "cachable-props";
+    public static final String CACHABLE_PROPS = SVN_ENTRY_PREFIX + "cachable-props";
 
     /**
      * <span class="javastring">"present-props"</span> SVN untweakable metaproperty.
      * @since 1.1, new in Subversion 1.4
      */
-    public static final String PRESENT_PROPS = "present-props";
+    public static final String PRESENT_PROPS = SVN_ENTRY_PREFIX + "present-props";
     
+    public static final String KEEP_LOCAL = SVN_ENTRY_PREFIX + "keep-local";
+
+    public static final String CHANGELIST = SVN_ENTRY_PREFIX + "changelist";
+
     /**
      * An <span class="javastring">"svn:entry:checksum"</span> SVN untweakable metaproperty.
      */

@@ -100,17 +100,17 @@ public class SVNWCManager {
                         "The URL ''{0}'' has a different repository root than its parent", copyFromURL);
                 SVNErrorManager.error(err);
             }
-            command.put(SVNProperty.shortPropertyName(SVNProperty.COPYFROM_URL), copyFromURL.toString());
-            command.put(SVNProperty.shortPropertyName(SVNProperty.COPYFROM_REVISION), SVNProperty.toString(copyFromRev));
-            command.put(SVNProperty.shortPropertyName(SVNProperty.COPIED), Boolean.TRUE.toString());
+            command.put(SVNProperty.COPYFROM_URL, copyFromURL.toString());
+            command.put(SVNProperty.COPYFROM_REVISION, SVNProperty.toString(copyFromRev));
+            command.put(SVNProperty.COPIED, Boolean.TRUE.toString());
         }
         if (replace) {
-            command.put(SVNProperty.shortPropertyName(SVNProperty.CHECKSUM), null);
+            command.put(SVNProperty.CHECKSUM, null);
         }
-        command.put(SVNProperty.shortPropertyName(SVNProperty.SCHEDULE), SVNProperty.SCHEDULE_ADD);
-        command.put(SVNProperty.shortPropertyName(SVNProperty.KIND), SVNFileType.getNodeKind(fileType).toString());
+        command.put(SVNProperty.SCHEDULE, SVNProperty.SCHEDULE_ADD);
+        command.put(SVNProperty.KIND, SVNFileType.getNodeKind(fileType).toString());
         if (!(replace || copyFromURL != null)) {
-            command.put(SVNProperty.shortPropertyName(SVNProperty.REVISION), "0");
+            command.put(SVNProperty.REVISION, "0");
         }
         parentDir.modifyEntry(name, command, true, false);
         
@@ -132,13 +132,13 @@ public class SVNWCManager {
             if (entry == null || entry.isDeleted()) {
                 dir = wcAccess.open(path, true, copyFromURL != null ? SVNWCAccess.INFINITE_DEPTH : 0);
             }
-            command.put(SVNProperty.shortPropertyName(SVNProperty.INCOMPLETE), null);
-            command.put(SVNProperty.shortPropertyName(SVNProperty.SCHEDULE), replace ? SVNProperty.SCHEDULE_REPLACE : SVNProperty.SCHEDULE_ADD);
+            command.put(SVNProperty.INCOMPLETE, null);
+            command.put(SVNProperty.SCHEDULE, replace ? SVNProperty.SCHEDULE_REPLACE : SVNProperty.SCHEDULE_ADD);
             dir.modifyEntry(dir.getThisDirName(), command, true, true);
             if (copyFromURL != null) {
                 SVNURL newURL = parentEntry.getSVNURL().appendPath(name, false);
                 updateCleanup(path, wcAccess, true, newURL.toString(), parentEntry.getRepositoryRoot(), -1, false);
-                markTree(dir, null, true, COPIED);
+                markTree(dir, null, true, false, COPIED);
                 SVNPropertiesManager.deleteWCProperties(dir, null, true);
             }
         }
@@ -149,42 +149,57 @@ public class SVNWCManager {
     public static final int SCHEDULE = 1; 
     public static final int COPIED = 2; 
     
-    public static void markTree(SVNAdminArea dir, String schedule, boolean copied, int flags) throws SVNException {
+    public static void markTree(SVNAdminArea dir, String schedule, boolean copied, boolean keepLocal, int flags) throws SVNException {
         Map attributes = new HashMap();
+        
         for(Iterator entries = dir.entries(false); entries.hasNext();) {
             SVNEntry entry = (SVNEntry) entries.next();
             if (dir.getThisDirName().equals(entry.getName())) {
                 continue;
             }
+        
             File path = dir.getFile(entry.getName());
             if (entry.getKind() == SVNNodeKind.DIR) {
                 SVNAdminArea childDir = dir.getWCAccess().retrieve(path);
-                markTree(childDir, schedule, copied, flags);
+                markTree(childDir, schedule, copied, keepLocal, flags);
             }
+            
             if ((flags & SCHEDULE) != 0) {
-                attributes.put(SVNProperty.shortPropertyName(SVNProperty.SCHEDULE), schedule);
+                attributes.put(SVNProperty.SCHEDULE, schedule);
             }
+            
             if ((flags & COPIED) != 0) {
-                attributes.put(SVNProperty.shortPropertyName(SVNProperty.COPIED), copied ? Boolean.TRUE.toString() : null);
+                attributes.put(SVNProperty.COPIED, copied ? Boolean.TRUE.toString() : null);
             }
+            
             dir.modifyEntry(entry.getName(), attributes, true, false);
             attributes.clear();
+            
             if (SVNProperty.SCHEDULE_DELETE.equals(schedule)) {
                 SVNEvent event = SVNEventFactory.createDeletedEvent(dir, entry.getName());
                 dir.getWCAccess().handleEvent(event);
             }
         }
+        
         SVNEntry dirEntry = dir.getEntry(dir.getThisDirName(), false);
         if (!(dirEntry.isScheduledForAddition() && SVNProperty.SCHEDULE_DELETE.equals(schedule))) {
             if ((flags & SCHEDULE) != 0) {
-                attributes.put(SVNProperty.shortPropertyName(SVNProperty.SCHEDULE), schedule);
+                attributes.put(SVNProperty.SCHEDULE, schedule);
             }
             if ((flags & COPIED) != 0) {
-                attributes.put(SVNProperty.shortPropertyName(SVNProperty.COPIED), copied ? Boolean.TRUE.toString() : null);
+                attributes.put(SVNProperty.COPIED, copied ? Boolean.TRUE.toString() : null);
             }
+        }
+        
+        if (keepLocal) {
+            attributes.put(SVNProperty.KEEP_LOCAL, SVNProperty.toString(true));
+        }
+
+        if (attributes.size() > 0) {
             dir.modifyEntry(dir.getThisDirName(), attributes, true, false);
             attributes.clear();
         }
+
         dir.saveEntries(false);
     }
     
@@ -336,7 +351,7 @@ public class SVNWCManager {
                 }
             } else {
                 if (dir != root) {
-                    markTree(dir, SVNProperty.SCHEDULE_DELETE, false, SCHEDULE);
+                    markTree(dir, SVNProperty.SCHEDULE_DELETE, false, !deleteFiles, SCHEDULE);
                 }
             }
         }

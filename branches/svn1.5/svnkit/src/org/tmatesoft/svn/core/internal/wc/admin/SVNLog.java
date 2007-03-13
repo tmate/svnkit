@@ -120,11 +120,8 @@ public abstract class SVNLog {
             for (Iterator names = modifiedEntryProps.keySet().iterator(); names.hasNext();) {
                 String propName = (String) names.next();
                 String propValue = (String) modifiedEntryProps.get(propName);
-                String longPropName = propName;
-                if (!(SVNProperty.CACHABLE_PROPS.equals(propName) || SVNProperty.PRESENT_PROPS.equals(propName) ||
-                        SVNProperty.HAS_PROPS.equals(propName) || SVNProperty.HAS_PROP_MODS.equals(propName))) {
-                    longPropName = SVNProperty.SVN_ENTRY_PREFIX + propName;
-                }
+                String longPropName = !propName.startsWith(SVNProperty.SVN_ENTRY_PREFIX) ? SVNProperty.SVN_ENTRY_PREFIX + propName : propName;
+
                 if (SVNProperty.LOCK_TOKEN.equals(longPropName)) {
                     Map deleteLockCommand = new HashMap();
                     deleteLockCommand.put(SVNLog.NAME_ATTR, name);

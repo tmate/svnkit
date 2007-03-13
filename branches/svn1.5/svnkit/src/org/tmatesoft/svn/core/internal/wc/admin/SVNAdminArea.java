@@ -825,10 +825,10 @@ public abstract class SVNAdminArea {
     }
 
     public void foldScheduling(String name, Map attributes, boolean force) throws SVNException {
-        if (!attributes.containsKey(SVNProperty.shortPropertyName(SVNProperty.SCHEDULE)) || force) {
+        if (!attributes.containsKey(SVNProperty.SCHEDULE) || force) {
             return;
         }
-        String schedule = (String) attributes.get(SVNProperty.shortPropertyName(SVNProperty.SCHEDULE));
+        String schedule = (String) attributes.get(SVNProperty.SCHEDULE);
         schedule = "".equals(schedule) ? null : schedule;
         
         SVNEntry entry = getEntry(name, true);
@@ -861,29 +861,29 @@ public abstract class SVNAdminArea {
                 if (!entry.isDeleted()) {
                     deleteEntry(name);
                 } else {
-                    attributes.put(SVNProperty.shortPropertyName(SVNProperty.SCHEDULE), null);
+                    attributes.put(SVNProperty.SCHEDULE, null);
                 }
             } else {
-                attributes.remove(SVNProperty.shortPropertyName(SVNProperty.SCHEDULE));
+                attributes.remove(SVNProperty.SCHEDULE);
             }
         } else if (SVNProperty.SCHEDULE_DELETE.equals(entry.getSchedule())) {
             if (SVNProperty.SCHEDULE_DELETE.equals(schedule)) {
-                attributes.remove(SVNProperty.shortPropertyName(SVNProperty.SCHEDULE));
+                attributes.remove(SVNProperty.SCHEDULE);
             } else if (SVNProperty.SCHEDULE_ADD.equals(schedule)) {
-                attributes.put(SVNProperty.shortPropertyName(SVNProperty.SCHEDULE), SVNProperty.SCHEDULE_REPLACE);
+                attributes.put(SVNProperty.SCHEDULE, SVNProperty.SCHEDULE_REPLACE);
             } 
         } else if (SVNProperty.SCHEDULE_REPLACE.equals(entry.getSchedule())) {
             if (SVNProperty.SCHEDULE_DELETE.equals(schedule)) {
-                attributes.put(SVNProperty.shortPropertyName(SVNProperty.SCHEDULE), SVNProperty.SCHEDULE_DELETE);
+                attributes.put(SVNProperty.SCHEDULE, SVNProperty.SCHEDULE_DELETE);
             } else if (SVNProperty.SCHEDULE_ADD.equals(schedule) || SVNProperty.SCHEDULE_REPLACE.equals(schedule)) {
-                attributes.remove(SVNProperty.shortPropertyName(SVNProperty.SCHEDULE));
+                attributes.remove(SVNProperty.SCHEDULE);
             }
         } else {
             if (SVNProperty.SCHEDULE_ADD.equals(schedule) && !entry.isDeleted()) {
                 SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_SCHEDULE_CONFLICT, "Entry ''{0}'' is already under version control", name);
                 SVNErrorManager.error(err);
             } else if (schedule == null) {
-                attributes.remove(SVNProperty.shortPropertyName(SVNProperty.SCHEDULE));
+                attributes.remove(SVNProperty.SCHEDULE);
             }
         }
     }
@@ -894,7 +894,7 @@ public abstract class SVNAdminArea {
         }
         
         boolean deleted = false;
-        if (attributes.containsKey(SVNProperty.shortPropertyName(SVNProperty.SCHEDULE))) {
+        if (attributes.containsKey(SVNProperty.SCHEDULE)) {
             SVNEntry entryBefore = getEntry(name, true);
             foldScheduling(name, attributes, force);
             SVNEntry entryAfter = getEntry(name, true);
@@ -917,8 +917,6 @@ public abstract class SVNAdminArea {
                     String[] propsArray = SVNAdminArea.fromString(value, " ");
                     entryAttrs.put(attName, propsArray);
                     continue;
-                } else if (!(SVNProperty.HAS_PROPS.equals(attName) || SVNProperty.HAS_PROP_MODS.equals(attName))) {
-                    attName = SVNProperty.SVN_ENTRY_PREFIX + attName;
                 }
                
                 if (value != null) {
@@ -951,7 +949,7 @@ public abstract class SVNAdminArea {
                 }
             }
             
-            if (attributes.containsKey(SVNProperty.shortPropertyName(SVNProperty.SCHEDULE)) && entry.isScheduledForDeletion()) {
+            if (attributes.containsKey(SVNProperty.SCHEDULE) && entry.isScheduledForDeletion()) {
                 entry.setCopied(false);
                 entry.setCopyFromRevision(-1);
                 entry.setCopyFromURL(null);

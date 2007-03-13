@@ -63,6 +63,15 @@ public class SVNUpdateCommand extends SVNCommand {
                 error = true;
             }
         }
+        
+        for (int i = 0; i < getCommandLine().getURLCount(); i++) {
+            String url = getCommandLine().getURL(i);
+            if (!getCommandLine().hasArgument(SVNArgument.QUIET)) {
+                println(out, "Skipped '" +  url + "'");
+            }
+            continue;
+        }
+
         if (error) {
             System.exit(1);
         }
