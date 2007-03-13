@@ -170,7 +170,7 @@ public class SVNEntry implements Comparable {
     }
 
     public void setIncomplete(boolean incomplete) {
-        setAttributeValue(SVNProperty.INCOMPLETE,incomplete ? Boolean.TRUE.toString() : null);
+        setAttributeValue(SVNProperty.INCOMPLETE, incomplete ? Boolean.TRUE.toString() : null);
     }
 
     public boolean isIncomplete() {
