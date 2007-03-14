@@ -28,6 +28,7 @@ import org.tmatesoft.svn.core.SVNProperty;
 import org.tmatesoft.svn.core.internal.util.SVNTimeUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
+import org.tmatesoft.svn.core.internal.wc.SVNProperties;
 import org.tmatesoft.svn.core.wc.SVNStatusType;
 import org.tmatesoft.svn.util.SVNDebugLog;
 
@@ -81,7 +82,6 @@ public class SVNLogRunner {
         } else if (SVNLog.MODIFY_ENTRY.equals(name)) {
             try {
                 Map entryAttrs = new HashMap();
-                
                 for (Iterator attrtibutesIter = attributes.keySet().iterator(); attrtibutesIter.hasNext();) {
                     String attrName = (String) attrtibutesIter.next();
                     if ("".equals(attrName) || SVNLog.NAME_ATTR.equals(attrName)) {
@@ -112,6 +112,18 @@ public class SVNLogRunner {
                         entryAttrs.put(SVNProperty.PROP_TIME, value);
                     }                
                 }
+
+                String workingSize = (String) entryAttrs.get(SVNProperty.WORKING_SIZE);
+                if (workingSize != null && SVNProperty.WORKING_SIZE_WC.equals(workingSize)) {
+                    SVNEntry entry = adminArea.getEntry(fileName, false);
+                    if (entry == null) {
+                        return;
+                    }
+                    File file = adminArea.getFile(fileName);
+                    
+                    
+                }
+                
                 try {
                     adminArea.modifyEntry(fileName, entryAttrs, false, false);
                 } catch (SVNException svne) {
