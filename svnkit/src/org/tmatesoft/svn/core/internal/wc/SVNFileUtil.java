@@ -137,7 +137,7 @@ public class SVNFileUtil {
         return path;
     }
 
-    public static boolean createEmptyFile(File file) throws SVNException {
+    public static void createEmptyFile(File file) throws SVNException {
         boolean created;
         if (file != null && file.getParentFile() != null && !file.getParentFile().exists()) {
             file.getParentFile().mkdirs();
@@ -151,7 +151,34 @@ public class SVNFileUtil {
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, "Cannot create new file ''{0}''", file);
             SVNErrorManager.error(err);
         }
-        return created;
+    }
+
+    /**
+     * An internal method for ASCII bytes to write only!
+     * 
+     * @param file
+     * @param contents
+     * @throws SVNException
+     */
+    public static void createFile(File file, String contents) throws SVNException {
+        createEmptyFile(file);
+        if (contents == null || contents.length() == 0) {
+            return;
+        }
+        
+        OutputStream os = null;
+        try {
+            os = SVNFileUtil.openFileForWriting(file); 
+            os.write(contents.getBytes());
+        } catch (IOException ioe) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, "Can not write to file ''{0}'': {1}", new Object[] {file, ioe.getLocalizedMessage()});
+            SVNErrorManager.error(err, ioe);
+        } catch (SVNException svne) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, "Can not write to file ''{0}''", file);
+            SVNErrorManager.error(err, svne);
+        } finally {
+            SVNFileUtil.closeFile(os);
+        }
     }
 
     public static File createUniqueFile(File parent, String name, String suffix) throws SVNException {
