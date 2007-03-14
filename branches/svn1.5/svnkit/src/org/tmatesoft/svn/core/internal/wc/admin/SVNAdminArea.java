@@ -949,11 +949,17 @@ public abstract class SVNAdminArea {
                 }
             }
             
-            if (attributes.containsKey(SVNProperty.SCHEDULE) && entry.isScheduledForDeletion()) {
-                entry.setCopied(false);
-                entry.setCopyFromRevision(-1);
-                entry.setCopyFromURL(null);
+            if (attributes.containsKey(SVNProperty.SCHEDULE)) {
+                if (entry.isScheduledForDeletion()) {
+                    entry.setCopied(false);
+                    entry.setCopyFromRevision(-1);
+                    entry.setCopyFromURL(null);
+                } else {
+                    entry.setKeepLocal(false);
+                }
             }
+            
+            
         }
         
         if (save) {

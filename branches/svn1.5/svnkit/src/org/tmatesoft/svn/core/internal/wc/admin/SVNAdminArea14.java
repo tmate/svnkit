@@ -67,7 +67,8 @@ public class SVNAdminArea14 extends SVNAdminArea {
     private static final String ATTRIBUTE_KEEP_LOCAL = "kep-local";
     private static final String ATTRIBUTE_HAS_PROPS = "has-props";
     private static final String ATTRIBUTE_HAS_PROP_MODS = "has-prop-mods";
-
+    private static final String KILL_ADM_ONLY = "adm-only";
+    private static final String ADM_KILLME = "KILLME";
     private static final String THIS_DIR = "";
 
     private File myLockFile;
@@ -863,6 +864,41 @@ public class SVNAdminArea14 extends SVNAdminArea {
         }
 
         line = reader.readLine();
+        if (isEntryFinished(line)) {
+            return entry;
+        }
+        String changelist = parseString(line);
+        if (changelist != null) {//TODO: correct this later
+            entryAttrs.put(SVNProperty.CHANGELIST, changelist);
+        }
+
+        line = reader.readLine();
+        if (isEntryFinished(line)) {
+            return entry;
+        }
+        boolean keepLocal = parseBoolean(line, ATTRIBUTE_KEEP_LOCAL);
+        if (keepLocal) {
+            entryAttrs.put(SVNProperty.KEEP_LOCAL, SVNProperty.toString(keepLocal));
+        }
+        
+        line = reader.readLine();
+        if (isEntryFinished(line)) {
+            return entry;
+        }
+        String workingSize = parseString(line);
+        if (workingSize != null) {
+            entryAttrs.put(SVNProperty.WORKING_SIZE, workingSize);
+        } else {
+            if (getThisDirName().equals(name)) {
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_ATTRIBUTE_INVALID, "This directory's entry has invalid or missing working-size");
+                SVNErrorManager.error(err);
+            } else {
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_ATTRIBUTE_INVALID, "Entry ''{0}'' has invalid or missing working-size", name);
+                SVNErrorManager.error(err);
+            }
+        }
+        
+        line = reader.readLine();
         if (line == null || line.length() != 1) {
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_CORRUPT, "Missing entry terminator");
             SVNErrorManager.error(err);
@@ -1246,7 +1282,7 @@ public class SVNAdminArea14 extends SVNAdminArea {
         
         //TODO: add changelist support here 
         String changelist = null; 
-        if (writeValue(writer, changelist, emptyFields)) {
+        if (writeString(writer, changelist, emptyFields)) {
             emptyFields = 0;
         } else {
             ++emptyFields;
@@ -1260,6 +1296,13 @@ public class SVNAdminArea14 extends SVNAdminArea {
             ++emptyFields;
         }
 
+        String workingSize = (String)entry.get(SVNProperty.WORKING_SIZE);
+        if (writeString(writer, workingSize, emptyFields)) {
+            emptyFields = 0;
+        } else {
+            ++emptyFields;
+        }
+        
         writer.write("\f\n");
         writer.flush();
     }
@@ -1510,6 +1553,13 @@ public class SVNAdminArea14 extends SVNAdminArea {
         SVNErrorManager.error(err);
     }
 
+    private void makeKillMe(boolean killAdminOnly) throws SVNException {
+        File killMe = getAdminFile("KILLME");
+        if (killMe.getParentFile().isDirectory()) {
+            SVNFileUtil.createFile(killMe, killAdminOnly ? KILL_ADM_ONLY : null);
+        }
+    }
+    
     public void postCommit(String fileName, long revisionNumber, boolean implicit, SVNErrorCode errorCode) throws SVNException {
         SVNEntry entry = getEntry(fileName, true);
         if (entry == null || (!getThisDirName().equals(fileName) && entry.getKind() != SVNNodeKind.FILE)) {
@@ -1521,15 +1571,7 @@ public class SVNAdminArea14 extends SVNAdminArea {
             if (getThisDirName().equals(fileName)) {
                 entry.setRevision(revisionNumber);
                 entry.setKind(SVNNodeKind.DIR);
-                File killMe = getAdminFile("KILLME");
-                if (killMe.getParentFile().isDirectory()) {
-                    try {
-                        killMe.createNewFile();
-                    } catch (IOException e) {
-                        SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, "Cannot create file ''{0}'': {1}", new Object[] {killMe, e.getLocalizedMessage()}); 
-                        SVNErrorManager.error(err, e);
-                    } 
-                }
+                makeKillMe(entry.isKeepLocal());
             } else {
                 removeFromRevisionControl(fileName, false, false);
                 SVNEntry parentEntry = getEntry(getThisDirName(), true);

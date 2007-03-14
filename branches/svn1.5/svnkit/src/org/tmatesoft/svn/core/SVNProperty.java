@@ -116,6 +116,8 @@ public class SVNProperty {
 
     public static final String CHANGELIST = SVN_ENTRY_PREFIX + "changelist";
 
+    public static final String WORKING_SIZE = SVN_ENTRY_PREFIX + "working-size";
+
     /**
      * An <span class="javastring">"svn:entry:checksum"</span> SVN untweakable metaproperty.
      */

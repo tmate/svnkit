@@ -402,6 +402,14 @@ public class SVNEntry implements Comparable {
         }
     }
 
+    public void setKeepLocal(boolean keepLocal) {
+        setAttributeValue(SVNProperty.KEEP_LOCAL, keepLocal ? Boolean.TRUE.toString() : null);
+    }
+
+    public boolean isKeepLocal() {
+        return Boolean.TRUE.toString().equals(myAttributes.get(SVNProperty.KEEP_LOCAL));
+    }
+
     public String[] getCachableProperties() {
         return (String[])myAttributes.get(SVNProperty.CACHABLE_PROPS);
     }
