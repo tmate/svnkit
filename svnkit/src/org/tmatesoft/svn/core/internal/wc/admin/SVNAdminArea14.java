@@ -64,11 +64,10 @@ public class SVNAdminArea14 extends SVNAdminArea {
     private static final String ATTRIBUTE_DELETED = "deleted";
     private static final String ATTRIBUTE_ABSENT = "absent";
     private static final String ATTRIBUTE_INCOMPLETE = "incomplete";
-    private static final String ATTRIBUTE_KEEP_LOCAL = "kep-local";
+    private static final String ATTRIBUTE_KEEP_LOCAL = "keep-local";
     private static final String ATTRIBUTE_HAS_PROPS = "has-props";
     private static final String ATTRIBUTE_HAS_PROP_MODS = "has-prop-mods";
     private static final String KILL_ADM_ONLY = "adm-only";
-    private static final String ADM_KILLME = "KILLME";
     private static final String THIS_DIR = "";
 
     private File myLockFile;
@@ -448,6 +447,42 @@ public class SVNAdminArea14 extends SVNAdminArea {
         }
     }
 
+    public void handleKillMe() throws SVNException {
+        boolean killMe = isKillMe();
+        if (killMe) {
+            String contents = SVNFileUtil.readFile(getAdminFile(ADM_KILLME));
+            boolean killAdmOnly = KILL_ADM_ONLY.equals(contents);
+            SVNEntry entry = getEntry(getThisDirName(), false);
+            long dirRevision = entry != null ? entry.getRevision() : -1;
+            // deleted dir, files and entry in parent.
+            File dir = getRoot();
+            SVNWCAccess access = getWCAccess(); 
+            boolean isWCRoot = access.isWCRoot(getRoot());
+            try {
+                removeFromRevisionControl(getThisDirName(), !killAdmOnly, false);
+            } catch (SVNException svne) {
+                SVNDebugLog.getDefaultLog().info(svne);
+                if (svne.getErrorMessage().getErrorCode() != SVNErrorCode.WC_LEFT_LOCAL_MOD) {
+                    throw svne;
+                }
+            }
+            if (isWCRoot) {
+                return;
+            }
+            // compare revision with parent's one
+            SVNAdminArea parentArea = access.retrieve(dir.getParentFile());
+            SVNEntry parentEntry = parentArea.getEntry(parentArea.getThisDirName(), false);
+            if (dirRevision > parentEntry.getRevision()) {
+                SVNEntry entryInParent = parentArea.addEntry(dir.getName());
+                Map attributes = new HashMap();
+                attributes.put(SVNProperty.DELETED, Boolean.TRUE.toString());
+                attributes.put(SVNProperty.KIND, SVNProperty.KIND_DIR);
+                attributes.put(SVNProperty.REVISION, Long.toString(dirRevision));
+                parentArea.modifyEntry(entryInParent.getName(), attributes, true, false);
+            }
+        }
+    }
+
     public void saveEntries(boolean close) throws SVNException {
         if (myEntries != null) {
             if (!isLocked()) {
@@ -510,8 +545,8 @@ public class SVNAdminArea14 extends SVNAdminArea {
                     } 
                     entries.put(entry.getName(), entry);
                 } catch (SVNException svne) {
-                    SVNErrorMessage err = svne.getErrorMessage().wrap("Error at entry {0} in entries file for ''{1}'':", new Object[]{new Integer(entryNumber), getRoot()});
-                    SVNErrorManager.error(err);
+                    SVNErrorMessage err = svne.getErrorMessage().wrap("Error at entry {0,number,integer} in entries file for ''{1}'':", new Object[]{new Integer(entryNumber), getRoot()});
+                    SVNErrorManager.error(err, svne);
                 }
                 ++entryNumber;
             }
@@ -1278,7 +1313,11 @@ public class SVNAdminArea14 extends SVNAdminArea {
         }
         
         String lockCreationDate = (String)entry.get(SVNProperty.LOCK_CREATION_DATE);
-        writeValue(writer, lockCreationDate, emptyFields);
+        if (writeValue(writer, lockCreationDate, emptyFields)) {
+            emptyFields = 0;
+        } else {
+            ++emptyFields;
+        }
         
         //TODO: add changelist support here 
         String changelist = null; 
@@ -1554,7 +1593,7 @@ public class SVNAdminArea14 extends SVNAdminArea {
     }
 
     private void makeKillMe(boolean killAdminOnly) throws SVNException {
-        File killMe = getAdminFile("KILLME");
+        File killMe = getAdminFile(ADM_KILLME);
         if (killMe.getParentFile().isDirectory()) {
             SVNFileUtil.createFile(killMe, killAdminOnly ? KILL_ADM_ONLY : null);
         }
@@ -1736,7 +1775,6 @@ public class SVNAdminArea14 extends SVNAdminArea {
         entryAttrs.put(SVNProperty.COPYFROM_REVISION, null);
         entryAttrs.put(SVNProperty.COPYFROM_URL, null);
         entryAttrs.put(SVNProperty.HAS_PROP_MODS, SVNProperty.toString(false));
-
         
         try {
             modifyEntry(fileName, entryAttrs, false, true);
@@ -1797,7 +1835,7 @@ public class SVNAdminArea14 extends SVNAdminArea {
             return true;
         }
         // only if there are not locks or killme files.
-        boolean killMe = getAdminFile("KILLME").exists();
+        boolean killMe = getAdminFile(ADM_KILLME).exists();
         if (killMe) {
             return false;
         }

@@ -55,6 +55,7 @@ import org.tmatesoft.svn.core.wc.SVNStatusType;
  * @author  TMate Software Ltd.
  */
 public abstract class SVNAdminArea {
+    protected static final String ADM_KILLME = "KILLME";
 
     private File myDirectory;
     private SVNWCAccess myWCAccess;
@@ -106,6 +107,8 @@ public abstract class SVNAdminArea {
 
     public abstract void postCommit(String fileName, long revisionNumber, boolean implicit, SVNErrorCode errorCode) throws SVNException;
 
+    public abstract void handleKillMe() throws SVNException;
+    
     public void updateURL(String rootURL, boolean recursive) throws SVNException {
         SVNWCAccess wcAccess = getWCAccess();
         for (Iterator ents = entries(false); ents.hasNext();) {
@@ -311,7 +314,7 @@ public abstract class SVNAdminArea {
     }
     
     public boolean isKillMe() {
-        return getAdminFile("KILLME").isFile();
+        return getAdminFile(ADM_KILLME).isFile();
     }
 
     public boolean markResolved(String name, boolean text, boolean props) throws SVNException {
@@ -552,6 +555,7 @@ public abstract class SVNAdminArea {
                 entry.setConflictNew(SVNFileUtil.getBasePath(newFile));
                 entry.setConflictOld(SVNFileUtil.getBasePath(oldFile));
                 entry.setConflictWorking(null);
+                saveEntries(false);
             } 
             status = SVNStatusType.CONFLICTED;
         } else {
@@ -958,15 +962,13 @@ public abstract class SVNAdminArea {
                     entry.setKeepLocal(false);
                 }
             }
-            
-            
         }
         
         if (save) {
             saveEntries(false);
         }
     }
-    
+
     public void deleteEntry(String name) throws SVNException {
         Map entries = loadEntries();
         if (entries != null) {

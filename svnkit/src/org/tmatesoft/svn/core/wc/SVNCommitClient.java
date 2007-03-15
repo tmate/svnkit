@@ -691,9 +691,10 @@ public class SVNCommitClient extends SVNBasicClient {
                                 if (parentDir != null) {
                                     SVNEntry entryInParent = parentDir.getEntry(nameInParent, true);
                                     if (entryInParent != null) {
-                                        entryInParent.unschedule();
-                                        entryInParent.setDeleted(true);
-                                        parentDir.saveEntries(false);
+                                        Map attributes = new HashMap();
+                                        attributes.put(SVNProperty.SCHEDULE, null);
+                                        attributes.put(SVNProperty.DELETED, Boolean.TRUE.toString());
+                                        parentDir.modifyEntry(nameInParent, attributes, true, true);
                                     }
                                 }
                             }

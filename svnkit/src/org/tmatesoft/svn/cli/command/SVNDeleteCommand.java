@@ -72,6 +72,7 @@ public class SVNDeleteCommand extends SVNCommand {
 
     private void runLocally(final PrintStream out, PrintStream err) {
         boolean force = getCommandLine().hasArgument(SVNArgument.FORCE);
+        boolean keepLocal = getCommandLine().hasArgument(SVNArgument.KEEP_LOCAL);
 
         getClientManager().setEventHandler(new SVNCommandEventProcessor(out, err, false));
 
@@ -80,7 +81,7 @@ public class SVNDeleteCommand extends SVNCommand {
         for (int i = 0; i < getCommandLine().getPathCount(); i++) {
             final String absolutePath = getCommandLine().getPathAt(i);
             try {
-                client.doDelete(new File(absolutePath), force, false);
+                client.doDelete(new File(absolutePath), force, !keepLocal, false);
             } catch (SVNException e) {
                 err.println(e.getMessage());
                 error = true;

@@ -77,6 +77,7 @@ public class SVN {
         ourArguments.add(SVNArgument.IGNORE_ALL_WS);
         ourArguments.add(SVNArgument.IGNORE_EOL_STYLE);
         ourArguments.add(SVNArgument.IGNORE_WS_CHANGE);
+        ourArguments.add(SVNArgument.KEEP_LOCAL);
     }
 
     public static void main(String[] args) {

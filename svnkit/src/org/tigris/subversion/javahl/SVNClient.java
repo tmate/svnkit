@@ -95,6 +95,9 @@ public class SVNClient implements SVNClientInterface {
         return myDelegate.checkout(moduleName, destPath, revision, recurse);
     }
 
+    /**
+     * @deprecated
+     */
     public void notification(Notify notify) {
         myDelegate.notification(notify);
     }
@@ -405,5 +408,17 @@ public class SVNClient implements SVNClientInterface {
 
     public long[] update(String[] path, Revision revision, boolean recurse, boolean ignoreExternals, boolean allowUnverObstructions) throws ClientException {
         return myDelegate.update(path, revision, recurse, ignoreExternals, allowUnverObstructions);
+    }
+
+    public void addToChangelist(String[] paths, String changelist) throws ClientException {
+        myDelegate.addToChangelist(paths, changelist);
+    }
+
+    public String[] getChangelist(String changelist, String rootPath) throws ClientException {
+        return myDelegate.getChangelist(changelist, rootPath);
+    }
+
+    public void removeFromChangelist(String[] paths, String changelist) throws ClientException {
+        myDelegate.removeFromChangelist(paths, changelist);
     }
 }
