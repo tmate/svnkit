@@ -919,30 +919,44 @@ public class SVNCopyClient extends SVNBasicClient {
     static void postCopyCleanup(SVNAdminArea dir) throws SVNException {
         SVNPropertiesManager.deleteWCProperties(dir, null, false);
         SVNFileUtil.setHidden(dir.getAdminDirectory(), true);
+        Map attributes = new HashMap(); 
+        boolean save = false;
         
         for(Iterator entries = dir.entries(true); entries.hasNext();) {
             SVNEntry entry = (SVNEntry) entries.next();
             boolean deleted = entry.isDeleted();
             SVNNodeKind kind = entry.getKind();
+            boolean force = false;
             
             if (entry.isDeleted()) {
-                entry.setSchedule(SVNProperty.SCHEDULE_DELETE);
-                entry.setDeleted(false);
+                force = true;
+                attributes.put(SVNProperty.SCHEDULE, SVNProperty.SCHEDULE_DELETE);
+                attributes.put(SVNProperty.DELETED, null);
                 if (entry.isDirectory()) {
-                    entry.setKind(SVNNodeKind.FILE);
+                    attributes.put(SVNProperty.KIND, SVNProperty.KIND_FILE);
                 }
             }
             if (entry.getLockToken() != null) {
-                entry.setLockToken(null);
-                entry.setLockOwner(null);
-                entry.setLockCreationDate(null);
+                force = true;
+                attributes.put(SVNProperty.LOCK_TOKEN, null);
+                attributes.put(SVNProperty.LOCK_OWNER, null);
+                attributes.put(SVNProperty.LOCK_CREATION_DATE, null);
+            }
+            if (force) {
+                dir.modifyEntry(entry.getName(), attributes, false, force);
+                save = true;
             }
             if (!deleted && kind == SVNNodeKind.DIR && !dir.getThisDirName().equals(entry.getName())) {
                 SVNAdminArea childDir = dir.getWCAccess().retrieve(dir.getFile(entry.getName()));
                 postCopyCleanup(childDir);
             }
+            
+            attributes.clear();
         }
-        dir.saveEntries(false);
+        
+        if (save) {
+            dir.saveEntries(false);
+        }
     }
 
     private static class CopyCommitPathHandler implements ISVNCommitPathHandler {

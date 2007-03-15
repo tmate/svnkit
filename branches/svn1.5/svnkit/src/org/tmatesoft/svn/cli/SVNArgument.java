@@ -63,6 +63,7 @@ public abstract class SVNArgument {
     public static final SVNArgument NON_INTERACTIVE = createUnaryArgument(new String[] { "--non-interactive" });
     public static final SVNArgument CHANGE = createStringArgument(new String[] { "--change", "-c" });
     public static final SVNArgument SUMMARIZE = createUnaryArgument(new String[] { "--summarize" });
+    public static final SVNArgument KEEP_LOCAL = createUnaryArgument(new String[] { "--keep-local" });
 
     public static final SVNArgument EXTENSIONS = createUnaryArgument(new String[] { "-x", "--extensions" });
     public static final SVNArgument IGNORE_WS_CHANGE = createUnaryArgument(new String[] { "-b", "--ignore-space-change" });
@@ -84,7 +85,6 @@ public abstract class SVNArgument {
     public static final SVNArgument COPY_INFO = createUnaryArgument(new String[] { "--copy-info" });
     public static final SVNArgument SHOW_IDS = createUnaryArgument(new String[] { "--show-ids" });
     public static final SVNArgument FULL_PATHS = createUnaryArgument(new String[] { "--full-paths" });
-    
     
     public static SVNArgument findArgument(String name, Set validArguments) {
         for (Iterator arguments = validArguments.iterator(); arguments.hasNext();) {

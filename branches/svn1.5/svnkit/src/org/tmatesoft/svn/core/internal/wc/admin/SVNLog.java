@@ -76,6 +76,8 @@ public abstract class SVNLog {
 
     public static final String FORMAT_ATTR = "format";
 
+    public static final String FORCE_ATTR = "force";
+
     public static final String ATTR1 = "arg1";
     public static final String ATTR2 = "arg2";
     public static final String ATTR3 = "arg3";
@@ -84,6 +86,7 @@ public abstract class SVNLog {
     public static final String ATTR6 = "arg6";
 
     public static final String WC_TIMESTAMP = "working";
+    public static final String WC_WORKING_SIZE = "working";
 
     protected Collection myCache;
     protected SVNAdminArea myAdminArea;

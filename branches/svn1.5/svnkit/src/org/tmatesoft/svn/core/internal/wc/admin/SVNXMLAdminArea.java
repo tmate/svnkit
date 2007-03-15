@@ -757,6 +757,39 @@ public class SVNXMLAdminArea extends SVNAdminArea {
     public void postUpgradeFormat(int format) throws SVNException {
     }
 
+    public void handleKillMe() throws SVNException {
+        boolean killMe = isKillMe();
+        if (killMe) {
+            SVNEntry entry = getEntry(getThisDirName(), false);
+            long dirRevision = entry != null ? entry.getRevision() : -1;
+            // deleted dir, files and entry in parent.
+            File dir = getRoot();
+            SVNWCAccess access = getWCAccess(); 
+            boolean isWCRoot = access.isWCRoot(getRoot());
+            try {
+                removeFromRevisionControl(getThisDirName(), true, false);
+            } catch (SVNException svne) {
+                SVNDebugLog.getDefaultLog().info(svne);
+                if (svne.getErrorMessage().getErrorCode() != SVNErrorCode.WC_LEFT_LOCAL_MOD) {
+                    throw svne;
+                }
+            }
+            if (isWCRoot) {
+                return;
+            }
+            // compare revision with parent's one
+            SVNAdminArea parentArea = access.retrieve(dir.getParentFile());
+            SVNEntry parentEntry = parentArea.getEntry(parentArea.getThisDirName(), false);
+            if (dirRevision > parentEntry.getRevision()) {
+                SVNEntry entryInParent = parentArea.addEntry(dir.getName());
+                entryInParent.setDeleted(true);
+                entryInParent.setKind(SVNNodeKind.DIR);
+                entryInParent.setRevision(dirRevision);
+                parentArea.saveEntries(false);
+            }
+        }
+    }
+
     public void postCommit(String fileName, long revisionNumber, boolean implicit, SVNErrorCode errorCode) throws SVNException {
         SVNEntry entry = getEntry(fileName, true);
         if (entry == null || (!getThisDirName().equals(fileName) && entry.getKind() != SVNNodeKind.FILE)) {
@@ -768,7 +801,7 @@ public class SVNXMLAdminArea extends SVNAdminArea {
             if (getThisDirName().equals(fileName)) {
                 entry.setRevision(revisionNumber);
                 entry.setKind(SVNNodeKind.DIR);
-                File killMe = getAdminFile("KILLME");
+                File killMe = getAdminFile(ADM_KILLME);
                 if (killMe.getParentFile().isDirectory()) {
                     try {
                         killMe.createNewFile();

@@ -58,6 +58,8 @@ public class SVNFileUtil {
     public final static boolean isOSX;
     public final static boolean isOpenVMS;
 
+    public static final int STREAM_CHUNK_SIZE = 16384;
+
     public final static OutputStream DUMMY_OUT = new OutputStream() {
 
         public void write(int b) throws IOException {
@@ -75,6 +77,7 @@ public class SVNFileUtil {
     private static String ourUserID;
     private static File ourAppDataPath;
     private static String ourAdminDirectoryName;
+    private static File ourSystemAppDataPath;
     
     public static final String BINARY_MIME_TYPE = "application/octet-stream";
 
@@ -115,6 +118,30 @@ public class SVNFileUtil {
         ENV_COMMAND = props.getProperty(prefix + "env", "env");
     }
 
+    public static String readFile(File file) throws SVNException {
+        InputStream is = null;
+        try {
+            is = openFileForReading(file);
+            return readFile(is);
+        } catch (IOException ioe) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, "Can not read from file ''{0}'': {1}", new Object[] {file, ioe.getLocalizedMessage()});
+            SVNErrorManager.error(err);
+        } finally { 
+            closeFile(is);
+        }
+        return null;
+    }
+    
+    public static String readFile(InputStream input) throws IOException {
+        byte[] buf = new byte[STREAM_CHUNK_SIZE];
+        StringBuffer result = new StringBuffer();
+        int r = -1;
+        while ((r = input.read(buf)) != -1) {
+            result.append(new String(buf, 0, r, "UTF-8"));
+        }
+        return result.toString();
+    }
+    
     public static String getBasePath(File file) {
         File base = file.getParentFile();
         while (base != null) {
@@ -1168,6 +1195,19 @@ public class SVNFileUtil {
         return ourAppDataPath;
     }
 
+    public static File getSystemApplicationDataPath() {
+        if (ourSystemAppDataPath != null) {
+            return ourSystemAppDataPath;
+        }
+        String envAppData = getEnvironmentVariable("ALLUSERSPROFILE");
+        if (envAppData == null) {
+            ourSystemAppDataPath = new File(new File("C:/Documents and Settings/All Users"), "Application Data");
+        } else {
+            ourSystemAppDataPath = new File(envAppData, "Application Data");
+        }
+        return ourSystemAppDataPath;
+    }
+
     public static String getEnvironmentVariable(String name) {
         try {
             // pre-Java 1.5 this throws an Error. On Java 1.5 it
@@ -1250,5 +1290,14 @@ public class SVNFileUtil {
             SVNErrorManager.error(err, e);
         }
         return tmpFile;
+    }
+
+    public static File getSystemConfigurationDirectory() {
+        if (isWindows) {
+            return new File(getSystemApplicationDataPath(), "Subversion");
+        } else if (isOpenVMS) {
+            return new File("/sys$config", "subversion").getAbsoluteFile();
+        }
+        return new File("/etc/subversion");
     }
 }

@@ -165,6 +165,13 @@ public class SVNEntry implements Comparable {
         return setAttributeValue(SVNProperty.REVISION, Long.toString(revision));
     }
 
+    public boolean setWorkingSize(long size) {
+        if (getKind() == SVNNodeKind.FILE) {
+            return setAttributeValue(SVNProperty.WORKING_SIZE, Long.toString(size));
+        }
+        return false;
+    }
+
     public boolean setURL(String url) {
         return setAttributeValue(SVNProperty.URL, url);
     }

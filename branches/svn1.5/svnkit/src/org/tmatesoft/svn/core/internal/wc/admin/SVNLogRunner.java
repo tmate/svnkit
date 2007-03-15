@@ -28,9 +28,7 @@ import org.tmatesoft.svn.core.SVNProperty;
 import org.tmatesoft.svn.core.internal.util.SVNTimeUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
-import org.tmatesoft.svn.core.internal.wc.SVNProperties;
 import org.tmatesoft.svn.core.wc.SVNStatusType;
-import org.tmatesoft.svn.util.SVNDebugLog;
 
 
 /**
@@ -84,7 +82,7 @@ public class SVNLogRunner {
                 Map entryAttrs = new HashMap();
                 for (Iterator attrtibutesIter = attributes.keySet().iterator(); attrtibutesIter.hasNext();) {
                     String attrName = (String) attrtibutesIter.next();
-                    if ("".equals(attrName) || SVNLog.NAME_ATTR.equals(attrName)) {
+                    if ("".equals(attrName) || SVNLog.NAME_ATTR.equals(attrName) || SVNLog.FORCE_ATTR.equals(attrName)) {
                         continue;
                     }
                     
@@ -101,6 +99,7 @@ public class SVNLogRunner {
                         entryAttrs.put(SVNProperty.TEXT_TIME, value);
                     }
                 }
+
                 if (entryAttrs.containsKey(SVNProperty.PROP_TIME)) {
                     String value = (String) entryAttrs.get(SVNProperty.PROP_TIME); 
                     if (SVNLog.WC_TIMESTAMP.equals(value)) {
@@ -113,19 +112,36 @@ public class SVNLogRunner {
                     }                
                 }
 
-                String workingSize = (String) entryAttrs.get(SVNProperty.WORKING_SIZE);
-                if (workingSize != null && SVNProperty.WORKING_SIZE_WC.equals(workingSize)) {
-                    SVNEntry entry = adminArea.getEntry(fileName, false);
-                    if (entry == null) {
-                        return;
+                if (entryAttrs.containsKey(SVNProperty.WORKING_SIZE)) {
+                    String workingSize = (String) entryAttrs.get(SVNProperty.WORKING_SIZE);
+                    if (SVNLog.WC_WORKING_SIZE.equals(workingSize)) {
+                        SVNEntry entry = adminArea.getEntry(fileName, false);
+                        if (entry == null) {
+                            return;
+                        }
+                        File file = adminArea.getFile(fileName);
+                        if (!file.exists()) {
+                            entry.setWorkingSize(0);
+                        } else {
+                            try {
+                                entry.setWorkingSize(file.length());
+                            } catch (SecurityException se) {
+                                SVNErrorCode code = count <= 1 ? SVNErrorCode.WC_BAD_ADM_LOG_START : SVNErrorCode.WC_BAD_ADM_LOG;
+                                SVNErrorMessage err = SVNErrorMessage.create(code, "Error getting file size on ''{0}''", file);
+                                SVNErrorManager.error(err, se);
+                            }
+                        }
                     }
-                    File file = adminArea.getFile(fileName);
-                    
-                    
+                }
+                
+                boolean force = false;
+                if (attributes.containsKey(SVNLog.FORCE_ATTR)) {
+                    String forceAttr = (String) attributes.get(SVNLog.FORCE_ATTR);
+                    force = SVNProperty.booleanValue(forceAttr);
                 }
                 
                 try {
-                    adminArea.modifyEntry(fileName, entryAttrs, false, false);
+                    adminArea.modifyEntry(fileName, entryAttrs, false, force);
                 } catch (SVNException svne) {
                     SVNErrorCode code = count <= 1 ? SVNErrorCode.WC_BAD_ADM_LOG_START : SVNErrorCode.WC_BAD_ADM_LOG;
                     SVNErrorMessage err = SVNErrorMessage.create(code, "Error modifying entry for ''{0}''", fileName);
@@ -403,36 +419,9 @@ public class SVNLogRunner {
         if (myIsEntriesChanged) {
             adminArea.saveEntries(false);
         } 
-        boolean killMe = adminArea.isKillMe();
-        if (killMe) {
-            SVNEntry entry = adminArea.getEntry(adminArea.getThisDirName(), false);
-            long dirRevision = entry != null ? entry.getRevision() : -1;
-            // deleted dir, files and entry in parent.
-            File dir = adminArea.getRoot();
-            SVNWCAccess access = adminArea.getWCAccess(); 
-            boolean isWCRoot = access.isWCRoot(adminArea.getRoot());
-            try {
-                adminArea.removeFromRevisionControl(adminArea.getThisDirName(), true, false);
-            } catch (SVNException svne) {
-                SVNDebugLog.getDefaultLog().info(svne);
-                if (svne.getErrorMessage().getErrorCode() != SVNErrorCode.WC_LEFT_LOCAL_MOD) {
-                    throw svne;
-                }
-            }
-            if (isWCRoot) {
-                return;
-            }
-            // compare revision with parent's one
-            SVNAdminArea parentArea = access.retrieve(dir.getParentFile());
-            SVNEntry parentEntry = parentArea.getEntry(parentArea.getThisDirName(), false);
-            if (dirRevision > parentEntry.getRevision()) {
-                SVNEntry entryInParent = parentArea.addEntry(dir.getName());
-                entryInParent.setDeleted(true);
-                entryInParent.setKind(SVNNodeKind.DIR);
-                entryInParent.setRevision(dirRevision);
-                parentArea.saveEntries(false);
-            }
-        }
+
+        adminArea.handleKillMe();
+        
         myIsEntriesChanged = false;
         myIsWCPropertiesChanged = false;
     }

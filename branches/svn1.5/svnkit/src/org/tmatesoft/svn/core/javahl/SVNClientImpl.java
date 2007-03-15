@@ -325,6 +325,9 @@ public class SVNClientImpl implements SVNClientInterface {
         return checkout(moduleName, destPath, revision, null, recurse, false);
     }
 
+    /**
+     * @deprecated
+     */
     public void notification(Notify notify) {
         myNotify = notify;
     }
@@ -1158,6 +1161,10 @@ public class SVNClientImpl implements SVNClientInterface {
         return Version.getMicroVersion();
     }
 
+    /**
+     * 
+     * @deprecated
+     */
     protected Notify getNotify() {
         return myNotify;
     }
@@ -1302,5 +1309,18 @@ public class SVNClientImpl implements SVNClientInterface {
 
     public long[] update(String[] path, Revision revision, boolean recurse, boolean ignoreExternals, boolean allowUnverObstructions) throws ClientException {
         return null;
+    }
+
+    public void addToChangelist(String[] paths, String changelist) throws ClientException {
+        // TODO Auto-generated method stub
+    }
+
+    public String[] getChangelist(String changelist, String rootPath) throws ClientException {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    public void removeFromChangelist(String[] paths, String changelist) throws ClientException {
+        // TODO Auto-generated method stub
     }
 }
