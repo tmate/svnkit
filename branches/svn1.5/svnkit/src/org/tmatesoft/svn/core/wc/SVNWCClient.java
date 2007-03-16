@@ -1211,13 +1211,10 @@ public class SVNWCClient extends SVNBasicClient {
             reverted = true;
             recursive = false;
             if (wasDeleted) {
-                SVNEntry entryInParent = parent.getEntry(path.getName(), true);
-                if (entryInParent == null) {
-                    entryInParent = parent.addEntry(path.getName());
-                }
-                entryInParent.setKind(entry.getKind());
-                entryInParent.setDeleted(true);
-                parent.saveEntries(false);
+                Map attributes = new HashMap();
+                attributes.put(SVNProperty.KIND, entry.getKind().toString());
+                attributes.put(SVNProperty.DELETED, Boolean.TRUE.toString());
+                parent.modifyEntry(path.getName(), attributes, true, false);
             }
         } else if (entry.getSchedule() == null || entry.isScheduledForDeletion() || entry.isScheduledForReplacement()) {
             if (entry.getKind() == SVNNodeKind.FILE) {
@@ -1335,7 +1332,11 @@ public class SVNWCClient extends SVNBasicClient {
                 command.put(SVNLog.NAME_ATTR, name);
                 command.put(SVNProperty.shortPropertyName(SVNProperty.TEXT_TIME), SVNLog.WC_TIMESTAMP);
                 log.addCommand(SVNLog.MODIFY_ENTRY, command, false);
-                command.clear();                    
+                command.clear();
+                command.put(SVNLog.NAME_ATTR, name);
+                command.put(SVNProperty.shortPropertyName(SVNProperty.WORKING_SIZE), SVNLog.WC_WORKING_SIZE);
+                log.addCommand(SVNLog.MODIFY_ENTRY, command, false);
+                command.clear();
             }
             reverted |= reinstallWorkingFile;
         }

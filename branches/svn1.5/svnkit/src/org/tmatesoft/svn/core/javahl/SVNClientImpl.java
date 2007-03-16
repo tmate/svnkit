@@ -1323,4 +1323,13 @@ public class SVNClientImpl implements SVNClientInterface {
     public void removeFromChangelist(String[] paths, String changelist) throws ClientException {
         // TODO Auto-generated method stub
     }
+
+    public long commit(String[] path, String message, boolean recurse, boolean noUnlock, boolean keepChangelist, String changelistName) throws ClientException {
+        // TODO Auto-generated method stub
+        return 0;
+    }
+
+    public void remove(String[] path, String message, boolean force, boolean keepLocal) throws ClientException {
+        // TODO Auto-generated method stub
+    }
 }
