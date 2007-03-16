@@ -124,10 +124,10 @@ public class SVNWCManager {
                 SVNEntry pEntry = wcAccess.getEntry(path.getParentFile(), false);
                 SVNURL newURL = pEntry.getSVNURL().appendPath(name, false);
                 SVNURL rootURL = pEntry.getRepositoryRootURL();
-                ensureAdmiAreaExists(path, newURL.toString(), rootURL != null ? rootURL.toString() : null, pEntry.getUUID(), 0);
+                ensureAdminAreaExists(path, newURL.toString(), rootURL != null ? rootURL.toString() : null, pEntry.getUUID(), 0);
             } else {
                 SVNURL rootURL = parentEntry.getRepositoryRootURL();
-                ensureAdmiAreaExists(path, copyFromURL.toString(), rootURL != null ? rootURL.toString() : null, parentEntry.getUUID(), copyFromRev);
+                ensureAdminAreaExists(path, copyFromURL.toString(), rootURL != null ? rootURL.toString() : null, parentEntry.getUUID(), copyFromRev);
             }
             if (entry == null || entry.isDeleted()) {
                 dir = wcAccess.open(path, true, copyFromURL != null ? SVNWCAccess.INFINITE_DEPTH : 0);
@@ -255,7 +255,7 @@ public class SVNWCManager {
         }
     }
     
-    public static boolean ensureAdmiAreaExists(File path, String url, String rootURL, String uuid, long revision) throws SVNException{
+    public static boolean ensureAdminAreaExists(File path, String url, String rootURL, String uuid, long revision) throws SVNException{
         SVNFileType fileType = SVNFileType.getType(path);
         if (fileType != SVNFileType.DIRECTORY && fileType != SVNFileType.NONE) {
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, "''{0}'' is not a directory", path);
