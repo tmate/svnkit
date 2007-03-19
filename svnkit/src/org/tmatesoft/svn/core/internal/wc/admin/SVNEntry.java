@@ -20,6 +20,7 @@ import org.tmatesoft.svn.core.SVNProperty;
 import org.tmatesoft.svn.core.SVNURL;
 import org.tmatesoft.svn.core.internal.util.SVNEncodingUtil;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
+import org.tmatesoft.svn.core.io.SVNRepository;
 
 
 /**
@@ -109,11 +110,11 @@ public class SVNEntry implements Comparable {
             try {
                 rootEntry = myAdminArea.getEntry(myAdminArea.getThisDirName(), true);
             } catch (SVNException svne) {
-                return -1;
+                return SVNRepository.INVALID_REVISION;
             }
             return rootEntry.getRevision();
         }
-        return revStr != null ? Long.parseLong(revStr) : -1;
+        return revStr != null ? Long.parseLong(revStr) : SVNRepository.INVALID_REVISION;
     }
 
     public boolean isScheduledForAddition() {
@@ -172,6 +173,14 @@ public class SVNEntry implements Comparable {
         return false;
     }
 
+    public long getWorkingSize() {
+        String workingSize = (String)myAttributes.get(SVNProperty.WORKING_SIZE);
+        if (workingSize == null) {
+            return SVNProperty.WORKING_SIZE_UNKNOWN;
+        }
+        return Long.parseLong(workingSize);
+    }
+
     public boolean setURL(String url) {
         return setAttributeValue(SVNProperty.URL, url);
     }
@@ -227,7 +236,7 @@ public class SVNEntry implements Comparable {
     public long getCommittedRevision() {
         String rev = (String)myAttributes.get(SVNProperty.COMMITTED_REVISION);
         if (rev == null) {
-            return -1;
+            return SVNRepository.INVALID_REVISION ;
         }
         return Long.parseLong(rev);
     }
@@ -334,7 +343,7 @@ public class SVNEntry implements Comparable {
     public long getCopyFromRevision() {
         String rev = (String)myAttributes.get(SVNProperty.COPYFROM_REVISION);
         if (rev == null) {
-            return -1;
+            return SVNRepository.INVALID_REVISION;
         }
         return Long.parseLong(rev);
     }

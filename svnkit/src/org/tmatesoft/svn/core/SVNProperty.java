@@ -275,6 +275,8 @@ public class SVNProperty {
      */
     public static final String SCHEDULE_REPLACE = "replace";
 
+    public static final long WORKING_SIZE_UNKNOWN = -1;
+    
     private static final byte[] EOL_LF_BYTES = { '\n' };
 
     private static final byte[] EOL_CRLF_BYTES = { '\r', '\n' };
