@@ -124,7 +124,8 @@ import org.tmatesoft.svn.util.SVNDebugLog;
  * @see         <a target="_top" href="http://svnkit.com/kb/examples/">Examples</a>
  */
 public abstract class SVNRepository {
-        
+    public static final long INVALID_REVISION = -1;
+    
     protected String myRepositoryUUID;
     protected SVNURL myRepositoryRoot;
     protected SVNURL myLocation;

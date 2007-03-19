@@ -57,17 +57,17 @@ import org.tmatesoft.svn.core.wc.SVNStatusType;
 public abstract class SVNAdminArea {
     protected static final String ADM_KILLME = "KILLME";
 
-    private File myDirectory;
-    private SVNWCAccess myWCAccess;
-    private File myAdminRoot;
     protected Map myBaseProperties;
     protected Map myProperties;
     protected Map myWCProperties;
     protected Map myEntries;
-    private Map myRevertProperties;
-    
     protected boolean myWasLocked;
+
     private ISVNCommitParameters myCommitParameters;
+    private Map myRevertProperties;
+    private File myDirectory;
+    private SVNWCAccess myWCAccess;
+    private File myAdminRoot;
     
     public abstract boolean isLocked() throws SVNException;
 
@@ -132,36 +132,66 @@ public abstract class SVNAdminArea {
     }
 
     public boolean hasTextModifications(String name, boolean forceComparison, boolean compareTextBase, boolean compareChecksum) throws SVNException {
-        SVNEntry entry = getEntry(name, false);
-        if (!forceComparison) {
-            if (entry == null || entry.isDirectory()) {
-                return false;
-            }
-            
-            String textTime = entry.getTextTime();
-            if (textTime != null) {
-                long textTimeAsLong = SVNFileUtil.roundTimeStamp(SVNTimeUtil.parseDateAsLong(textTime));
-                long tstamp = SVNFileUtil.roundTimeStamp(getFile(name).lastModified());
-                if (textTimeAsLong == tstamp ) {
-                    return false;
-                }
-            }
-        }
-        SVNFileType fType = SVNFileType.getType(getFile(name));
-        if (fType != SVNFileType.FILE && fType != SVNFileType.SYMLINK) {
+        File textFile = getFile(name);
+        if (!textFile.isFile()) {
             return false;
         }
-        File textFile = getFile(name);
+        
+        SVNEntry entry = null;
+        if (!forceComparison) {
+            boolean compare = false;
+            try {
+                entry = getEntry(name, false);    
+            } catch (SVNException svne) {
+                compare = true;
+            }
+            
+            if (!compare && entry == null) {
+                compare = true;
+            }
+            
+            if (!compare) {
+                if (entry.getWorkingSize() != SVNProperty.WORKING_SIZE_UNKNOWN &&
+                    textFile.length() != entry.getWorkingSize()) {
+                    compare = true;
+                }
+            }
+
+            if (!compare) {
+                String textTime = entry.getTextTime();
+                if (textTime == null) {
+                    compare = true;
+                } else {
+                    long textTimeAsLong = SVNFileUtil.roundTimeStamp(SVNTimeUtil.parseDateAsLong(textTime));
+                    long tstamp = SVNFileUtil.roundTimeStamp(textFile.lastModified());
+                    if (textTimeAsLong != tstamp ) {
+                        compare = true;
+                    }
+                }
+            }
+            
+            if (!compare) {
+                return false;
+            }
+        }
+
         File baseFile = getBaseFile(name, false);
         if (!baseFile.isFile()) {
             return true;
         }
+        
         boolean differs = compareAndVerify(textFile, baseFile, compareTextBase, compareChecksum);
         if (!differs && isLocked()) {
-            entry.setTextTime(SVNTimeUtil.formatDate(new Date(textFile.lastModified())));
-            saveEntries(false);
+            Map attributes = new HashMap();
+            attributes.put(SVNProperty.WORKING_SIZE, Long.toString(textFile.length()));
+            attributes.put(SVNProperty.TEXT_TIME, SVNTimeUtil.formatDate(new Date(textFile.lastModified())));
+            modifyEntry(name, attributes, true, false);
         }
         return differs;
+    }
+
+    public boolean hasVersionedFileTextChanges(File file, File baseFile, boolean compareTextBase) throws SVNException {
+        return compareAndVerify(file, baseFile, compareTextBase, false);
     }
     
     private boolean compareAndVerify(File text, File baseFile, boolean compareTextBase, boolean checksum) throws SVNException {
@@ -494,7 +524,6 @@ public abstract class SVNAdminArea {
                 for (Iterator lines = conflicts.iterator(); lines.hasNext();) {
                     String line = (String) lines.next();
                     os.write(SVNEncodingUtil.fuzzyEscape(line).getBytes("UTF-8"));
-//                    os.write(line.getBytes("UTF-8"));
                 }
             } catch (IOException e) {
                 SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, "Cannot write properties conflict file: {1}", e.getLocalizedMessage());
@@ -519,6 +548,7 @@ public abstract class SVNAdminArea {
         }
         return result;
     }
+
     public SVNStatusType mergeText(String localPath, File base,
             File latest, String localLabel, String baseLabel,
             String latestLabel, boolean leaveConflict, boolean dryRun) throws SVNException {
@@ -1325,11 +1355,11 @@ public abstract class SVNAdminArea {
         }
     }
 
-    protected void setLocked(boolean locked) {
-        myWasLocked = locked;
-    }
-
     public void setCommitParameters(ISVNCommitParameters commitParameters) {
         myCommitParameters = commitParameters;
+    }
+
+    protected void setLocked(boolean locked) {
+        myWasLocked = locked;
     }
 }
