@@ -463,6 +463,10 @@ public class SVNUpdateEditor implements ISVNEditor {
     }
 
     public void applyTextDelta(String commitPath, String baseChecksum) throws SVNException {
+        if (myCurrentFile.isSkipped) {
+            return;
+        }
+        
         SVNAdminArea adminArea = myCurrentFile.getAdminArea();
         SVNEntry entry = adminArea.getEntry(myCurrentFile.Name, false);
         boolean replaced = entry != null && entry.isScheduledForReplacement();
@@ -770,6 +774,7 @@ public class SVNUpdateEditor implements ISVNEditor {
         info.Name = SVNPathUtil.tail(path);
         info.isExisted = false;
         info.isAddExisted = false;
+        info.isSkipped = false;
         
         SVNAdminArea adminArea = parent.getAdminArea();
         SVNFileType kind = SVNFileType.getType(adminArea.getFile(info.Name));
@@ -797,15 +802,25 @@ public class SVNUpdateEditor implements ISVNEditor {
                 }
             }
 
-            if (added && entry != null && entry.isScheduledForAddition()) {
-                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_OBSTRUCTED_UPDATE, "Failed to add file ''{0}'': object of the same name already exists and scheduled for addition", path);
-                SVNErrorManager.error(err);
-            }
             if (!added && entry == null) {
                 SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.UNVERSIONED_RESOURCE, "File ''{0}'' in directory ''{1}'' is not a versioned resource", 
                         new Object[] {info.Name, adminArea.getRoot()});
                 SVNErrorManager.error(err);
             }
+            
+            if (!added) {
+                boolean hasTextConflicts = adminArea.hasTextConflict(info.Name);
+                boolean hasPropConflicts = adminArea.hasPropConflict(info.Name);
+                if (hasTextConflicts || hasPropConflicts) {
+                    info.isSkipped = true;
+                    Collection skippedPaths = getSkippedPaths();
+                    File file = new File(myAdminInfo.getAnchor().getRoot(), path);
+                    skippedPaths.add(file);
+                    SVNEvent event = SVNEventFactory.createSkipEvent(myAdminInfo, adminArea, null, SVNEventAction.SKIP, added ? SVNEventAction.UPDATE_ADD : SVNEventAction.UPDATE_UPDATE, SVNNodeKind.FILE, -1, hasTextConflicts ? SVNStatusType.CONFLICTED : SVNStatusType.UNKNOWN, hasPropConflicts ? SVNStatusType.CONFLICTED : SVNStatusType.UNKNOWN);
+                    myWCAccess.handleEvent(event);
+                }
+            }
+            
             if (mySwitchURL != null || entry == null) {
                 info.URL = SVNPathUtil.append(parent.URL, SVNEncodingUtil.uriEncode(info.Name));
             } else {
@@ -874,6 +889,8 @@ public class SVNUpdateEditor implements ISVNEditor {
         public boolean isExisted;
         public boolean isAddExisted;
         public SVNDirectoryInfo Parent;
+        public boolean isSkipped;
+
         private String myPath;
         private Map myChangedProperties;
         private Map myChangedEntryProperties;
@@ -933,7 +950,6 @@ public class SVNUpdateEditor implements ISVNEditor {
     private class SVNDirectoryInfo extends SVNEntryInfo {
 
         public int RefCount;
-        public boolean isSkipped;
         public SVNLog log;
         
         public SVNDirectoryInfo(String path) {
