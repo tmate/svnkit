@@ -138,6 +138,10 @@ public class SVNUpdateClient extends SVNBasicClient {
      * @throws SVNException 
      */
     public long doUpdate(File file, SVNRevision revision, boolean recursive) throws SVNException {
+        return doUpdate(file, revision, recursive, false);
+    }
+    
+    public long doUpdate(File file, SVNRevision revision, boolean recursive, boolean force) throws SVNException {
         file = new File(SVNPathUtil.validateFilePath(file.getAbsolutePath()));
         SVNWCAccess wcAccess = createWCAccess();
         SVNAdminAreaInfo adminInfo = null;
@@ -152,7 +156,7 @@ public class SVNUpdateClient extends SVNBasicClient {
                 SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_MISSING_URL, "Entry ''{0}'' has no URL", anchorArea.getRoot());
                 SVNErrorManager.error(err);
             }
-            SVNUpdateEditor editor = new SVNUpdateEditor(adminInfo, null, recursive, isLeaveConflictsUnresolved());
+            SVNUpdateEditor editor = new SVNUpdateEditor(adminInfo, null, recursive, isLeaveConflictsUnresolved(), force);
             SVNRepository repos = createRepository(url, true);
             
             String target = "".equals(adminInfo.getTargetName()) ? null : adminInfo.getTargetName();
@@ -223,6 +227,10 @@ public class SVNUpdateClient extends SVNBasicClient {
      * @throws SVNException
      */
     public long doSwitch(File file, SVNURL url, SVNRevision pegRevision, SVNRevision revision, boolean recursive) throws SVNException {
+        return doSwitch(file, url, pegRevision, revision, recursive, false);
+    }
+    
+    public long doSwitch(File file, SVNURL url, SVNRevision pegRevision, SVNRevision revision, boolean recursive, boolean force) throws SVNException {
         SVNWCAccess wcAccess = createWCAccess();
         try {
             SVNAdminAreaInfo info = wcAccess.openAnchor(file, true, SVNWCAccess.INFINITE_DEPTH);
@@ -245,7 +253,7 @@ public class SVNUpdateClient extends SVNBasicClient {
                 url = locs[0].getURL();
             }
 
-            SVNUpdateEditor editor = new SVNUpdateEditor(info, url.toString(), recursive, isLeaveConflictsUnresolved());
+            SVNUpdateEditor editor = new SVNUpdateEditor(info, url.toString(), recursive, isLeaveConflictsUnresolved(), force);
             String target = "".equals(info.getTargetName()) ? null : info.getTargetName();
             repository.update(url, revNumber, target, recursive, reporter, SVNCancellableEditor.newInstance(editor, this, getDebugLog()));
 

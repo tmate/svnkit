@@ -429,4 +429,8 @@ public class SVNClient implements SVNClientInterface {
     public void remove(String[] path, String message, boolean force, boolean keepLocal) throws ClientException {
         myDelegate.remove(path, message, force, keepLocal);
     }
+
+    public void blame(String path, Revision pegRevision, Revision revisionStart, Revision revisionEnd, boolean ignoreMimeType, BlameCallback callback) throws ClientException {
+        myDelegate.blame(path, pegRevision, revisionStart, revisionEnd, ignoreMimeType, callback);
+    }
 }

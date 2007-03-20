@@ -922,7 +922,7 @@ public abstract class SVNAdminArea {
         }
     }
     
-    public void modifyEntry(String name, Map attributes, boolean save, boolean force) throws SVNException {
+    public SVNEntry modifyEntry(String name, Map attributes, boolean save, boolean force) throws SVNException {
         if (name == null) {
             name = getThisDirName();
         }
@@ -937,8 +937,9 @@ public abstract class SVNAdminArea {
             }
         }
         
+        SVNEntry entry = null;
         if (!deleted) {
-            SVNEntry entry = getEntry(name, true);
+            entry = getEntry(name, true);
             if (entry == null) {
                 entry = addEntry(name);
             }
@@ -997,6 +998,7 @@ public abstract class SVNAdminArea {
         if (save) {
             saveEntries(false);
         }
+        return entry;
     }
 
     public void deleteEntry(String name) throws SVNException {

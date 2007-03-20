@@ -552,7 +552,7 @@ public class FSCommitter {
             String changedPath = (String) changedPaths[i];
             boolean recurse = true;
 
-            if (lastRecursedPath != null && SVNPathUtil.pathIsChild(lastRecursedPath, changedPath) != null) {
+            if (lastRecursedPath != null && SVNPathUtil.getPathAsChild(lastRecursedPath, changedPath) != null) {
                 continue;
             }
 

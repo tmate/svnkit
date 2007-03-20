@@ -699,7 +699,7 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
                     ++count;
                 }
                 
-                String remainder = path.equals(cpath) ? "" : SVNPathUtil.pathIsChild(cpath, path);
+                String remainder = path.equals(cpath) ? "" : SVNPathUtil.getPathAsChild(cpath, path);
                 path = SVNPathUtil.concatToAbs(copyfromPath, remainder);
                 revision = copyfromRevision;
             }

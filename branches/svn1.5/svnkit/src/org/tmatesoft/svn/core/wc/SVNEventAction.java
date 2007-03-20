@@ -264,4 +264,6 @@ public class SVNEventAction {
      * area is upgraded to a newer one. 
      */
     public static final SVNEventAction UPGRADE = new SVNEventAction(-2, "wc_upgrade");
+
+    public static final SVNEventAction UPDATE_EXISTS = new SVNEventAction(25, "update_exists");
 }

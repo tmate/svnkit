@@ -482,7 +482,14 @@ public class SVNPathUtil {
         return false;
     }
 
-    public static String pathIsChild(String path, String pathChild){
+    /**
+     * Former pathIsChild. 
+     * 
+     * @param path
+     * @param pathChild
+     * @return
+     */
+    public static String getPathAsChild(String path, String pathChild){
     	if(path == null || pathChild == null){
     		return null;
     	}
