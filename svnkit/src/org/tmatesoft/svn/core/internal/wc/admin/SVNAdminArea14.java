@@ -923,14 +923,6 @@ public class SVNAdminArea14 extends SVNAdminArea {
         String workingSize = parseString(line);
         if (workingSize != null) {
             entryAttrs.put(SVNProperty.WORKING_SIZE, workingSize);
-        } else {
-            if (getThisDirName().equals(name)) {
-                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_ATTRIBUTE_INVALID, "This directory's entry has invalid or missing working-size");
-                SVNErrorManager.error(err);
-            } else {
-                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_ATTRIBUTE_INVALID, "Entry ''{0}'' has invalid or missing working-size", name);
-                SVNErrorManager.error(err);
-            }
         }
         
         line = reader.readLine();

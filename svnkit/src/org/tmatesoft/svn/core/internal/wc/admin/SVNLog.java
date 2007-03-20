@@ -159,6 +159,20 @@ public abstract class SVNLog {
         }
     }
 
+    public void logTweakEntry(String name, String newURL, long newRevision) throws SVNException {
+        Map attributes = new HashMap();
+        attributes.put(SVNProperty.shortPropertyName(SVNProperty.KIND), SVNProperty.KIND_FILE);
+        attributes.put(SVNProperty.shortPropertyName(SVNProperty.REVISION), Long.toString(newRevision));
+        attributes.put(SVNProperty.shortPropertyName(SVNProperty.DELETED), Boolean.FALSE.toString());
+        attributes.put(SVNProperty.shortPropertyName(SVNProperty.ABSENT), Boolean.FALSE.toString());
+        attributes.put(SVNProperty.shortPropertyName(SVNProperty.WORKING_SIZE), Long.toString(SVNProperty.WORKING_SIZE_UNKNOWN));
+        attributes.put(SVNProperty.shortPropertyName(SVNProperty.TEXT_TIME), "0");
+        if (newURL != null) {
+            attributes.put(SVNProperty.shortPropertyName(SVNProperty.URL), newURL);
+        }
+        logChangedEntryProperties(name, attributes);
+    }
+
     public void run(SVNLogRunner runner) throws SVNException {
         Collection commands = readCommands();
         if (commands == null || commands.isEmpty()) {

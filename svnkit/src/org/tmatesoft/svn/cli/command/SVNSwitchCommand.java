@@ -45,12 +45,12 @@ public class SVNSwitchCommand extends SVNCommand {
         SVNUpdateClient updater = getClientManager().getUpdateClient();
         try {
             SVNURL switchURL = SVNURL.parseURIEncoded(url);
-            
             if (getCommandLine().hasArgument(SVNArgument.RELOCATE)) {
                 SVNURL targetURL = SVNURL.parseURIEncoded(getCommandLine().getURL(1));
                 updater.doRelocate(new File(absolutePath).getAbsoluteFile(), switchURL, targetURL, !getCommandLine().hasArgument(SVNArgument.NON_RECURSIVE));
             } else {
-                updater.doSwitch(new File(absolutePath).getAbsoluteFile(), switchURL, revision, !getCommandLine().hasArgument(SVNArgument.NON_RECURSIVE));
+                boolean force = getCommandLine().hasArgument(SVNArgument.FORCE);
+                updater.doSwitch(new File(absolutePath).getAbsoluteFile(), switchURL, SVNRevision.UNDEFINED, revision, !getCommandLine().hasArgument(SVNArgument.NON_RECURSIVE), force);
             }
         } catch (Throwable th) {
             updater.getDebugLog().info(th);

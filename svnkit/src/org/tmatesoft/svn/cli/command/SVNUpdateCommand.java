@@ -54,8 +54,9 @@ public class SVNUpdateCommand extends SVNCommand {
                     continue;
                 }
             }
+            boolean force = getCommandLine().hasArgument(SVNArgument.FORCE);
             try {
-                updater.doUpdate(file.getAbsoluteFile(), revision, !getCommandLine().hasArgument(SVNArgument.NON_RECURSIVE));
+                updater.doUpdate(file.getAbsoluteFile(), revision, !getCommandLine().hasArgument(SVNArgument.NON_RECURSIVE), force);
             } catch (Throwable th) {
                 updater.getDebugLog().info(th);
                 println(err, th.getMessage());

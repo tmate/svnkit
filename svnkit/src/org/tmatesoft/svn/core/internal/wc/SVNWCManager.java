@@ -13,6 +13,7 @@ package org.tmatesoft.svn.core.internal.wc;
 
 import java.io.File;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -205,18 +206,28 @@ public class SVNWCManager {
     
     public static void updateCleanup(File path, SVNWCAccess wcAccess, boolean recursive, String baseURL, String rootURL,
             long newRevision, boolean removeMissingDirs) throws SVNException {
+        updateCleanup(path, wcAccess, recursive, baseURL, rootURL, newRevision, removeMissingDirs, null);
+    }
+    
+    public static void updateCleanup(File path, SVNWCAccess wcAccess, boolean recursive, String baseURL, String rootURL,
+            long newRevision, boolean removeMissingDirs, Collection excludePaths) throws SVNException {
         SVNEntry entry = wcAccess.getEntry(path, true);
         if (entry == null) {
             return;
         }
+        
+        excludePaths = excludePaths == null ? Collections.EMPTY_LIST : excludePaths; 
         if (entry.isFile() || (entry.isDirectory() && (entry.isAbsent() || entry.isDeleted()))) {
+            if (excludePaths.contains(path)) {
+                return;
+            }
             SVNAdminArea dir = wcAccess.retrieve(path.getParentFile());
             if (dir.tweakEntry(path.getName(), baseURL, rootURL, newRevision, false)) {
                 dir.saveEntries(false);
             }
         } else if (entry.isDirectory()) {
             SVNAdminArea dir = wcAccess.retrieve(path);
-            tweakEntries(dir, baseURL, rootURL, newRevision, removeMissingDirs, recursive);
+            tweakEntries(dir, baseURL, rootURL, newRevision, removeMissingDirs, recursive, excludePaths);
         } else {
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.NODE_UNKNOWN_KIND, "Unrecognized node kind: ''{0}''", path);
             SVNErrorManager.error(err);
@@ -224,29 +235,40 @@ public class SVNWCManager {
         }
     }
     
-    private static void tweakEntries(SVNAdminArea dir, String baseURL, String rootURL, long newRevision, boolean removeMissingDirs, boolean recursive) throws SVNException {
-        boolean write = dir.tweakEntry(dir.getThisDirName(), baseURL, rootURL, newRevision, false);
+    private static void tweakEntries(SVNAdminArea dir, String baseURL, String rootURL, long newRevision, boolean removeMissingDirs, boolean recursive, Collection excludePaths) throws SVNException {
+        boolean write = false;
+        if (!excludePaths.contains(dir.getRoot())) {
+            write = dir.tweakEntry(dir.getThisDirName(), baseURL, rootURL, newRevision, false);
+        }
+        
         for(Iterator entries = dir.entries(true); entries.hasNext();) {
             SVNEntry entry = (SVNEntry) entries.next();
             if (dir.getThisDirName().equals(entry.getName())) {
                 continue;
             }
+            
+            File childFile = dir.getFile(entry.getName());
+            boolean isExcluded = excludePaths.contains(childFile);
+            
             String childURL = null;
             if (baseURL != null) {
                 childURL = SVNPathUtil.append(baseURL, SVNEncodingUtil.uriEncode(entry.getName()));
             }
-            if (entry.isFile() || (entry.isDirectory() && (entry.isAbsent() || entry.isDeleted()))) {
-                write |= dir.tweakEntry(entry.getName(), childURL, rootURL, newRevision, true);
+            
+            if (entry.isFile() || (recursive && (entry.isAbsent() || entry.isDeleted()))) {
+                if (!isExcluded) {
+                    write |= dir.tweakEntry(entry.getName(), childURL, rootURL, newRevision, true);
+                }
             } else if (entry.isDirectory() && recursive) {
                 File path = dir.getFile(entry.getName());
                 if (removeMissingDirs && dir.getWCAccess().isMissing(path)) {
-                    if (!entry.isScheduledForAddition()) {
+                    if (!entry.isScheduledForAddition() && !isExcluded) {
                         dir.deleteEntry(entry.getName());
                         dir.getWCAccess().handleEvent(SVNEventFactory.createUpdateDeleteEvent(null, dir, entry));
                     }
                 } else {
                     SVNAdminArea childDir = dir.getWCAccess().retrieve(path);
-                    tweakEntries(childDir, childURL, rootURL, newRevision, removeMissingDirs, recursive);
+                    tweakEntries(childDir, childURL, rootURL, newRevision, removeMissingDirs, recursive, excludePaths);
                 }
             } 
         }

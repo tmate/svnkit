@@ -1332,4 +1332,8 @@ public class SVNClientImpl implements SVNClientInterface {
     public void remove(String[] path, String message, boolean force, boolean keepLocal) throws ClientException {
         // TODO Auto-generated method stub
     }
+
+    public void blame(String path, Revision pegRevision, Revision revisionStart, Revision revisionEnd, boolean ignoreMimeType, BlameCallback callback) throws ClientException {
+        // TODO Auto-generated method stub
+    }
 }
