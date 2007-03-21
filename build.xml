@@ -26,11 +26,13 @@
         <mkdir dir="svnkit/bin" />
         <mkdir dir="contrib/javahl/bin" />
         <mkdir dir="contrib/sequence/bin" />
+        <mkdir dir="contrib/servlet/bin" />
 
         <path id="library.classpath">
             <pathelement location="contrib/ganymed/ganymed.jar" />
             <pathelement path="contrib/javahl/bin" />
             <pathelement path="contrib/sequence/bin" />
+            <pathelement path="contrib/servlet/bin" />
         </path>
 
         <javac debug="true" destdir="contrib/javahl/bin" srcdir="contrib/javahl/src">
@@ -39,6 +41,7 @@
             <exclude name="org/tigris/subversion/javahl/tests/**" />
         </javac>
         <javac debug="true" destdir="contrib/sequence/bin" srcdir="contrib/sequence/src" />
+        <javac debug="true" destdir="contrib/servlet/bin" srcdir="contrib/servlet/src" />
         <javac debug="true"
                destdir="svnkit/bin"
                srcdir="svnkit/src"
@@ -54,6 +57,7 @@
             <pathelement location="contrib/ganymed/ganymed.jar" />
             <pathelement path="contrib/javahl/bin" />
             <pathelement path="contrib/sequence/bin" />
+            <pathelement path="contrib/servlet/bin" />
         	<fileset dir="${eclipse.home}/plugins">
     	        <include name="**/*.jar"/>
 	        </fileset>
@@ -106,6 +110,7 @@
             <pathelement location="contrib/junit/junit.jar" />
             <pathelement path="contrib/javahl/bin" />
             <pathelement path="contrib/sequence/bin" />
+            <pathelement path="contrib/servlet/bin" />
             <pathelement path="contrib/sequence/bin-test" />
             <pathelement path="svnkit/bin" />
         </path>
@@ -273,6 +278,7 @@
     	<path id="doc.classpath">
             <pathelement path="svnkit/bin" />
             <pathelement path="contrib/sequence/bin" />
+            <pathelement path="contrib/servlet/bin" />
             <pathelement path="contrib/javahl/bin" />
 		</path>
     	<javadoc destdir="build/doc/javadoc" failonerror="false"
@@ -308,6 +314,7 @@
                 <include name="contrib/javahl/bin/**" />
                 <include name="contrib/sequence/bin/**" />
                 <include name="contrib/sequence/bin-test/**" />
+                <include name="contrib/servlet/bin/**" />
                 <include name="svnkit/bin/**" />
                 <include name="svnkit-eclipse/bin/**" />
                 <include name="svnkit-test/bin/**" />
@@ -365,6 +372,7 @@
             <pathelement path="contrib/junit/junit.jar" />
             <pathelement path="svnkit/bin" />
             <pathelement path="contrib/sequence/bin" />
+            <pathelement path="contrib/servlet/bin" />
             <pathelement path="svnkit-test/bin" />
             <pathelement path="contrib/sequence/bin-test" />
         </path>
@@ -396,6 +404,7 @@
             <pathelement path="contrib/junit/junit.jar" />
             <pathelement path="svnkit/bin" />
             <pathelement path="contrib/sequence/bin" />
+            <pathelement path="contrib/servlet/bin" />
             <pathelement path="svnkit-test/bin" />
             <pathelement path="contrib/sequence/bin-test" />
         </path>
@@ -469,17 +478,20 @@
         <mkdir dir="svnkit/bin" />
         <mkdir dir="contrib/javahl/bin" />
         <mkdir dir="contrib/sequence/bin" />
+        <mkdir dir="contrib/servlet/bin" />
 
         <path id="library.classpath">
             <pathelement location="contrib/ganymed/ganymed.jar" />
             <pathelement path="contrib/javahl/bin" />
             <pathelement path="contrib/sequence/bin" />
+            <pathelement path="contrib/servlet/bin" />
         </path>
 
         <javac debug="true" optimize="true" destdir="contrib/javahl/bin" srcdir="contrib/javahl/src">
             <exclude name="org/tigris/subversion/javahl/tests/**" />
         </javac>
         <javac debug="true" optimize="true" destdir="contrib/sequence/bin" srcdir="contrib/sequence/src" />
+        <javac debug="true" optimize="true" destdir="contrib/servlet/bin" srcdir="contrib/servlet/src" />
         <javac debug="true" optimize="true" 
                destdir="svnkit/bin"
                srcdir="svnkit/src"
@@ -497,6 +509,7 @@
             <pathelement path="contrib/javahl/bin" />
             <pathelement path="contrib/sequence/bin" />
             <pathelement path="contrib/sequence/bin-test" />
+            <pathelement path="contrib/servlet/bin" />
             <pathelement path="svnkit/bin" />
         </path>
 
@@ -531,6 +544,7 @@
                 <include name="SEQUENCE-LICENSE" />
             </fileset>
             <fileset dir="contrib/sequence/bin" />
+            <fileset dir="contrib/servlet/bin" />
             <fileset dir="svnkit/src">
                 <include name="org/tmatesoft/svn/core/internal/wc/config/**" />
                 <include name="org/tmatesoft/svn/core/io/repository/**" />

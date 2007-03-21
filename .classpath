@@ -2,6 +2,7 @@
 <classpath>
 	<classpathentry kind="lib" path="contrib/junit/junit.jar"/>
 	<classpathentry kind="src" output="svnkit/bin" path="svnkit/src"/>
+	<classpathentry kind="src" output="contrib/servlet/bin" path="contrib/servlet/src"/>
 	<classpathentry kind="src" output="doc/examples/bin" path="doc/examples/src"/>
 	<classpathentry kind="src" output="svnkit-eclipse/bin" path="svnkit-eclipse/org.tmatesoft.svnkit/src"/>
 	<classpathentry kind="src" output="svnkit-test/bin" path="svnkit-test/src"/>
