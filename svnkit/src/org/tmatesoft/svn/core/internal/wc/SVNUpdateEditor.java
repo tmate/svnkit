@@ -215,12 +215,10 @@ public class SVNUpdateEditor implements ISVNEditor {
         File childDir = parentArea.getFile(name);
         SVNFileType kind = SVNFileType.getType(childDir);
         if (kind == SVNFileType.FILE || kind == SVNFileType.UNKNOWN) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_OBSTRUCTED_UPDATE, "Failed to add directory ''{0}'': object of the same name already exists", path);
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_OBSTRUCTED_UPDATE, "Failed to add directory ''{0}'': " +
+                    "a non-directory object of the same name already exists", path);
             SVNErrorManager.error(err);
-        } else if (SVNFileUtil.getAdminDirectoryName().equals(name)) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_OBSTRUCTED_UPDATE, "Failed to add directory ''{0}'':  object of the same name as the administrative directory", path);
-            SVNErrorManager.error(err);
-        }
+        } 
 
         if (kind == SVNFileType.DIRECTORY) {
             SVNAdminArea adminArea = null;
@@ -246,7 +244,10 @@ public class SVNUpdateEditor implements ISVNEditor {
                 SVNErrorManager.error(err);
             }
         }
-
+        if (SVNFileUtil.getAdminDirectoryName().equals(name)) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_OBSTRUCTED_UPDATE, "Failed to add directory ''{0}'':  object of the same name as the administrative directory", path);
+            SVNErrorManager.error(err);
+        }
         if (copyFromPath != null || SVNRevision.isValidRevisionNumber(copyFromRevision)) {
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.UNSUPPORTED_FEATURE, "Failed to add directory ''{0}'': copyfrom arguments not yet supported", path);
             SVNErrorManager.error(err);
@@ -765,8 +766,8 @@ public class SVNUpdateEditor implements ISVNEditor {
 
         if (mergeOutcome == SVNStatusType.CONFLICTED_UNRESOLVED) {
             textStatus = SVNStatusType.CONFLICTED_UNRESOLVED;
-        } else if (mergeOutcome == SVNStatusType.CONFLICTED_UNRESOLVED) {
-            textStatus = SVNStatusType.CONFLICTED_UNRESOLVED;
+        } else if (mergeOutcome == SVNStatusType.CONFLICTED) {
+            textStatus = SVNStatusType.CONFLICTED;
         } else if (myCurrentFile.newBaseFile != null) {
             if (isLocallyModified) {
                 textStatus = SVNStatusType.MERGED;
@@ -781,9 +782,9 @@ public class SVNUpdateEditor implements ISVNEditor {
             if (myCurrentFile.isExisted || myCurrentFile.isAddExisted) {
                 if (textStatus != SVNStatusType.CONFLICTED_UNRESOLVED && textStatus != SVNStatusType.CONFLICTED) {
                     action = SVNEventAction.UPDATE_EXISTS;
-                } else if (myCurrentFile.IsAdded) {
-                    action = SVNEventAction.UPDATE_ADD;
-                }
+                } 
+            } else if (myCurrentFile.IsAdded) {
+                action = SVNEventAction.UPDATE_ADD;
             }
             myWCAccess.handleEvent(SVNEventFactory.createUpdateModifiedEvent(myAdminInfo, adminArea, myCurrentFile.Name, SVNNodeKind.FILE, action, null, textStatus, propStatus, lockStatus));
         }

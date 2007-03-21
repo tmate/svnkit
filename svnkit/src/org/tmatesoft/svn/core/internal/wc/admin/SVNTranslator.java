@@ -50,18 +50,31 @@ public class SVNTranslator {
     public static final byte[] NATIVE = System.getProperty("line.separator")
             .getBytes();
 
-    
     public static void translate(SVNAdminArea adminArea, String name, String srcPath,
             String dstPath, boolean expand) throws SVNException {
-        translate(adminArea, name, adminArea.getFile(srcPath), adminArea.getFile(dstPath), expand);
+    
     }
+
+    public static void translate(SVNAdminArea adminArea, String name, String srcPath,
+            String dstPath, String customEOLStyle, boolean expand) throws SVNException {
+        translate(adminArea, name, adminArea.getFile(srcPath), adminArea.getFile(dstPath), customEOLStyle, expand);
+    }
+    
     public static void translate(SVNAdminArea adminArea, String name, File src,
             File dst, boolean expand) throws SVNException {
+        
+    }
+    
+    public static void translate(SVNAdminArea adminArea, String name, File src,
+            File dst, String customEOLStyle, boolean expand) throws SVNException {
         File dst2 = dst;
         
         SVNVersionedProperties props = adminArea.getProperties(name);
         String keywords = props.getPropertyValue(SVNProperty.KEYWORDS);
         String eolStyle = props.getPropertyValue(SVNProperty.EOL_STYLE);
+        if (customEOLStyle != null) {
+            eolStyle = customEOLStyle;
+        }
         boolean special = props.getPropertyValue(SVNProperty.SPECIAL) != null;
         Map keywordsMap = null;
         byte[] eols;

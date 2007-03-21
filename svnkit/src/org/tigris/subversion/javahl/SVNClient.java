@@ -433,4 +433,8 @@ public class SVNClient implements SVNClientInterface {
     public void blame(String path, Revision pegRevision, Revision revisionStart, Revision revisionEnd, boolean ignoreMimeType, BlameCallback callback) throws ClientException {
         myDelegate.blame(path, pegRevision, revisionStart, revisionEnd, ignoreMimeType, callback);
     }
+
+    public LogMessage[] logMessages(String path, Revision pegRevision, Revision revisionStart, Revision revisionEnd, boolean stopOnCopy, boolean discoverPath, long limit) throws ClientException {
+        return myDelegate.logMessages(path, pegRevision, revisionStart, revisionEnd, stopOnCopy, discoverPath, limit);
+    }
 }

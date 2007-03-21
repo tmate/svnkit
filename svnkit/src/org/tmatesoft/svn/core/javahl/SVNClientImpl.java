@@ -1336,4 +1336,9 @@ public class SVNClientImpl implements SVNClientInterface {
     public void blame(String path, Revision pegRevision, Revision revisionStart, Revision revisionEnd, boolean ignoreMimeType, BlameCallback callback) throws ClientException {
         // TODO Auto-generated method stub
     }
+
+    public LogMessage[] logMessages(String path, Revision pegRevision, Revision revisionStart, Revision revisionEnd, boolean stopOnCopy, boolean discoverPath, long limit) throws ClientException {
+        // TODO Auto-generated method stub
+        return null;
+    }
 }

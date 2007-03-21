@@ -86,7 +86,14 @@ public class SVNCopyCommand extends SVNCommand {
             SVNErrorMessage msg = SVNErrorMessage.create(SVNErrorCode.CL_INSUFFICIENT_ARGS, "Please enter SRC and DST URLs");
             throw new SVNException(msg);
         }
+        
         String srcURL = getCommandLine().getURL(0);
+        SVNRevision pegRevision = SVNRevision.UNDEFINED;
+        if (srcURL != null && srcURL.indexOf('@') > 0) {
+            pegRevision = SVNRevision.parse(srcURL.substring(srcURL.lastIndexOf('@') + 1));
+            srcURL = srcURL.substring(0, srcURL.lastIndexOf('@'));
+        }
+
         SVNRevision srcRevision = SVNRevision.parse((String) getCommandLine().getArgumentValue(SVNArgument.REVISION));
         String dstURL = getCommandLine().getURL(1);
 
@@ -97,7 +104,8 @@ public class SVNCopyCommand extends SVNCommand {
         String commitMessage = getCommitMessage();
         getClientManager().setEventHandler(new SVNCommandEventProcessor(out, err, false));
         SVNCopyClient updater = getClientManager().getCopyClient();
-        SVNCommitInfo result = updater.doCopy(SVNURL.parseURIEncoded(srcURL), srcRevision, SVNURL.parseURIEncoded(dstURL), false, commitMessage);
+
+        SVNCommitInfo result = updater.doCopy(SVNURL.parseURIEncoded(srcURL), pegRevision, srcRevision, SVNURL.parseURIEncoded(dstURL), false, false, commitMessage);
         if (result != SVNCommitInfo.NULL) {
             out.println();
             out.println("Committed revision " + result.getNewRevision() + ".");
@@ -105,15 +113,18 @@ public class SVNCopyCommand extends SVNCommand {
     }
 
     private void runRemoteToLocal(final PrintStream out, PrintStream err) throws SVNException {
-        final String srcURL = getCommandLine().getURL(0);
+        String srcURL = getCommandLine().getURL(0);
+        SVNRevision pegRevision = SVNRevision.UNDEFINED;
+        if (srcURL != null && srcURL.indexOf('@') > 0) {
+            pegRevision = SVNRevision.parse(srcURL.substring(srcURL.lastIndexOf('@') + 1));
+            srcURL = srcURL.substring(0, srcURL.lastIndexOf('@'));
+        }
+
         String dstPath = getCommandLine().getPathAt(0);
         SVNRevision revision = SVNRevision.parse((String) getCommandLine().getArgumentValue(SVNArgument.REVISION));
-        if (revision == null || !revision.isValid()) {
-            revision = SVNRevision.HEAD;
-        }
         getClientManager().setEventHandler(new SVNCommandEventProcessor(out, err, false));
         SVNCopyClient updater = getClientManager().getCopyClient();
-        updater.doCopy(SVNURL.parseURIEncoded(srcURL), revision, new File(dstPath));
+        updater.doCopy(SVNURL.parseURIEncoded(srcURL), pegRevision, revision, new File(dstPath));
     }
     
     private void runLocalToRemote(final PrintStream out, PrintStream err) throws SVNException {
