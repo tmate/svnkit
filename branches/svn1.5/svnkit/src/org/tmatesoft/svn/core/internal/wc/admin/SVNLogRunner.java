@@ -121,10 +121,10 @@ public class SVNLogRunner {
                         }
                         File file = adminArea.getFile(fileName);
                         if (!file.exists()) {
-                            entry.setWorkingSize(0);
+                            entryAttrs.put(SVNProperty.WORKING_SIZE, "0");
                         } else {
                             try {
-                                entry.setWorkingSize(file.length());
+                                entryAttrs.put(SVNProperty.WORKING_SIZE, Long.toString(file.length()));
                             } catch (SecurityException se) {
                                 SVNErrorCode code = count <= 1 ? SVNErrorCode.WC_BAD_ADM_LOG_START : SVNErrorCode.WC_BAD_ADM_LOG;
                                 SVNErrorMessage err = SVNErrorMessage.create(code, "Error getting file size on ''{0}''", file);
@@ -415,13 +415,11 @@ public class SVNLogRunner {
         if (myIsWCPropertiesChanged) {
             adminArea.saveWCProperties(true);
         } 
-        
         if (myIsEntriesChanged) {
             adminArea.saveEntries(false);
         } 
 
         adminArea.handleKillMe();
-        
         myIsEntriesChanged = false;
         myIsWCPropertiesChanged = false;
     }

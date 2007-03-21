@@ -264,6 +264,20 @@ public class SVNCopyClient extends SVNBasicClient {
      *                           </ul>
      */
     public SVNCommitInfo doCopy(SVNURL srcURL, SVNRevision srcRevision, SVNURL dstURL, boolean isMove, boolean failWhenDstExists, String commitMessage) throws SVNException {
+        return doCopy(srcURL, SVNRevision.UNDEFINED, srcRevision, dstURL, isMove, failWhenDstExists, commitMessage);
+    }
+    
+    public SVNCommitInfo doCopy(SVNURL srcURL, SVNRevision pegRevision, SVNRevision srcRevision, SVNURL dstURL, boolean isMove, boolean failWhenDstExists, String commitMessage) throws SVNException {
+        if (pegRevision == SVNRevision.BASE || pegRevision == SVNRevision.COMMITTED || pegRevision == SVNRevision.PREVIOUS) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.CLIENT_BAD_REVISION, "Revision type requires a working copy path, not a URL");
+            SVNErrorManager.error(err);
+        } else if (pegRevision == SVNRevision.UNDEFINED) {
+            pegRevision = SVNRevision.HEAD;
+        }
+        if (!srcRevision.isValid()) {
+            srcRevision = pegRevision;
+        }
+
         SVNURL topURL = SVNURLUtil.getCommonURLAncestor(srcURL, dstURL);
         if (topURL == null) {
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.UNSUPPORTED_FEATURE, "Source and dest appear not to be in the same repository (src: ''{0}''; dst: ''{1}'')", new Object[] {srcURL, dstURL});
@@ -276,30 +290,34 @@ public class SVNCopyClient extends SVNBasicClient {
             isResurrect = true;
         }
 
-        SVNRepository repository = createRepository(topURL, true);
+        SVNRepository repository = createRepository(topURL, false);
         if (!dstURL.equals(repository.getRepositoryRoot(true)) && srcURL.getPath().startsWith(dstURL.getPath() + "/")) {
             isResurrect = true;
             topURL = topURL.removePathTail();
-            repository = createRepository(topURL, true);
+            repository = createRepository(topURL, false);
         }
         
+        long srcRevNumber = getRevisionNumber(srcRevision, repository, null);
+        long latestRevision = repository.getLatestRevision();
+
+        SVNRepositoryLocation[] locs = getLocations(srcURL, null, null, pegRevision, srcRevision, SVNRevision.UNDEFINED);
+        srcURL = locs[0].getURL();
+
         // substring one more char, because path always starts with /, and we need relative path.
-        String srcPath = srcURL.equals(topURL) ? "" : srcURL.getURIEncodedPath().substring(topURL.getURIEncodedPath().length() + 1);
-        srcPath = SVNEncodingUtil.uriDecode(srcPath);
-        String dstPath = dstURL.equals(topURL) ? "" : dstURL.getURIEncodedPath().substring(topURL.getURIEncodedPath().length() + 1); 
-        dstPath = SVNEncodingUtil.uriDecode(dstPath);
+        String srcPath = SVNPathUtil.getPathAsChild(topURL.getURIEncodedPath(), srcURL.getURIEncodedPath()); 
+        srcPath = srcPath == null ? "" : SVNEncodingUtil.uriDecode(srcPath);
+        String dstPath = SVNPathUtil.getPathAsChild(topURL.getPath(), dstURL.getPath());
+        dstPath = dstPath == null ? "" : SVNEncodingUtil.uriDecode(dstPath);
         
         if ("".equals(srcPath) && isMove) {
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.UNSUPPORTED_FEATURE, "Cannot move URL ''{0}'' into itself", srcURL);
             SVNErrorManager.error(err);
         }
-        
-        long srcRevNumber = getRevisionNumber(srcRevision, repository, null);
-        long latestRevision = repository.getLatestRevision();
-        
+
         if (srcRevNumber < 0) {
             srcRevNumber = latestRevision;
         }
+
         SVNNodeKind srcKind = repository.checkPath(srcPath, srcRevNumber);
         if (srcKind == SVNNodeKind.NONE) {
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_NOT_FOUND, "Path ''{0}'' does not exist in revision {1}", new Object[] {srcURL, new Long(srcRevNumber)});
@@ -546,10 +564,25 @@ public class SVNCopyClient extends SVNBasicClient {
      *                        </ul>
      */
     public long doCopy(SVNURL srcURL, SVNRevision srcRevision, File dstPath) throws SVNException {
-        SVNRepository repository = createRepository(srcURL, true);
-        if (!srcRevision.isValid()) {
-            srcRevision = SVNRevision.HEAD;
+        return doCopy(srcURL, SVNRevision.UNDEFINED, srcRevision, dstPath);
+    }
+    
+    public long doCopy(SVNURL srcURL, SVNRevision pegRevision, SVNRevision srcRevision, File dstPath) throws SVNException {
+        if (pegRevision == SVNRevision.BASE || pegRevision == SVNRevision.COMMITTED || pegRevision == SVNRevision.PREVIOUS) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.CLIENT_BAD_REVISION, "Revision type requires a working copy path, not a URL");
+            SVNErrorManager.error(err);
+        } else if (pegRevision == SVNRevision.UNDEFINED) {
+            pegRevision = SVNRevision.HEAD;
         }
+        if (!srcRevision.isValid()) {
+            srcRevision = pegRevision;
+        }
+        
+        SVNRepositoryLocation[] locs = getLocations(srcURL, null, null, pegRevision, srcRevision, SVNRevision.UNDEFINED);
+        srcURL = locs[0].getURL();
+
+        SVNRepository repository = createRepository(srcURL, true);
+    
         long srcRevisionNumber = getRevisionNumber(srcRevision, repository, null);
         SVNNodeKind srcKind = repository.checkPath("", srcRevisionNumber);
         
