@@ -38,6 +38,7 @@ import org.tmatesoft.svn.core.internal.util.SVNEncodingUtil;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
 import org.tmatesoft.svn.core.internal.util.SVNTimeUtil;
 import org.tmatesoft.svn.core.internal.util.SVNURLUtil;
+import org.tmatesoft.svn.core.internal.wc.IOExceptionWrapper;
 import org.tmatesoft.svn.core.internal.wc.SVNAdminUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNCancellableOutputStream;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
@@ -266,6 +267,8 @@ public class SVNWCClient extends SVNBasicClient {
                     repos.getFile("", revNumber, null, new SVNCancellableOutputStream(translatingStream, getEventDispatcher()));
                     try {
                         translatingStream.close();
+                    } catch (IOExceptionWrapper ioew) {
+                        throw ioew.getOriginalException();
                     } catch (IOException e) {
                         SVNErrorManager.error(SVNErrorMessage.create(SVNErrorCode.IO_ERROR, e.getMessage()));
                     }
@@ -333,6 +336,8 @@ public class SVNWCClient extends SVNBasicClient {
                 repos.getFile("", revNumber, null, new SVNCancellableOutputStream(translatingStream, getEventDispatcher()));
                 try {
                     translatingStream.close();
+                } catch (IOExceptionWrapper ioew) {
+                    throw ioew.getOriginalException();
                 } catch (IOException e) {
                     SVNErrorManager.error(SVNErrorMessage.create(SVNErrorCode.IO_ERROR, e.getMessage()));
                 }
@@ -2480,6 +2485,8 @@ public class SVNWCClient extends SVNBasicClient {
                     SVNFileUtil.closeFile(translatingStream);
                 }
                 dst.flush();
+            } catch (IOExceptionWrapper ioew) {
+                throw ioew.getOriginalException();
             } catch (IOException e) {
                 if (e instanceof SVNCancellableOutputStream.IOCancelException) {
                     SVNErrorManager.cancel(e.getMessage());

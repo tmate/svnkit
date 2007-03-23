@@ -56,6 +56,8 @@ public abstract class SVNLog {
 
     public static final String MAYBE_READONLY = "maybe-readonly";
 
+    public static final String MAYBE_EXECUTABLE = "maybe-executable";
+    
     public static final String SET_TIMESTAMP = "set-timestamp";
 
     public static final String COMMIT = "committed";
