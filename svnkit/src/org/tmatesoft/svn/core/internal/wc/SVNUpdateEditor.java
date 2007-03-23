@@ -641,7 +641,7 @@ public class SVNUpdateEditor implements ISVNEditor {
                     boolean usedTmpFile = false;
                     if (myCurrentFile.isAddExisted && !isReplaced) {
                         usedTmpFile = true;
-                        mergeLeftFile = SVNAdminUtil.createTmpFile(adminArea, "tempfile", ".tmp", true);
+                        mergeLeftFile = SVNAdminUtil.createTmpFile(adminArea);
                     }
 
                     String absMergeLeftFilePath = mergeLeftFile.getAbsolutePath().replace(File.separatorChar, '/');
@@ -650,34 +650,17 @@ public class SVNUpdateEditor implements ISVNEditor {
                         mergeLeftFilePath = mergeLeftFilePath.substring(1);
                     }
 
+                    String leftLabel = ".r" + fileEntry.getRevision();
+                    String rightLabel = ".r" + myTargetRevision;
+                    
                     // do test merge.
-                    String oldEolStyle = null;
-                    String oldKeywords = null;
-                    SVNVersionedProperties props = adminArea.getProperties(myCurrentFile.Name);
-                    try {
-                        if (magicPropsChanged && 
-                                (modifiedProps.containsKey(SVNProperty.EOL_STYLE) || modifiedProps.containsKey(SVNProperty.KEYWORDS))) {
-                            // use new valuse to let dry-run merge use the same input as real merge will use.
-                            oldKeywords = props.getPropertyValue(SVNProperty.KEYWORDS);
-                            oldEolStyle = props.getPropertyValue(SVNProperty.EOL_STYLE);
-                            props.setPropertyValue(SVNProperty.EOL_STYLE, (String) modifiedProps.get(SVNProperty.EOL_STYLE));
-                            props.setPropertyValue(SVNProperty.KEYWORDS, (String) modifiedProps.get(SVNProperty.KEYWORDS));
-                        }
-                        mergeOutcome = adminArea.mergeText(name, mergeLeftFile, adminArea.getFile(tmpBasePath), "", "", "", myIsLeaveConflicts, true);
-                    } finally {
-                        if (magicPropsChanged && 
-                                (modifiedProps.containsKey(SVNProperty.EOL_STYLE) || modifiedProps.containsKey(SVNProperty.KEYWORDS))) {
-                            // restore original values.
-                            props.setPropertyValue(SVNProperty.EOL_STYLE, oldEolStyle);
-                            props.setPropertyValue(SVNProperty.KEYWORDS, oldKeywords);
-                        }
-                    }
+                    mergeOutcome = adminArea.mergeText(name, mergeLeftFile, adminArea.getFile(tmpBasePath), ".mine", leftLabel, rightLabel, modifiedProps, myIsLeaveConflicts, false, null, log);
 
                     if (mergeOutcome == SVNStatusType.UNCHANGED) {
                         textStatus = SVNStatusType.MERGED;
                     }
                     
-                    String oldRevisionStr = ".r" + fileEntry.getRevision();
+/*                    String oldRevisionStr = ".r" + fileEntry.getRevision();
                     String newRevisionStr = ".r" + myTargetRevision;
 
                     command.put(SVNLog.NAME_ATTR, name);
@@ -691,7 +674,7 @@ public class SVNUpdateEditor implements ISVNEditor {
                     }
                     log.addCommand(SVNLog.MERGE, command, false);
                     command.clear();
-
+*/
                     if (usedTmpFile) {
                         command.put(SVNLog.NAME_ATTR, mergeLeftFilePath);
                         log.addCommand(SVNLog.DELETE, command, false);

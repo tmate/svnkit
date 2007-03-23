@@ -266,6 +266,7 @@ public class SVNLogRunner {
             try {
                 SVNEntry entry = adminArea.getEntry(fileName, false);
                 if (entry != null) {
+                    adminArea.closeVersionedProperties();
                     SVNVersionedProperties props = adminArea.getProperties(fileName);
                     String needsLock = props.getPropertyValue(SVNProperty.NEEDS_LOCK);
                     if (entry.getLockToken() == null && needsLock != null) {
@@ -274,6 +275,13 @@ public class SVNLogRunner {
                 }
             } catch (SVNException svne) {
                 error = svne;
+            }
+        } else if (SVNLog.MAYBE_EXECUTABLE.equals(name)) {
+            adminArea.closeVersionedProperties();
+            SVNVersionedProperties props = adminArea.getProperties(fileName);
+            boolean executable = SVNFileUtil.isWindows ? false : props.getPropertyValue(SVNProperty.EXECUTABLE) != null;
+            if (executable) {
+                SVNFileUtil.setExecutable(adminArea.getFile(fileName), true);
             }
         } else if (SVNLog.COPY_AND_TRANSLATE.equals(name)) {
             String dstName = (String) attributes.get(SVNLog.DEST_ATTR);
@@ -287,6 +295,13 @@ public class SVNLogRunner {
                         throw svne;
                     }
                 }
+
+                //when performing a merge from a log runner we may have just set 
+                //new properties (log command that copies a new base prop file), 
+                //but probably we've got a non empty props cache which is no more 
+                //valid, so clean it up.
+                adminArea.closeVersionedProperties();
+                
                 // get properties for this entry.
                 SVNVersionedProperties props = adminArea.getProperties(dstName);
                 boolean executable = SVNFileUtil.isWindows ? false : props.getPropertyValue(SVNProperty.EXECUTABLE) != null;
@@ -303,6 +318,7 @@ public class SVNLogRunner {
             }
         } else if (SVNLog.COPY_AND_DETRANSLATE.equals(name)) {
             String dstName = (String) attributes.get(SVNLog.DEST_ATTR);
+            adminArea.closeVersionedProperties();
             try {
                 SVNTranslator.translate(adminArea, fileName, fileName, dstName, false);
             } catch (SVNException svne) {
@@ -337,6 +353,11 @@ public class SVNLogRunner {
                 String targetLabel = (String) attributes.get(SVNLog.ATTR5);
                 targetLabel = targetLabel == null ? ".working" : targetLabel;
     
+                //when performing a merge from a log runner we may have just set 
+                //new properties (log command that copies a new base prop file), 
+                //but probably we've got a non empty props cache which is no more 
+                //valid, so clean it up.
+                adminArea.closeVersionedProperties();
                 SVNVersionedProperties props = adminArea.getProperties(fileName);
                 SVNEntry entry = adminArea.getEntry(fileName, true);
     

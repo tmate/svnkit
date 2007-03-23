@@ -35,6 +35,7 @@ import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNLock;
 import org.tmatesoft.svn.core.SVNNodeKind;
 import org.tmatesoft.svn.core.internal.util.SVNTimeUtil;
+import org.tmatesoft.svn.core.internal.wc.IOExceptionWrapper;
 import org.tmatesoft.svn.core.internal.wc.SVNCancellableOutputStream;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.io.ISVNEditor;
@@ -423,6 +424,9 @@ class SVNReader {
                 cancelled = true;
                 if (e instanceof SVNCancellableOutputStream.IOCancelException) {
                     SVNErrorManager.cancel(e.getMessage());
+                } else if (e instanceof IOExceptionWrapper) {
+                    IOExceptionWrapper wrappedException = (IOExceptionWrapper) e;
+                    throw wrappedException.getOriginalException();
                 }
                 //
             } finally {
