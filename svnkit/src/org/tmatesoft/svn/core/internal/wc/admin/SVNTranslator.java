@@ -107,6 +107,8 @@ public class SVNTranslator {
         } else {
             eols = getWorkingEOL(eolStyle);
         }
+        
+        
         translate(src, dst2, eols, keywordsMap, special, expand);
     }
 
@@ -181,21 +183,10 @@ public class SVNTranslator {
         return result;
     }
     
-    public static File maybeUpdateTargetEOLs(SVNAdminArea dir, String name, File target, Map propDiff) throws SVNException {
+    public static File maybeUpdateTargetEOLs(SVNAdminArea dir, File target, Map propDiff) throws SVNException {
         String eolStyle = null;
-        boolean updateEOLs = false;
-        if (propDiff != null && propDiff.containsKey(SVNProperty.EOL_STYLE)) {
+        if (propDiff != null && propDiff.containsKey(SVNProperty.EOL_STYLE) && propDiff.get(SVNProperty.EOL_STYLE) != null) {
             eolStyle = (String) propDiff.get(SVNProperty.EOL_STYLE);
-            updateEOLs = true;
-        } else  {
-            SVNVersionedProperties props = dir.getProperties(name);
-            if (!SVNProperty.isBinaryMimeType(props.getPropertyValue(SVNProperty.MIME_TYPE))) {
-                eolStyle = props.getPropertyValue(SVNProperty.EOL_STYLE);
-                updateEOLs = eolStyle != null;
-            }
-        }
-
-        if (updateEOLs) {
             byte[] eol = getEOL(eolStyle);
             File tmpFile = SVNAdminUtil.createTmpFile(dir);
             copyAndTranslate(target, tmpFile, eol, null, false, false, eol == null);

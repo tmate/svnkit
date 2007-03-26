@@ -588,7 +588,7 @@ public abstract class SVNAdminArea {
         boolean isBinary = SVNProperty.isBinaryMimeType(mimeType); 
 
         localLabel = localLabel == null ? ".working" : localLabel;
-        baseLabel = baseLabel == null ? ".old" : localLabel;
+        baseLabel = baseLabel == null ? ".old" : baseLabel;
         latestLabel = latestLabel == null ? ".new" : latestLabel;
         
         byte[] conflictStart = ("<<<<<<< " + localLabel).getBytes();
@@ -599,7 +599,7 @@ public abstract class SVNAdminArea {
         boolean customMerger = merger.getClass() != DefaultSVNMerger.class;
 
         File tmpTarget = SVNTranslator.detranslateWorkingCopy(this, localPath, propChanges, !isBinary && customMerger);
-        base = SVNTranslator.maybeUpdateTargetEOLs(this, localPath, base, propChanges);
+        base = SVNTranslator.maybeUpdateTargetEOLs(this, base, propChanges);
         
         SVNStatusType status = SVNStatusType.UNCHANGED;
         Map command = new HashMap();
@@ -618,7 +618,6 @@ public abstract class SVNAdminArea {
                     command.put(SVNLog.DEST_ATTR, minePath);
                     log.addCommand(SVNLog.MOVE, command, false);
                     command.clear();
-                    
                     command.put(SVNProperty.shortPropertyName(SVNProperty.CONFLICT_WRK), minePath);
                 } else {
                     command.put(SVNProperty.shortPropertyName(SVNProperty.CONFLICT_WRK), "");
@@ -631,13 +630,6 @@ public abstract class SVNAdminArea {
                 command.put(SVNProperty.shortPropertyName(SVNProperty.CONFLICT_OLD), oldPath);
                 log.logChangedEntryProperties(localPath, command);
                 command.clear();
-
-                // update entry props
-/*                entry.setConflictNew(SVNFileUtil.getBasePath(newFile));
-                entry.setConflictOld(SVNFileUtil.getBasePath(oldFile));
-                entry.setConflictWorking(null);
-                saveEntries(false);
-*/                
             } 
             status = SVNStatusType.CONFLICTED;
         } else {
@@ -656,7 +648,6 @@ public abstract class SVNAdminArea {
             } finally {
                 SVNFileUtil.closeFile(result);
             }
-
             if (dryRun) {
                 if (leaveConflict && status == SVNStatusType.CONFLICTED) {
                     status = SVNStatusType.CONFLICTED_UNRESOLVED;
@@ -672,8 +663,6 @@ public abstract class SVNAdminArea {
                     command.put(SVNLog.NAME_ATTR, resultPath);
                     log.addCommand(SVNLog.DELETE, command, false);
                     command.clear();
-                    
-//                    SVNTranslator.translate(this, localPath, SVNFileUtil.getBasePath(resultFile), localPath, true);
                 } else {
                     // copy all to wc.
                     File mineFile = SVNFileUtil.createUniqueFile(getRoot(), localPath, localLabel);
@@ -732,10 +721,6 @@ public abstract class SVNAdminArea {
                         command.clear();
                     }
                     
-//                    SVNFileUtil.copyFile(getFile(localPath), mineFile, false);
-
-//                    SVNTranslator.translate(this, localPath, base, oldFile, true);
-//                    SVNTranslator.translate(this, localPath, latest, newFile, true);
                     // translate result to local
                     if (!leaveConflict) {
                         String resultPath = SVNFileUtil.getBasePath(resultFile);
@@ -747,7 +732,6 @@ public abstract class SVNAdminArea {
                         command.put(SVNLog.NAME_ATTR, resultPath);
                         log.addCommand(SVNLog.DELETE, command, false);
                         command.clear();
-//                        SVNTranslator.translate(this, localPath, SVNFileUtil.getBasePath(resultFile), localPath, true);
                     }
                     
                     command.put(SVNProperty.shortPropertyName(SVNProperty.CONFLICT_WRK), minePath);
@@ -755,23 +739,11 @@ public abstract class SVNAdminArea {
                     command.put(SVNProperty.shortPropertyName(SVNProperty.CONFLICT_OLD), oldPath);
                     log.logChangedEntryProperties(localPath, command);
                     command.clear();
-//                    entry.setConflictNew(newPath);
-//                    entry.setConflictOld(oldPath);
-//                    entry.setConflictWorking(minePath);
-//                    saveEntries(false);
                 }
             }
-//            if (!tmpTarget.equals(getFile(localPath))) {
-//                localTmpFile.delete();    
-//            }
             if (status == SVNStatusType.CONFLICTED && leaveConflict) {
                 status = SVNStatusType.CONFLICTED_UNRESOLVED;
             }
-
-//            if (resultFile != null) {
-//                resultFile.delete();
-//            }
-
         }
 
         if (!tmpTarget.equals(getFile(localPath))) {
