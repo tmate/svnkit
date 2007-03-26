@@ -40,6 +40,8 @@ import org.tmatesoft.svn.core.wc.SVNEvent;
 import org.tmatesoft.svn.core.wc.SVNEventAction;
 import org.tmatesoft.svn.core.wc.SVNRevision;
 import org.tmatesoft.svn.core.wc.SVNStatusType;
+import org.tmatesoft.svn.util.ISVNDebugLog;
+import org.tmatesoft.svn.util.SVNDebugLog;
 
 
 /**
@@ -223,7 +225,7 @@ public class SVNUpdateEditor implements ISVNEditor {
         if (kind == SVNFileType.DIRECTORY) {
             SVNAdminArea adminArea = null;
             try {
-                adminArea = myWCAccess.open(childDir, false, 0);
+                adminArea = SVNWCAccess.newInstance(null).open(childDir, false, 0);
             } catch (SVNException svne) {
                 if (svne.getErrorMessage().getErrorCode() != SVNErrorCode.WC_NOT_DIRECTORY) {
                     throw svne;
@@ -236,14 +238,17 @@ public class SVNUpdateEditor implements ISVNEditor {
                 }
             }
 
-            SVNEntry entry = adminArea.getEntry(adminArea.getThisDirName(), false);
-            if (entry != null && entry.isScheduledForAddition() && !entry.isCopied()) {
-                myCurrentDirectory.isAddExisted = true;
-            } else {
-                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_OBSTRUCTED_UPDATE, "Failed to add directory ''{0}'': a versioned directory of the same name already exists", myCurrentDirectory.getPath());
-                SVNErrorManager.error(err);
+            if (adminArea != null) {
+                SVNEntry entry = adminArea.getEntry(adminArea.getThisDirName(), false);
+                if (entry != null && entry.isScheduledForAddition() && !entry.isCopied()) {
+                    myCurrentDirectory.isAddExisted = true;
+                } else {
+                    SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_OBSTRUCTED_UPDATE, "Failed to add directory ''{0}'': a versioned directory of the same name already exists", myCurrentDirectory.getPath());
+                    SVNErrorManager.error(err);
+                }
             }
         }
+        
         if (SVNFileUtil.getAdminDirectoryName().equals(name)) {
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_OBSTRUCTED_UPDATE, "Failed to add directory ''{0}'':  object of the same name as the administrative directory", path);
             SVNErrorManager.error(err);
@@ -288,7 +293,14 @@ public class SVNUpdateEditor implements ISVNEditor {
         }
         myWCAccess.open(childDir, true, 0);
         if (!myCurrentDirectory.isAddExisted) {
-            myWCAccess.handleEvent(SVNEventFactory.createUpdateAddEvent(myAdminInfo, parentArea, SVNNodeKind.DIR, entry));
+            if (myCurrentDirectory.isExisted) {
+                SVNDebugLog.getDefaultLog().info("Add-dir-name: " + entry.getName());
+                SVNEvent event = new SVNEvent(myAdminInfo, parentArea, entry.getName(), SVNEventAction.UPDATE_EXISTS, 
+                                              SVNNodeKind.DIR, entry.getRevision(), null, null, null, null, null, null);
+                myWCAccess.handleEvent(event);
+            } else {
+                myWCAccess.handleEvent(SVNEventFactory.createUpdateAddEvent(myAdminInfo, parentArea, SVNNodeKind.DIR, entry));
+            }
         }
     }
 
@@ -303,7 +315,7 @@ public class SVNUpdateEditor implements ISVNEditor {
                 myCurrentDirectory.isSkipped = true;
                 Collection skippedPaths = getSkippedPaths();
                 skippedPaths.add(adminArea.getRoot());
-                SVNEvent event = SVNEventFactory.createSkipEvent(myAdminInfo, adminArea, null, SVNEventAction.SKIP, SVNEventAction.UPDATE_UPDATE, SVNNodeKind.DIR, -1, SVNStatusType.INAPPLICABLE, SVNStatusType.CONFLICTED);
+                SVNEvent event = SVNEventFactory.createSkipEvent(myAdminInfo, adminArea, "", SVNEventAction.SKIP, SVNEventAction.UPDATE_UPDATE, SVNNodeKind.DIR, -1, SVNStatusType.INAPPLICABLE, SVNStatusType.CONFLICTED);
                 myWCAccess.handleEvent(event);
                 return;
             }
@@ -417,7 +429,7 @@ public class SVNUpdateEditor implements ISVNEditor {
             if (!(adminArea == myAdminInfo.getAnchor() && !"".equals(myAdminInfo.getTargetName()))) {
                 // skip event for anchor when there is a target.
                 SVNEventAction action = myCurrentDirectory.isAddExisted || myCurrentDirectory.isExisted ? SVNEventAction.UPDATE_EXISTS : SVNEventAction.UPDATE_UPDATE;
-                if (propStatus == SVNStatusType.UNKNOWN) {
+                if (propStatus == SVNStatusType.UNKNOWN && action != SVNEventAction.UPDATE_EXISTS) {
                     action = SVNEventAction.UPDATE_NONE;
                 }
                 myWCAccess.handleEvent(SVNEventFactory.createUpdateModifiedEvent(myAdminInfo, adminArea, "", SVNNodeKind.DIR, action, null, SVNStatusType.UNKNOWN, propStatus, null));
@@ -433,6 +445,7 @@ public class SVNUpdateEditor implements ISVNEditor {
             deleteEntry(myTarget, myTargetRevision);
         }
 
+        SVNDebugLog.getDefaultLog().info("COMPLETING DIRECTORY myIsRootOpen=" + myIsRootOpen);
         if (!myIsRootOpen) {
             completeDirectory(myCurrentDirectory);
         }
@@ -585,7 +598,7 @@ public class SVNUpdateEditor implements ISVNEditor {
 
         boolean isLocallyModified = false;
         if (!myCurrentFile.isExisted) { 
-            isLocallyModified = !myCurrentFile.IsAdded && adminArea.hasTextModifications(name, false, false, false);
+            isLocallyModified = adminArea.hasTextModifications(name, false, false, false);
         } else if (isTextUpdated) {
             isLocallyModified = adminArea.hasVersionedFileTextChanges(adminArea.getFile(name), myCurrentFile.newBaseFile, false);
         }
@@ -655,26 +668,10 @@ public class SVNUpdateEditor implements ISVNEditor {
                     
                     // do test merge.
                     mergeOutcome = adminArea.mergeText(name, mergeLeftFile, adminArea.getFile(tmpBasePath), ".mine", leftLabel, rightLabel, modifiedProps, myIsLeaveConflicts, false, null, log);
-
                     if (mergeOutcome == SVNStatusType.UNCHANGED) {
                         textStatus = SVNStatusType.MERGED;
                     }
                     
-/*                    String oldRevisionStr = ".r" + fileEntry.getRevision();
-                    String newRevisionStr = ".r" + myTargetRevision;
-
-                    command.put(SVNLog.NAME_ATTR, name);
-                    command.put(SVNLog.ATTR1, mergeLeftFilePath);
-                    command.put(SVNLog.ATTR2, tmpBasePath);
-                    command.put(SVNLog.ATTR3, oldRevisionStr);
-                    command.put(SVNLog.ATTR4, newRevisionStr);
-                    command.put(SVNLog.ATTR5, ".mine");
-                    if (mergeOutcome == SVNStatusType.CONFLICTED_UNRESOLVED) {
-                        command.put(SVNLog.ATTR6, Boolean.TRUE.toString());
-                    }
-                    log.addCommand(SVNLog.MERGE, command, false);
-                    command.clear();
-*/
                     if (usedTmpFile) {
                         command.put(SVNLog.NAME_ATTR, mergeLeftFilePath);
                         log.addCommand(SVNLog.DELETE, command, false);
@@ -758,7 +755,7 @@ public class SVNUpdateEditor implements ISVNEditor {
                 textStatus = SVNStatusType.CHANGED;
             }
         }
-        
+
         // notify.
         if (textStatus != SVNStatusType.UNCHANGED || propStatus != SVNStatusType.UNCHANGED || lockStatus != SVNStatusType.LOCK_UNCHANGED) {
             SVNEventAction action = SVNEventAction.UPDATE_UPDATE;
@@ -778,18 +775,22 @@ public class SVNUpdateEditor implements ISVNEditor {
     public void abortEdit() throws SVNException {
     }
 
-    private void completeDirectory(SVNDirectoryInfo info) throws SVNException {
-        while (info != null) {
-            info.RefCount--;
-            if (info.RefCount > 0) {
+    private void completeDirectory(SVNDirectoryInfo dirInfo) throws SVNException {
+        ISVNDebugLog log = SVNDebugLog.getDefaultLog();
+        log.info("info " + dirInfo.getPath());
+        log.info("info rc " + dirInfo.RefCount);
+
+        while (dirInfo != null) {
+            dirInfo.RefCount--;
+            if (dirInfo.RefCount > 0) {
                 return;
             }
-
-            if (!info.isSkipped) {
-                if (info.Parent == null && myTarget != null) {
+//            log.info("bla-bla");
+            if (!dirInfo.isSkipped) {
+                if (dirInfo.Parent == null && myTarget != null) {
                     return;
                 }
-                SVNAdminArea adminArea = info.getAdminArea();
+                SVNAdminArea adminArea = dirInfo.getAdminArea();
                 SVNEntry thisEntry = adminArea.getEntry(adminArea.getThisDirName(), true); 
                 if (thisEntry == null) {
                     SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_NOT_FOUND, "No ''.'' entry found in ''{0}''", adminArea.getRoot());
@@ -812,12 +813,12 @@ public class SVNUpdateEditor implements ISVNEditor {
                     } else if (entry.getKind() == SVNNodeKind.DIR) {
                         if (myWCAccess.isMissing(adminArea.getFile(entry.getName())) && !entry.isAbsent() && !entry.isScheduledForAddition()) {
                             adminArea.deleteEntry(entry.getName());
-                            myWCAccess.handleEvent(SVNEventFactory.createUpdateDeleteEvent(myAdminInfo, info.getAdminArea(), entry));
+                            myWCAccess.handleEvent(SVNEventFactory.createUpdateDeleteEvent(myAdminInfo, dirInfo.getAdminArea(), entry));
                         }
                     }
                 }
                 adminArea.saveEntries(true);
-                info = info.Parent;
+                dirInfo = dirInfo.Parent;
             }
         }
     }
@@ -872,7 +873,7 @@ public class SVNUpdateEditor implements ISVNEditor {
                     Collection skippedPaths = getSkippedPaths();
                     File file = new File(myAdminInfo.getAnchor().getRoot(), path);
                     skippedPaths.add(file);
-                    SVNEvent event = SVNEventFactory.createSkipEvent(myAdminInfo, adminArea, null, SVNEventAction.SKIP, added ? SVNEventAction.UPDATE_ADD : SVNEventAction.UPDATE_UPDATE, SVNNodeKind.FILE, -1, hasTextConflicts ? SVNStatusType.CONFLICTED : SVNStatusType.UNKNOWN, hasPropConflicts ? SVNStatusType.CONFLICTED : SVNStatusType.UNKNOWN);
+                    SVNEvent event = SVNEventFactory.createSkipEvent(myAdminInfo, adminArea, info.Name, SVNEventAction.SKIP, added ? SVNEventAction.UPDATE_ADD : SVNEventAction.UPDATE_UPDATE, SVNNodeKind.FILE, -1, hasTextConflicts ? SVNStatusType.CONFLICTED : SVNStatusType.UNKNOWN, hasPropConflicts ? SVNStatusType.CONFLICTED : SVNStatusType.UNKNOWN);
                     myWCAccess.handleEvent(event);
                 }
             }

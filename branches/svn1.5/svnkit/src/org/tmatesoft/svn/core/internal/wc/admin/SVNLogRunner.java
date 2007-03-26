@@ -287,6 +287,11 @@ public class SVNLogRunner {
             String dstName = (String) attributes.get(SVNLog.DEST_ATTR);
             File src = adminArea.getFile(fileName);
             File dst = adminArea.getFile(dstName);
+            //when performing a merge from a log runner we may have just set 
+            //new properties (log command that copies a new base prop file), 
+            //but probably we've got a non empty props cache which is no more 
+            //valid, so clean it up.
+            adminArea.closeVersionedProperties();
             try {
                 try {
                     SVNTranslator.translate(adminArea, dstName, fileName, dstName, true);
@@ -296,11 +301,6 @@ public class SVNLogRunner {
                     }
                 }
 
-                //when performing a merge from a log runner we may have just set 
-                //new properties (log command that copies a new base prop file), 
-                //but probably we've got a non empty props cache which is no more 
-                //valid, so clean it up.
-                adminArea.closeVersionedProperties();
                 
                 // get properties for this entry.
                 SVNVersionedProperties props = adminArea.getProperties(dstName);

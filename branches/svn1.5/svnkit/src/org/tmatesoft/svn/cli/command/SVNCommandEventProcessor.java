@@ -124,6 +124,42 @@ public class SVNCommandEventProcessor implements ISVNEventHandler {
             } else {
                 SVNCommand.println(myPrintStream, "A    " + SVNFormatUtil.formatPath(event.getFile()));
             }
+        } else if (event.getAction() == SVNEventAction.UPDATE_EXISTS) {
+            StringBuffer sb = new StringBuffer();
+            if (event.getNodeKind() == SVNNodeKind.DIR) {
+                sb.append("E");
+            } else {
+                if (event.getContentsStatus() == SVNStatusType.CONFLICTED) {
+                    sb.append("C");
+                } else {
+                    sb.append("E");
+                }
+            }
+            
+            if (event.getPropertiesStatus() == SVNStatusType.CHANGED) {
+                sb.append("U");
+            } else if (event.getPropertiesStatus() == SVNStatusType.CONFLICTED) {
+                sb.append("C");
+            } else if (event.getPropertiesStatus() == SVNStatusType.MERGED) {
+                sb.append("G");
+            } else {
+                sb.append(" ");
+            }
+            if (sb.toString().trim().length() != 0) {
+                if (myIsExternal) {
+                    myIsExternalChanged = true;
+                } else {
+                    myIsChanged = true;
+                }
+            }
+            if (event.getLockStatus() == SVNStatusType.LOCK_UNLOCKED) {
+                sb.append("B");
+            } else {
+                sb.append(" ");
+            }
+            if (sb.toString().trim().length() > 0) {
+                SVNCommand.println(myPrintStream, sb.toString() + "  " + SVNFormatUtil.formatPath(event.getFile()));
+            }
         } else if (event.getAction() == SVNEventAction.UPDATE_DELETE) {
             if (myIsExternal) {
                 myIsExternalChanged = true;
