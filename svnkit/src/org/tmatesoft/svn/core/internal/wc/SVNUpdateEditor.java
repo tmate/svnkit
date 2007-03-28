@@ -40,8 +40,6 @@ import org.tmatesoft.svn.core.wc.SVNEvent;
 import org.tmatesoft.svn.core.wc.SVNEventAction;
 import org.tmatesoft.svn.core.wc.SVNRevision;
 import org.tmatesoft.svn.core.wc.SVNStatusType;
-import org.tmatesoft.svn.util.ISVNDebugLog;
-import org.tmatesoft.svn.util.SVNDebugLog;
 
 
 /**
@@ -66,13 +64,8 @@ public class SVNUpdateEditor implements ISVNEditor {
     //File objects
     private Collection mySkippedPaths;
     private SVNWCAccess myWCAccess; 
-    
     private SVNDeltaProcessor myDeltaProcessor;
 
-    public SVNUpdateEditor(SVNAdminAreaInfo info, String switchURL, boolean recursive, boolean leaveConflicts) throws SVNException {
-        this(info, switchURL, recursive, leaveConflicts, false);
-    }
-    
     public SVNUpdateEditor(SVNAdminAreaInfo info, String switchURL, boolean recursive, boolean leaveConflicts, boolean allowUnversionedObstructions) throws SVNException {
         myAdminInfo = info;
         myWCAccess = info.getWCAccess();
@@ -294,7 +287,6 @@ public class SVNUpdateEditor implements ISVNEditor {
         myWCAccess.open(childDir, true, 0);
         if (!myCurrentDirectory.isAddExisted) {
             if (myCurrentDirectory.isExisted) {
-                SVNDebugLog.getDefaultLog().info("Add-dir-name: " + entry.getName());
                 SVNEvent event = new SVNEvent(myAdminInfo, parentArea, entry.getName(), SVNEventAction.UPDATE_EXISTS, 
                                               SVNNodeKind.DIR, entry.getRevision(), null, null, null, null, null, null);
                 myWCAccess.handleEvent(event);
@@ -444,14 +436,12 @@ public class SVNUpdateEditor implements ISVNEditor {
             myCurrentDirectory = createDirectoryInfo(null, "", false);
             deleteEntry(myTarget, myTargetRevision);
         }
-
-        SVNDebugLog.getDefaultLog().info("COMPLETING DIRECTORY myIsRootOpen=" + myIsRootOpen);
         if (!myIsRootOpen) {
             completeDirectory(myCurrentDirectory);
         }
         if (!myIsTargetDeleted) {
             File targetFile = myTarget != null ? myAdminInfo.getAnchor().getFile(myTarget) : myAdminInfo.getAnchor().getRoot(); 
-            SVNWCManager.updateCleanup(targetFile, myWCAccess, myIsRecursive, mySwitchURL, myRootURL, myTargetRevision, true);
+            SVNWCManager.updateCleanup(targetFile, myWCAccess, myIsRecursive, mySwitchURL, myRootURL, myTargetRevision, true, mySkippedPaths);
         }
         return null;
     }
@@ -776,16 +766,12 @@ public class SVNUpdateEditor implements ISVNEditor {
     }
 
     private void completeDirectory(SVNDirectoryInfo dirInfo) throws SVNException {
-        ISVNDebugLog log = SVNDebugLog.getDefaultLog();
-        log.info("info " + dirInfo.getPath());
-        log.info("info rc " + dirInfo.RefCount);
-
         while (dirInfo != null) {
             dirInfo.RefCount--;
             if (dirInfo.RefCount > 0) {
                 return;
             }
-//            log.info("bla-bla");
+
             if (!dirInfo.isSkipped) {
                 if (dirInfo.Parent == null && myTarget != null) {
                     return;
@@ -818,8 +804,8 @@ public class SVNUpdateEditor implements ISVNEditor {
                     }
                 }
                 adminArea.saveEntries(true);
-                dirInfo = dirInfo.Parent;
             }
+            dirInfo = dirInfo.Parent;
         }
     }
 
@@ -835,56 +821,52 @@ public class SVNUpdateEditor implements ISVNEditor {
         
         SVNAdminArea adminArea = parent.getAdminArea();
         SVNFileType kind = SVNFileType.getType(adminArea.getFile(info.Name));
-        try {
-            SVNEntry entry = adminArea.getEntry(info.Name, true);
-            if (added && kind != SVNFileType.NONE) {
-                if (myIsUnversionedObstructionsAllowed || (entry != null && entry.isScheduledForAddition())) {
-                    if (entry != null && entry.isCopied()) {
-                        SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_OBSTRUCTED_UPDATE, "Failed to add file ''{0}'': a file of the same name is already scheduled for addition with history", path);
-                        SVNErrorManager.error(err);
-                    }
-                    if (kind != SVNFileType.FILE) {
-                        SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_OBSTRUCTED_UPDATE, "Failed to add file ''{0}'': a non-file object of the same name already exists", path);
-                        SVNErrorManager.error(err);
-                    }
+        SVNEntry entry = adminArea.getEntry(info.Name, true);
 
-                    if (entry != null) {
-                        info.isAddExisted = true;
-                    } else {
-                        info.isExisted = true;
-                    }
-                } else {
-                    SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_OBSTRUCTED_UPDATE, "Failed to add file ''{0}'': object of the same name already exists", path);
+        if (added && kind != SVNFileType.NONE) {
+            if (myIsUnversionedObstructionsAllowed || (entry != null && entry.isScheduledForAddition())) {
+                if (entry != null && entry.isCopied()) {
+                    SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_OBSTRUCTED_UPDATE, "Failed to add file ''{0}'': a file of the same name is already scheduled for addition with history", path);
                     SVNErrorManager.error(err);
                 }
-            }
-
-            if (!added && entry == null) {
-                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.UNVERSIONED_RESOURCE, "File ''{0}'' in directory ''{1}'' is not a versioned resource", 
-                        new Object[] {info.Name, adminArea.getRoot()});
+                if (kind != SVNFileType.FILE) {
+                    SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_OBSTRUCTED_UPDATE, "Failed to add file ''{0}'': a non-file object of the same name already exists", path);
+                    SVNErrorManager.error(err);
+                }
+                if (entry != null) {
+                    info.isAddExisted = true;
+                } else {
+                    info.isExisted = true;
+                }
+            } else {
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_OBSTRUCTED_UPDATE, "Failed to add file ''{0}'': object of the same name already exists", path);
                 SVNErrorManager.error(err);
             }
+        }
+
+        if (!added && entry == null) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.UNVERSIONED_RESOURCE, "File ''{0}'' in directory ''{1}'' is not a versioned resource", 
+                    new Object[] {info.Name, adminArea.getRoot()});
+            SVNErrorManager.error(err);
+        }
             
-            if (!added) {
-                boolean hasTextConflicts = adminArea.hasTextConflict(info.Name);
-                boolean hasPropConflicts = adminArea.hasPropConflict(info.Name);
-                if (hasTextConflicts || hasPropConflicts) {
-                    info.isSkipped = true;
-                    Collection skippedPaths = getSkippedPaths();
-                    File file = new File(myAdminInfo.getAnchor().getRoot(), path);
-                    skippedPaths.add(file);
-                    SVNEvent event = SVNEventFactory.createSkipEvent(myAdminInfo, adminArea, info.Name, SVNEventAction.SKIP, added ? SVNEventAction.UPDATE_ADD : SVNEventAction.UPDATE_UPDATE, SVNNodeKind.FILE, -1, hasTextConflicts ? SVNStatusType.CONFLICTED : SVNStatusType.UNKNOWN, hasPropConflicts ? SVNStatusType.CONFLICTED : SVNStatusType.UNKNOWN);
-                    myWCAccess.handleEvent(event);
-                }
+        if (!added) {
+            boolean hasTextConflicts = adminArea.hasTextConflict(info.Name);
+            boolean hasPropConflicts = adminArea.hasPropConflict(info.Name);
+            if (hasTextConflicts || hasPropConflicts) {
+                info.isSkipped = true;
+                Collection skippedPaths = getSkippedPaths();
+                File file = new File(myAdminInfo.getAnchor().getRoot(), path);
+                skippedPaths.add(file);
+                SVNEvent event = SVNEventFactory.createSkipEvent(myAdminInfo, adminArea, info.Name, SVNEventAction.SKIP, added ? SVNEventAction.UPDATE_ADD : SVNEventAction.UPDATE_UPDATE, SVNNodeKind.FILE, -1, hasTextConflicts ? SVNStatusType.CONFLICTED : SVNStatusType.UNKNOWN, hasPropConflicts ? SVNStatusType.CONFLICTED : SVNStatusType.UNKNOWN);
+                myWCAccess.handleEvent(event);
             }
+        }
             
-            if (mySwitchURL != null || entry == null) {
-                info.URL = SVNPathUtil.append(parent.URL, SVNEncodingUtil.uriEncode(info.Name));
-            } else {
-                info.URL = entry.getURL();
-            }
-        } finally {
-            adminArea.closeEntries();
+        if (mySwitchURL != null || entry == null) {
+            info.URL = SVNPathUtil.append(parent.URL, SVNEncodingUtil.uriEncode(info.Name));
+        } else {
+            info.URL = entry.getURL();
         }
         parent.RefCount++;
         return info;
@@ -940,7 +922,6 @@ public class SVNUpdateEditor implements ISVNEditor {
     }
 
     private class SVNEntryInfo {
-
         public String URL;
         public boolean IsAdded;
         public boolean isExisted;

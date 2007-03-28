@@ -509,7 +509,7 @@ public abstract class SVNAdminArea {
                 SVNErrorManager.error(err);
             }
             String prejPath = entry.getPropRejectFile();
-            closeEntries();
+//            closeEntries();
 
             if (prejPath == null) {
                 prejPath = getThisDirName().equals(name) ? "dir_conflicts" : name;

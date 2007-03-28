@@ -41,6 +41,7 @@ import org.tmatesoft.svn.core.wc.SVNRevision;
 import org.tmatesoft.svn.core.wc.SVNStatus;
 import org.tmatesoft.svn.core.wc.SVNStatusClient;
 import org.tmatesoft.svn.core.wc.SVNStatusType;
+import org.tmatesoft.svn.util.SVNDebugLog;
 
 
 
@@ -218,6 +219,9 @@ public class SVNWCManager {
         
         excludePaths = excludePaths == null ? Collections.EMPTY_LIST : excludePaths; 
         if (entry.isFile() || (entry.isDirectory() && (entry.isAbsent() || entry.isDeleted()))) {
+            //TODO: remove
+            SVNDebugLog.getDefaultLog().info("TWEAKING ENTRY '" + entry.getName() + "'");
+            SVNDebugLog.getDefaultLog().info("EXCLUDE PATHS: " + excludePaths);
             if (excludePaths.contains(path)) {
                 return;
             }

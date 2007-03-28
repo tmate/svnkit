@@ -970,7 +970,7 @@ public class SVNFileUtil {
             return null;
         }
         if (!file.isFile() || !file.canRead()) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, "Cannot read from to ''{0}'': path refers to directory or read access is denied", file);
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, "Cannot read from ''{0}'': path refers to directory or read access is denied", file);
             SVNErrorManager.error(err);
         }
         if (!file.exists()) {
@@ -979,7 +979,7 @@ public class SVNFileUtil {
         try {
             return new BufferedInputStream(new FileInputStream(file));
         } catch (FileNotFoundException e) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, "Cannot read from to ''{0}'': {1}", new Object[] {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, "Cannot read from ''{0}'': {1}", new Object[] {
                     file, e.getLocalizedMessage()
             });
             SVNErrorManager.error(err, e);
@@ -992,7 +992,7 @@ public class SVNFileUtil {
             return null;
         }
         if (!file.isFile() || !file.canRead()) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, "Cannot read from to ''{0}'': path refers to directory or read access is denied", file);
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, "Cannot read from ''{0}'': path refers to directory or read access is denied", file);
             SVNErrorManager.error(err);
         }
         if (!file.exists()) {
@@ -1002,7 +1002,7 @@ public class SVNFileUtil {
         try {
             return new SVNInputFileChannel(file);
         } catch (FileNotFoundException e) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, "Cannot read from to ''{0}'': {1}", new Object[] {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, "Cannot read from ''{0}'': {1}", new Object[] {
                     file, e.getLocalizedMessage()
             });
             SVNErrorManager.error(err, e);
