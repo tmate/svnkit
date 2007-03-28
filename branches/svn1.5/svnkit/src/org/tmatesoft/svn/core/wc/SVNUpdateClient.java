@@ -296,6 +296,10 @@ public class SVNUpdateClient extends SVNBasicClient {
      * 						against which the directory is controlled)  
      */
     public long doCheckout(SVNURL url, File dstPath, SVNRevision pegRevision, SVNRevision revision, boolean recursive) throws SVNException {
+        return doCheckout(url, dstPath, pegRevision, revision, recursive, false);
+    }
+    
+    public long doCheckout(SVNURL url, File dstPath, SVNRevision pegRevision, SVNRevision revision, boolean recursive, boolean force) throws SVNException {
         if (dstPath == null) {
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.BAD_FILENAME, "Checkout destination path can not be NULL");
             SVNErrorManager.error(err);
@@ -349,7 +353,7 @@ public class SVNUpdateClient extends SVNBasicClient {
                     }
                 } else {
                     SVNAdminAreaFactory.createVersionedDirectory(dstPath, url, repositoryRoot, uuid, revNumber);
-                    result = doUpdate(dstPath, revision, recursive);
+                    result = doUpdate(dstPath, revision, recursive, force);
                 }
             } else {
                 SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_NODE_KIND_CHANGE, "''{0}'' already exists and is not a directory", dstPath);

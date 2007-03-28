@@ -461,7 +461,6 @@ public class SVNAdminArea14 extends SVNAdminArea {
             try {
                 removeFromRevisionControl(getThisDirName(), !killAdmOnly, false);
             } catch (SVNException svne) {
-                SVNDebugLog.getDefaultLog().info(svne);
                 if (svne.getErrorMessage().getErrorCode() != SVNErrorCode.WC_LEFT_LOCAL_MOD) {
                     throw svne;
                 }
@@ -1047,7 +1046,6 @@ public class SVNAdminArea14 extends SVNAdminArea {
                     entryAttributes.put(SVNProperty.CACHABLE_PROPS, defaultEntryAttrs.get(SVNProperty.CACHABLE_PROPS));
                 }
             }
-
             writeEntry(writer, name, entryAttributes, rootEntry.asMap());
         }
     }

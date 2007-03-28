@@ -37,7 +37,6 @@ import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.internal.wc.SVNFileType;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 import org.tmatesoft.svn.core.wc.ISVNOptions;
-import org.tmatesoft.svn.util.SVNDebugLog;
 
 
 /**
@@ -216,7 +215,6 @@ public class SVNTranslator {
                     eolStyle = (String) propDiff.get(SVNProperty.EOL_STYLE);
                 } else if (!isLocalBinary) {
                     eolStyle = props.getPropertyValue(SVNProperty.EOL_STYLE);
-                    SVNDebugLog.getDefaultLog().info("eol style: " + eolStyle);
                 }
                 
                 if (!isLocalBinary) {
