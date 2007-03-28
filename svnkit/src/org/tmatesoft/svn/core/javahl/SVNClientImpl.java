@@ -37,11 +37,14 @@ import org.tigris.subversion.javahl.NotifyInformation;
 import org.tigris.subversion.javahl.ProgressListener;
 import org.tigris.subversion.javahl.PromptUserPassword;
 import org.tigris.subversion.javahl.PropertyData;
+import org.tigris.subversion.javahl.ProplistCallback;
 import org.tigris.subversion.javahl.Revision;
+import org.tigris.subversion.javahl.RevisionRange;
 import org.tigris.subversion.javahl.SVNClient;
 import org.tigris.subversion.javahl.SVNClientInterface;
 import org.tigris.subversion.javahl.SVNClientLogLevel;
 import org.tigris.subversion.javahl.Status;
+import org.tigris.subversion.javahl.SubversionException;
 import org.tmatesoft.svn.core.ISVNDirEntryHandler;
 import org.tmatesoft.svn.core.ISVNLogEntryHandler;
 import org.tmatesoft.svn.core.SVNCancelException;
@@ -1340,5 +1343,19 @@ public class SVNClientImpl implements SVNClientInterface {
     public LogMessage[] logMessages(String path, Revision pegRevision, Revision revisionStart, Revision revisionEnd, boolean stopOnCopy, boolean discoverPath, long limit) throws ClientException {
         // TODO Auto-generated method stub
         return null;
+    }
+
+    public CopySource getCopySource(String path) throws SubversionException {
+        return null;
+    }
+
+    public PropertyData getMergeInfoProperty(String path) throws SubversionException {
+        return null;
+    }
+
+    public void merge(String path, Revision pegRevision, RevisionRange[] revisions, String localPath, boolean force, boolean recurse, boolean ignoreAncestry, boolean dryRun) throws ClientException {
+    }
+
+    public void properties(String path, Revision revision, Revision pegRevision, boolean recurse, ProplistCallback callback) throws ClientException {
     }
 }

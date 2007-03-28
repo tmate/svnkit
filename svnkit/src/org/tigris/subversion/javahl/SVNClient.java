@@ -437,4 +437,20 @@ public class SVNClient implements SVNClientInterface {
     public LogMessage[] logMessages(String path, Revision pegRevision, Revision revisionStart, Revision revisionEnd, boolean stopOnCopy, boolean discoverPath, long limit) throws ClientException {
         return myDelegate.logMessages(path, pegRevision, revisionStart, revisionEnd, stopOnCopy, discoverPath, limit);
     }
+
+    public CopySource getCopySource(String path) throws SubversionException {
+        return myDelegate.getCopySource(path);
+    }
+
+    public PropertyData getMergeInfoProperty(String path) throws SubversionException {
+        return myDelegate.getMergeInfoProperty(path);
+    }
+
+    public void merge(String path, Revision pegRevision, RevisionRange[] revisions, String localPath, boolean force, boolean recurse, boolean ignoreAncestry, boolean dryRun) throws ClientException {
+        myDelegate.merge(path, pegRevision, revisions, localPath, force, recurse, ignoreAncestry, dryRun);
+    }
+
+    public void properties(String path, Revision revision, Revision pegRevision, boolean recurse, ProplistCallback callback) throws ClientException {
+        myDelegate.properties(path, revision, pegRevision, recurse, callback);
+    }
 }

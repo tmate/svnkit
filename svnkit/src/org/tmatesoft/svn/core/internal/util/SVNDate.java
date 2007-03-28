@@ -131,10 +131,10 @@ public class SVNDate extends Date {
 
             CALENDAR.set(year, month - 1, date, hour, min, sec);
             CALENDAR.set(Calendar.MILLISECOND, ms);
+            SVNDate resultDate = new SVNDate(CALENDAR.getTimeInMillis(), microseconds);
             if (oldTimeZone != null) {
                 CALENDAR.setTimeZone(oldTimeZone);
             }
-            SVNDate resultDate = new SVNDate(CALENDAR.getTimeInMillis(), microseconds);
             return resultDate;
         }
     }
