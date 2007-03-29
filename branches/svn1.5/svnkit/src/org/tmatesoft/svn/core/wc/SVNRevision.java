@@ -13,9 +13,11 @@ package org.tmatesoft.svn.core.wc;
 
 import java.text.DateFormat;
 import java.text.ParseException;
+import java.util.Calendar;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.TimeZone;
 
 import org.tmatesoft.svn.core.internal.util.SVNTimeUtil;
 
@@ -109,7 +111,9 @@ public class SVNRevision {
 
     private SVNRevision(Date date) {
         this(-1);
-        myDate = date;
+        Calendar calendar = Calendar.getInstance(TimeZone.getTimeZone("GMT"));
+        calendar.setTime(date);
+        myDate = calendar.getTime();
         myID = 20;
     }
     

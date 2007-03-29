@@ -1268,7 +1268,7 @@ public class SVNFileUtil {
         try {
             tmpFile = File.createTempFile(".svnkit." + name + ".", ".tmp");
         } catch (IOException e) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, "Cannot create temporary directory: {1}", e.getLocalizedMessage());
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, "Cannot create temporary directory: {0}", e.getLocalizedMessage());
             SVNErrorManager.error(err, e);
         }
         if (tmpFile.exists()) {
@@ -1286,7 +1286,7 @@ public class SVNFileUtil {
             }
             tmpFile = File.createTempFile(prefix, suffix);
         } catch (IOException e) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, "Cannot create temporary file: {1}", e.getLocalizedMessage());
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, "Cannot create temporary file: {0}", e.getLocalizedMessage());
             SVNErrorManager.error(err, e);
         }
         return tmpFile;
