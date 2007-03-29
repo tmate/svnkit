@@ -131,29 +131,10 @@ public class SVNDate extends Date {
 
             CALENDAR.set(year, month - 1, date, hour, min, sec);
             CALENDAR.set(Calendar.MILLISECOND, ms);
-            long time = CALENDAR.getTimeInMillis();
+            SVNDate resultDate = new SVNDate(CALENDAR.getTimeInMillis(), microseconds);
             if (oldTimeZone != null) {
                 CALENDAR.setTimeZone(oldTimeZone);
-                CALENDAR.setTimeInMillis(time);
-                int y = CALENDAR.get(Calendar.YEAR);
-                int m = CALENDAR.get(Calendar.MONTH);
-                int d = CALENDAR.get(Calendar.DAY_OF_MONTH);
-                int h = CALENDAR.get(Calendar.HOUR_OF_DAY);
-                int minutes = CALENDAR.get(Calendar.MINUTE);
-                int seconds = CALENDAR.get(Calendar.SECOND);
-                int milliseconds = CALENDAR.get(Calendar.MILLISECOND);
-                CALENDAR.clear();
-                CALENDAR.set(Calendar.YEAR, y);
-                CALENDAR.set(Calendar.MONTH, m);
-                CALENDAR.set(Calendar.DAY_OF_MONTH, d);
-                CALENDAR.set(Calendar.HOUR_OF_DAY, h);
-                CALENDAR.set(Calendar.MINUTE, minutes);
-                CALENDAR.set(Calendar.SECOND, seconds);
-                CALENDAR.set(Calendar.MILLISECOND, milliseconds);
-                time = CALENDAR.getTimeInMillis();
             }
-            
-            SVNDate resultDate = new SVNDate(time, microseconds);
             return resultDate;
         }
     }
