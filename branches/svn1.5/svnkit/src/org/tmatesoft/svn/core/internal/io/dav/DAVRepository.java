@@ -24,6 +24,7 @@ import java.util.Map;
 
 import org.tmatesoft.svn.core.ISVNDirEntryHandler;
 import org.tmatesoft.svn.core.ISVNLogEntryHandler;
+import org.tmatesoft.svn.core.SVNDepth;
 import org.tmatesoft.svn.core.SVNDirEntry;
 import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
@@ -591,103 +592,6 @@ class DAVRepository extends SVNRepository {
 
     }
 
-    public void update(long revision, String target, boolean recursive, ISVNReporterBaton reporter, ISVNEditor editor) throws SVNException {
-        try {
-            openConnection();
-            StringBuffer request = DAVEditorHandler.generateEditorRequest(myConnection, null, getLocation().toString(), revision, target, null, recursive, false, false, true, reporter);
-            DAVEditorHandler handler = new DAVEditorHandler(editor, true);
-
-            String bcPath = SVNEncodingUtil.uriEncode(getLocation().getPath());
-            try {
-                bcPath = DAVUtil.getVCCPath(myConnection, this, bcPath);
-            } catch (SVNException e) {
-                // no need to call close edit here, I suppose,
-                // no editing has been started yet.
-                throw e;
-            }
-        	HTTPStatus status = myConnection.doReport(bcPath, request, handler);
-            if (status.getError() != null) {
-                SVNErrorManager.error(status.getError());
-            }
-        } finally {
-            closeConnection();
-        }
-    }
-
-    public void update(SVNURL url, long revision, String target, boolean recursive, ISVNReporterBaton reporter, ISVNEditor editor) throws SVNException {
-        if (url == null) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.RA_ILLEGAL_URL, "URL could not be NULL");
-            SVNErrorManager.error(err);
-        }
-        try {
-            openConnection();
-            StringBuffer request = DAVEditorHandler.generateEditorRequest(myConnection, null, getLocation().toString(), revision, target, url.toString(), 
-                    recursive, true, false, true, reporter);
-            DAVEditorHandler handler = new DAVEditorHandler(editor, true);
-
-            String bcPath = SVNEncodingUtil.uriEncode(getLocation().getPath());
-            try {
-                bcPath = DAVUtil.getVCCPath(myConnection, this, bcPath);
-            } catch (SVNException e) {
-                editor.closeEdit();
-                throw e;
-            }
-            HTTPStatus status = myConnection.doReport(bcPath, request, handler);
-            if (status.getError() != null) {
-                SVNErrorManager.error(status.getError());
-            }
-        } finally {
-            closeConnection();
-        }
-    }
-
-    public void diff(SVNURL url, long revision, String target, boolean ignoreAncestry, boolean recursive, ISVNReporterBaton reporter, ISVNEditor editor) throws SVNException {
-        diff(url, revision, revision, target, ignoreAncestry, recursive, reporter, editor);
-    }
-    
-    public void diff(SVNURL url, long targetRevision, long revision, String target, boolean ignoreAncestry, boolean recursive, ISVNReporterBaton reporter, ISVNEditor editor) throws SVNException {
-        diff(url, revision, revision, target, ignoreAncestry, recursive, true, reporter, editor);
-    }
-
-    public void diff(SVNURL url, long targetRevision, long revision, String target, boolean ignoreAncestry, boolean recursive, boolean getContents, ISVNReporterBaton reporter, ISVNEditor editor) throws SVNException {
-        if (url == null) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.RA_ILLEGAL_URL, "URL could not be NULL");
-            SVNErrorManager.error(err);
-        }
-        if (revision < 0) {
-            revision = targetRevision;
-        }
-        try {
-            openConnection();
-            StringBuffer request = DAVEditorHandler.generateEditorRequest(myConnection, null, getLocation().toString(), targetRevision, target, url.toString(), recursive, ignoreAncestry, false, getContents, reporter);
-            DAVEditorHandler handler = new DAVEditorHandler(editor, true);
-            String path = SVNEncodingUtil.uriEncode(getLocation().getPath());
-            path = DAVUtil.getVCCPath(myConnection, this, path);
-            HTTPStatus status = myConnection.doReport(path, request, handler, true);
-            if (status.getError() != null) {
-                SVNErrorManager.error(status.getError());
-            }
-        } finally {
-            closeConnection();
-        }
-    }
-
-    public void status(long revision, String target, boolean recursive, ISVNReporterBaton reporter, ISVNEditor editor) throws SVNException {
-        try {
-            openConnection();
-            StringBuffer request = DAVEditorHandler.generateEditorRequest(myConnection, null, getLocation().toString(), revision, target, null, recursive, false, false, false, reporter);
-            DAVEditorHandler handler = new DAVEditorHandler(editor, false);
-            String path = SVNEncodingUtil.uriEncode(getLocation().getPath());
-            path = DAVUtil.getVCCPath(myConnection, this, path);
-            HTTPStatus status = myConnection.doReport(path, request, handler);
-            if (status.getError() != null) {
-                SVNErrorManager.error(status.getError());
-            }
-        } finally {
-            closeConnection();
-        }
-    }
-
     public void setRevisionPropertyValue(long revision, String propertyName, String propertyValue) throws SVNException {
         assertValidRevision(revision);
 
@@ -906,6 +810,94 @@ class DAVRepository extends SVNRepository {
         }
         SVNURL url = getLocation().setPath(fullPath, true);
         return new SVNDirEntry(url, name, kind, size, hasProperties, lastRevision, date, author);
+    }
+
+    public void diff(SVNURL url, long targetRevision, long revision, String target, boolean ignoreAncestry, SVNDepth depth, boolean getContents, ISVNReporterBaton reporter, ISVNEditor editor) throws SVNException {
+        if (url == null) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.RA_ILLEGAL_URL, "URL could not be NULL");
+            SVNErrorManager.error(err);
+        }
+        if (revision < 0) {
+            revision = targetRevision;
+        }
+        try {
+            openConnection();
+            StringBuffer request = DAVEditorHandler.generateEditorRequest(myConnection, null, getLocation().toString(), targetRevision, target, url.toString(), depth, ignoreAncestry, false, getContents, reporter);
+            DAVEditorHandler handler = new DAVEditorHandler(editor, true);
+            String path = SVNEncodingUtil.uriEncode(getLocation().getPath());
+            path = DAVUtil.getVCCPath(myConnection, this, path);
+            HTTPStatus status = myConnection.doReport(path, request, handler, true);
+            if (status.getError() != null) {
+                SVNErrorManager.error(status.getError());
+            }
+        } finally {
+            closeConnection();
+        }
+    }
+
+    public void status(long revision, String target, SVNDepth depth, ISVNReporterBaton reporter, ISVNEditor editor) throws SVNException {
+        try {
+            openConnection();
+            StringBuffer request = DAVEditorHandler.generateEditorRequest(myConnection, null, getLocation().toString(), revision, target, null, depth, false, false, false, reporter);
+            DAVEditorHandler handler = new DAVEditorHandler(editor, false);
+            String path = SVNEncodingUtil.uriEncode(getLocation().getPath());
+            path = DAVUtil.getVCCPath(myConnection, this, path);
+            HTTPStatus status = myConnection.doReport(path, request, handler);
+            if (status.getError() != null) {
+                SVNErrorManager.error(status.getError());
+            }
+        } finally {
+            closeConnection();
+        }
+    }
+
+    public void update(SVNURL url, long revision, String target, SVNDepth depth, ISVNReporterBaton reporter, ISVNEditor editor) throws SVNException {
+        if (url == null) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.RA_ILLEGAL_URL, "URL could not be NULL");
+            SVNErrorManager.error(err);
+        }
+        try {
+            openConnection();
+            StringBuffer request = DAVEditorHandler.generateEditorRequest(myConnection, null, getLocation().toString(), revision, target, url.toString(), 
+                    depth, true, false, true, reporter);
+            DAVEditorHandler handler = new DAVEditorHandler(editor, true);
+
+            String bcPath = SVNEncodingUtil.uriEncode(getLocation().getPath());
+            try {
+                bcPath = DAVUtil.getVCCPath(myConnection, this, bcPath);
+            } catch (SVNException e) {
+                editor.closeEdit();
+                throw e;
+            }
+            HTTPStatus status = myConnection.doReport(bcPath, request, handler);
+            if (status.getError() != null) {
+                SVNErrorManager.error(status.getError());
+            }
+        } finally {
+            closeConnection();
+        }
+    }
+
+    public void update(long revision, String target, SVNDepth depth, ISVNReporterBaton reporter, ISVNEditor editor) throws SVNException {
+        try {
+            openConnection();
+            StringBuffer request = DAVEditorHandler.generateEditorRequest(myConnection, null, getLocation().toString(), revision, target, null, depth, false, false, true, reporter);
+            DAVEditorHandler handler = new DAVEditorHandler(editor, true);
+            String bcPath = SVNEncodingUtil.uriEncode(getLocation().getPath());
+            try {
+                bcPath = DAVUtil.getVCCPath(myConnection, this, bcPath);
+            } catch (SVNException e) {
+                // no need to call close edit here, I suppose,
+                // no editing has been started yet.
+                throw e;
+            }
+            HTTPStatus status = myConnection.doReport(bcPath, request, handler);
+            if (status.getError() != null) {
+                SVNErrorManager.error(status.getError());
+            }
+        } finally {
+            closeConnection();
+        }
     }
 }
 

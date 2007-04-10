@@ -14,6 +14,7 @@ package org.tmatesoft.svn.core.internal.wc.admin;
 import java.io.File;
 import java.util.Iterator;
 
+import org.tmatesoft.svn.core.SVNDepth;
 import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
@@ -27,6 +28,7 @@ import org.tmatesoft.svn.core.internal.wc.SVNExternalInfo;
 import org.tmatesoft.svn.core.internal.wc.SVNFileType;
 import org.tmatesoft.svn.core.io.ISVNReporter;
 import org.tmatesoft.svn.core.io.ISVNReporterBaton;
+import org.tmatesoft.svn.core.wc.SVNRevision;
 import org.tmatesoft.svn.util.ISVNDebugLog;
 
 
@@ -37,14 +39,14 @@ import org.tmatesoft.svn.util.ISVNDebugLog;
 public class SVNReporter implements ISVNReporterBaton {
 
     private SVNAdminAreaInfo myInfo;
-    private boolean myIsRecursive;
+    private SVNDepth myDepth;
     private boolean myIsRestore;
     private File myTarget;
     private ISVNDebugLog myLog;
 
-    public SVNReporter(SVNAdminAreaInfo info, File file, boolean restoreFiles, boolean recursive, ISVNDebugLog log) {
+    public SVNReporter(SVNAdminAreaInfo info, File file, boolean restoreFiles, SVNDepth depth, ISVNDebugLog log) {
         myInfo = info;
-        myIsRecursive = recursive;
+        myDepth = depth;
         myIsRestore = restoreFiles;
         myLog = log;
         myTarget = file;
@@ -58,7 +60,10 @@ public class SVNReporter implements ISVNReporterBaton {
             if (targetEntry == null || (targetEntry.isDirectory() && targetEntry.isScheduledForAddition())) {
                 SVNEntry parentEntry = wcAccess.getEntry(myTarget.getParentFile(), false);
                 long revision = parentEntry.getRevision();
-                reporter.setPath("", null, revision, targetEntry != null ? targetEntry.isIncomplete() : true);
+                if (myDepth == SVNDepth.DEPTH_UNKNOWN) {
+                    myDepth = parentEntry.getDepth();
+                }
+                reporter.setPath("", null, revision, myDepth, targetEntry != null ? targetEntry.isIncomplete() : true);
                 reporter.deletePath("");
                 reporter.finishReport();
                 return;
@@ -66,7 +71,7 @@ public class SVNReporter implements ISVNReporterBaton {
             
             SVNEntry parentEntry = null;
             long revision = targetEntry.getRevision();
-            if (revision < 0) {
+            if (!SVNRevision.isValidRevisionNumber(revision)) {
                  parentEntry = wcAccess.getEntry(myTarget.getParentFile(), false);
                 if (parentEntry == null) {
                     SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.UNVERSIONED_RESOURCE, "''{0}'' is not under version control", myTarget.getParentFile());
@@ -74,7 +79,10 @@ public class SVNReporter implements ISVNReporterBaton {
                 }
                 revision = parentEntry.getRevision();
             }
-            reporter.setPath("", null, revision, targetEntry.isIncomplete());
+            if (myDepth == SVNDepth.DEPTH_UNKNOWN) {
+                myDepth = targetEntry.getDepth();
+            }
+            reporter.setPath("", null, revision, myDepth, targetEntry.isIncomplete());
             
             SVNFileType fileType = SVNFileType.getType(myTarget);
             boolean missing = !targetEntry.isScheduledForDeletion() && fileType == SVNFileType.NONE;
@@ -83,7 +91,14 @@ public class SVNReporter implements ISVNReporterBaton {
                 if (missing) {
                     reporter.deletePath("");
                 } else {
-                    reportEntries(reporter, targetArea, "", revision, targetEntry.isIncomplete(), myIsRecursive);
+                    /* TODO(sd): svn dev says: "Just passing depth here is not enough.  There
+                     * can be circumstances where the root is depth 0 or 1,
+                     * but some child directories are present at depth
+                     * infinity.  We need to detect them and recurse into
+                     * them *unless* there is a passed-in depth that is not
+                     * infinity." - unfortunately, I don't understand why depth is not enough
+                     */
+                    reportEntries(reporter, targetArea, "", revision, targetEntry.isIncomplete(), myDepth);
                 }
             } else if (targetEntry.isFile()) {
                 if (missing) {
@@ -96,9 +111,9 @@ public class SVNReporter implements ISVNReporterBaton {
                 String expectedURL = SVNPathUtil.append(parentURL, SVNEncodingUtil.uriEncode(targetEntry.getName()));
                 if (parentEntry != null && !expectedURL.equals(url)) {
                     SVNURL svnURL = SVNURL.parseURIEncoded(url);
-                    reporter.linkPath(svnURL, "", targetEntry.getLockToken(), targetEntry.getRevision(), false);
+                    reporter.linkPath(svnURL, "", targetEntry.getLockToken(), targetEntry.getRevision(), targetEntry.getDepth(), false);
                 } else if (targetEntry.getRevision() != revision || targetEntry.getLockToken() != null) {
-                    reporter.setPath("", targetEntry.getLockToken(), targetEntry.getRevision(), false);
+                    reporter.setPath("", targetEntry.getLockToken(), targetEntry.getRevision(), targetEntry.getDepth(), false);
                 }
             }
             reporter.finishReport();
@@ -125,7 +140,7 @@ public class SVNReporter implements ISVNReporterBaton {
         }
     }
 
-    private void reportEntries(ISVNReporter reporter, SVNAdminArea adminArea, String dirPath, long dirRevision, boolean reportAll, boolean recursive) throws SVNException {
+    private void reportEntries(ISVNReporter reporter, SVNAdminArea adminArea, String dirPath, long dirRevision, boolean reportAll, SVNDepth depth) throws SVNException {
         SVNWCAccess wcAccess = myInfo.getWCAccess();
         SVNExternalInfo[] externals = myInfo.addExternals(adminArea, adminArea.getProperties(adminArea.getThisDirName()).getPropertyValue(SVNProperty.EXTERNALS));
         for (int i = 0; externals != null && i < externals.length; i++) {
@@ -161,18 +176,24 @@ public class SVNReporter implements ISVNReporterBaton {
                 if (reportAll) {
                     if (!url.equals(expectedURL)) {
                         SVNURL svnURL = SVNURL.parseURIEncoded(url);
-                        reporter.linkPath(svnURL, path, entry.getLockToken(), entry.getRevision(), false);
+                        reporter.linkPath(svnURL, path, entry.getLockToken(), entry.getRevision(), entry.getDepth(), false);
                     } else {
-                        reporter.setPath(path, entry.getLockToken(), entry.getRevision(), false);
+                        reporter.setPath(path, entry.getLockToken(), entry.getRevision(), entry.getDepth(), false);
                     }
-                } else if (!entry.isScheduledForReplacement() && !url.equals(expectedURL)) {
+                } else if (!entry.isScheduledForAddition() && !entry.isScheduledForReplacement() && !url.equals(expectedURL)) {
                     // link path
                     SVNURL svnURL = SVNURL.parseURIEncoded(url);
-                    reporter.linkPath(svnURL, path, entry.getLockToken(), entry.getRevision(), false);
-                } else if (entry.getRevision() != dirRevision || entry.getLockToken() != null) {
-                    reporter.setPath(path, entry.getLockToken(), entry.getRevision(), false);
+                    reporter.linkPath(svnURL, path, entry.getLockToken(), entry.getRevision(), entry.getDepth(), false);
+                } else if (entry.getRevision() != dirRevision || entry.getDepth() != depth ||entry.getLockToken() != null) {
+                    reporter.setPath(path, entry.getLockToken(), entry.getRevision(), entry.getDepth(), false);
                 }
-            } else if (entry.isDirectory() && recursive) {
+                /* TODO(sd): svn devs think "...it's correct to check whether
+                 * 'depth == svn_depth_infinity' above.  If the
+                 * specified depth is not infinity, then we don't want
+                 * to recurse at all.  If it is, then we want recursion
+                 * to be dependent on the subdirs' entries, right?..."
+                 */ 
+            } else if (entry.isDirectory() && depth == SVNDepth.DEPTH_INFINITY) {
                 if (missing) {
                     if (!reportAll) {
                         reporter.deletePath(path);
@@ -185,17 +206,21 @@ public class SVNReporter implements ISVNReporterBaton {
                 if (reportAll) {
                     if (!url.equals(expectedURL)) {
                         SVNURL svnURL = SVNURL.parseURIEncoded(url);
-                        reporter.linkPath(svnURL, path, childEntry.getLockToken(), childEntry.getRevision(), childEntry.isIncomplete());
+                        reporter.linkPath(svnURL, path, childEntry.getLockToken(), childEntry.getRevision(), childEntry.getDepth(), childEntry.isIncomplete());
                     } else {
-                        reporter.setPath(path, childEntry.getLockToken(), childEntry.getRevision(), childEntry.isIncomplete());
+                        reporter.setPath(path, childEntry.getLockToken(), childEntry.getRevision(), childEntry.getDepth(), childEntry.isIncomplete());
                     }
                 } else if (!url.equals(expectedURL)) {
                     SVNURL svnURL = SVNURL.parseURIEncoded(url);
-                    reporter.linkPath(svnURL, path, childEntry.getLockToken(), childEntry.getRevision(), childEntry.isIncomplete());
+                    reporter.linkPath(svnURL, path, childEntry.getLockToken(), childEntry.getRevision(), childEntry.getDepth(), childEntry.isIncomplete());
                 } else if (childEntry.getLockToken() != null || childEntry.getRevision() != dirRevision || childEntry.isIncomplete()) {
-                    reporter.setPath(path, childEntry.getLockToken(), childEntry.getRevision(), childEntry.isIncomplete());
+                    reporter.setPath(path, childEntry.getLockToken(), childEntry.getRevision(), childEntry.getDepth(), childEntry.isIncomplete());
                 }
-                reportEntries(reporter, childArea, path, childEntry.getRevision(), childEntry.isIncomplete(), recursive);
+
+                //TODO(sd): review it later, seems to be ok. 
+                if (depth == SVNDepth.DEPTH_INFINITY) {
+                    reportEntries(reporter, childArea, path, childEntry.getRevision(), childEntry.isIncomplete(), depth);
+                }
             }
         }
     }

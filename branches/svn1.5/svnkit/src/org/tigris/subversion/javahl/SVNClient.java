@@ -453,4 +453,72 @@ public class SVNClient implements SVNClientInterface {
     public void properties(String path, Revision revision, Revision pegRevision, boolean recurse, ProplistCallback callback) throws ClientException {
         myDelegate.properties(path, revision, pegRevision, recurse, callback);
     }
+
+    public long checkout(String moduleName, String destPath, Revision revision, Revision pegRevision, int depth, boolean ignoreExternals, boolean allowUnverObstructions) throws ClientException {
+        return myDelegate.checkout(moduleName, destPath, revision, pegRevision, depth, ignoreExternals, allowUnverObstructions);
+    }
+
+    public void diff(String target1, Revision revision1, String target2, Revision revision2, String outFileName, int depth, boolean ignoreAncestry, boolean noDiffDeleted, boolean force) throws ClientException {
+        myDelegate.diff(target1, revision1, target2, revision2, outFileName, depth, ignoreAncestry, noDiffDeleted, force);
+    }
+
+    public void diff(String target, Revision pegRevision, Revision startRevision, Revision endRevision, String outFileName, int depth, boolean ignoreAncestry, boolean noDiffDeleted, boolean force) throws ClientException {
+        myDelegate.diff(target, pegRevision, startRevision, endRevision, outFileName, depth, ignoreAncestry, noDiffDeleted, force);
+    }
+
+    public void diffSummarize(String target1, Revision revision1, String target2, Revision revision2, int depth, boolean ignoreAncestry, DiffSummaryReceiver receiver) throws ClientException {
+        myDelegate.diffSummarize(target1, revision1, target2, revision2, depth, ignoreAncestry, receiver);
+    }
+
+    public void diffSummarize(String target, Revision pegRevision, Revision startRevision, Revision endRevision, int depth, boolean ignoreAncestry, DiffSummaryReceiver receiver) throws ClientException {
+        myDelegate.diffSummarize(target, pegRevision, startRevision, endRevision, depth, ignoreAncestry, receiver);
+    }
+
+    public long doExport(String srcPath, String destPath, Revision revision, Revision pegRevision, boolean force, boolean ignoreExternals, int depth, String nativeEOL) throws ClientException {
+        return myDelegate.doExport(srcPath, destPath, revision, pegRevision, force, ignoreExternals, depth, nativeEOL);
+    }
+
+    public long doSwitch(String path, String url, Revision revision, int depth, boolean allowUnverObstructions) throws ClientException {
+        return myDelegate.doSwitch(path, url, revision, depth, allowUnverObstructions);
+    }
+
+    public CopySource getCopySource(String path, Revision revision) throws SubversionException {
+        return myDelegate.getCopySource(path, revision);
+    }
+
+    public MergeInfo getMergeInfo(String path, Revision revision) throws SubversionException {
+        return myDelegate.getMergeInfo(path, revision);
+    }
+
+    public void info2(String pathOrUrl, Revision revision, Revision pegRevision, boolean recurse, InfoCallback callback) throws ClientException {
+        myDelegate.info2(pathOrUrl, revision, pegRevision, recurse, callback);
+    }
+
+    public void logMessages(String path, Revision pegRevision, Revision revisionStart, Revision revisionEnd, boolean stopOnCopy, boolean discoverPath, long limit, LogMessageCallback callback) throws ClientException {
+        myDelegate.logMessages(path, pegRevision, revisionStart, revisionEnd, stopOnCopy, discoverPath, limit, callback);
+    }
+
+    public void merge(String path1, Revision revision1, String path2, Revision revision2, String localPath, boolean force, int depth, boolean ignoreAncestry, boolean dryRun) throws ClientException {
+        myDelegate.merge(path1, revision1, path2, revision2, localPath, force, depth, ignoreAncestry, dryRun);
+    }
+
+    public void merge(String path, Revision pegRevision, Revision revision1, Revision revision2, String localPath, boolean force, int depth, boolean ignoreAncestry, boolean dryRun) throws ClientException {
+        myDelegate.merge(path, pegRevision, revision1, revision2, localPath, force, depth, ignoreAncestry, dryRun);
+    }
+
+    public void merge(String path, Revision pegRevision, RevisionRange[] revisions, String localPath, boolean force, int depth, boolean ignoreAncestry, boolean dryRun) throws ClientException {
+        myDelegate.merge(path, pegRevision, revisions, localPath, force, depth, ignoreAncestry, dryRun);
+    }
+
+    public Status[] status(String path, int depth, boolean onServer, boolean getAll, boolean noIgnore, boolean ignoreExternals) throws ClientException {
+        return myDelegate.status(path, depth, onServer, getAll, noIgnore, ignoreExternals);
+    }
+
+    public long update(String path, Revision revision, int depth, boolean ignoreExternals, boolean allowUnverObstructions) throws ClientException {
+        return myDelegate.update(path, revision, depth, ignoreExternals, allowUnverObstructions);
+    }
+
+    public long[] update(String[] path, Revision revision, int depth, boolean ignoreExternals, boolean allowUnverObstructions) throws ClientException {
+        return myDelegate.update(path, revision, depth, ignoreExternals, allowUnverObstructions);
+    }
 }

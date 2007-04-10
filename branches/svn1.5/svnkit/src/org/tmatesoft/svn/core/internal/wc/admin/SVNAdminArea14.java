@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.tmatesoft.svn.core.SVNDepth;
 import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
@@ -925,6 +926,17 @@ public class SVNAdminArea14 extends SVNAdminArea {
         }
         
         line = reader.readLine();
+        if (isEntryFinished(line)) {
+            return entry;
+        }
+        String depthStr = parseValue(line);
+        if (depthStr == null) {
+            entryAttrs.put(SVNProperty.DEPTH, SVNDepth.DEPTH_INFINITY.getName());
+        } else {
+            entryAttrs.put(SVNProperty.DEPTH, depthStr);
+        }
+        
+        line = reader.readLine();
         if (line == null || line.length() != 1) {
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_CORRUPT, "Missing entry terminator");
             SVNErrorManager.error(err);
@@ -1332,6 +1344,14 @@ public class SVNAdminArea14 extends SVNAdminArea {
             ++emptyFields;
         }
         
+        String depth = (String)entry.get(SVNProperty.DEPTH);
+        if (!isSubDir && SVNDepth.fromString(depth) != SVNDepth.DEPTH_INFINITY) {
+            writeValue(writer, depth, emptyFields);
+            emptyFields = 0;
+        } else {
+            ++emptyFields;
+        }
+        
         writer.write("\f\n");
         writer.flush();
     }
@@ -1448,7 +1468,7 @@ public class SVNAdminArea14 extends SVNAdminArea {
         }
     }
     
-    public SVNAdminArea createVersionedDirectory(File dir, String url, String rootURL, String uuid, long revNumber, boolean createMyself) throws SVNException {
+    public SVNAdminArea createVersionedDirectory(File dir, String url, String rootURL, String uuid, long revNumber, boolean createMyself, SVNDepth depth) throws SVNException {
         dir = createMyself ? getRoot() : dir;
         dir.mkdirs();
         File adminDir = createMyself ? getAdminDirectory() : new File(dir, SVNFileUtil.getAdminDirectoryName());
@@ -1486,6 +1506,7 @@ public class SVNAdminArea14 extends SVNAdminArea {
         rootEntry.setRepositoryRoot(rootURL);
         rootEntry.setRevision(revNumber);
         rootEntry.setKind(SVNNodeKind.DIR);
+        rootEntry.setDepth(depth);
         if (uuid != null) {
             rootEntry.setUUID(uuid);
         }

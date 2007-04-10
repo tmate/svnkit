@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.tmatesoft.svn.core.SVNCommitInfo;
+import org.tmatesoft.svn.core.SVNDepth;
 import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
@@ -99,8 +100,8 @@ public abstract class SVNAdminArea {
 
     public abstract boolean hasProperties(String entryName) throws SVNException;
 
-    public abstract SVNAdminArea createVersionedDirectory(File dir, String url, String rootURL, String uuid, long revNumber, boolean createMyself) throws SVNException;
-    
+    public abstract SVNAdminArea createVersionedDirectory(File dir, String url, String rootURL, String uuid, long revNumber, boolean createMyself, SVNDepth depth) throws SVNException;
+
     public abstract SVNAdminArea upgradeFormat(SVNAdminArea adminArea) throws SVNException;
     
     public abstract void postUpgradeFormat(int format) throws SVNException;

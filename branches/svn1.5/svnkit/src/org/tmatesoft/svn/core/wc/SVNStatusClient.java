@@ -17,6 +17,7 @@ import java.util.Iterator;
 import java.util.Map;
 
 import org.tmatesoft.svn.core.SVNCancelException;
+import org.tmatesoft.svn.core.SVNDepth;
 import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
@@ -205,9 +206,15 @@ public class SVNStatusClient extends SVNBasicClient {
      * @throws SVNException
      */
     public long doStatus(File path, SVNRevision revision, boolean recursive, boolean remote, boolean reportAll, boolean includeIgnored, boolean collectParentExternals, final ISVNStatusHandler handler) throws SVNException {
+        return doStatus(path, revision, SVNDepth.fromRecurse(recursive), remote, reportAll, includeIgnored, collectParentExternals, handler);
+    }
+    
+    public long doStatus(File path, SVNRevision revision, SVNDepth depth, boolean remote, boolean reportAll, boolean includeIgnored, boolean collectParentExternals, final ISVNStatusHandler handler) throws SVNException {
         if (handler == null) {
             return -1;
         }
+        //TODO(sd): This is a shim, we should use depth for real.
+        boolean recursive = SVNDepth.recurseFromDepth(depth);
         SVNWCAccess wcAccess = createWCAccess();
         SVNStatusEditor editor = null;
         final boolean[] deletedInRepository = new boolean[] {false};
@@ -221,13 +228,22 @@ public class SVNStatusClient extends SVNBasicClient {
         };
         try {
             SVNAdminAreaInfo info = wcAccess.openAnchor(path, false, recursive ? -1 : 1);
+            SVNEntry entry = null;
+            if (depth == SVNDepth.DEPTH_UNKNOWN) {
+                entry = wcAccess.getEntry(info.getAnchor().getRoot(), false);                
+                if (entry != null) {
+                    depth = entry.getDepth();
+                }
+            }
             Map externals = null;
             if (collectParentExternals) {
                 // prefetch externals from parent dirs, and pass it to the editor.
                 externals = collectParentExternals(path, info.getAnchor().getRoot());
             }
             if (remote) {
-                SVNEntry entry = wcAccess.getEntry(info.getAnchor().getRoot(), false);
+                if (entry == null) {
+                    entry = wcAccess.getEntry(info.getAnchor().getRoot(), false);
+                }
                 if (entry == null) {
                     SVNErrorMessage error = SVNErrorMessage.create(SVNErrorCode.UNVERSIONED_RESOURCE, "''{0}'' is not under version control", path);
                     SVNErrorManager.error(error);
@@ -250,19 +266,21 @@ public class SVNStatusClient extends SVNBasicClient {
                     if (!entry.isScheduledForAddition()) {
                         deletedInRepository[0] = true;
                     }
+                    //TODO(sd): ...and this would take depth, not recurse... 
                     editor = new SVNStatusEditor(getOptions(), wcAccess, info, includeIgnored, reportAll, recursive, realHandler);
                     editor.setExternals(externals);
                     checkCancelled();
                     editor.closeEdit();
                 } else {
+                    //TODO(sd): ...and this would take depth, not recurse... 
                     editor = new SVNRemoteStatusEditor(getOptions(), wcAccess, info, includeIgnored, reportAll, recursive, realHandler);
                     editor.setExternals(externals);
                     SVNRepository locksRepos = createRepository(url, false);
                     checkCancelled();
-                    SVNReporter reporter = new SVNReporter(info, path, false, recursive, getDebugLog());
+                    SVNReporter reporter = new SVNReporter(info, path, false, depth, getDebugLog());
                     SVNStatusReporter statusReporter = new SVNStatusReporter(locksRepos, reporter, editor);
                     String target = "".equals(info.getTargetName()) ? null : info.getTargetName();
-                    repository.status(rev, target, recursive, statusReporter, SVNCancellableEditor.newInstance((ISVNEditor) editor, getEventDispatcher(), getDebugLog()));
+                    repository.status(rev, target, depth, statusReporter, SVNCancellableEditor.newInstance((ISVNEditor) editor, getEventDispatcher(), getDebugLog()));
                 }
                 if (getEventDispatcher() != null) {
                     SVNEvent event = SVNEventFactory.createStatusCompletedEvent(info, editor.getTargetRevision());
@@ -273,7 +291,7 @@ public class SVNStatusClient extends SVNBasicClient {
                 editor.setExternals(externals);
                 editor.closeEdit();
             }         
-            if (!isIgnoreExternals() && recursive) {
+            if (!isIgnoreExternals() && depth == SVNDepth.DEPTH_INFINITY) {
                 externals = editor.getExternals();
                 for (Iterator paths = externals.keySet().iterator(); paths.hasNext();) {
                     String externalPath = (String) paths.next();

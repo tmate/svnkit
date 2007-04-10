@@ -274,8 +274,8 @@ public class JavaHLObjectFactory {
             }
             cp = (ChangePath[]) clientChangePaths.toArray(new ChangePath[clientChangePaths.size()]);
         }
-        return new LogMessage(logEntry.getMessage(), logEntry.getDate(),
-                logEntry.getRevision(), logEntry.getAuthor(), cp);
+        return new LogMessage(cp, logEntry.getRevision(), logEntry.getAuthor(), logEntry.getDate(),
+                logEntry.getMessage());
     }
 
     public static CommitItem[] getCommitItems(SVNCommitItem[] commitables) {
@@ -385,18 +385,19 @@ public class JavaHLObjectFactory {
                 info.getRepositoryRootURL() != null ? info.getRepositoryRootURL().toString() : null,
                 info.getRepositoryUUID(),
                 info.getCommittedRevision() != null ? info.getCommittedRevision().getNumber() : - 1,
-                info.getCommittedDate() != null ? info.getCommittedDate().getTime() * 1000 : 0,
+                info.getCommittedDate() != null ? info.getCommittedDate() : new Date(0),
                 info.getAuthor(),
                 createLock(info.getLock()),
                 !info.isRemote(),
                 schedule, copyUrl, copyRev,
-                info.getTextTime() != null  ? info.getTextTime().getTime() * 1000 : 0,
-                info.getPropTime() != null ? info.getPropTime().getTime() * 1000 : 0,
+                info.getTextTime() != null  ? info.getTextTime() : new Date(0),
+                info.getPropTime() != null ? info.getPropTime() : new Date(0),
                 info.getChecksum(),
                 info.getConflictOldFile() != null ? info.getConflictOldFile().getName() : null,
                 info.getConflictNewFile() != null ? info.getConflictNewFile().getName() : null,
                 info.getConflictWrkFile() != null ? info.getConflictWrkFile().getName() : null,
-                info.getPropConflictFile() != null ? info.getPropConflictFile().getName() : null
+                info.getPropConflictFile() != null ? info.getPropConflictFile().getName() : null,
+                info.isCopied(), info.isDeleted(), info.isAbsent(), info.isIncomplete()
                 );
     }
     

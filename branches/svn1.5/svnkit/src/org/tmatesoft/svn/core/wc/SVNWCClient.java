@@ -417,6 +417,10 @@ public class SVNWCClient extends SVNBasicClient {
      * @see                     #doGetProperty(File, String, SVNRevision, SVNRevision, boolean)
      * @see                     #doGetRevisionProperty(File, String, SVNRevision, ISVNPropertyHandler)
      */
+    /* TODO(sd): "I don't see any reason to change this recurse parameter
+     * to a depth right now; it's not exactly part of the
+     * sparse-directories feature, although it's related."
+     */
     public void doSetProperty(File path, String propName, String propValue, boolean force, boolean recursive, ISVNPropertyHandler handler) throws SVNException {
         propName = validatePropertyName(propName);
         if (SVNRevisionProperty.isRevisionProperty(propName)) {
@@ -568,6 +572,12 @@ public class SVNWCClient extends SVNBasicClient {
      * @see                   #doGetProperty(File, String, SVNRevision, SVNRevision, boolean, ISVNPropertyHandler)
      * @see                   #doSetProperty(File, String, String, boolean, boolean, ISVNPropertyHandler)
      */
+    /* TODO(sd): "I don't see any reason to change this recurse parameter
+     * to a depth right now; it's not exactly part of the
+     * sparse-directories feature, although it's related.  Usually
+     * you would just name the target carefully... Is there a
+     * situation where depth support would be useful here?"
+     */
     public SVNPropertyData doGetProperty(final File path, String propName,
             SVNRevision pegRevision, SVNRevision revision, boolean recursive)
             throws SVNException {
@@ -605,6 +615,12 @@ public class SVNWCClient extends SVNBasicClient {
      *                         svn:wc:} prefix
      * @see                    #doGetProperty(SVNURL, String, SVNRevision, SVNRevision, boolean, ISVNPropertyHandler)
      * @see                    #doSetProperty(File, String, String, boolean, boolean, ISVNPropertyHandler)
+     */
+    /* TODO(sd): "I don't see any reason to change this recurse parameter
+     * to a depth right now; it's not exactly part of the
+     * sparse-directories feature, although it's related.  Usually
+     * you would just name the target carefully... Is there a
+     * situation where depth support would be useful here?"
      */
     public SVNPropertyData doGetProperty(final SVNURL url, String propName,
             SVNRevision pegRevision, SVNRevision revision, boolean recursive)
@@ -658,6 +674,12 @@ public class SVNWCClient extends SVNBasicClient {
      *                        </ul>
      * @see                   #doGetProperty(File, String, SVNRevision, SVNRevision, boolean)
      * @see                   #doSetProperty(File, String, String, boolean, boolean, ISVNPropertyHandler)
+     */
+    /* TODO(sd): "I don't see any reason to change this recurse parameter
+     * to a depth right now; it's not exactly part of the
+     * sparse-directories feature, although it's related.  Usually
+     * you would just name the target carefully... Is there a
+     * situation where depth support would be useful here?"
      */
     public void doGetProperty(File path, String propName, SVNRevision pegRevision, SVNRevision revision, boolean recursive, ISVNPropertyHandler handler) throws SVNException {
         if (propName != null && propName.startsWith(SVNProperty.SVN_WC_PREFIX)) {
@@ -734,6 +756,12 @@ public class SVNWCClient extends SVNBasicClient {
      *                         svn:wc:} prefix
      * @see                    #doGetProperty(SVNURL, String, SVNRevision, SVNRevision, boolean)
      * @see                    #doSetProperty(File, String, String, boolean, boolean, ISVNPropertyHandler)
+     */
+    /* TODO(sd): "I don't see any reason to change this recurse parameter
+     * to a depth right now; it's not exactly part of the
+     * sparse-directories feature, although it's related.  Usually
+     * you would just name the target carefully... Is there a
+     * situation where depth support would be useful here?"
      */
     public void doGetProperty(SVNURL url, String propName, SVNRevision pegRevision, SVNRevision revision, boolean recursive, ISVNPropertyHandler handler) throws SVNException {
         if (propName != null && propName.startsWith(SVNProperty.SVN_WC_PREFIX)) {
@@ -969,6 +997,12 @@ public class SVNWCClient extends SVNBasicClient {
      *                                     </ul>
      * @since                              1.1
      */
+
+    /* TODO(sd): "For consistency, this should take svn_depth_t depth
+     * instead of svn_boolean_t recursive.  However, it is not
+     * important for the sparse-directories work, so leaving it
+     * for now."
+     */
     public void doAdd(File path, boolean force, boolean mkdir, boolean climbUnversionedParents, boolean recursive, boolean includeIgnored) throws SVNException {
         path = new File(SVNPathUtil.validateFilePath(path.getAbsolutePath()));
         if (!mkdir && climbUnversionedParents) {
@@ -1140,6 +1174,9 @@ public class SVNWCClient extends SVNBasicClient {
      *                         <li>when trying to revert an addition of a directory
      *                         from within the directory itself
      *                         </ul>
+     */
+    /* TODO(sd): "I don't see any reason to change this recurse parameter
+     * to a depth, but making a note to re-check this logic later."
      */
     public void doRevert(File path, boolean recursive) throws SVNException {
         path = new File(SVNPathUtil.validateFilePath(path.getAbsolutePath()));
@@ -1390,6 +1427,9 @@ public class SVNWCClient extends SVNBasicClient {
      *                         descend recursively (relevant for directories) - this
      *                         will resolve the entire tree
      * @throws SVNException    if <code>path</code> is not under version control
+     */
+    /* TODO(sd): "I don't see any reason to change this recurse parameter
+     * to a depth, but making a note to re-check this logic later."
      */
     public void doResolve(File path, boolean recursive) throws SVNException {
         SVNWCAccess wcAccess = createWCAccess();
@@ -1788,6 +1828,9 @@ public class SVNWCClient extends SVNBasicClient {
      * @see                    #doInfo(File, SVNRevision)
      * @see                    #doInfo(File, SVNRevision, boolean, ISVNInfoHandler)
      */
+    /* TODO(sd): "I don't see any compelling reason to switch to
+     * depth-style instead of recurse-style control here"
+     */
     public void doInfo(File path, SVNRevision pegRevision, SVNRevision revision, boolean recursive, ISVNInfoHandler handler) throws SVNException {
         if (handler == null) {
             return;
@@ -1882,6 +1925,9 @@ public class SVNWCClient extends SVNBasicClient {
      *                          the specified <code>revision</code>
      * @see                     #doInfo(SVNURL, SVNRevision, SVNRevision)
      * @see                     #doInfo(File, SVNRevision, boolean, ISVNInfoHandler)
+     */
+    /* TODO(sd): "I don't see any compelling reason to switch to
+     * depth-style instead of recurse-style control here"
      */
     public void doInfo(SVNURL url, SVNRevision pegRevision, SVNRevision revision, boolean recursive, ISVNInfoHandler handler) throws SVNException {
         if (revision == null || !revision.isValid()) {
