@@ -20,6 +20,7 @@ import java.util.LinkedList;
 import java.util.Map;
 
 import org.tmatesoft.svn.core.SVNCommitInfo;
+import org.tmatesoft.svn.core.SVNDepth;
 import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
@@ -52,7 +53,6 @@ public class SVNUpdateEditor implements ISVNEditor {
     private String myTarget;
     private String myTargetURL;
     private String myRootURL;
-    private boolean myIsRecursive;
     private SVNAdminAreaInfo myAdminInfo;
     private SVNDirectoryInfo myCurrentDirectory;
     private SVNFileInfo myCurrentFile;
@@ -65,16 +65,21 @@ public class SVNUpdateEditor implements ISVNEditor {
     private Collection mySkippedPaths;
     private SVNWCAccess myWCAccess; 
     private SVNDeltaProcessor myDeltaProcessor;
-
+    private SVNDepth myDepth;
+    
     public SVNUpdateEditor(SVNAdminAreaInfo info, String switchURL, boolean recursive, boolean leaveConflicts, boolean allowUnversionedObstructions) throws SVNException {
+        this(info, switchURL, leaveConflicts, allowUnversionedObstructions, SVNDepth.fromRecurse(recursive));
+    }
+
+    public SVNUpdateEditor(SVNAdminAreaInfo info, String switchURL, boolean leaveConflicts, boolean allowUnversionedObstructions, SVNDepth depth) throws SVNException {
         myAdminInfo = info;
         myWCAccess = info.getWCAccess();
-        myIsRecursive = recursive;
         myIsUnversionedObstructionsAllowed = allowUnversionedObstructions;
         myTarget = info.getTargetName();
         mySwitchURL = switchURL;
         myTargetRevision = -1;
         myIsLeaveConflicts = leaveConflicts;
+        myDepth = depth;
         myDeltaProcessor = new SVNDeltaProcessor();
 
         SVNEntry entry = info.getAnchor().getEntry(info.getAnchor().getThisDirName(), false);
@@ -272,6 +277,12 @@ public class SVNUpdateEditor implements ISVNEditor {
             adminArea.modifyEntry(adminArea.getThisDirName(), attributes, true, true);
         }
         
+        SVNDepth depth = SVNDepth.DEPTH_INFINITY;
+        if (myDepth == SVNDepth.DEPTH_EMPTY || myDepth == SVNDepth.DEPTH_FILES ||
+                myDepth == SVNDepth.DEPTH_IMMEDIATES) {
+            depth = SVNDepth.DEPTH_EMPTY;
+        }
+            
         String rootURL = null;
         if (SVNPathUtil.isAncestor(myRootURL, myCurrentDirectory.URL)) {
             rootURL = myRootURL;
@@ -280,7 +291,7 @@ public class SVNUpdateEditor implements ISVNEditor {
             myWCAccess.closeAdminArea(childDir);
         }
         
-        if (SVNWCManager.ensureAdminAreaExists(childDir, myCurrentDirectory.URL, rootURL, null, myTargetRevision)) {
+        if (SVNWCManager.ensureAdminAreaExists(childDir, myCurrentDirectory.URL, rootURL, null, myTargetRevision, depth)) {
             // hack : remove created lock file.
             SVNFileUtil.deleteFile(new File(childDir, SVNFileUtil.getAdminDirectoryName() + "/lock"));
         }
@@ -441,7 +452,7 @@ public class SVNUpdateEditor implements ISVNEditor {
         }
         if (!myIsTargetDeleted) {
             File targetFile = myTarget != null ? myAdminInfo.getAnchor().getFile(myTarget) : myAdminInfo.getAnchor().getRoot(); 
-            SVNWCManager.updateCleanup(targetFile, myWCAccess, myIsRecursive, mySwitchURL, myRootURL, myTargetRevision, true, mySkippedPaths);
+            SVNWCManager.updateCleanup(targetFile, myWCAccess, mySwitchURL, myRootURL, myTargetRevision, true, mySkippedPaths, myDepth);
         }
         return null;
     }
@@ -642,6 +653,13 @@ public class SVNUpdateEditor implements ISVNEditor {
                 } else if (!myCurrentFile.isExisted) {
                     File mergeLeftFile = myCurrentFile.baseFile;
                     boolean usedTmpFile = false;
+
+                    String ext = null;
+                    int dotInd = name.lastIndexOf('.'); 
+                    if (dotInd != -1 && dotInd != 0 && dotInd != name.length() - 1) {
+                        ext = name.substring(dotInd + 1);
+                    }
+                    
                     if (myCurrentFile.isAddExisted && !isReplaced) {
                         usedTmpFile = true;
                         mergeLeftFile = SVNAdminUtil.createTmpFile(adminArea);
@@ -653,11 +671,11 @@ public class SVNUpdateEditor implements ISVNEditor {
                         mergeLeftFilePath = mergeLeftFilePath.substring(1);
                     }
 
-                    String leftLabel = ".r" + fileEntry.getRevision();
-                    String rightLabel = ".r" + myTargetRevision;
-                    
+                    String leftLabel = ".r" + fileEntry.getRevision() + (ext != null ? "." + ext : "");
+                    String rightLabel = ".r" + myTargetRevision + (ext != null ? "." + ext : "");
+                    String mineLabel = ".mine" + (ext != null ? "." + ext : "");
                     // do test merge.
-                    mergeOutcome = adminArea.mergeText(name, mergeLeftFile, adminArea.getFile(tmpBasePath), ".mine", leftLabel, rightLabel, modifiedProps, myIsLeaveConflicts, false, null, log);
+                    mergeOutcome = adminArea.mergeText(name, mergeLeftFile, adminArea.getFile(tmpBasePath), mineLabel, leftLabel, rightLabel, modifiedProps, myIsLeaveConflicts, false, null, log);
                     if (mergeOutcome == SVNStatusType.UNCHANGED) {
                         textStatus = SVNStatusType.MERGED;
                     }

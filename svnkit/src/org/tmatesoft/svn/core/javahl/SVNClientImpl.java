@@ -29,8 +29,11 @@ import org.tigris.subversion.javahl.DiffSummaryReceiver;
 import org.tigris.subversion.javahl.DirEntry;
 import org.tigris.subversion.javahl.Info;
 import org.tigris.subversion.javahl.Info2;
+import org.tigris.subversion.javahl.InfoCallback;
 import org.tigris.subversion.javahl.JavaHLObjectFactory;
 import org.tigris.subversion.javahl.LogMessage;
+import org.tigris.subversion.javahl.LogMessageCallback;
+import org.tigris.subversion.javahl.MergeInfo;
 import org.tigris.subversion.javahl.Notify;
 import org.tigris.subversion.javahl.Notify2;
 import org.tigris.subversion.javahl.NotifyInformation;
@@ -1357,5 +1360,64 @@ public class SVNClientImpl implements SVNClientInterface {
     }
 
     public void properties(String path, Revision revision, Revision pegRevision, boolean recurse, ProplistCallback callback) throws ClientException {
+    }
+
+    public long checkout(String moduleName, String destPath, Revision revision, Revision pegRevision, int depth, boolean ignoreExternals, boolean allowUnverObstructions) throws ClientException {
+        return 0;
+    }
+
+    public void diff(String target1, Revision revision1, String target2, Revision revision2, String outFileName, int depth, boolean ignoreAncestry, boolean noDiffDeleted, boolean force) throws ClientException {
+    }
+
+    public void diff(String target, Revision pegRevision, Revision startRevision, Revision endRevision, String outFileName, int depth, boolean ignoreAncestry, boolean noDiffDeleted, boolean force) throws ClientException {
+    }
+
+    public void diffSummarize(String target1, Revision revision1, String target2, Revision revision2, int depth, boolean ignoreAncestry, DiffSummaryReceiver receiver) throws ClientException {
+    }
+
+    public void diffSummarize(String target, Revision pegRevision, Revision startRevision, Revision endRevision, int depth, boolean ignoreAncestry, DiffSummaryReceiver receiver) throws ClientException {
+    }
+
+    public long doExport(String srcPath, String destPath, Revision revision, Revision pegRevision, boolean force, boolean ignoreExternals, int depth, String nativeEOL) throws ClientException {
+        return 0;
+    }
+
+    public long doSwitch(String path, String url, Revision revision, int depth, boolean allowUnverObstructions) throws ClientException {
+        return 0;
+    }
+
+    public CopySource getCopySource(String path, Revision revision) throws SubversionException {
+        return null;
+    }
+
+    public MergeInfo getMergeInfo(String path, Revision revision) throws SubversionException {
+        return null;
+    }
+
+    public void info2(String pathOrUrl, Revision revision, Revision pegRevision, boolean recurse, InfoCallback callback) throws ClientException {
+    }
+
+    public void logMessages(String path, Revision pegRevision, Revision revisionStart, Revision revisionEnd, boolean stopOnCopy, boolean discoverPath, long limit, LogMessageCallback callback) throws ClientException {
+    }
+
+    public void merge(String path1, Revision revision1, String path2, Revision revision2, String localPath, boolean force, int depth, boolean ignoreAncestry, boolean dryRun) throws ClientException {
+    }
+
+    public void merge(String path, Revision pegRevision, Revision revision1, Revision revision2, String localPath, boolean force, int depth, boolean ignoreAncestry, boolean dryRun) throws ClientException {
+    }
+
+    public void merge(String path, Revision pegRevision, RevisionRange[] revisions, String localPath, boolean force, int depth, boolean ignoreAncestry, boolean dryRun) throws ClientException {
+    }
+
+    public Status[] status(String path, int depth, boolean onServer, boolean getAll, boolean noIgnore, boolean ignoreExternals) throws ClientException {
+        return null;
+    }
+
+    public long update(String path, Revision revision, int depth, boolean ignoreExternals, boolean allowUnverObstructions) throws ClientException {
+        return 0;
+    }
+
+    public long[] update(String[] path, Revision revision, int depth, boolean ignoreExternals, boolean allowUnverObstructions) throws ClientException {
+        return null;
     }
 }

@@ -118,6 +118,8 @@ public class SVNProperty {
 
     public static final String WORKING_SIZE = SVN_ENTRY_PREFIX + "working-size";
 
+    public static final String DEPTH = SVN_ENTRY_PREFIX + "depth";
+    
     /**
      * An <span class="javastring">"svn:entry:checksum"</span> SVN untweakable metaproperty.
      */

@@ -14,6 +14,7 @@ package org.tmatesoft.svn.core.internal.wc.admin;
 import java.util.Iterator;
 import java.util.Map;
 
+import org.tmatesoft.svn.core.SVNDepth;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNNodeKind;
 import org.tmatesoft.svn.core.SVNProperty;
@@ -181,6 +182,14 @@ public class SVNEntry implements Comparable {
         return Long.parseLong(workingSize);
     }
 
+    public SVNDepth getDepth() {
+        return SVNDepth.fromString((String) myAttributes.get(SVNProperty.DEPTH));
+    }
+
+    public void setDepth(SVNDepth depth) {
+        setAttributeValue(SVNProperty.DEPTH, depth.getName());
+    }
+    
     public boolean setURL(String url) {
         return setAttributeValue(SVNProperty.URL, url);
     }

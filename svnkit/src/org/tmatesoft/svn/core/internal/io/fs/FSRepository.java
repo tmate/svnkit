@@ -29,6 +29,7 @@ import org.tmatesoft.svn.core.ISVNDirEntryHandler;
 import org.tmatesoft.svn.core.ISVNLogEntryHandler;
 import org.tmatesoft.svn.core.SVNAuthenticationException;
 import org.tmatesoft.svn.core.SVNCancelException;
+import org.tmatesoft.svn.core.SVNDepth;
 import org.tmatesoft.svn.core.SVNDirEntry;
 import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
@@ -742,57 +743,7 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
         }
     }
     
-    public void diff(SVNURL url, long revision, String target, boolean ignoreAncestry, boolean recursive, ISVNReporterBaton reporter, ISVNEditor editor) throws SVNException {
-        try {
-            openRepository();
-            makeReporterContext(revision, target, url, recursive, ignoreAncestry, true, editor);
-            reporter.report(this);
-        } finally {
-            closeRepository();
-        }
-    }
-
-    public void diff(SVNURL url, long targetRevision, long revision, String target, boolean ignoreAncestry, boolean recursive, ISVNReporterBaton reporter, ISVNEditor editor) throws SVNException {
-        try {
-            openRepository();
-            makeReporterContext(targetRevision, target, url, recursive, ignoreAncestry, true, editor);
-            reporter.report(this);
-        } finally {
-            closeRepository();
-        }
-    }
-
-    public void diff(SVNURL url, long targetRevision, long revision, String target, boolean ignoreAncestry, boolean recursive, boolean getContents, ISVNReporterBaton reporter, ISVNEditor editor) throws SVNException {
-        try {
-            openRepository();
-            makeReporterContext(targetRevision, target, url, recursive, ignoreAncestry, getContents, editor);
-            reporter.report(this);
-        } finally {
-            closeRepository();
-        }
-    }
-
-    public void update(long revision, String target, boolean recursive, ISVNReporterBaton reporter, ISVNEditor editor) throws SVNException {
-        try {
-            openRepository();
-            makeReporterContext(revision, target, null, recursive, false, true, editor);
-            reporter.report(this);
-        } finally {
-            closeRepository();
-        }
-    }
-
-    public void status(long revision, String target, boolean recursive, ISVNReporterBaton reporter, ISVNEditor editor) throws SVNException {
-        try {
-            openRepository();
-            makeReporterContext(revision, target, null, recursive, false, false, editor);
-            reporter.report(this);
-        } finally {
-            closeRepository();
-        }
-    }
-
-    private void makeReporterContext(long targetRevision, String target, SVNURL switchURL, boolean recursive, boolean ignoreAncestry, boolean textDeltas, ISVNEditor editor)
+    private void makeReporterContext(long targetRevision, String target, SVNURL switchURL, SVNDepth depth, boolean ignoreAncestry, boolean textDeltas, ISVNEditor editor)
             throws SVNException {
         target = target == null ? "" : target;
 
@@ -823,19 +774,9 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
         String fullTargetPath = switchPath != null ? switchPath : SVNPathUtil.concatToAbs(anchor, target);
         
         if(myReporterContext == null){
-            myReporterContext = new FSUpdateContext(this, myFSFS, targetRevision, SVNFileUtil.createTempFile("report", ".tmp"), target, fullTargetPath, switchURL == null ? false : true, recursive, ignoreAncestry, textDeltas, editor);    
+            myReporterContext = new FSUpdateContext(this, myFSFS, targetRevision, SVNFileUtil.createTempFile("report", ".tmp"), target, fullTargetPath, switchURL == null ? false : true, depth, ignoreAncestry, textDeltas, editor);    
         }else{
-            myReporterContext.reset(this, myFSFS, targetRevision, SVNFileUtil.createTempFile("report", ".tmp"), target, fullTargetPath, switchURL == null ? false : true, recursive, ignoreAncestry, textDeltas, editor);
-        }
-    }
-
-    public void update(SVNURL url, long revision, String target, boolean recursive, ISVNReporterBaton reporter, ISVNEditor editor) throws SVNException {
-        try {
-            openRepository();
-            makeReporterContext(revision, target, url, recursive, true, true, editor);
-            reporter.report(this);
-        } finally {
-            closeRepository();
+            myReporterContext.reset(this, myFSFS, targetRevision, SVNFileUtil.createTempFile("report", ".tmp"), target, fullTargetPath, switchURL == null ? false : true, depth, ignoreAncestry, textDeltas, editor);
         }
     }
 
@@ -995,32 +936,6 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
         super.setLocation(url, forceReconnect);
     }
 
-    public void setPath(String path, String lockToken, long revision, boolean startEmpty) throws SVNException {
-        assertValidRevision(revision);
-        myReporterContext.writePathInfoToReportFile(path, null, lockToken, revision, startEmpty);
-    }
-
-    public void deletePath(String path) throws SVNException {
-        myReporterContext.writePathInfoToReportFile(path, null, null, FSRepository.SVN_INVALID_REVNUM, false);
-    }
-
-    public void linkPath(SVNURL url, String path, String lockToken, long revision, boolean startEmpty) throws SVNException {
-        assertValidRevision(revision);
-        SVNURL reposRootURL = getRepositoryRoot(false);
-        if (url.toDecodedString().indexOf(reposRootURL.toDecodedString()) == -1) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.RA_ILLEGAL_URL, "''{0}''\nis not the same repository as\n''{1}''", new Object[] {
-                    url, reposRootURL
-            });
-            SVNErrorManager.error(err);
-        }
-        String reposLinkPath = url.toDecodedString().substring(reposRootURL.toDecodedString().length());
-        if ("".equals(reposLinkPath)) {
-            reposLinkPath = "/";
-        }
-
-        myReporterContext.writePathInfoToReportFile(path, reposLinkPath, lockToken, revision, startEmpty);
-    }
-
     public void finishReport() throws SVNException {
         try {
             myReporterContext.drive();
@@ -1108,5 +1023,78 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
             }
         }
         return System.getProperty("user.name");
+    }
+
+    public void setPath(String path, String lockToken, long revision, boolean startEmpty) throws SVNException {
+        setPath(path, lockToken, revision, SVNDepth.DEPTH_INFINITY, startEmpty);
+    }
+
+    public void deletePath(String path) throws SVNException {
+        myReporterContext.writePathInfoToReportFile(path, null, null, FSRepository.SVN_INVALID_REVNUM, false, SVNDepth.DEPTH_INFINITY);
+    }
+
+    public void linkPath(SVNURL url, String path, String lockToken, long revision, boolean startEmpty) throws SVNException {
+        linkPath(url, path, lockToken, revision, SVNDepth.DEPTH_INFINITY, startEmpty);
+    }
+
+    public void linkPath(SVNURL url, String path, String lockToken, long revision, SVNDepth depth, boolean startEmpty) throws SVNException {
+        assertValidRevision(revision);
+        SVNURL reposRootURL = getRepositoryRoot(false);
+        if (url.toDecodedString().indexOf(reposRootURL.toDecodedString()) == -1) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.RA_ILLEGAL_URL, "''{0}''\nis not the same repository as\n''{1}''", new Object[] {
+                    url, reposRootURL
+            });
+            SVNErrorManager.error(err);
+        }
+        String reposLinkPath = url.toDecodedString().substring(reposRootURL.toDecodedString().length());
+        if ("".equals(reposLinkPath)) {
+            reposLinkPath = "/";
+        }
+        myReporterContext.writePathInfoToReportFile(path, reposLinkPath, lockToken, revision, startEmpty, depth);
+    }
+
+    public void setPath(String path, String lockToken, long revision, SVNDepth depth, boolean startEmpty) throws SVNException {
+        assertValidRevision(revision);
+        myReporterContext.writePathInfoToReportFile(path, null, lockToken, revision, startEmpty, depth);
+    }
+
+    public void update(long revision, String target, SVNDepth depth, ISVNReporterBaton reporter, ISVNEditor editor) throws SVNException {
+        try {
+            openRepository();
+            makeReporterContext(revision, target, null, depth, false, true, editor);
+            reporter.report(this);
+        } finally {
+            closeRepository();
+        }
+    }
+
+    public void update(SVNURL url, long revision, String target, SVNDepth depth, ISVNReporterBaton reporter, ISVNEditor editor) throws SVNException {
+        try {
+            openRepository();
+            makeReporterContext(revision, target, url, depth, true, true, editor);
+            reporter.report(this);
+        } finally {
+            closeRepository();
+        }
+    }
+
+    public void diff(SVNURL url, long targetRevision, long revision, String target, boolean ignoreAncestry, SVNDepth depth, boolean getContents, ISVNReporterBaton reporter, ISVNEditor editor) throws SVNException {
+        try {
+            openRepository();
+            makeReporterContext(targetRevision, target, url, depth, ignoreAncestry, true, editor);
+            reporter.report(this);
+        } finally {
+            closeRepository();
+        }
+    }
+
+    public void status(long revision, String target, SVNDepth depth, ISVNReporterBaton reporter, ISVNEditor editor) throws SVNException {
+        try {
+            openRepository();
+            makeReporterContext(revision, target, null, depth, false, false, editor);
+            reporter.report(this);
+        } finally {
+            closeRepository();
+        }
     }
 }

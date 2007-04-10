@@ -397,6 +397,11 @@ public class SVNCommitClient extends SVNBasicClient {
      *                          <li><code>path</code> contains a reserved name - <i>'.svn'</i>
      *                          </ul>
      */
+    /* TODO(sd): For consistency, this should probably take svn_depth_t
+     * depth instead of svn_boolean_t nonrecursive.  But it's not
+     * needed for the sparse-directories work right now, so leaving it
+     * alone.
+     */
     public SVNCommitInfo doImport(File path, SVNURL dstURL, String commitMessage, boolean recursive) throws SVNException {
         return doImport(path, dstURL, commitMessage, true, recursive);
     }
@@ -430,6 +435,11 @@ public class SVNCommitClient extends SVNBasicClient {
      *                          exists
      *                          <li><code>path</code> contains a reserved name - <i>'.svn'</i>
      *                          </ul>
+     */
+    /* TODO(sd): "For consistency, this should probably take svn_depth_t
+     * depth instead of svn_boolean_t nonrecursive.  But it's not
+     * needed for the sparse-directories work right now, so leaving it
+     * alone."
      */
     public SVNCommitInfo doImport(File path, SVNURL dstURL, String commitMessage, boolean useGlobalIgnores, boolean recursive) throws SVNException {
         // first find dstURL root.
@@ -541,6 +551,12 @@ public class SVNCommitClient extends SVNBasicClient {
      * 							of the commit
      * @throws SVNException
      * @see	                    #doCommit(SVNCommitPacket, boolean, String) 
+     */
+    /* TODO(sd): "For consistency, this should probably take svn_depth_t
+     * depth instead of svn_boolean_t recurse.  But it's not needed
+     * for the sparse-directories work right now, so leaving it alone
+     * for now, although note that this is a 1.5 API so revving it
+     * would be fairly painless."
      */
     public SVNCommitInfo doCommit(File[] paths, boolean keepLocks, String commitMessage, boolean force, boolean recursive) throws SVNException {
         SVNCommitPacket packet = doCollectCommitItems(paths, keepLocks, force, recursive);
@@ -781,6 +797,7 @@ public class SVNCommitClient extends SVNBasicClient {
      * @throws SVNException
      * @see	                    SVNCommitItem
      */
+    //TODO(sd): to be updated...
     public SVNCommitPacket doCollectCommitItems(File[] paths, boolean keepLocks, boolean force, boolean recursive) throws SVNException {
         if (paths == null || paths.length == 0) {
             return SVNCommitPacket.EMPTY;
@@ -862,6 +879,7 @@ public class SVNCommitClient extends SVNBasicClient {
      * @throws SVNException
      * @see                     SVNCommitItem
      */
+    //TODO(sd): to be updated...
     public SVNCommitPacket[] doCollectCommitItems(File[] paths, boolean keepLocks, boolean force, boolean recursive, boolean combinePackets) throws SVNException {
         if (paths == null || paths.length == 0) {
             return new SVNCommitPacket[0];

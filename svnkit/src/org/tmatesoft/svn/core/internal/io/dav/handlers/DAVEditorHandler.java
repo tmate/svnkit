@@ -14,6 +14,7 @@ package org.tmatesoft.svn.core.internal.io.dav.handlers;
 
 import java.io.UnsupportedEncodingException;
 
+import org.tmatesoft.svn.core.SVNDepth;
 import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
@@ -41,7 +42,7 @@ import org.xml.sax.Attributes;
 public class DAVEditorHandler extends BasicDAVDeltaHandler {
 
     public static StringBuffer generateEditorRequest(final DAVConnection connection, StringBuffer buffer, String url, 
-            long targetRevision, String target, String dstPath, boolean recurse,
+            long targetRevision, String target, String dstPath, SVNDepth depth,
             boolean ignoreAncestry, boolean resourceWalk, 
             boolean fetchContents, ISVNReporterBaton reporterBaton) throws SVNException {
 		buffer = buffer == null ? new StringBuffer() : buffer;
@@ -68,7 +69,7 @@ public class DAVEditorHandler extends BasicDAVDeltaHandler {
             buffer.append(SVNEncodingUtil.xmlEncodeCDATA(dstPath));
             buffer.append("</S:dst-path>\n");
         }
-        if (!recurse) {
+        if (depth == SVNDepth.DEPTH_FILES || depth == SVNDepth.DEPTH_EMPTY) {
             buffer.append("<S:recursive>no</S:recursive>\n");
         }
         if (ignoreAncestry) {
@@ -82,21 +83,8 @@ public class DAVEditorHandler extends BasicDAVDeltaHandler {
         }
         final StringBuffer report = buffer;
         reporterBaton.report(new ISVNReporter() {
-            public void setPath(String path, String locktoken, long revision, boolean startEmpty) {
-                report.append("<S:entry rev=\"");
-                report.append(revision);
-                report.append("\" ");
-                if (locktoken != null) {
-                    report.append("lock-token=\"");
-                    report.append(locktoken);
-                    report.append("\" ");
-                }
-                if (startEmpty) {
-                    report.append("start-empty=\"true\" ");
-                }
-                report.append(">");
-                report.append(SVNEncodingUtil.xmlEncodeCDATA(path));
-                report.append("</S:entry>\n");
+            public void setPath(String path, String lockToken, long revision, boolean startEmpty) throws SVNException {
+                setPath(path, lockToken, revision, SVNDepth.DEPTH_INFINITY, startEmpty);
             }
 
             public void deletePath(String path) {
@@ -105,13 +93,28 @@ public class DAVEditorHandler extends BasicDAVDeltaHandler {
                 report.append("</S:missing>\n");
             }
 
-            public void linkPath(SVNURL url, String path, String locktoken, long revision, boolean startEmpty) throws SVNException {
+            public void linkPath(SVNURL url, String path, String lockToken, long revision, boolean startEmpty) throws SVNException {
+                linkPath(url, path, lockToken, revision, SVNDepth.DEPTH_INFINITY, startEmpty);
+            }
+
+            public void finishReport() {
+            }
+            
+            public void abortReport() throws SVNException {
+                SVNErrorManager.cancel("report aborted");
+            }
+
+            public void linkPath(SVNURL url, String path, String lockToken, long revision, SVNDepth depth, boolean startEmpty) throws SVNException {
                 report.append("<S:entry rev=\"");
                 report.append(revision);
                 report.append("\" ");
-                if (locktoken != null) {
+
+                report.append("depth=\"");
+                report.append(SVNDepth.asString(depth));
+                report.append("\" ");
+                if (lockToken != null) {
                     report.append("lock-token=\"");
-                    report.append(locktoken);
+                    report.append(lockToken);
                     report.append("\" ");
                 }
                 if (startEmpty) {
@@ -130,10 +133,25 @@ public class DAVEditorHandler extends BasicDAVDeltaHandler {
                 report.append("</S:entry>\n");
             }
 
-            public void finishReport() {
-            }
-            public void abortReport() throws SVNException {
-                SVNErrorManager.cancel("report aborted");
+            public void setPath(String path, String lockToken, long revision, SVNDepth depth, boolean startEmpty) throws SVNException {
+                report.append("<S:entry rev=\"");
+                report.append(revision);
+                report.append("\" ");
+                
+                report.append("depth=\"");
+                report.append(SVNDepth.asString(depth));
+                report.append("\" ");
+                if (lockToken != null) {
+                    report.append("lock-token=\"");
+                    report.append(lockToken);
+                    report.append("\" ");
+                }
+                if (startEmpty) {
+                    report.append("start-empty=\"true\" ");
+                }
+                report.append(">");
+                report.append(SVNEncodingUtil.xmlEncodeCDATA(path));
+                report.append("</S:entry>\n");
             }
         });
         buffer.append("</S:update-report>");

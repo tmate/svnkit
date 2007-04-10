@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.TreeMap;
 
 import org.tmatesoft.svn.core.SVNCommitInfo;
+import org.tmatesoft.svn.core.SVNDepth;
 import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
@@ -647,7 +648,7 @@ public class SVNCopyClient extends SVNBasicClient {
                 SVNUpdateClient updateClient = new SVNUpdateClient(getRepositoryPool(), getOptions());
                 updateClient.setEventHandler(getEventDispatcher());
     
-                revision = updateClient.doCheckout(srcURL, dstPath, srcRevision, srcRevision, true);
+                revision = updateClient.doCheckout(srcURL, dstPath, srcRevision, srcRevision, SVNDepth.DEPTH_INFINITY, false);
                 
                 if (srcRevision == SVNRevision.HEAD && sameRepositories) {
                     SVNAdminArea dstArea = dstAccess.open(dstPath, true, SVNWCAccess.INFINITE_DEPTH);

@@ -95,7 +95,11 @@ public class SVNInfo {
     private File myConflictNewFile;
     private File myConflictWrkFile;
     private File myPropConflictFile;
-
+    private boolean myIsIncomplete;
+    private boolean myIsAbsent;
+    private boolean myIsCopied;
+    private boolean myIsDeleted;
+    
     static SVNInfo createInfo(File file, SVNEntry entry) throws SVNException {
         if (entry == null) {
             return null;
@@ -448,6 +452,22 @@ public class SVNInfo {
      */
     public SVNURL getURL() {
         return myURL;
+    }
+
+    public boolean isAbsent() {
+        return myIsAbsent;
+    }
+
+    public boolean isCopied() {
+        return myIsCopied;
+    }
+
+    public boolean isDeleted() {
+        return myIsDeleted;
+    }
+
+    public boolean isIncomplete() {
+        return myIsIncomplete;
     }
 
 }
