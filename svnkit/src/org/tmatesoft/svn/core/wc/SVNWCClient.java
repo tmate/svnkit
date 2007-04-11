@@ -1866,7 +1866,7 @@ public class SVNWCClient extends SVNBasicClient {
             wcAccess.probeOpen(path, false, recursive ? SVNWCAccess.INFINITE_DEPTH : 0);
             SVNEntry entry = wcAccess.getEntry(path, false);
             if (entry == null) {
-                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.UNVERSIONED_RESOURCE, "Cannot read entry for ''{0}''", path);
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.UNVERSIONED_RESOURCE, "''{0}'' is not under version control", path);
                 SVNErrorManager.error(err);
             }
             if (entry.isFile()) {
@@ -1892,6 +1892,11 @@ public class SVNWCClient extends SVNBasicClient {
 
     private void reportAllEntries(SVNWCAccess wcAccess, File path, ISVNInfoHandler handler) throws SVNException {
         SVNEntry entry = wcAccess.getEntry(path, false);
+        if (entry == null) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.UNVERSIONED_RESOURCE, "''{0}'' is not under version control", path);
+            SVNErrorManager.error(err);
+        }
+        
         reportEntry(path, entry, handler);
         if (entry.isDirectory()) {
             SVNAdminArea dir = wcAccess.retrieve(path);

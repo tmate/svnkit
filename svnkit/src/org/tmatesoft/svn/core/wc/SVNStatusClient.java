@@ -229,7 +229,7 @@ public class SVNStatusClient extends SVNBasicClient {
         try {
             SVNAdminAreaInfo info = wcAccess.openAnchor(path, false, recursive ? -1 : 1);
             SVNEntry entry = null;
-            if (depth == SVNDepth.DEPTH_UNKNOWN) {
+            if (depth == null || depth == SVNDepth.DEPTH_UNKNOWN) {
                 entry = wcAccess.getEntry(info.getAnchor().getRoot(), false);                
                 if (entry != null) {
                     depth = entry.getDepth();
@@ -311,7 +311,11 @@ public class SVNStatusClient extends SVNBasicClient {
                     handleEvent(SVNEventFactory.createStatusExternalEvent(info, externalPath), ISVNEventHandler.UNKNOWN);
                     setEventPathPrefix(externalPath);
                     try {
-                        doStatus(externalFile, recursive, remote, reportAll, includeIgnored, false, handler);
+                        /* TODO(sd): "Is it really correct
+                         * to unconditionally recurse
+                         * here?" 
+                         */
+                        doStatus(externalFile, SVNRevision.HEAD, SVNDepth.DEPTH_INFINITY, remote, reportAll, includeIgnored, false, handler);
                     } catch (SVNException e) {
                         if (e instanceof SVNCancelException) {
                             throw e;

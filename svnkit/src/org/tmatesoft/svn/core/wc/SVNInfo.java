@@ -14,6 +14,7 @@ package org.tmatesoft.svn.core.wc;
 import java.io.File;
 import java.util.Date;
 
+import org.tmatesoft.svn.core.SVNDepth;
 import org.tmatesoft.svn.core.SVNDirEntry;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNLock;
@@ -99,6 +100,7 @@ public class SVNInfo {
     private boolean myIsAbsent;
     private boolean myIsCopied;
     private boolean myIsDeleted;
+    private SVNDepth myDepth;
     
     static SVNInfo createInfo(File file, SVNEntry entry) throws SVNException {
         if (entry == null) {
@@ -117,7 +119,9 @@ public class SVNInfo {
                         .getCopyFromRevision(), entry.getTextTime(), entry
                         .getPropTime(), entry.getChecksum(), entry
                         .getConflictOld(), entry.getConflictNew(), entry
-                        .getConflictWorking(), entry.getPropRejectFile(), lock);
+                        .getConflictWorking(), entry.getPropRejectFile(), lock, 
+                        entry.getDepth(), entry.isIncomplete(), entry.isAbsent(), 
+                        entry.isCopied(), entry.isDeleted());
     }
 
     static SVNInfo createInfo(String path, SVNURL reposRootURL, String uuid,
@@ -127,7 +131,8 @@ public class SVNInfo {
         }
         return new SVNInfo(path, url, revision, dirEntry.getKind(), uuid,
                 reposRootURL, dirEntry.getRevision(), dirEntry.getDate(),
-                dirEntry.getAuthor(), lock);
+                dirEntry.getAuthor(), lock, SVNDepth.DEPTH_UNKNOWN, false, 
+                false, false, false);
     }
 
     protected SVNInfo(File file, SVNURL url, SVNURL rootURL, long revision, SVNNodeKind kind,
@@ -135,7 +140,9 @@ public class SVNInfo {
             String author, String schedule, SVNURL copyFromURL,
             long copyFromRevision, String textTime, String propTime,
             String checksum, String conflictOld, String conflictNew,
-            String conflictWorking, String propRejectFile, SVNLock lock) {
+            String conflictWorking, String propRejectFile, SVNLock lock, 
+            SVNDepth depth, boolean isIncomplete, boolean isAbsent, 
+            boolean isCopied, boolean isDeleted) {
         myFile = file;
         myURL = url;
         myRevision = SVNRevision.create(revision);
@@ -176,11 +183,18 @@ public class SVNInfo {
         }
 
         myIsRemote = false;
+        myDepth = depth;
+        myIsIncomplete = isIncomplete;
+        myIsAbsent = isAbsent;
+        myIsCopied = isCopied;
+        myIsDeleted = isDeleted;
     }
 
     protected SVNInfo(String path, SVNURL url, SVNRevision revision,
             SVNNodeKind kind, String uuid, SVNURL reposRootURL,
-            long comittedRevision, Date date, String author, SVNLock lock) {
+            long comittedRevision, Date date, String author, SVNLock lock, 
+            SVNDepth depth, boolean isIncomplete, boolean isAbsent, 
+            boolean isCopied, boolean isDeleted) {
         myIsRemote = true;
         myURL = url;
         myRevision = revision;
@@ -194,6 +208,11 @@ public class SVNInfo {
 
         myLock = lock;
         myPath = path;
+        myDepth = depth;
+        myIsIncomplete = isIncomplete;
+        myIsAbsent = isAbsent;
+        myIsCopied = isCopied;
+        myIsDeleted = isDeleted;
     }
     
     /**
@@ -468,6 +487,10 @@ public class SVNInfo {
 
     public boolean isIncomplete() {
         return myIsIncomplete;
+    }
+
+    public SVNDepth getDepth() {
+        return myDepth;
     }
 
 }

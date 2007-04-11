@@ -941,7 +941,7 @@ public class SVNDiffClient extends SVNBasicClient {
      * @param  revision2      a revision of <code>path2</code>
      * @param  dstPath        the target path to which the result should
      *                        be applied 
-     * @param  recusrsive     <span class="javakeyword">true</span> to descend 
+     * @param  recursive     <span class="javakeyword">true</span> to descend 
      *                        recursively
      * @param  useAncestry    if <span class="javakeyword">true</span> then
      *                        the paths ancestry will be noticed while calculating differences,
@@ -964,7 +964,12 @@ public class SVNDiffClient extends SVNBasicClient {
      *                        <li><code>dstPath</code> is not under version control
      *                        </ul>
      */
-    public void doMerge(File path1, SVNRevision revision1, File path2, SVNRevision revision2, File dstPath, boolean recusrsive, boolean useAncestry, 
+    public void doMerge(File path1, SVNRevision revision1, File path2, SVNRevision revision2, File dstPath, boolean recursive, boolean useAncestry, 
+            boolean force, boolean dryRun) throws SVNException {
+        doMerge(path1, revision1, path2, revision2, dstPath, SVNDepth.fromRecurse(recursive), useAncestry, force, dryRun);
+    }
+    
+    public void doMerge(File path1, SVNRevision revision1, File path2, SVNRevision revision2, File dstPath, SVNDepth depth, boolean useAncestry, 
             boolean force, boolean dryRun) throws SVNException {
         path1 = new File(SVNPathUtil.validateFilePath(path1.getAbsolutePath())).getAbsoluteFile();
         path2 = new File(SVNPathUtil.validateFilePath(path2.getAbsolutePath())).getAbsoluteFile();
@@ -992,17 +997,19 @@ public class SVNDiffClient extends SVNBasicClient {
         dstPath = new File(SVNPathUtil.validateFilePath(dstPath.getAbsolutePath()));
         try {
             dstPath = new File(SVNPathUtil.validateFilePath(dstPath.getAbsolutePath()));
-            SVNAdminAreaInfo info = wcAccess.openAnchor(dstPath, !dryRun, recusrsive ? SVNWCAccess.INFINITE_DEPTH : 0);
-            
+            SVNAdminAreaInfo info = wcAccess.openAnchor(dstPath, !dryRun, SVNDepth.recurseFromDepth(depth) ? SVNWCAccess.INFINITE_DEPTH : 0);
             SVNEntry targetEntry = wcAccess.getEntry(dstPath, false);
             if (targetEntry == null) {
                 SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_NOT_FOUND, "''{0}'' is not under version control", dstPath);
                 SVNErrorManager.error(err);
             }
+            if (depth == null || depth == SVNDepth.DEPTH_UNKNOWN) {
+                depth = targetEntry.getDepth();
+            }
             if (targetEntry.isFile()) {
                 doMergeFile(url1, path1, revision1, url2, path2, revision2, pegRevision, info, force, dryRun);
             } else if (targetEntry.isDirectory()) {
-                doMerge(url1, path1, revision1, url2, path2, revision2, pegRevision, info, recusrsive, useAncestry, force, dryRun);
+                doMerge(url1, path1, revision1, url2, path2, revision2, pegRevision, info, depth, useAncestry, force, dryRun);
             }
         } finally {
             wcAccess.close();
@@ -1028,7 +1035,7 @@ public class SVNDiffClient extends SVNBasicClient {
      * @param  revision2      a revision of <code>url2</code>
      * @param  dstPath        the target path to which the result should
      *                        be applied
-     * @param  recusrsive     <span class="javakeyword">true</span> to descend 
+     * @param  recursive     <span class="javakeyword">true</span> to descend 
      *                        recursively
      * @param  useAncestry    if <span class="javakeyword">true</span> then
      *                        the paths ancestry will be noticed while calculating differences,
@@ -1050,7 +1057,12 @@ public class SVNDiffClient extends SVNBasicClient {
      *                        <li><code>dstPath</code> is not under version control
      *                        </ul>
      */
-    public void doMerge(File path1, SVNRevision revision1, SVNURL url2, SVNRevision revision2, File dstPath, boolean recusrsive, boolean useAncestry, 
+    public void doMerge(File path1, SVNRevision revision1, SVNURL url2, SVNRevision revision2, File dstPath, boolean recursive, boolean useAncestry, 
+            boolean force, boolean dryRun) throws SVNException {
+        doMerge(path1, revision1, url2, revision2, dstPath, SVNDepth.fromRecurse(recursive), useAncestry, force, dryRun);
+    }
+    
+    public void doMerge(File path1, SVNRevision revision1, SVNURL url2, SVNRevision revision2, File dstPath, SVNDepth depth, boolean useAncestry, 
             boolean force, boolean dryRun) throws SVNException {
         path1 = new File(SVNPathUtil.validateFilePath(path1.getAbsolutePath())).getAbsoluteFile();
         dstPath = new File(SVNPathUtil.validateFilePath(dstPath.getAbsolutePath())).getAbsoluteFile();
@@ -1066,17 +1078,21 @@ public class SVNDiffClient extends SVNBasicClient {
         SVNWCAccess wcAccess = createWCAccess();
         try {
             dstPath = new File(SVNPathUtil.validateFilePath(dstPath.getAbsolutePath()));
-            SVNAdminAreaInfo info = wcAccess.openAnchor(dstPath, !dryRun, recusrsive ? SVNWCAccess.INFINITE_DEPTH : 0);
+            SVNAdminAreaInfo info = wcAccess.openAnchor(dstPath, !dryRun, SVNDepth.recurseFromDepth(depth) ? SVNWCAccess.INFINITE_DEPTH : 0);
             
             SVNEntry targetEntry = wcAccess.getEntry(dstPath, false);
             if (targetEntry == null) {
                 SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_NOT_FOUND, "''{0}'' is not under version control", dstPath);
                 SVNErrorManager.error(err);
             }
+            if (depth == null || depth == SVNDepth.DEPTH_UNKNOWN) {
+                depth = targetEntry.getDepth();
+            }
+
             if (targetEntry.isFile()) {
                 doMergeFile(url1, path1, revision1, url2, null, revision2, pegRevision, info, force, dryRun);
             } else if (targetEntry.isDirectory()) {
-                doMerge(url1, path1, revision1, url2, null, revision2, pegRevision, info, recusrsive, useAncestry, force, dryRun);
+                doMerge(url1, path1, revision1, url2, null, revision2, pegRevision, info, depth, useAncestry, force, dryRun);
             }
         } finally {
             wcAccess.close();
@@ -1101,7 +1117,7 @@ public class SVNDiffClient extends SVNBasicClient {
      * @param  revision2      a revision of <code>path2</code>
      * @param  dstPath        the target path to which the result should
      *                        be applied
-     * @param  recusrsive     <span class="javakeyword">true</span> to descend 
+     * @param  recursive     <span class="javakeyword">true</span> to descend 
      *                        recursively
      * @param  useAncestry    if <span class="javakeyword">true</span> then
      *                        the paths ancestry will be noticed while calculating differences,
@@ -1123,7 +1139,12 @@ public class SVNDiffClient extends SVNBasicClient {
      *                        <li><code>dstPath</code> is not under version control
      *                        </ul>
      */
-    public void doMerge(SVNURL url1, SVNRevision revision1, File path2, SVNRevision revision2, File dstPath, boolean recusrsive, boolean useAncestry, 
+    public void doMerge(SVNURL url1, SVNRevision revision1, File path2, SVNRevision revision2, File dstPath, boolean recursive, boolean useAncestry, 
+            boolean force, boolean dryRun) throws SVNException {
+        doMerge(url1, revision1, path2, revision2, dstPath, SVNDepth.fromRecurse(recursive), useAncestry, force, dryRun);
+    }
+    
+    public void doMerge(SVNURL url1, SVNRevision revision1, File path2, SVNRevision revision2, File dstPath, SVNDepth depth, boolean useAncestry, 
             boolean force, boolean dryRun) throws SVNException {
         path2 = new File(SVNPathUtil.validateFilePath(path2.getAbsolutePath())).getAbsoluteFile();
         dstPath = new File(SVNPathUtil.validateFilePath(dstPath.getAbsolutePath())).getAbsoluteFile();
@@ -1139,17 +1160,20 @@ public class SVNDiffClient extends SVNBasicClient {
         SVNWCAccess wcAccess = createWCAccess();
         try {
             dstPath = new File(SVNPathUtil.validateFilePath(dstPath.getAbsolutePath()));
-            SVNAdminAreaInfo info = wcAccess.openAnchor(dstPath, !dryRun, recusrsive ? SVNWCAccess.INFINITE_DEPTH : 0);
+            SVNAdminAreaInfo info = wcAccess.openAnchor(dstPath, !dryRun, SVNDepth.recurseFromDepth(depth) ? SVNWCAccess.INFINITE_DEPTH : 0);
             
             SVNEntry targetEntry = wcAccess.getEntry(dstPath, false);
             if (targetEntry == null) {
                 SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_NOT_FOUND, "''{0}'' is not under version control", dstPath);
                 SVNErrorManager.error(err);
             }
+            if (depth == null || depth == SVNDepth.DEPTH_UNKNOWN) {
+                depth = targetEntry.getDepth();
+            }
             if (targetEntry.isFile()) {
                 doMergeFile(url1, null, revision1, url2, path2, revision2, pegRevision, info, force, dryRun);
             } else if (targetEntry.isDirectory()) {
-                doMerge(url1, null, revision1, url2, path2, revision2, pegRevision, info, recusrsive, useAncestry, force, dryRun);
+                doMerge(url1, null, revision1, url2, path2, revision2, pegRevision, info, depth, useAncestry, force, dryRun);
             }
         } finally {
             wcAccess.close();
@@ -1178,7 +1202,7 @@ public class SVNDiffClient extends SVNBasicClient {
      * @param  revision2      a revision of <code>url2</code>
      * @param  dstPath        the target path to which the result should
      *                        be applied
-     * @param  recusrsive     <span class="javakeyword">true</span> to descend 
+     * @param  recursive     <span class="javakeyword">true</span> to descend 
      *                        recursively
      * @param  useAncestry    if <span class="javakeyword">true</span> then
      *                        the paths ancestry will be noticed while calculating differences,
@@ -1199,7 +1223,12 @@ public class SVNDiffClient extends SVNBasicClient {
      *                        <li><code>dstPath</code> is not under version control
      *                        </ul>
      */
-    public void doMerge(SVNURL url1, SVNRevision revision1, SVNURL url2, SVNRevision revision2, File dstPath, boolean recusrsive, boolean useAncestry, 
+    public void doMerge(SVNURL url1, SVNRevision revision1, SVNURL url2, SVNRevision revision2, File dstPath, boolean recursive, boolean useAncestry, 
+            boolean force, boolean dryRun) throws SVNException {
+        doMerge(url1, revision1, url2, revision2, dstPath, SVNDepth.fromRecurse(recursive), useAncestry, force, dryRun);
+    }
+    
+    public void doMerge(SVNURL url1, SVNRevision revision1, SVNURL url2, SVNRevision revision2, File dstPath, SVNDepth depth, boolean useAncestry, 
             boolean force, boolean dryRun) throws SVNException {
         SVNRevision pegRevision = SVNRevision.UNDEFINED;
         if (url1.equals(url2)) {
@@ -1208,22 +1237,24 @@ public class SVNDiffClient extends SVNBasicClient {
         SVNWCAccess wcAccess = createWCAccess();
         try {
             dstPath = new File(SVNPathUtil.validateFilePath(dstPath.getAbsolutePath())).getAbsoluteFile();
-            SVNAdminAreaInfo info = wcAccess.openAnchor(dstPath, !dryRun, recusrsive ? SVNWCAccess.INFINITE_DEPTH : 0);
+            SVNAdminAreaInfo info = wcAccess.openAnchor(dstPath, !dryRun, SVNDepth.recurseFromDepth(depth) ? SVNWCAccess.INFINITE_DEPTH : 0);
             SVNEntry targetEntry = wcAccess.getEntry(dstPath, false);
             
             if (targetEntry == null) {
                 SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_NOT_FOUND, "''{0}'' is not under version control", dstPath);
                 SVNErrorManager.error(err);
             }
+            if (depth == null || depth == SVNDepth.DEPTH_UNKNOWN) {
+                depth = targetEntry.getDepth();
+            }
             if (targetEntry.isFile()) {
                 doMergeFile(url1, null, revision1, url2, null, revision2, pegRevision, info, force, dryRun);
             } else if (targetEntry.isDirectory()) {
-                doMerge(url1, null, revision1, url2, null, revision2, pegRevision, info, recusrsive, useAncestry, force, dryRun);
+                doMerge(url1, null, revision1, url2, null, revision2, pegRevision, info, depth, useAncestry, force, dryRun);
             }
         } finally {
             wcAccess.close();
         }
-         
     }
     
     /**
@@ -1249,7 +1280,7 @@ public class SVNDiffClient extends SVNBasicClient {
      * @param  revision2      a right-hand revision of <code>url1</code>
      * @param  dstPath        the target path to which the result should
      *                        be applied
-     * @param  recusrsive     <span class="javakeyword">true</span> to descend 
+     * @param  recursive     <span class="javakeyword">true</span> to descend 
      *                        recursively
      * @param  useAncestry    if <span class="javakeyword">true</span> then
      *                        the paths ancestry will be noticed while calculating differences,
@@ -1270,7 +1301,12 @@ public class SVNDiffClient extends SVNBasicClient {
      *                        <li><code>dstPath</code> is not under version control
      *                        </ul>
      */
-    public void doMerge(SVNURL url1, SVNRevision pegRevision, SVNRevision revision1, SVNRevision revision2, File dstPath, boolean recusrsive, boolean useAncestry, 
+    public void doMerge(SVNURL url1, SVNRevision pegRevision, SVNRevision revision1, SVNRevision revision2, File dstPath, boolean recursive, boolean useAncestry, 
+            boolean force, boolean dryRun) throws SVNException {
+        doMerge(url1, pegRevision, revision1, revision2, dstPath, SVNDepth.fromRecurse(recursive), useAncestry, force, dryRun);
+    }
+    
+    public void doMerge(SVNURL url1, SVNRevision pegRevision, SVNRevision revision1, SVNRevision revision2, File dstPath, SVNDepth depth, boolean useAncestry, 
             boolean force, boolean dryRun) throws SVNException {
         if (pegRevision == null || !pegRevision.isValid()) {
             pegRevision = SVNRevision.HEAD;
@@ -1278,17 +1314,20 @@ public class SVNDiffClient extends SVNBasicClient {
         SVNWCAccess wcAccess = createWCAccess();
         dstPath = new File(SVNPathUtil.validateFilePath(dstPath.getAbsolutePath())).getAbsoluteFile();
         try {
-            SVNAdminAreaInfo info = wcAccess.openAnchor(dstPath, !dryRun, recusrsive ? SVNWCAccess.INFINITE_DEPTH : 0);
+            SVNAdminAreaInfo info = wcAccess.openAnchor(dstPath, !dryRun, SVNDepth.recurseFromDepth(depth) ? SVNWCAccess.INFINITE_DEPTH : 0);
             
             SVNEntry targetEntry = wcAccess.getEntry(dstPath, false);
             if (targetEntry == null) {
                 SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_NOT_FOUND, "''{0}'' is not under version control", dstPath);
                 SVNErrorManager.error(err);
             }
+            if (depth == null || depth == SVNDepth.DEPTH_UNKNOWN) {
+                depth = targetEntry.getDepth();
+            }
             if (targetEntry.isFile()) {
                 doMergeFile(url1, null, revision1, url1, null, revision2, pegRevision, info, force, dryRun);
             } else if (targetEntry.isDirectory()) {
-                doMerge(url1, null, revision1, url1, null, revision2, pegRevision, info, recusrsive, useAncestry, force, dryRun);
+                doMerge(url1, null, revision1, url1, null, revision2, pegRevision, info, depth, useAncestry, force, dryRun);
             }
         } finally {
             wcAccess.close();
@@ -1319,7 +1358,7 @@ public class SVNDiffClient extends SVNBasicClient {
      * @param  revision2      a right-hand revision of <code>path1</code>
      * @param  dstPath        the target path to which the result should
      *                        be applied
-     * @param  recusrsive     <span class="javakeyword">true</span> to descend 
+     * @param  recursive     <span class="javakeyword">true</span> to descend 
      *                        recursively
      * @param  useAncestry    if <span class="javakeyword">true</span> then
      *                        the paths ancestry will be noticed while calculating differences,
@@ -1341,7 +1380,12 @@ public class SVNDiffClient extends SVNBasicClient {
      *                        <li><code>dstPath</code> is not under version control
      *                        </ul>
      */
-    public void doMerge(File path1, SVNRevision pegRevision, SVNRevision revision1, SVNRevision revision2, File dstPath, boolean recusrsive, boolean useAncestry, 
+    public void doMerge(File path1, SVNRevision pegRevision, SVNRevision revision1, SVNRevision revision2, File dstPath, boolean recursive, boolean useAncestry, 
+            boolean force, boolean dryRun) throws SVNException {
+        doMerge(path1, pegRevision, revision1, revision2, dstPath, SVNDepth.fromRecurse(recursive), useAncestry, force, dryRun);
+    }
+    
+    public void doMerge(File path1, SVNRevision pegRevision, SVNRevision revision1, SVNRevision revision2, File dstPath, SVNDepth depth, boolean useAncestry, 
             boolean force, boolean dryRun) throws SVNException {
         SVNURL url1 = getURL(path1);
         if (url1 == null) {
@@ -1359,17 +1403,20 @@ public class SVNDiffClient extends SVNBasicClient {
         try {
             dstPath = new File(SVNPathUtil.validateFilePath(dstPath.getAbsolutePath())).getAbsoluteFile();
             path1 = new File(SVNPathUtil.validateFilePath(path1.getAbsolutePath())).getAbsoluteFile();
-            SVNAdminAreaInfo info = wcAccess.openAnchor(dstPath.getAbsoluteFile(), !dryRun, recusrsive ? SVNWCAccess.INFINITE_DEPTH : 0);
+            SVNAdminAreaInfo info = wcAccess.openAnchor(dstPath.getAbsoluteFile(), !dryRun, SVNDepth.recurseFromDepth(depth) ? SVNWCAccess.INFINITE_DEPTH : 0);
             
             SVNEntry targetEntry = wcAccess.getEntry(dstPath, false);
             if (targetEntry == null) {
                 SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_NOT_FOUND, "''{0}'' is not under version control", dstPath);
                 SVNErrorManager.error(err);
             }
+            if (depth == null || depth == SVNDepth.DEPTH_UNKNOWN) {
+                depth = targetEntry.getDepth();
+            }
             if (targetEntry.isFile()) {
                 doMergeFile(url1, path1.getAbsoluteFile(), revision1, url1, path1.getAbsoluteFile(), revision2, pegRevision, info, force, dryRun);
             } else if (targetEntry.isDirectory()) {
-                doMerge(url1, path1.getAbsoluteFile(), revision1, url1, path1.getAbsoluteFile(), revision2, pegRevision, info, recusrsive, useAncestry, force, dryRun);
+                doMerge(url1, path1.getAbsoluteFile(), revision1, url1, path1.getAbsoluteFile(), revision2, pegRevision, info, depth, useAncestry, force, dryRun);
             }
         } finally {
             wcAccess.close();
@@ -1377,7 +1424,7 @@ public class SVNDiffClient extends SVNBasicClient {
     }
     
     private void doMerge(SVNURL url1, File path1, SVNRevision revision1, SVNURL url2, File path2, SVNRevision revision2, SVNRevision pegRevision,
-            SVNAdminAreaInfo info, boolean recursive, boolean useAncestry, boolean force, boolean dryRun) throws SVNException {
+            SVNAdminAreaInfo info, SVNDepth depth, boolean useAncestry, boolean force, boolean dryRun) throws SVNException {
         if (!revision1.isValid() || !revision2.isValid()) {
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.CLIENT_BAD_REVISION, "Both rN and rM revisions should be specified");            
             SVNErrorManager.error(err);
@@ -1398,12 +1445,12 @@ public class SVNDiffClient extends SVNBasicClient {
         
         SVNMergeCallback callback = new SVNMergeCallback(info, url2, force, dryRun, getMergeOptions());
         SVNRemoteDiffEditor editor = new SVNRemoteDiffEditor(info, info.getTarget().getRoot(), callback, repository2, rev1, rev2, dryRun, this, this);
-        
+        final SVNDepth reportDepth = depth;
         try {
-            repository1.diff(url2, rev2, rev1, null, !useAncestry, recursive, true,
+            repository1.diff(url2, rev2, rev1, null, !useAncestry, depth, true,
                     new ISVNReporterBaton() {
                         public void report(ISVNReporter reporter) throws SVNException {
-                            reporter.setPath("", null, rev1, false);
+                            reporter.setPath("", null, rev1, reportDepth, false);
                             reporter.finishReport();
                         }
                     }, SVNCancellableEditor.newInstance(editor, this, getDebugLog()));

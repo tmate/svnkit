@@ -121,15 +121,21 @@ public class SVNWCManager {
             SVNFileUtil.deleteFile(propFile);
         }
         if (kind == SVNNodeKind.DIR) {
+            /* TODO(sd): "Both the calls to ensureAdminAreaExists() below pass
+             * SVNDepth.DEPTH_INFINITY.  I think this is reasonable, because
+             * we don't have any other source of depth information in
+             * the current context, and if ensureAdminAreaExists() *does*
+             * create a new admin directory, it ought to default to
+             * SVNDepth.DEPTH_INFINITY. However, if 'svn add' ever takes
+             * a depth parameter, then this would need to change." 
+             */
             if (copyFromURL == null) {
                 SVNEntry pEntry = wcAccess.getEntry(path.getParentFile(), false);
                 SVNURL newURL = pEntry.getSVNURL().appendPath(name, false);
                 SVNURL rootURL = pEntry.getRepositoryRootURL();
-                //TODO: fix me!!!!!!!!!
                 ensureAdminAreaExists(path, newURL.toString(), rootURL != null ? rootURL.toString() : null, pEntry.getUUID(), 0, SVNDepth.DEPTH_INFINITY);
             } else {
                 SVNURL rootURL = parentEntry.getRepositoryRootURL();
-                //TODO: fix me!!!!!!!!!
                 ensureAdminAreaExists(path, copyFromURL.toString(), rootURL != null ? rootURL.toString() : null, parentEntry.getUUID(), copyFromRev, SVNDepth.DEPTH_INFINITY);
             }
             if (entry == null || entry.isDeleted()) {
@@ -140,7 +146,6 @@ public class SVNWCManager {
             dir.modifyEntry(dir.getThisDirName(), command, true, true);
             if (copyFromURL != null) {
                 SVNURL newURL = parentEntry.getSVNURL().appendPath(name, false);
-                //TODO: fix me!!!!!!!!!
                 updateCleanup(path, wcAccess, newURL.toString(), parentEntry.getRepositoryRoot(), -1, false, null, SVNDepth.DEPTH_INFINITY);
                 markTree(dir, null, true, false, COPIED);
                 SVNPropertiesManager.deleteWCProperties(dir, null, true);

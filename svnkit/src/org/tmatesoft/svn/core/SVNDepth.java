@@ -53,7 +53,7 @@ public class SVNDepth {
     }
     
     public static boolean recurseFromDepth(SVNDepth depth) {
-        return depth == DEPTH_INFINITY || depth == DEPTH_UNKNOWN;
+        return depth == null || depth == DEPTH_INFINITY || depth == DEPTH_UNKNOWN;
     }
     
     public static SVNDepth fromRecurse(boolean recurse) {
