@@ -521,4 +521,8 @@ public class SVNClient implements SVNClientInterface {
     public long[] update(String[] path, Revision revision, int depth, boolean ignoreExternals, boolean allowUnverObstructions) throws ClientException {
         return myDelegate.update(path, revision, depth, ignoreExternals, allowUnverObstructions);
     }
+
+    public void status(String path, int depth, boolean onServer, boolean getAll, boolean noIgnore, boolean ignoreExternals, StatusCallback callback) throws ClientException {
+        myDelegate.status(path, depth, onServer, getAll, noIgnore, ignoreExternals, callback);
+    }
 }
