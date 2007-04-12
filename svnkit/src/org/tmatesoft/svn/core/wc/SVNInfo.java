@@ -96,10 +96,6 @@ public class SVNInfo {
     private File myConflictNewFile;
     private File myConflictWrkFile;
     private File myPropConflictFile;
-    private boolean myIsIncomplete;
-    private boolean myIsAbsent;
-    private boolean myIsCopied;
-    private boolean myIsDeleted;
     private SVNDepth myDepth;
     
     static SVNInfo createInfo(File file, SVNEntry entry) throws SVNException {
@@ -120,8 +116,7 @@ public class SVNInfo {
                         .getPropTime(), entry.getChecksum(), entry
                         .getConflictOld(), entry.getConflictNew(), entry
                         .getConflictWorking(), entry.getPropRejectFile(), lock, 
-                        entry.getDepth(), entry.isIncomplete(), entry.isAbsent(), 
-                        entry.isCopied(), entry.isDeleted());
+                        entry.getDepth());
     }
 
     static SVNInfo createInfo(String path, SVNURL reposRootURL, String uuid,
@@ -131,8 +126,7 @@ public class SVNInfo {
         }
         return new SVNInfo(path, url, revision, dirEntry.getKind(), uuid,
                 reposRootURL, dirEntry.getRevision(), dirEntry.getDate(),
-                dirEntry.getAuthor(), lock, SVNDepth.DEPTH_UNKNOWN, false, 
-                false, false, false);
+                dirEntry.getAuthor(), lock, SVNDepth.DEPTH_UNKNOWN);
     }
 
     protected SVNInfo(File file, SVNURL url, SVNURL rootURL, long revision, SVNNodeKind kind,
@@ -141,8 +135,7 @@ public class SVNInfo {
             long copyFromRevision, String textTime, String propTime,
             String checksum, String conflictOld, String conflictNew,
             String conflictWorking, String propRejectFile, SVNLock lock, 
-            SVNDepth depth, boolean isIncomplete, boolean isAbsent, 
-            boolean isCopied, boolean isDeleted) {
+            SVNDepth depth) {
         myFile = file;
         myURL = url;
         myRevision = SVNRevision.create(revision);
@@ -184,17 +177,12 @@ public class SVNInfo {
 
         myIsRemote = false;
         myDepth = depth;
-        myIsIncomplete = isIncomplete;
-        myIsAbsent = isAbsent;
-        myIsCopied = isCopied;
-        myIsDeleted = isDeleted;
     }
 
     protected SVNInfo(String path, SVNURL url, SVNRevision revision,
             SVNNodeKind kind, String uuid, SVNURL reposRootURL,
             long comittedRevision, Date date, String author, SVNLock lock, 
-            SVNDepth depth, boolean isIncomplete, boolean isAbsent, 
-            boolean isCopied, boolean isDeleted) {
+            SVNDepth depth) {
         myIsRemote = true;
         myURL = url;
         myRevision = revision;
@@ -209,10 +197,6 @@ public class SVNInfo {
         myLock = lock;
         myPath = path;
         myDepth = depth;
-        myIsIncomplete = isIncomplete;
-        myIsAbsent = isAbsent;
-        myIsCopied = isCopied;
-        myIsDeleted = isDeleted;
     }
     
     /**
@@ -471,22 +455,6 @@ public class SVNInfo {
      */
     public SVNURL getURL() {
         return myURL;
-    }
-
-    public boolean isAbsent() {
-        return myIsAbsent;
-    }
-
-    public boolean isCopied() {
-        return myIsCopied;
-    }
-
-    public boolean isDeleted() {
-        return myIsDeleted;
-    }
-
-    public boolean isIncomplete() {
-        return myIsIncomplete;
     }
 
     public SVNDepth getDepth() {

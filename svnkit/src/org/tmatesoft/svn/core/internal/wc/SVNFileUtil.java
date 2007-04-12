@@ -14,11 +14,11 @@ package org.tmatesoft.svn.core.internal.wc;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
-import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -27,7 +27,10 @@ import java.io.Reader;
 import java.io.Writer;
 import java.io.RandomAccessFile;
 import java.lang.reflect.Method;
+import java.nio.ByteBuffer;
+import java.nio.CharBuffer;
 import java.nio.channels.FileChannel;
+import java.nio.charset.CharsetDecoder;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Properties;
@@ -675,11 +678,13 @@ public class SVNFileUtil {
         }
         BufferedReader reader = null;
         String line = null;
+        InputStream is = null;
         try {
-            reader = new BufferedReader(new FileReader(file));
+            is = new FileInputStream(file);
+            reader = new BufferedReader(new InputStreamReader(is, "UTF-8"));
             line = reader.readLine();
         } finally {
-            closeFile(reader);
+            closeFile(is);
         }
         return line;
     }
@@ -770,19 +775,30 @@ public class SVNFileUtil {
         }
     }
 
-    // method that reads line until a LF ('\n') is met. all read bytes are
-    // appended to the passed buffer
-    // returns the resultant string collected in the buffer excluding an LF. if
-    // an eof is met returns null.
-    public static String readLineFromStream(InputStream is, StringBuffer buffer) throws IOException {
+    public static String readLineFromStream(InputStream is, StringBuffer buffer, CharsetDecoder decoder) throws IOException {
+        ByteArrayOutputStream byteBuffer = new ByteArrayOutputStream();
         int r = -1;
         while ((r = is.read()) != '\n') {
             if (r == -1) {
+                String out = decode(decoder, byteBuffer.toByteArray());
+                buffer.append(out);
                 return null;
             }
-            buffer.append((char) r);
+            byteBuffer.write(r);
+            
         }
-        return buffer.toString();
+        String out = decode(decoder, byteBuffer.toByteArray());
+        buffer.append(out);
+        return out;
+    }
+
+    private static String decode(CharsetDecoder decoder, byte[] in) {
+        ByteBuffer inBuf = ByteBuffer.wrap(in);
+        CharBuffer outBuf = CharBuffer.allocate(inBuf.capacity()*Math.round(decoder.maxCharsPerByte() + 0.5f));
+        decoder.decode(inBuf, outBuf, true);
+        decoder.flush(outBuf);
+        decoder.reset();
+        return outBuf.flip().toString();
     }
 
     public static String detectMimeType(InputStream is) throws IOException {

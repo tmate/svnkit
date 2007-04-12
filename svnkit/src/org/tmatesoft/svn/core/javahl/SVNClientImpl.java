@@ -109,6 +109,9 @@ public class SVNClientImpl implements SVNClientInterface {
     private String myUserName;
     private String myPassword;
     private ISVNEventHandler mySVNEventListener;
+    /**
+     * @deprecated
+     */
     private Notify myNotify;
     private Notify2 myNotify2;
     private CommitMessage myMessageHandler;
@@ -1169,7 +1172,6 @@ public class SVNClientImpl implements SVNClientInterface {
     }
 
     /**
-     * 
      * @deprecated
      */
     protected Notify getNotify() {

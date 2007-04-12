@@ -13,6 +13,7 @@ package org.tmatesoft.svn.core.internal.wc;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.CharsetDecoder;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -60,14 +61,16 @@ public class DefaultLoadHandler implements ISVNLoadHandler {
     private SVNDeltaReader myDeltaReader;
     private SVNDeltaGenerator myDeltaGenerator;
     private ISVNAdminEventHandler myProgressHandler;
+    private CharsetDecoder myDecoder;
     
-    public DefaultLoadHandler(boolean usePreCommitHook, boolean usePostCommitHook, SVNUUIDAction uuidAction, String parentDir, ISVNAdminEventHandler progressHandler) {
+    public DefaultLoadHandler(boolean usePreCommitHook, boolean usePostCommitHook, SVNUUIDAction uuidAction, String parentDir, ISVNAdminEventHandler progressHandler, CharsetDecoder decoder) {
         myProgressHandler = progressHandler;
         myIsUsePreCommitHook = usePreCommitHook;
         myIsUsePostCommitHook = usePostCommitHook;
         myUUIDAction = uuidAction;
         myParentDir = SVNPathUtil.canonicalizeAbsPath(parentDir);
         myRevisionsMap = new HashMap();
+        myDecoder = decoder;
     }
     
     public void setFSFS(FSFS fsfs) {
@@ -123,14 +126,14 @@ public class DefaultLoadHandler implements ISVNLoadHandler {
                 myFSFS.setRevisionProperty(newRevision, SVNRevisionProperty.DATE, baton.myDatestamp);
             }
             
+            String message;
             if (newRevision == baton.myRevision) {
-                SVNDebugLog.getDefaultLog().info("\n------- Committed revision " + newRevision + " >>>\n\n");
+                message = "\n------- Committed revision " + newRevision + " >>>";
             } else {
-                SVNDebugLog.getDefaultLog().info("\n------- Committed new rev " + newRevision + " (loaded from original rev " + baton.myRevision + ") >>>\n\n");
+                message = "\n------- Committed new rev " + newRevision + " (loaded from original rev " + baton.myRevision + ") >>>";
             }
-            
             if (myProgressHandler != null) {
-                SVNAdminEvent event = new SVNAdminEvent(newRevision, baton.myRevision, SVNAdminEventAction.REVISION_LOADED); 
+                SVNAdminEvent event = new SVNAdminEvent(newRevision, baton.myRevision, SVNAdminEventAction.REVISION_LOADED, message); 
                 myProgressHandler.handleAdminEvent(event, ISVNEventHandler.UNKNOWN);
             }
         }
@@ -154,12 +157,12 @@ public class DefaultLoadHandler implements ISVNLoadHandler {
         
         if (revision > 0) {
             myCurrentRevisionBaton.myTxn = FSTransactionRoot.beginTransaction(headRevision, 0, myFSFS);
-            myCurrentRevisionBaton.myTxnRoot = myFSFS.createTransactionRoot(myCurrentRevisionBaton.myTxn.getTxnId()); 
+            myCurrentRevisionBaton.myTxnRoot = myFSFS.createTransactionRoot(myCurrentRevisionBaton.myTxn.getTxnId());
+            String message = "<<< Started new transaction, based on original revision " + revision;
             if (myProgressHandler != null) {
-                SVNAdminEvent event = new SVNAdminEvent(revision, SVNAdminEventAction.REVISION_LOAD); 
+                SVNAdminEvent event = new SVNAdminEvent(revision, SVNAdminEventAction.REVISION_LOAD, message); 
                 myProgressHandler.handleAdminEvent(event, ISVNEventHandler.UNKNOWN);
             }
-            SVNDebugLog.getDefaultLog().info("<<< Started new transaction, based on original revision " + revision + "\n");
         }
     }
 
@@ -170,36 +173,37 @@ public class DefaultLoadHandler implements ISVNLoadHandler {
         }
         
         myCurrentNodeBaton = createNodeBaton(headers);
+        String message;
         switch (myCurrentNodeBaton.myAction) {
             case SVNAdminHelper.NODE_ACTION_CHANGE:
+                message = "     * editing path : " + myCurrentNodeBaton.myPath + " ...";
                 if (myProgressHandler != null) {
-                    SVNAdminEvent event = new SVNAdminEvent(SVNAdminEventAction.REVISION_LOAD_EDIT_PATH, myCurrentNodeBaton.myPath); 
+                    SVNAdminEvent event = new SVNAdminEvent(SVNAdminEventAction.REVISION_LOAD_EDIT_PATH, myCurrentNodeBaton.myPath, message); 
                     myProgressHandler.handleAdminEvent(event, ISVNEventHandler.UNKNOWN);
                 }
-                SVNDebugLog.getDefaultLog().info("     * editing path : " + myCurrentNodeBaton.myPath + " ...");
                 break;
             case SVNAdminHelper.NODE_ACTION_DELETE:
+                message = "     * deleting path : " + myCurrentNodeBaton.myPath + " ...";
                 if (myProgressHandler != null) {
-                    SVNAdminEvent event = new SVNAdminEvent(SVNAdminEventAction.REVISION_LOAD_DELETE_PATH, myCurrentNodeBaton.myPath); 
+                    SVNAdminEvent event = new SVNAdminEvent(SVNAdminEventAction.REVISION_LOAD_DELETE_PATH, myCurrentNodeBaton.myPath, message); 
                     myProgressHandler.handleAdminEvent(event, ISVNEventHandler.UNKNOWN);
                 }
-                SVNDebugLog.getDefaultLog().info("     * deleting path : " + myCurrentNodeBaton.myPath + " ...");
                 myCurrentRevisionBaton.getCommitter().deleteNode(myCurrentNodeBaton.myPath);
                 break;
             case SVNAdminHelper.NODE_ACTION_ADD:
+                message = "     * adding path : " + myCurrentNodeBaton.myPath + " ...";
                 if (myProgressHandler != null) {
-                    SVNAdminEvent event = new SVNAdminEvent(SVNAdminEventAction.REVISION_LOAD_ADD_PATH, myCurrentNodeBaton.myPath); 
+                    SVNAdminEvent event = new SVNAdminEvent(SVNAdminEventAction.REVISION_LOAD_ADD_PATH, myCurrentNodeBaton.myPath, message); 
                     myProgressHandler.handleAdminEvent(event, ISVNEventHandler.UNKNOWN);
                 }
-                SVNDebugLog.getDefaultLog().info("     * adding path : " + myCurrentNodeBaton.myPath + " ...");
                 maybeAddWithHistory(myCurrentNodeBaton);
                 break;
             case SVNAdminHelper.NODE_ACTION_REPLACE:
+                message = "     * replacing path : " + myCurrentNodeBaton.myPath + " ...";
                 if (myProgressHandler != null) {
-                    SVNAdminEvent event = new SVNAdminEvent(SVNAdminEventAction.REVISION_LOAD_REPLACE_PATH, myCurrentNodeBaton.myPath); 
+                    SVNAdminEvent event = new SVNAdminEvent(SVNAdminEventAction.REVISION_LOAD_REPLACE_PATH, myCurrentNodeBaton.myPath, message); 
                     myProgressHandler.handleAdminEvent(event, ISVNEventHandler.UNKNOWN);
                 }
-                SVNDebugLog.getDefaultLog().info("     * replacing path : " + myCurrentNodeBaton.myPath + " ...");
                 myCurrentRevisionBaton.getCommitter().deleteNode(myCurrentNodeBaton.myPath);
                 maybeAddWithHistory(myCurrentNodeBaton);
                 break;
@@ -291,7 +295,7 @@ public class DefaultLoadHandler implements ISVNLoadHandler {
         try {
             while (contentLength != actualLength) {
                 buffer.setLength(0);
-                line = SVNFileUtil.readLineFromStream(dumpStream, buffer);
+                line = SVNFileUtil.readLineFromStream(dumpStream, buffer, myDecoder);
                 
                 if (line == null) {
                     SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.STREAM_MALFORMED_DATA, "Incomplete or unterminated property block");
@@ -316,7 +320,7 @@ public class DefaultLoadHandler implements ISVNLoadHandler {
                     String propName = new String(buff, "UTF-8");
                     
                     buffer.setLength(0);
-                    line = SVNFileUtil.readLineFromStream(dumpStream, buffer);
+                    line = SVNFileUtil.readLineFromStream(dumpStream, buffer, myDecoder);
                     if (line == null) {
                         SVNAdminHelper.generateIncompleteDataError();
                     }

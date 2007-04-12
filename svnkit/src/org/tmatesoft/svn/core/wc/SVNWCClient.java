@@ -1370,6 +1370,11 @@ public class SVNWCClient extends SVNBasicClient {
                     command.put(SVNLog.TIMESTAMP_ATTR, entry.getCommittedDate());
                     log.addCommand(SVNLog.SET_TIMESTAMP, command, false);
                     command.clear();                    
+                } else {
+                    command.put(SVNLog.NAME_ATTR, name);
+                    command.put(SVNLog.TIMESTAMP_ATTR, SVNTimeUtil.formatDate(new Date(System.currentTimeMillis())));
+                    log.addCommand(SVNLog.SET_TIMESTAMP, command, false);
+                    command.clear();                    
                 }
                 command.put(SVNLog.NAME_ATTR, name);
                 command.put(SVNProperty.shortPropertyName(SVNProperty.TEXT_TIME), SVNLog.WC_TIMESTAMP);
@@ -1387,24 +1392,36 @@ public class SVNWCClient extends SVNBasicClient {
             log.addCommand(SVNLog.DELETE, command, false);
             command.clear();
             newEntryProperties.put(SVNProperty.shortPropertyName(SVNProperty.CONFLICT_NEW), null);
+            if (!reverted) {
+                reverted |= dir.getFile(entry.getConflictNew()).exists();
+            }
         }
         if (entry.getConflictOld() != null) {
             command.put(SVNLog.NAME_ATTR, entry.getConflictOld());
             log.addCommand(SVNLog.DELETE, command, false);
             command.clear();
             newEntryProperties.put(SVNProperty.shortPropertyName(SVNProperty.CONFLICT_OLD), null);
+            if (!reverted) {
+                reverted |= dir.getFile(entry.getConflictOld()).exists();
+            }
         }
         if (entry.getConflictWorking() != null) {
             command.put(SVNLog.NAME_ATTR, entry.getConflictWorking());
             log.addCommand(SVNLog.DELETE, command, false);
             command.clear();
             newEntryProperties.put(SVNProperty.shortPropertyName(SVNProperty.CONFLICT_WRK), null);
+            if (!reverted) {
+                reverted |= dir.getFile(entry.getConflictWorking()).exists();
+            }
         }
         if (entry.getPropRejectFile() != null) {
             command.put(SVNLog.NAME_ATTR, entry.getPropRejectFile());
             log.addCommand(SVNLog.DELETE, command, false);
             command.clear();
             newEntryProperties.put(SVNProperty.shortPropertyName(SVNProperty.PROP_REJECT_FILE), null);
+            if (!reverted) {
+                reverted |= dir.getFile(entry.getPropRejectFile()).exists();
+            }
         }
         if (entry.getSchedule() != null) {
             newEntryProperties.put(SVNProperty.shortPropertyName(SVNProperty.SCHEDULE), null);
@@ -2069,16 +2086,21 @@ public class SVNWCClient extends SVNBasicClient {
      *                         even exported
      */
     public String doGetWorkingCopyID(final File path, String trailURL) throws SVNException {
+        return doGetWorkingCopyID(path, trailURL, false);
+    }
+    
+    public String doGetWorkingCopyID(final File path, String trailURL, final boolean committed) throws SVNException {
         SVNWCAccess wcAccess = createWCAccess();
         try {
-            wcAccess.probeOpen(path, false, 0);
+            wcAccess.open(path, false, 0);
         } catch (SVNException e) {            
             SVNFileType pathType = SVNFileType.getType(path);
             if (pathType == SVNFileType.DIRECTORY) {
                 return "exported";
-            } 
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_PATH_NOT_FOUND, "''{0}'' is not versioned and not exported", path);
-            SVNErrorManager.error(err);
+            } else if (pathType == SVNFileType.NONE) {
+                return null;
+            }
+            return "'" + path + "' is not versioned and not exported"; 
         } finally {
             wcAccess.close();
         }
@@ -2094,7 +2116,7 @@ public class SVNWCClient extends SVNBasicClient {
                     return;
                 }
                 if (status.getContentsStatus() != SVNStatusType.STATUS_ADDED) {
-                    SVNRevision revision = status.getRevision();
+                    SVNRevision revision = committed ? status.getCommittedRevision() : status.getRevision();
                     if (revision != null) {
                         if (minRevision[0] < 0 || minRevision[0] > revision.getNumber()) {
                             minRevision[0] = revision.getNumber();

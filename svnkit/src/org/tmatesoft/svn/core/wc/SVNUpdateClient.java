@@ -151,6 +151,7 @@ public class SVNUpdateClient extends SVNBasicClient {
      * inside the subdirs themselves?"
      */
     public long doUpdate(File file, SVNRevision revision, SVNDepth depth, boolean force) throws SVNException {
+        depth = depth == null ? SVNDepth.DEPTH_UNKNOWN : depth;
         file = new File(SVNPathUtil.validateFilePath(file.getAbsolutePath()));
         SVNWCAccess wcAccess = createWCAccess();
         SVNAdminAreaInfo adminInfo = null;
@@ -169,7 +170,7 @@ public class SVNUpdateClient extends SVNBasicClient {
                 SVNErrorManager.error(err);
             }
 
-            if (depth == null || depth == SVNDepth.DEPTH_UNKNOWN) {
+            if (depth == SVNDepth.DEPTH_UNKNOWN) {
                 if (file.isFile() || !file.exists()) {
                     depth = SVNDepth.DEPTH_INFINITY;
                 } else if (file.isDirectory()) {
@@ -376,11 +377,12 @@ public class SVNUpdateClient extends SVNBasicClient {
         SVNURL repositoryRoot = repos.getRepositoryRoot(true);
 
         long result = -1;
+        depth = depth == null ? SVNDepth.DEPTH_UNKNOWN : depth;
         try {
             SVNWCAccess wcAccess = createWCAccess();
             SVNFileType kind = SVNFileType.getType(dstPath);
             if (kind == SVNFileType.NONE) {
-                depth = depth == null || depth == SVNDepth.DEPTH_UNKNOWN ? SVNDepth.DEPTH_INFINITY : depth;
+                depth = depth == SVNDepth.DEPTH_UNKNOWN ? SVNDepth.DEPTH_INFINITY : depth;
                 SVNAdminAreaFactory.createVersionedDirectory(dstPath, url, repositoryRoot, uuid, revNumber, depth);
                 result = doUpdate(dstPath, revision, SVNDepth.DEPTH_UNKNOWN, force);
             } else if (kind == SVNFileType.DIRECTORY) {
@@ -400,7 +402,7 @@ public class SVNUpdateClient extends SVNBasicClient {
                         SVNErrorManager.error(err);
                     }
                 } else {
-                    depth = depth == null || depth == SVNDepth.DEPTH_UNKNOWN ? SVNDepth.DEPTH_INFINITY : depth;
+                    depth = depth == SVNDepth.DEPTH_UNKNOWN ? SVNDepth.DEPTH_INFINITY : depth;
                     SVNAdminAreaFactory.createVersionedDirectory(dstPath, url, repositoryRoot, uuid, revNumber, depth);
                     result = doUpdate(dstPath, revision, SVNDepth.DEPTH_UNKNOWN, force);
                 }
