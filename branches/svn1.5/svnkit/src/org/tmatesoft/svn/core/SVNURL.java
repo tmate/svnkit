@@ -11,12 +11,12 @@
  */
 package org.tmatesoft.svn.core;
 
+import java.io.File;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.StringTokenizer;
-import java.io.File;
 
 import org.tmatesoft.svn.core.internal.util.SVNEncodingUtil;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
@@ -253,8 +253,15 @@ public class SVNURL {
             } else {
                 // do not use httpPath. 
                 String originalPath = url.substring(index + "://".length());
-                originalPath = originalPath.substring(originalPath.indexOf("/") + 1);
+                if (originalPath.indexOf("/") < 0) {
+                    originalPath = "";
+                } else {
+                    originalPath = originalPath.substring(originalPath.indexOf("/") + 1);
+                }
                 myPath = originalPath;
+                if(!myPath.startsWith("/")){
+                    myPath = "/" + myPath;
+                }
                 myEncodedPath = SVNEncodingUtil.uriEncode(myPath);
             }
             myUserName = httpURL.getUserInfo();

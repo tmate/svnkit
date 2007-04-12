@@ -109,6 +109,7 @@ except ImportError:
 
 # The locations of the svn, svnadmin and svnlook binaries, relative to
 # the only scripts that import this file right now (they live in ../).
+#svn_binary = 'svn' + _exe
 svn_binary = os.path.abspath('../../../build/lib/jsvn' + _bat)
 #svnadmin_binary = 'svnadmin' + _exe
 svnadmin_binary = os.path.abspath('../../../build/lib/jsvnadmin' + _bat)
@@ -116,7 +117,8 @@ svnadmin_binary = os.path.abspath('../../../build/lib/jsvnadmin' + _bat)
 svnlook_binary = os.path.abspath('../../../build/lib/jsvnlook' + _bat)
 #svnsync_binary = 'svnsync' + _exe
 svnsync_binary = os.path.abspath('../../../build/lib/jsvnsync' + _bat)
-svnversion_binary = 'svnversion' + _exe
+#svnversion_binary = 'svnversion' + _exe
+svnversion_binary = os.path.abspath('../../../build/lib/jsvnversion' + _bat)
 
 # The location of our mock svneditor script.
 svneditor_script = os.path.join(sys.path[0], 'svneditor.py')

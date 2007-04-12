@@ -10,7 +10,7 @@ externals ALL
 history ALL
 import ALL
 lock ALL
-log ALL
+log ALL -11
 merge ALL
 prop ALL
 revert ALL
@@ -23,3 +23,4 @@ update ALL
 svnsync ALL
 svnadmin ALL
 svnlook ALL
+svnversion ALL

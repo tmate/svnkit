@@ -183,7 +183,8 @@ public class SVNEntry implements Comparable {
     }
 
     public SVNDepth getDepth() {
-        return SVNDepth.fromString((String) myAttributes.get(SVNProperty.DEPTH));
+        String depthString = (String) myAttributes.get(SVNProperty.DEPTH);
+        return SVNDepth.fromString(depthString);
     }
 
     public void setDepth(SVNDepth depth) {

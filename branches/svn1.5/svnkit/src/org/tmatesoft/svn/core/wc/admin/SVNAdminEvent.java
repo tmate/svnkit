@@ -13,6 +13,9 @@ package org.tmatesoft.svn.core.wc.admin;
 
 import java.io.File;
 
+import org.tmatesoft.svn.core.SVNErrorMessage;
+import org.tmatesoft.svn.core.SVNLock;
+
 
 /**
  * The <b>SVNAdminEvent</b> is a type of an event used to notify callers' handlers 
@@ -28,7 +31,10 @@ public class SVNAdminEvent {
     private long myRevision;
     private long myOriginalRevision;
     private SVNAdminEventAction myAction;
-    private String myPath; 
+    private String myPath;
+    private String myMessage; 
+    private SVNLock myLock;
+    private SVNErrorMessage myError;
     
     /**
      * Creates a new event.
@@ -37,10 +43,11 @@ public class SVNAdminEvent {
      * @param originalRevision       the original revision
      * @param action                 an event action                 
      */
-    public SVNAdminEvent(long revision, long originalRevision, SVNAdminEventAction action) {
+    public SVNAdminEvent(long revision, long originalRevision, SVNAdminEventAction action, String message) {
         myRevision = revision;
         myOriginalRevision = originalRevision;
         myAction = action;
+        myMessage = message;
     }
 
     /**
@@ -49,10 +56,15 @@ public class SVNAdminEvent {
      * 
      * @param action   a path change action
      * @param path     repository path being changed 
+     * @param message 
      */
-    public SVNAdminEvent(SVNAdminEventAction action, String path) {
+    public SVNAdminEvent(SVNAdminEventAction action, String path, String message) {
         myAction = action;
         myPath = path;
+        if (myPath != null && myPath.startsWith("/")) {
+            myPath = myPath.substring("/".length());
+        }
+        myMessage = message;
     }
 
     /**
@@ -61,9 +73,10 @@ public class SVNAdminEvent {
      * @param revision    a revision number
      * @param action      an event action
      */
-    public SVNAdminEvent(long revision, SVNAdminEventAction action) {
+    public SVNAdminEvent(long revision, SVNAdminEventAction action, String message) {
         myOriginalRevision = -1;
         myRevision = -1;
+        myMessage = message;
         
         if (action == SVNAdminEventAction.REVISION_LOAD) {
             myOriginalRevision = revision;    
@@ -89,6 +102,13 @@ public class SVNAdminEvent {
         myAction = action;
     }
 
+    public SVNAdminEvent(SVNAdminEventAction action, SVNLock lock, SVNErrorMessage error, String message) {
+        myError = error;
+        myMessage = message;
+        myAction = action;
+        myLock = lock;
+    }
+
     /**
      * Returns the type of an action this event is fired for.
      * 
@@ -96,6 +116,10 @@ public class SVNAdminEvent {
      */
     public SVNAdminEventAction getAction() {
         return myAction;
+    }
+    
+    public String getMessage() {
+        return myMessage == null ? "" : myMessage;
     }
 
     /**
@@ -151,12 +175,20 @@ public class SVNAdminEvent {
     }
 
     /**
-     * Returns an absolute repository path being changed withing 
+     * Returns an absolute repository path being changed within 
      * the current revision load iteration.
      *  
      * @return  repository path
      */
     public String getPath() {
         return myPath;
+    }
+
+    public SVNLock getLock() {
+        return myLock;
+    }
+
+    public SVNErrorMessage getError() {
+        return myError;
     }
 }

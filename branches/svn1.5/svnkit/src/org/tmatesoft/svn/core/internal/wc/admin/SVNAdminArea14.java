@@ -621,6 +621,7 @@ public class SVNAdminArea14 extends SVNAdminArea {
         Map entryAttrs = new HashMap();
         entryAttrs.put(SVNProperty.NAME, name);
         SVNEntry entry = new SVNEntry(entryAttrs, this, name);
+        entry.setDepth(SVNDepth.DEPTH_INFINITY);
         
         line = reader.readLine();
         String kind = parseValue(line);

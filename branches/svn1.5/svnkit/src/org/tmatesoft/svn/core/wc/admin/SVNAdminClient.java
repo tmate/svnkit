@@ -18,6 +18,8 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.nio.charset.Charset;
+import java.nio.charset.CharsetDecoder;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -26,6 +28,7 @@ import org.tmatesoft.svn.core.ISVNLogEntryHandler;
 import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
+import org.tmatesoft.svn.core.SVNLock;
 import org.tmatesoft.svn.core.SVNNodeKind;
 import org.tmatesoft.svn.core.SVNProperty;
 import org.tmatesoft.svn.core.SVNRevisionProperty;
@@ -46,6 +49,7 @@ import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNSynchronizeEditor;
 import org.tmatesoft.svn.core.io.ISVNEditor;
+import org.tmatesoft.svn.core.io.ISVNLockHandler;
 import org.tmatesoft.svn.core.io.SVNRepository;
 import org.tmatesoft.svn.core.io.SVNRepositoryFactory;
 import org.tmatesoft.svn.core.replicator.SVNRepositoryReplicator;
@@ -455,6 +459,62 @@ public class SVNAdminClient extends SVNBasicClient {
         }
     }
 
+    public void doListLocks(File repositoryRoot) throws SVNException {
+        FSFS fsfs = SVNAdminHelper.openRepository(repositoryRoot);
+        File digestFile = fsfs.getDigestFileFromRepositoryPath("/");
+        ISVNLockHandler handler = new ISVNLockHandler() {
+            public void handleLock(String path, SVNLock lock, SVNErrorMessage error) throws SVNException {
+                checkCancelled();
+                if (myEventHandler != null) {
+                    SVNAdminEvent event = new SVNAdminEvent(SVNAdminEventAction.LOCK_LISTED, lock, error, null);
+                    myEventHandler.handleAdminEvent(event, ISVNEventHandler.UNKNOWN);
+                }
+                
+            }
+            public void handleUnlock(String path, SVNLock lock, SVNErrorMessage error) throws SVNException {
+            }
+        };
+        fsfs.walkDigestFiles(digestFile, handler, false);
+    }
+
+    public void doRemoveLocks(File repositoryRoot, String[] paths) throws SVNException {
+        if (paths == null) {
+            return;
+        }
+        
+        FSFS fsfs = SVNAdminHelper.openRepository(repositoryRoot);
+        for (int i = 0; i < paths.length; i++) {
+            String path = paths[i];
+            if (path == null) {
+                continue;
+            }
+            checkCancelled();
+            
+            SVNLock lock = null;
+            try {
+                lock = fsfs.getLockHelper(path, false);
+                if (lock == null) {
+                    if (myEventHandler != null) {
+                        SVNAdminEvent event = new SVNAdminEvent(SVNAdminEventAction.NOT_LOCKED, lock, null, "Path '" + path + "' isn't locked.");
+                        myEventHandler.handleAdminEvent(event, ISVNEventHandler.UNKNOWN);
+                    }
+                    continue;
+                }
+                
+                fsfs.unlockPath(path, lock.getID(), null, true, false);
+                if (myEventHandler != null) {
+                    SVNAdminEvent event = new SVNAdminEvent(SVNAdminEventAction.UNLOCKED, lock, null, "Removed lock on '" + path + "'.");
+                    myEventHandler.handleAdminEvent(event, ISVNEventHandler.UNKNOWN);
+                }
+            } catch (SVNException svne) {
+                if (myEventHandler != null) {
+                    SVNAdminEvent event = new SVNAdminEvent(SVNAdminEventAction.UNLOCK_FAILED, lock, svne.getErrorMessage(), "svnadmin: " + svne.getErrorMessage().getFullMessage());
+                    myEventHandler.handleAdminEvent(event, ISVNEventHandler.UNKNOWN);
+                }
+            }
+        }
+    }
+    
     /**
      * Lists all uncommitted transactions.
      * On each uncommetted transaction found this method fires an {@link SVNAdminEvent} 
@@ -532,10 +592,21 @@ public class SVNAdminClient extends SVNBasicClient {
      * @since                   1.1.1
      */
     public void doVerify(File repositoryRoot) throws SVNException {
+        doVerify(repositoryRoot, SVNRevision.create(0), SVNRevision.HEAD);
+    }
+
+    public void doVerify(File repositoryRoot, SVNRevision startRevision, SVNRevision endRevision) throws SVNException {
         FSFS fsfs = SVNAdminHelper.openRepository(repositoryRoot);
-        long youngestRevision = fsfs.getYoungestRevision();
+        long startRev = startRevision.getNumber();
+        long endRev = endRevision.getNumber();
+        if (startRev < 0) {
+            startRev = 0;
+        }
+        if (endRev < 0) {
+            endRev = fsfs.getYoungestRevision();
+        }
         try {
-            dump(fsfs, SVNFileUtil.DUMMY_OUT, 0, youngestRevision, false, false);
+            dump(fsfs, SVNFileUtil.DUMMY_OUT, startRev, endRev, false, false);
         } catch (IOException ioe) {
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, ioe.getLocalizedMessage());
             SVNErrorManager.error(err, ioe);
@@ -653,13 +724,14 @@ public class SVNAdminClient extends SVNBasicClient {
      * @since                       1.1.1
      */
     public void doLoad(File repositoryRoot, InputStream dumpStream, boolean usePreCommitHook, boolean usePostCommitHook, SVNUUIDAction uuidAction, String parentDir) throws SVNException {
-        ISVNLoadHandler handler = getLoadHandler(repositoryRoot, usePreCommitHook, usePostCommitHook, uuidAction, parentDir);
-    
+        CharsetDecoder decoder = Charset.forName("UTF-8").newDecoder();
+        ISVNLoadHandler handler = getLoadHandler(repositoryRoot, usePreCommitHook, usePostCommitHook, uuidAction, parentDir, decoder);
+
         String line = null;
         int version = -1;
         StringBuffer buffer = new StringBuffer();
         try {
-            line = SVNFileUtil.readLineFromStream(dumpStream, buffer);
+            line = SVNFileUtil.readLineFromStream(dumpStream, buffer, decoder);
             if (line == null) {
                 SVNAdminHelper.generateIncompleteDataError();
             }
@@ -689,7 +761,7 @@ public class SVNAdminClient extends SVNBasicClient {
             
                 //skip empty lines
                 buffer.setLength(0);
-                line = SVNFileUtil.readLineFromStream(dumpStream, buffer);
+                line = SVNFileUtil.readLineFromStream(dumpStream, buffer, decoder);
                 if (line == null) {
                     if (buffer.length() > 0) {
                         SVNAdminHelper.generateIncompleteDataError();
@@ -702,7 +774,7 @@ public class SVNAdminClient extends SVNBasicClient {
                     continue;
                 }
             
-                Map headers = readHeaderBlock(dumpStream, line);
+                Map headers = readHeaderBlock(dumpStream, line, decoder);
                 if (headers.containsKey(SVNAdminHelper.DUMPFILE_REVISION_NUMBER)) {
                     handler.closeRevision();
                     handler.openRevision(headers);
@@ -887,9 +959,9 @@ public class SVNAdminClient extends SVNBasicClient {
                 if (i == 0) {
                     writeRevisionRecord(dumpStream, fsfs, 0);
                     toRev = 0;
-                    SVNDebugLog.getDefaultLog().info((isDumping ? "* Dumped" : "* Verified") + " revision " + toRev + ".\n");
+                    String message = (isDumping ? "* Dumped" : "* Verified") + " revision " + toRev + ".";
                     if (myEventHandler != null) {
-                        SVNAdminEvent event = new SVNAdminEvent(toRev, SVNAdminEventAction.REVISION_DUMPED);
+                        SVNAdminEvent event = new SVNAdminEvent(toRev, SVNAdminEventAction.REVISION_DUMPED, message);
                         myEventHandler.handleAdminEvent(event, ISVNEventHandler.UNKNOWN);
                     }
                     continue;
@@ -913,9 +985,9 @@ public class SVNAdminClient extends SVNBasicClient {
             } else {
                 FSRepositoryUtil.replay(fsfs, toRoot, "", -1, false, dumpEditor);
             }
-            SVNDebugLog.getDefaultLog().info((isDumping ? "* Dumped" : "* Verified") + " revision " + toRev + ".\n");
+            String message = (isDumping ? "* Dumped" : "* Verified") + " revision " + toRev + ".";
             if (myEventHandler != null) {
-                SVNAdminEvent event = new SVNAdminEvent(toRev, SVNAdminEventAction.REVISION_DUMPED);
+                SVNAdminEvent event = new SVNAdminEvent(toRev, SVNAdminEventAction.REVISION_DUMPED, message);
                 myEventHandler.handleAdminEvent(event, ISVNEventHandler.UNKNOWN);
             }
         }
@@ -945,10 +1017,10 @@ public class SVNAdminClient extends SVNBasicClient {
         out.write(data.getBytes("UTF-8"));
     }
     
-    private ISVNLoadHandler getLoadHandler(File repositoryRoot, boolean usePreCommitHook, boolean usePostCommitHook, SVNUUIDAction uuidAction, String parentDir) throws SVNException {
+    private ISVNLoadHandler getLoadHandler(File repositoryRoot, boolean usePreCommitHook, boolean usePostCommitHook, SVNUUIDAction uuidAction, String parentDir, CharsetDecoder decoder) throws SVNException {
         if (myLoadHandler == null) {
             FSFS fsfs = SVNAdminHelper.openRepository(repositoryRoot);
-            DefaultLoadHandler handler = new DefaultLoadHandler(usePreCommitHook, usePostCommitHook, uuidAction, parentDir, myEventHandler);
+            DefaultLoadHandler handler = new DefaultLoadHandler(usePreCommitHook, usePostCommitHook, uuidAction, parentDir, myEventHandler, decoder);
             handler.setFSFS(fsfs);
             myLoadHandler = handler;
         } else {
@@ -962,7 +1034,7 @@ public class SVNAdminClient extends SVNBasicClient {
     }
 
 
-    private Map readHeaderBlock(InputStream dumpStream, String firstHeader) throws SVNException, IOException {
+    private Map readHeaderBlock(InputStream dumpStream, String firstHeader, CharsetDecoder decoder) throws SVNException, IOException {
         Map headers = new HashMap();
         StringBuffer buffer = new StringBuffer();
     
@@ -973,7 +1045,7 @@ public class SVNAdminClient extends SVNBasicClient {
                 header = firstHeader;
                 firstHeader = null;
             } else {
-                header = SVNFileUtil.readLineFromStream(dumpStream, buffer);
+                header = SVNFileUtil.readLineFromStream(dumpStream, buffer, decoder);
                 if (header == null && buffer.length() > 0) {
                     SVNAdminHelper.generateIncompleteDataError();
                 } else if (buffer.length() == 0) {

@@ -101,7 +101,6 @@ public class DAVEditorHandler extends BasicDAVDeltaHandler {
             }
             
             public void abortReport() throws SVNException {
-                SVNErrorManager.cancel("report aborted");
             }
 
             public void linkPath(SVNURL url, String path, String lockToken, long revision, SVNDepth depth, boolean startEmpty) throws SVNException {

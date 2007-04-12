@@ -168,6 +168,10 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
     }
 
     public void setRevisionPropertyValue(long revision, String propertyName, String propertyValue) throws SVNException {
+        setRevisionPropertyValue(revision, propertyName, propertyValue, false);
+    }
+
+    public void setRevisionPropertyValue(long revision, String propertyName, String propertyValue, boolean bypassHooks) throws SVNException {
         assertValidRevision(revision);
         try {
             openRepository();
@@ -187,11 +191,11 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
             } else {
                 action = FSHooks.REVPROP_MODIFY;
             }
-            if (FSHooks.isHooksEnabled()) {
+            if (FSHooks.isHooksEnabled() && !bypassHooks) {
                 FSHooks.runPreRevPropChangeHook(myReposRootDir, propertyName, propertyValue, userName, revision, action);
             }
             myFSFS.setRevisionProperty(revision, propertyName, propertyValue);
-            if (FSHooks.isHooksEnabled()) {
+            if (FSHooks.isHooksEnabled() && !bypassHooks) {
                 FSHooks.runPostRevPropChangeHook(myReposRootDir, propertyName, propertyValue, userName, revision, action);
             }
         } finally {
@@ -891,7 +895,7 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
                 String reposPath = getRepositoryPath(path);
                 SVNErrorMessage error = null;
                 try {
-                    myFSFS.unlockPath(reposPath, token, getUserName(), force);
+                    myFSFS.unlockPath(reposPath, token, getUserName(), force, true);
                 } catch (SVNException svne) {
                     error = svne.getErrorMessage();
                     if (!FSErrors.isUnlockError(error)) {
