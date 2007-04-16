@@ -18,8 +18,12 @@ import java.io.PrintStream;
 
 import org.tmatesoft.svn.cli.SVNArgument;
 import org.tmatesoft.svn.cli.SVNCommand;
+import org.tmatesoft.svn.core.SVNDepth;
+import org.tmatesoft.svn.core.SVNErrorCode;
+import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
+import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.wc.SVNStatus;
 import org.tmatesoft.svn.core.wc.SVNStatusType;
 import org.tmatesoft.svn.core.wc.SVNWCClient;
@@ -35,7 +39,19 @@ public class SVNRevertCommand extends SVNCommand {
     }
 
     public final void run(final PrintStream out, final PrintStream err) throws SVNException {
-        final boolean recursive = getCommandLine().hasArgument(SVNArgument.RECURSIVE);
+        SVNDepth depth = SVNDepth.DEPTH_UNKNOWN;
+        if (getCommandLine().hasArgument(SVNArgument.RECURSIVE)) {
+            depth = SVNDepth.fromRecurse(true);
+        }
+        String depthStr = (String) getCommandLine().getArgumentValue(SVNArgument.DEPTH);
+        if (depthStr != null) {
+            depth = SVNDepth.fromString(depthStr);
+        }
+        if (depth == SVNDepth.DEPTH_UNKNOWN) {
+            depth = SVNDepth.fromRecurse(false);
+        }
+        
+        final boolean recursive = SVNDepth.recurseFromDepth(depth);
         
         getClientManager().setEventHandler(new SVNCommandEventProcessor(out, err, false));
         SVNWCClient wcClient = getClientManager().getWCClient();
@@ -53,7 +69,14 @@ public class SVNRevertCommand extends SVNCommand {
                     }
                 }
             }
-            wcClient.doRevert(new File(absolutePath), recursive);
+            try {
+                wcClient.doRevert(new File(absolutePath), recursive);
+            } catch (SVNException svne) {
+                if (svne.getErrorMessage().getErrorCode() == SVNErrorCode.WC_NOT_LOCKED && !recursive) {
+                    SVNErrorMessage error = svne.getErrorMessage().wrap("Try 'svn revert --recursive' instead?");
+                    SVNErrorManager.error(error);
+                }
+            }
         }
     }
 }

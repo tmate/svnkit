@@ -18,6 +18,7 @@ import java.io.PrintStream;
 
 import org.tmatesoft.svn.cli.SVNArgument;
 import org.tmatesoft.svn.cli.SVNCommand;
+import org.tmatesoft.svn.core.SVNDepth;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.internal.util.SVNFormatUtil;
 import org.tmatesoft.svn.core.wc.SVNRevision;
@@ -35,6 +36,15 @@ public class SVNUpdateCommand extends SVNCommand {
     }
 
     public void run(final PrintStream out, final PrintStream err) throws SVNException {
+        SVNDepth depth = SVNDepth.DEPTH_UNKNOWN;
+        if (getCommandLine().hasArgument(SVNArgument.NON_RECURSIVE)) {
+            depth = SVNDepth.fromRecurse(false);
+        }
+        String depthStr = (String) getCommandLine().getArgumentValue(SVNArgument.DEPTH);
+        if (depthStr != null) {
+            depth = SVNDepth.fromString(depthStr);
+        }
+        
         boolean error = false;
         for (int i = 0; i < getCommandLine().getPathCount(); i++) {
             final String path;
@@ -56,7 +66,7 @@ public class SVNUpdateCommand extends SVNCommand {
             }
             boolean force = getCommandLine().hasArgument(SVNArgument.FORCE);
             try {
-                updater.doUpdate(file.getAbsoluteFile(), revision, !getCommandLine().hasArgument(SVNArgument.NON_RECURSIVE), force);
+                updater.doUpdate(file.getAbsoluteFile(), revision, depth, force);
             } catch (Throwable th) {
                 updater.getDebugLog().info(th);
                 println(err, th.getMessage());

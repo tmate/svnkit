@@ -18,6 +18,7 @@ import java.io.PrintStream;
 
 import org.tmatesoft.svn.cli.SVNArgument;
 import org.tmatesoft.svn.cli.SVNCommand;
+import org.tmatesoft.svn.core.SVNDepth;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.wc.SVNWCClient;
 
@@ -32,7 +33,19 @@ public class SVNResolvedCommand extends SVNCommand {
     }
 
     public void run(final PrintStream out, PrintStream err) throws SVNException {
-        final boolean recursive = getCommandLine().hasArgument(SVNArgument.RECURSIVE);
+        SVNDepth depth = SVNDepth.DEPTH_UNKNOWN;
+        if (getCommandLine().hasArgument(SVNArgument.RECURSIVE)) {
+            depth = SVNDepth.fromRecurse(true);
+        }
+        String depthStr = (String) getCommandLine().getArgumentValue(SVNArgument.DEPTH);
+        if (depthStr != null) {
+            depth = SVNDepth.fromString(depthStr);
+        }
+        if (depth == SVNDepth.DEPTH_UNKNOWN) {
+            depth = SVNDepth.DEPTH_EMPTY;
+        }
+        
+        final boolean recursive = SVNDepth.recurseFromDepth(depth);
         getClientManager().setEventHandler(new SVNCommandEventProcessor(out, err, false));
         SVNWCClient wcClient  = getClientManager().getWCClient();
         boolean error = false;

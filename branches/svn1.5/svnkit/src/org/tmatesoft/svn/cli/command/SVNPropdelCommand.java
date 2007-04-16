@@ -18,6 +18,7 @@ import java.io.PrintStream;
 
 import org.tmatesoft.svn.cli.SVNArgument;
 import org.tmatesoft.svn.cli.SVNCommand;
+import org.tmatesoft.svn.core.SVNDepth;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNURL;
 import org.tmatesoft.svn.core.internal.util.SVNFormatUtil;
@@ -38,7 +39,19 @@ public class SVNPropdelCommand extends SVNCommand {
 
     public final void run(final PrintStream out, PrintStream err) throws SVNException {
         final String propertyName = getCommandLine().getPathAt(0);
-        final boolean recursive = getCommandLine().hasArgument(SVNArgument.RECURSIVE);
+        SVNDepth depth = SVNDepth.DEPTH_UNKNOWN;
+        if (getCommandLine().hasArgument(SVNArgument.RECURSIVE)) {
+            depth = SVNDepth.fromRecurse(true);
+        }
+        String depthStr = (String) getCommandLine().getArgumentValue(SVNArgument.DEPTH);
+        if (depthStr != null) {
+            depth = SVNDepth.fromString(depthStr);
+        }
+        if (depth == SVNDepth.DEPTH_UNKNOWN) {
+            depth = SVNDepth.DEPTH_EMPTY;
+        }
+        
+        boolean recursive = SVNDepth.recurseFromDepth(depth);
         boolean revProp = getCommandLine().hasArgument(SVNArgument.REV_PROP);
         boolean force = getCommandLine().hasArgument(SVNArgument.FORCE);
         int pathIndex = 1;

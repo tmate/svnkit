@@ -18,6 +18,7 @@ import java.io.PrintStream;
 
 import org.tmatesoft.svn.cli.SVNArgument;
 import org.tmatesoft.svn.cli.SVNCommand;
+import org.tmatesoft.svn.core.SVNDepth;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNURL;
 import org.tmatesoft.svn.core.wc.SVNRevision;
@@ -34,6 +35,21 @@ public class SVNSwitchCommand extends SVNCommand {
     }
 
     public void run(final PrintStream out, final PrintStream err) throws SVNException {
+        SVNDepth depth = SVNDepth.DEPTH_UNKNOWN;
+        if (getCommandLine().hasArgument(SVNArgument.NON_RECURSIVE)) {
+            depth = SVNDepth.fromRecurse(false);
+        }
+        String depthStr = (String) getCommandLine().getArgumentValue(SVNArgument.DEPTH);
+        if (depthStr != null) {
+            depth = SVNDepth.fromString(depthStr);
+        }
+        /* TODO(sd): "I'm not completely sure we should allow explicit depth
+         * on this command.  It took -N but not -R.  Why was -N
+         * useful?  Does it make sense in a depthy universe?" 
+         */
+        if (depth == SVNDepth.DEPTH_UNKNOWN) {
+            depth = SVNDepth.DEPTH_INFINITY;
+        }
         String url = getCommandLine().getURL(0);
         String absolutePath = getCommandLine().getPathAt(0);
 
@@ -47,10 +63,10 @@ public class SVNSwitchCommand extends SVNCommand {
             SVNURL switchURL = SVNURL.parseURIEncoded(url);
             if (getCommandLine().hasArgument(SVNArgument.RELOCATE)) {
                 SVNURL targetURL = SVNURL.parseURIEncoded(getCommandLine().getURL(1));
-                updater.doRelocate(new File(absolutePath).getAbsoluteFile(), switchURL, targetURL, !getCommandLine().hasArgument(SVNArgument.NON_RECURSIVE));
+                updater.doRelocate(new File(absolutePath).getAbsoluteFile(), switchURL, targetURL, SVNDepth.recurseFromDepth(depth));
             } else {
                 boolean force = getCommandLine().hasArgument(SVNArgument.FORCE);
-                updater.doSwitch(new File(absolutePath).getAbsoluteFile(), switchURL, SVNRevision.UNDEFINED, revision, !getCommandLine().hasArgument(SVNArgument.NON_RECURSIVE), force);
+                updater.doSwitch(new File(absolutePath).getAbsoluteFile(), switchURL, SVNRevision.UNDEFINED, revision, depth, force);
             }
         } catch (Throwable th) {
             updater.getDebugLog().info(th);

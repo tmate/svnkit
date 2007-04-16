@@ -85,6 +85,7 @@ public abstract class SVNArgument {
     public static final SVNArgument COPY_INFO = createUnaryArgument(new String[] { "--copy-info" });
     public static final SVNArgument SHOW_IDS = createUnaryArgument(new String[] { "--show-ids" });
     public static final SVNArgument FULL_PATHS = createUnaryArgument(new String[] { "--full-paths" });
+    public static final SVNArgument DEPTH = createStringArgument(new String[] { "--depth" });
     
     public static SVNArgument findArgument(String name, Set validArguments) {
         for (Iterator arguments = validArguments.iterator(); arguments.hasNext();) {

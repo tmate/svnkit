@@ -24,6 +24,7 @@ import java.util.TimeZone;
 import org.tmatesoft.svn.cli.SVNArgument;
 import org.tmatesoft.svn.cli.SVNCommand;
 import org.tmatesoft.svn.core.ISVNDirEntryHandler;
+import org.tmatesoft.svn.core.SVNDepth;
 import org.tmatesoft.svn.core.SVNDirEntry;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNNodeKind;
@@ -32,6 +33,7 @@ import org.tmatesoft.svn.core.wc.SVNLogClient;
 import org.tmatesoft.svn.core.wc.SVNRevision;
 import org.tmatesoft.svn.core.wc.xml.SVNXMLDirEntryHandler;
 import org.tmatesoft.svn.core.wc.xml.SVNXMLSerializer;
+import org.tmatesoft.svn.util.SVNDebugLog;
 
 /**
  * @version 1.1.1
@@ -55,10 +57,20 @@ public class SVNLsCommand extends SVNCommand implements ISVNDirEntryHandler {
     }
 
     public void run(PrintStream out, PrintStream err) throws SVNException {
-        boolean recursive = getCommandLine().hasArgument(SVNArgument.RECURSIVE);
+        SVNDepth depth = SVNDepth.DEPTH_UNKNOWN;
+        if (getCommandLine().hasArgument(SVNArgument.RECURSIVE)) {
+            depth = SVNDepth.fromRecurse(true);
+        }
+        String depthStr = (String) getCommandLine().getArgumentValue(SVNArgument.DEPTH);
+        if (depthStr != null) {
+            depth = SVNDepth.fromString(depthStr);
+        }
+        if (depth == SVNDepth.DEPTH_UNKNOWN) {
+            depth = SVNDepth.DEPTH_IMMEDIATES;
+        }
+        
         myIsVerbose = getCommandLine().hasArgument(SVNArgument.VERBOSE);
         myPrintStream = out;
-        
         boolean isXml = getCommandLine().hasArgument(SVNArgument.XML);
         SVNXMLSerializer serializer = isXml ? new SVNXMLSerializer(myPrintStream) : null;
         SVNXMLDirEntryHandler handler = isXml ? new SVNXMLDirEntryHandler(serializer) : null;
@@ -78,17 +90,19 @@ public class SVNLsCommand extends SVNCommand implements ISVNDirEntryHandler {
             if (handler != null) {
                 handler.startTarget(url);
             }
-            logClient.doList(SVNURL.parseURIEncoded(url), getCommandLine().getPegRevision(i), revision == null ? SVNRevision.UNDEFINED : revision, myIsVerbose || isXml, recursive, isXml ? handler : (ISVNDirEntryHandler) this);
+            SVNDebugLog.getDefaultLog().info("URL: " + url);
+            logClient.doList(SVNURL.parseURIEncoded(url), getCommandLine().getPegRevision(i), revision == null ? SVNRevision.UNDEFINED : revision, myIsVerbose || isXml, depth, isXml ? handler : (ISVNDirEntryHandler) this);
             if (handler != null) {
                 handler.endTarget();
             }
         }
         for(int i = 0; i < getCommandLine().getPathCount(); i++) {
             File path = new File(getCommandLine().getPathAt(i)).getAbsoluteFile();
+            SVNDebugLog.getDefaultLog().info("Path: " + path);
             if (handler != null) {
                 handler.startTarget(path.getAbsolutePath().replace(File.separatorChar, '/'));
             }
-            logClient.doList(path, getCommandLine().getPathPegRevision(i), revision == null || !revision.isValid() ? SVNRevision.BASE : revision, myIsVerbose || isXml, recursive, isXml ? handler : (ISVNDirEntryHandler) this);
+            logClient.doList(path, getCommandLine().getPathPegRevision(i), revision == null || !revision.isValid() ? SVNRevision.BASE : revision, myIsVerbose || isXml, depth, isXml ? handler : (ISVNDirEntryHandler) this);
             if (handler != null) {
                 handler.endTarget();
             }
