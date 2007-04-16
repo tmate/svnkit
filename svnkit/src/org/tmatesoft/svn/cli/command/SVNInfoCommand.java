@@ -23,6 +23,7 @@ import java.util.Locale;
 
 import org.tmatesoft.svn.cli.SVNArgument;
 import org.tmatesoft.svn.cli.SVNCommand;
+import org.tmatesoft.svn.core.SVNDepth;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNLock;
 import org.tmatesoft.svn.core.SVNNodeKind;
@@ -52,7 +53,6 @@ public class SVNInfoCommand extends SVNCommand implements ISVNInfoHandler {
     }
 
     public final void run(final PrintStream out, PrintStream err) throws SVNException {
-        final boolean recursive = getCommandLine().hasArgument(SVNArgument.RECURSIVE);
         SVNRevision revision = SVNRevision.UNDEFINED;
 
         if (getCommandLine().hasArgument(SVNArgument.REVISION)) {
@@ -65,18 +65,31 @@ public class SVNInfoCommand extends SVNCommand implements ISVNInfoHandler {
         if (getCommandLine().hasArgument(SVNArgument.XML) && !getCommandLine().hasArgument(SVNArgument.INCREMENTAL)) {
             handler.startDocument();
         }
+
+        SVNDepth depth = SVNDepth.DEPTH_UNKNOWN;
+        if (getCommandLine().hasArgument(SVNArgument.RECURSIVE)) {
+            depth = SVNDepth.fromRecurse(true);
+        }
+        String depthStr = (String) getCommandLine().getArgumentValue(SVNArgument.DEPTH);
+        if (depthStr != null) {
+            depth = SVNDepth.fromString(depthStr);
+        }
+        if (depth == SVNDepth.DEPTH_UNKNOWN) {
+            depth = SVNDepth.DEPTH_IMMEDIATES;
+        }
+        
         ISVNInfoHandler infoHandler = getCommandLine().hasArgument(SVNArgument.XML) ? handler : (ISVNInfoHandler) this;
         for (int i = 0; i < getCommandLine().getPathCount(); i++) {
             myBaseFile = new File(getCommandLine().getPathAt(i));
             SVNRevision peg = getCommandLine().getPathPegRevision(i);
             handler.setTargetPath(myBaseFile);
-            wcClient.doInfo(myBaseFile, peg, revision, recursive, infoHandler);
+            wcClient.doInfo(myBaseFile, peg, revision, SVNDepth.recurseFromDepth(depth), infoHandler);
         }
         myBaseFile = null;
         for (int i = 0; i < getCommandLine().getURLCount(); i++) {
             String url = getCommandLine().getURL(i);
             SVNRevision peg = getCommandLine().getPegRevision(i);
-            wcClient.doInfo(SVNURL.parseURIEncoded(url), peg, revision, recursive, infoHandler);
+            wcClient.doInfo(SVNURL.parseURIEncoded(url), peg, revision, SVNDepth.recurseFromDepth(depth), infoHandler);
         }
         if (getCommandLine().hasArgument(SVNArgument.XML)&& !getCommandLine().hasArgument(SVNArgument.INCREMENTAL)) {
             handler.endDocument();
@@ -132,10 +145,24 @@ public class SVNInfoCommand extends SVNCommand implements ISVNInfoHandler {
         } else {
             print("Node Kind: unknown", myOut);
         }
-        if (info.getSchedule() == null && !info.isRemote()) {
-            print("Schedule: normal", myOut);
-        } else if (!info.isRemote()) {
-            print("Schedule: " + info.getSchedule(), myOut);
+        
+        if (!info.isRemote()) {
+            if (info.getSchedule() == null) {
+                print("Schedule: normal", myOut);
+            } else {
+                print("Schedule: " + info.getSchedule(), myOut);
+            }
+            if (info.getDepth() != null) {
+                if (info.getDepth() != SVNDepth.DEPTH_UNKNOWN && info.getDepth() != SVNDepth.DEPTH_INFINITY) {
+                    print("Depth: " + info.getDepth(), myOut);
+                }
+            }
+            if (info.getCopyFromURL() != null) {
+                print("Copied From URL: " + info.getCopyFromURL(), myOut);
+            }
+            if (info.getCopyFromRevision() != null && info.getCopyFromRevision().getNumber() >= 0) {
+                print("Copied From Rev: " + info.getCopyFromRevision(), myOut);
+            }
         }
         if (info.getAuthor() != null) {
             print("Last Changed Author: " + info.getAuthor(), myOut);
@@ -155,12 +182,6 @@ public class SVNInfoCommand extends SVNCommand implements ISVNInfoHandler {
             }
             if (info.getChecksum() != null) {
                 print("Checksum: " + info.getChecksum(), myOut);
-            }
-            if (info.getCopyFromURL() != null) {
-                print("Copied From URL: " + info.getCopyFromURL(), myOut);
-            }
-            if (info.getCopyFromRevision() != null && info.getCopyFromRevision().getNumber() >= 0) {
-                print("Copied From Rev: " + info.getCopyFromRevision(), myOut);
             }
             if (info.getConflictOldFile() != null) {
                 print("Conflict Previous Base File: " + info.getConflictOldFile().getName(), myOut);

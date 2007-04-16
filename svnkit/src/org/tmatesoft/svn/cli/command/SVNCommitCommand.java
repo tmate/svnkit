@@ -15,6 +15,7 @@ package org.tmatesoft.svn.cli.command;
 import org.tmatesoft.svn.cli.SVNArgument;
 import org.tmatesoft.svn.cli.SVNCommand;
 import org.tmatesoft.svn.core.SVNCommitInfo;
+import org.tmatesoft.svn.core.SVNDepth;
 import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
@@ -36,7 +37,18 @@ public class SVNCommitCommand extends SVNCommand {
     
     public void run(final PrintStream out, PrintStream err) throws SVNException {
         checkEditorCommand();
-        final boolean recursive = !getCommandLine().hasArgument(SVNArgument.NON_RECURSIVE);
+        SVNDepth depth = SVNDepth.DEPTH_UNKNOWN;
+        if (getCommandLine().hasArgument(SVNArgument.NON_RECURSIVE)) {
+            depth = SVNDepth.fromRecurse(false);
+        }
+        String depthStr = (String) getCommandLine().getArgumentValue(SVNArgument.DEPTH);
+        if (depthStr != null) {
+            depth = SVNDepth.fromString(depthStr);
+        }
+        if (depth == SVNDepth.DEPTH_UNKNOWN) {
+            depth = SVNDepth.DEPTH_INFINITY;
+        }
+        
         boolean keepLocks = getCommandLine().hasArgument(SVNArgument.NO_UNLOCK);
         final String message = getCommitMessage();
 
@@ -47,7 +59,7 @@ public class SVNCommitCommand extends SVNCommand {
         }
         getClientManager().setEventHandler(new SVNCommandEventProcessor(out, err, false));
         SVNCommitClient client = getClientManager().getCommitClient();
-        SVNCommitInfo result = client.doCommit(localPaths, keepLocks, message, false, recursive);
+        SVNCommitInfo result = client.doCommit(localPaths, keepLocks, message, false, SVNDepth.recurseFromDepth(depth));
         if (result != SVNCommitInfo.NULL) {
             out.println();
             out.println("Committed revision " + result.getNewRevision() + ".");

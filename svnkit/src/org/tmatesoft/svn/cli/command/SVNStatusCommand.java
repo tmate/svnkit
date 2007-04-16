@@ -21,10 +21,12 @@ import org.tmatesoft.svn.cli.SVNArgument;
 import org.tmatesoft.svn.cli.SVNCommand;
 import org.tmatesoft.svn.cli.SVNCommandLine;
 import org.tmatesoft.svn.cli.SVNCommandStatusHandler;
+import org.tmatesoft.svn.core.SVNDepth;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNFileType;
 import org.tmatesoft.svn.core.wc.ISVNStatusHandler;
+import org.tmatesoft.svn.core.wc.SVNRevision;
 import org.tmatesoft.svn.core.wc.SVNStatusClient;
 import org.tmatesoft.svn.core.wc.SVNWCUtil;
 import org.tmatesoft.svn.core.wc.xml.SVNXMLSerializer;
@@ -77,7 +79,16 @@ public class SVNStatusCommand extends SVNCommand {
         if (getCommandLine().getPathCount() == 0) {
             getCommandLine().setPathAt(0, ".");
         }
-        boolean recursive = !getCommandLine().hasArgument(SVNArgument.NON_RECURSIVE);
+
+        SVNDepth depth = SVNDepth.DEPTH_UNKNOWN;
+        if (getCommandLine().hasArgument(SVNArgument.NON_RECURSIVE)) {
+            depth = SVNDepth.fromRecurse(false);
+        }
+        String depthStr = (String) getCommandLine().getArgumentValue(SVNArgument.DEPTH);
+        if (depthStr != null) {
+            depth = SVNDepth.fromString(depthStr);
+        }
+        
         boolean reportAll = getCommandLine().hasArgument(SVNArgument.VERBOSE);
         boolean ignored = getCommandLine().hasArgument(SVNArgument.NO_IGNORE);
         boolean quiet = getCommandLine().hasArgument(SVNArgument.QUIET);
@@ -107,7 +118,7 @@ public class SVNStatusCommand extends SVNCommand {
               }
               long rev = -1;
               try {
-                rev = stClient.doStatus(file, recursive, showUpdates, reportAll, ignored, handler);
+                rev = stClient.doStatus(file, SVNRevision.HEAD, depth, showUpdates, reportAll, ignored, false, handler);
               } catch (SVNException e) {
                   stClient.getDebugLog().info(e);
                   err.println(e.getMessage());

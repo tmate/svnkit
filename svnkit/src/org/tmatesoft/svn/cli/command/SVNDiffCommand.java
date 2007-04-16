@@ -18,6 +18,7 @@ import java.io.PrintStream;
 
 import org.tmatesoft.svn.cli.SVNArgument;
 import org.tmatesoft.svn.cli.SVNCommand;
+import org.tmatesoft.svn.core.SVNDepth;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNURL;
 import org.tmatesoft.svn.core.internal.util.SVNFormatUtil;
@@ -44,6 +45,18 @@ public class SVNDiffCommand extends SVNCommand implements ISVNDiffStatusHandler 
     }
 
     public void run(final PrintStream out, PrintStream err) throws SVNException {
+        SVNDepth depth = SVNDepth.DEPTH_UNKNOWN;
+        if (getCommandLine().hasArgument(SVNArgument.NON_RECURSIVE)) {
+            depth = SVNDepth.fromRecurse(false);
+        }
+        String depthStr = (String) getCommandLine().getArgumentValue(SVNArgument.DEPTH);
+        if (depthStr != null) {
+            depth = SVNDepth.fromString(depthStr);
+        }
+        if (depth == SVNDepth.DEPTH_UNKNOWN) {
+            depth = SVNDepth.DEPTH_INFINITY;
+        }
+        
         myOut = out;
         boolean error = false;
         SVNDiffClient differ = getClientManager().getDiffClient();
@@ -60,7 +73,6 @@ public class SVNDiffCommand extends SVNCommand implements ISVNDiffStatusHandler 
         differ.getDiffGenerator().setBasePath(userDir);
 
         boolean useAncestry = getCommandLine().hasArgument(SVNArgument.USE_ANCESTRY);
-        boolean recursive = !getCommandLine().hasArgument(SVNArgument.NON_RECURSIVE);
         boolean summarize = getCommandLine().hasArgument(SVNArgument.SUMMARIZE);
         
         differ.getDiffGenerator().setDiffDeleted(!getCommandLine().hasArgument(SVNArgument.NO_DIFF_DELETED));
@@ -79,7 +91,7 @@ public class SVNDiffCommand extends SVNCommand implements ISVNDiffStatusHandler 
                 peg2 = SVNRevision.HEAD;
             }
 
-            differ.doDiff(url1, peg1, url2, peg2, recursive, useAncestry, out);
+            differ.doDiff(url1, peg1, url2, peg2, depth, useAncestry, out);
         } else {
             SVNRevision rN = SVNRevision.UNDEFINED;
             SVNRevision rM = SVNRevision.UNDEFINED;
@@ -144,36 +156,36 @@ public class SVNDiffCommand extends SVNCommand implements ISVNDiffStatusHandler 
                             SVNURL url2 = SVNURL.parseURIEncoded(nP);
                             // path:url
                             if (summarize) {
-                                differ.doDiffStatus(path1, rN, url2, rM, recursive, useAncestry, this);
+                                differ.doDiffStatus(path1, rN, url2, rM, depth, useAncestry, this);
                             } else {
-                                differ.doDiff(path1, rN, url2, rM, recursive, useAncestry, out);
+                                differ.doDiff(path1, rN, url2, rM, depth, useAncestry, out);
                             }
                         } else if (getCommandLine().isURL(oP) && !getCommandLine().isURL(nP)) {
                             // url:path
                             File path2 = new File(nP).getAbsoluteFile();
                             SVNURL url1 = SVNURL.parseURIEncoded(oP);
                             if (summarize) {
-                                differ.doDiffStatus(url1, rN, path2, rM, recursive, useAncestry, this);
+                                differ.doDiffStatus(url1, rN, path2, rM, depth, useAncestry, this);
                             } else {
-                                differ.doDiff(url1, rN, path2, rM, recursive, useAncestry, out);
+                                differ.doDiff(url1, rN, path2, rM, depth, useAncestry, out);
                             }
                         } else if (getCommandLine().isURL(oP) && getCommandLine().isURL(nP)) {
                             // url:url
                             SVNURL url1 = SVNURL.parseURIEncoded(oP);
                             SVNURL url2 = SVNURL.parseURIEncoded(nP);
                             if (summarize) {
-                                differ.doDiffStatus(url1, rN, url2, rM, recursive, useAncestry, this);
+                                differ.doDiffStatus(url1, rN, url2, rM, depth, useAncestry, this);
                             } else {
-                                differ.doDiff(url1, rN, url2, rM, recursive, useAncestry, out);
+                                differ.doDiff(url1, rN, url2, rM, depth, useAncestry, out);
                             }
                         } else {
                             // path:path
                             File path1 = new File(oP).getAbsoluteFile();
                             File path2 = new File(nP).getAbsoluteFile();
                             if (summarize) {
-                                differ.doDiffStatus(path1, rN, path2, rM, recursive, useAncestry, this);
+                                differ.doDiffStatus(path1, rN, path2, rM, depth, useAncestry, this);
                             } else {
-                                differ.doDiff(path1, rN, path2, rM, recursive, useAncestry, out);
+                                differ.doDiff(path1, rN, path2, rM, depth, useAncestry, out);
                             }
                         }
                     } catch (SVNException e) {
@@ -197,12 +209,12 @@ public class SVNDiffCommand extends SVNCommand implements ISVNDiffStatusHandler 
                     if (peggedDiff) {
                         SVNRevision peg = getCommandLine().getPathPegRevision(i);
                         peg = peg == SVNRevision.UNDEFINED ? SVNRevision.WORKING : peg;
-                        differ.doDiff(path1, peg, r1, r2, recursive, useAncestry, out);
+                        differ.doDiff(path1, peg, r1, r2, depth, useAncestry, out);
                     } else {
                         if (summarize) {
-                            differ.doDiffStatus(path1, r1, path1, r2, recursive, useAncestry, this);
+                            differ.doDiffStatus(path1, r1, path1, r2, depth, useAncestry, this);
                         } else {
-                            differ.doDiff(path1, r1, path1, r2, recursive, useAncestry, out);
+                            differ.doDiff(path1, r1, path1, r2, depth, useAncestry, out);
                         }
                     }
                 }
@@ -218,12 +230,12 @@ public class SVNDiffCommand extends SVNCommand implements ISVNDiffStatusHandler 
                     if (peggedDiff) {
                         SVNRevision peg = getCommandLine().getPegRevision(i);
                         peg = peg == SVNRevision.UNDEFINED ? SVNRevision.HEAD : peg;
-                        differ.doDiff(url1, peg, r1, r2, recursive, useAncestry, out);
+                        differ.doDiff(url1, peg, r1, r2, depth, useAncestry, out);
                     } else {
                         if (summarize) {
-                            differ.doDiffStatus(url1, r1, url1, r2, recursive, useAncestry, this);
+                            differ.doDiffStatus(url1, r1, url1, r2, depth, useAncestry, this);
                         } else {
-                            differ.doDiff(url1, r1, url1, r2, recursive, useAncestry, out);
+                            differ.doDiff(url1, r1, url1, r2, depth, useAncestry, out);
                         }
                     }
                 }
