@@ -381,14 +381,16 @@ class DAVRepository extends SVNRepository {
                     parentVCC[0] = child.getPropertyValue(DAVElement.VERSION_CONTROLLED_CONFIGURATION);
                 } else {
                     childURL = childURL.appendPath(name, false);
-                    entries.add(new SVNDirEntry(childURL, name, kind, size, false, lastRevision, date, author));
+                    if (entries != null) {
+                        entries.add(new SVNDirEntry(childURL, name, kind, size, false, lastRevision, date, author));
+                    }
                     vccs.add(child.getPropertyValue(DAVElement.VERSION_CONTROLLED_CONFIGURATION));
                 }
             }
 
             if (includeComments) {
                 DAVElement logProperty = DAVElement.getElement(DAVElement.SVN_SVN_PROPERTY_NAMESPACE, "log");
-                Iterator ents = entries.iterator();
+                Iterator ents = entries != null ? entries.iterator() : null;
                 SVNDirEntry entry = parent[0];
                 String vcc = parentVCC[0];
                 int index = 0;
@@ -410,7 +412,7 @@ class DAVRepository extends SVNRepository {
                         getOptions().saveCommitMessage(DAVRepository.this, currentEntry.getRevision(), commitMessage);
                         currentEntry.setCommitMessage(commitMessage);
                     }
-                    if (ents.hasNext()) {
+                    if (ents != null && ents.hasNext()) {
                         entry = (SVNDirEntry) ents.next();
                         vcc = (String) vccs.get(index);
                         index++;

@@ -352,13 +352,13 @@ public class SVNBasicClient implements ISVNEventHandler {
             }
             SVNWCAccess wcAccess = createWCAccess();
             wcAccess.probeOpen(path, false, 0);
-            SVNEntry entry = wcAccess.getEntry(path, false);
-            wcAccess.close();
-            
-            if (entry == null) {
-                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.UNVERSIONED_RESOURCE, "''{0}'' is not under version control", path);
-                SVNErrorManager.error(err);
+            SVNEntry entry = null;
+            try {
+                entry = wcAccess.getVersionedEntry(path, false);
+            } finally {
+                wcAccess.close();
             }
+            
             if (revision == SVNRevision.WORKING || revision == SVNRevision.BASE) {
                 return entry.getRevision();
             }

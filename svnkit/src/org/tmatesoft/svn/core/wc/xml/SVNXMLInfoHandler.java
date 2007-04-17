@@ -63,6 +63,7 @@ public class SVNXMLInfoHandler extends AbstractXMLHandler implements ISVNInfoHan
     private static final String CREATED_TAG = "created";
     private static final String EXPIRES_TAG = "expires";
     private static final String LOCK_TAG = "lock";
+    private static final String DEPTH_TAG = "depth";
     
     private File myTargetPath;
 
@@ -141,6 +142,9 @@ public class SVNXMLInfoHandler extends AbstractXMLHandler implements ISVNInfoHan
                 schedule = "normal";
             }
             addTag(SCHEDULE_TAG, schedule);
+            if (info.getDepth() != null) {
+                addTag(DEPTH_TAG, info.getDepth().getName());
+            }
             if (info.getCopyFromURL() != null) {
                 addTag(COPY_FROM_URL_TAG, info.getCopyFromURL().toString());
             }

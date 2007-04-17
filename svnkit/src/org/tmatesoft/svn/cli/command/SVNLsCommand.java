@@ -119,6 +119,14 @@ public class SVNLsCommand extends SVNCommand implements ISVNDirEntryHandler {
     }
 
     public void handleDirEntry(SVNDirEntry dirEntry) {
+        String path = dirEntry.getRelativePath();
+        if ("".equals(path)) {
+            if (myIsVerbose && dirEntry.getKind() == SVNNodeKind.DIR) {
+                path = ".";
+            } else if (dirEntry.getKind() == SVNNodeKind.DIR) {
+                return;
+            }
+        }
         if (myIsVerbose) {
             StringBuffer verbose = new StringBuffer();
             verbose.append(SVNCommand.formatString(dirEntry.getRevision() + "", 7, false));
@@ -143,7 +151,7 @@ public class SVNLsCommand extends SVNCommand implements ISVNDirEntryHandler {
             verbose.append(' ');
             myPrintStream.print(verbose.toString());
         }
-        myPrintStream.print(dirEntry.getRelativePath());
+        myPrintStream.print(path);
         if (dirEntry.getKind() == SVNNodeKind.DIR) {
             myPrintStream.print('/');
         }

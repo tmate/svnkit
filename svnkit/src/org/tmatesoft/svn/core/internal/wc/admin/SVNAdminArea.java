@@ -211,11 +211,7 @@ public abstract class SVNAdminArea {
         if (checksum || needsTranslation) {
             InputStream baseStream = null;
             InputStream textStream = null;
-            entry = getEntry(text.getName(), true);
-            if (entry == null) {
-                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.UNVERSIONED_RESOURCE, "''{0}'' is not under version control", text);
-                SVNErrorManager.error(err);
-            }
+            entry = getVersionedEntry(text.getName(), true);
             File tmpFile = null;
             try {
                 baseStream = SVNFileUtil.openFileForReading(baseFile);
@@ -1139,6 +1135,15 @@ public abstract class SVNAdminArea {
             return entry;
         }
         return null;
+    }
+
+    public SVNEntry getVersionedEntry(String name, boolean hidden) throws SVNException {
+        SVNEntry entry = getEntry(name, hidden);
+        if (entry == null) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_NOT_FOUND, "''{0}'' is not under version control", getFile(name));
+            SVNErrorManager.error(err);
+        }
+        return entry;
     }
 
     public SVNEntry addEntry(String name) throws SVNException {

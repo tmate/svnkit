@@ -22,8 +22,6 @@ import java.util.StringTokenizer;
 import java.util.TreeMap;
 
 import org.tmatesoft.svn.core.SVNCommitInfo;
-import org.tmatesoft.svn.core.SVNErrorCode;
-import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNLock;
 import org.tmatesoft.svn.core.SVNNodeKind;
@@ -41,7 +39,6 @@ import org.tmatesoft.svn.core.wc.ISVNStatusHandler;
 import org.tmatesoft.svn.core.wc.SVNRevision;
 import org.tmatesoft.svn.core.wc.SVNStatus;
 import org.tmatesoft.svn.core.wc.SVNStatusType;
-
 
 
 /**
@@ -270,11 +267,7 @@ public class SVNStatusEditor {
         if (fileKind == SVNNodeKind.DIR) {
             SVNEntry fullEntry = entry;
             if (entry.getKind() == fileKind) {
-                fullEntry = myWCAccess.getEntry(path, false);
-                if (fullEntry == null) {
-                    SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.UNVERSIONED_RESOURCE, "''{0}'' is not under version control", path);
-                    SVNErrorManager.error(err);
-                }
+                fullEntry = myWCAccess.getVersionedEntry(path, false);
             }
             if (descend && fullEntry != entry) {
                 SVNAdminArea childDir = myWCAccess.retrieve(path);

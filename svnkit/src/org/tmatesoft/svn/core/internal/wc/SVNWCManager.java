@@ -294,11 +294,7 @@ public class SVNWCManager {
         SVNWCAccess wcAccess = SVNWCAccess.newInstance(null);
         try {
             wcAccess.open(path, false, 0);
-            SVNEntry entry = wcAccess.getEntry(path, false);
-            if (entry == null) {
-                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, "No entry for ''{0}''", path);
-                SVNErrorManager.error(err);            
-            }
+            SVNEntry entry = wcAccess.getVersionedEntry(path, false);
             if (!entry.isScheduledForDeletion()) {
                 if (entry.getRevision() != revision) {
                     SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_OBSTRUCTED_UPDATE, "Revision {0} doesn''t match existing revision {1} in ''{2}''", 
@@ -467,11 +463,7 @@ public class SVNWCManager {
     }
 
     public static void addRepositoryFile(SVNAdminArea dir, String fileName, File text, File textBase, Map baseProperties, Map properties, String copyFromURL, long copyFromRev) throws SVNException {
-        SVNEntry parentEntry = dir.getEntry(dir.getThisDirName(), false);
-        if (parentEntry == null) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.UNVERSIONED_RESOURCE, "''{0}'' is not under version control", dir.getRoot());
-            SVNErrorManager.error(err);
-        }
+        SVNEntry parentEntry = dir.getVersionedEntry(dir.getThisDirName(), false);
         String newURL = SVNPathUtil.append(parentEntry.getURL(), SVNEncodingUtil.uriEncode(fileName));
         if (copyFromURL != null && parentEntry.getRepositoryRoot() != null && !SVNPathUtil.isAncestor(parentEntry.getRepositoryRoot(), copyFromURL)) {
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.UNSUPPORTED_FEATURE, "Copyfrom-url ''{0}'' has different repository root than ''{1}''", new Object[]{copyFromURL, parentEntry.getRepositoryRoot()});

@@ -56,11 +56,7 @@ public class SVNPropertiesManager {
     }
 
     public static void setWCProperty(SVNWCAccess access, File path, String propName, String propValue, boolean write) throws SVNException {
-        SVNEntry entry = access.getEntry(path, false);
-        if (entry == null) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.UNVERSIONED_RESOURCE, "''{0}'' is not under version control", path);
-            SVNErrorManager.error(err);
-        }
+        SVNEntry entry = access.getVersionedEntry(path, false);
         SVNAdminArea dir = entry.getKind() == SVNNodeKind.DIR ? access.retrieve(path) : access.retrieve(path.getParentFile());
         dir.getWCProperties(entry.getName()).setPropertyValue(propName, propValue);
         if (write) {
@@ -141,11 +137,7 @@ public class SVNPropertiesManager {
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.BAD_PROP_KIND, "Property ''{0}'' is an entry property", propName);
             SVNErrorManager.error(err);
         }
-        SVNEntry entry = access.getEntry(path, false);
-        if (entry == null) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.UNVERSIONED_RESOURCE, "''{0}'' is not under version control", path);
-            SVNErrorManager.error(err);
-        }
+        SVNEntry entry = access.getVersionedEntry(path, false);
         SVNAdminArea dir = entry.getKind() == SVNNodeKind.DIR ? access.retrieve(path) : access.retrieve(path.getParentFile());
         boolean updateTimeStamp = SVNProperty.EOL_STYLE.equals(propName);
         if (propValue != null) {
@@ -203,11 +195,7 @@ public class SVNPropertiesManager {
     }
     
     public static SVNStatusType mergeProperties(SVNWCAccess wcAccess, File path, Map baseProperties, Map diff, boolean baseMerge, boolean dryRun) throws SVNException {
-        SVNEntry entry = wcAccess.getEntry(path, false);
-        if (entry == null) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.UNVERSIONED_RESOURCE, "''{0}'' is not under version control", path);
-            SVNErrorManager.error(err);
-        }
+        SVNEntry entry = wcAccess.getVersionedEntry(path, false);
         File parent = null;
         String name = null;
         if (entry.isDirectory()) {

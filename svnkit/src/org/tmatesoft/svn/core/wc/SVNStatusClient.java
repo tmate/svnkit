@@ -242,11 +242,7 @@ public class SVNStatusClient extends SVNBasicClient {
             }
             if (remote) {
                 if (entry == null) {
-                    entry = wcAccess.getEntry(info.getAnchor().getRoot(), false);
-                }
-                if (entry == null) {
-                    SVNErrorMessage error = SVNErrorMessage.create(SVNErrorCode.UNVERSIONED_RESOURCE, "''{0}'' is not under version control", path);
-                    SVNErrorManager.error(error);
+                    entry = wcAccess.getVersionedEntry(info.getAnchor().getRoot(), false);
                 }
                 if (entry.getURL() == null) {
                     SVNErrorMessage error = SVNErrorMessage.create(SVNErrorCode.ENTRY_MISSING_URL, "Entry ''{0}'' has no URL", info.getAnchor().getRoot());

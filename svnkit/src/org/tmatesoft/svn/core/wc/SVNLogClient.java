@@ -13,6 +13,7 @@ package org.tmatesoft.svn.core.wc;
 
 import java.io.File;
 import java.util.Collection;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -29,10 +30,12 @@ import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNLock;
 import org.tmatesoft.svn.core.SVNLogEntry;
 import org.tmatesoft.svn.core.SVNNodeKind;
+import org.tmatesoft.svn.core.SVNRevisionProperty;
 import org.tmatesoft.svn.core.SVNURL;
 import org.tmatesoft.svn.core.auth.ISVNAuthenticationManager;
 import org.tmatesoft.svn.core.internal.util.SVNEncodingUtil;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
+import org.tmatesoft.svn.core.internal.util.SVNTimeUtil;
 import org.tmatesoft.svn.core.internal.util.SVNURLUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
@@ -437,11 +440,7 @@ public class SVNLogClient extends SVNBasicClient {
             checkCancelled();
             File path = paths[i];
             wcAccess.probeOpen(path, false, 0); 
-            SVNEntry entry = wcAccess.getEntry(path, false); 
-            if (entry == null) {
-                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.UNVERSIONED_RESOURCE, "''{0}'' is not under version control", path);
-                SVNErrorManager.error(err);
-            }   
+            SVNEntry entry = wcAccess.getVersionedEntry(path, false); 
             if (entry.getURL() == null) {
                 SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_MISSING_URL, "Entry ''{0}'' has no URL", path);
                 SVNErrorManager.error(err);
@@ -593,7 +592,7 @@ public class SVNLogClient extends SVNBasicClient {
      * @see                   #doList(SVNURL, SVNRevision, SVNRevision, boolean, ISVNDirEntryHandler)  
      */
     public void doList(File path, SVNRevision pegRevision, SVNRevision revision, boolean fetchLocks, boolean recursive, ISVNDirEntryHandler handler) throws SVNException {
-        doList(path, pegRevision, revision, fetchLocks, SVNDepth.fromRecurse(recursive), handler);
+        doList(path, pegRevision, revision, fetchLocks, recursive ? SVNDepth.DEPTH_INFINITY : SVNDepth.DEPTH_IMMEDIATES, handler);
     }
     
     public void doList(File path, SVNRevision pegRevision, SVNRevision revision, boolean fetchLocks, SVNDepth depth, ISVNDirEntryHandler handler) throws SVNException {
@@ -655,7 +654,7 @@ public class SVNLogClient extends SVNBasicClient {
      * @see                   #doList(File, SVNRevision, SVNRevision, boolean, ISVNDirEntryHandler)   
      */
     public void doList(SVNURL url, SVNRevision pegRevision, SVNRevision revision, boolean fetchLocks, boolean recursive, ISVNDirEntryHandler handler) throws SVNException {
-        doList(url, pegRevision, revision, fetchLocks, SVNDepth.fromRecurse(recursive), handler);
+        doList(url, pegRevision, revision, fetchLocks, recursive ? SVNDepth.DEPTH_INFINITY : SVNDepth.DEPTH_IMMEDIATES, handler);
     }
     
     public void doList(SVNURL url, SVNRevision pegRevision, SVNRevision revision, boolean fetchLocks, SVNDepth depth, ISVNDirEntryHandler handler) throws SVNException {
@@ -693,6 +692,62 @@ public class SVNLogClient extends SVNBasicClient {
     }
 
     private void doList(SVNRepository repos, long rev, final ISVNDirEntryHandler handler, boolean fetchLocks, SVNDepth depth) throws SVNException {
+        SVNURL url = repos.getLocation();
+        SVNURL reposRoot = repos.getRepositoryRoot(true);
+        SVNDirEntry entry = null;
+        SVNException error = null;
+        try {
+            entry = repos.info("", rev); 
+        } catch (SVNException svne) {
+            if (svne.getErrorMessage().getErrorCode() == SVNErrorCode.RA_NOT_IMPLEMENTED) {
+                error = svne;
+            } else {
+                throw svne;
+            }
+        }
+        
+        if (error != null) {
+            SVNNodeKind kind = repos.checkPath("", rev);
+            if (kind != SVNNodeKind.NONE) {
+                if (!url.equals(reposRoot)) {
+                    String name = SVNPathUtil.tail(repos.getLocation().getPath());
+                    repos.setLocation(repos.getLocation().removePathTail(), false);
+                    Collection dirEntries = repos.getDir("", rev, null, (Collection) null);
+                    repos.setLocation(url, false);
+                    
+                    for (Iterator ents = dirEntries.iterator(); ents.hasNext();) {
+                        SVNDirEntry dirEntry = (SVNDirEntry) ents.next();
+                        if (name.equals(dirEntry.getName())) {
+                            entry = dirEntry;
+                            break;
+                        }
+                    }
+                    if (entry != null) {
+                        entry.setRelativePath(kind == SVNNodeKind.FILE ? name : "");
+                    }
+                } else {
+                    Map props = new HashMap();
+                    repos.getDir("", rev, props, (Collection) null);
+                    Map revProps = repos.getRevisionProperties(rev, null);
+                    String author = (String) revProps.get(SVNRevisionProperty.AUTHOR);
+                    String dateStr = (String) revProps.get(SVNRevisionProperty.DATE);
+                    Date datestamp = null;
+                    if (dateStr != null) {
+                        datestamp = SVNTimeUtil.parseDateString(dateStr);
+                    }
+                    entry = new SVNDirEntry(url, "", kind, 0, !props.isEmpty(), rev, datestamp, author);
+                    entry.setRelativePath("");
+                }
+            }
+        } else if (entry != null) {
+            entry.setRelativePath(entry.getKind() == SVNNodeKind.DIR ? "" : entry.getName());
+        }
+        
+        if (entry == null) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_NOT_FOUND, "URL ''{0}'' non-existent in that revision", url);
+            SVNErrorManager.error(err);
+        }
+        
         final Map locksMap = new HashMap();
         if (fetchLocks) {
             SVNLock[] locks = new SVNLock[0];
@@ -712,35 +767,18 @@ public class SVNLogClient extends SVNBasicClient {
                 }
             }
         }
+        
         ISVNDirEntryHandler nestedHandler = new ISVNDirEntryHandler() {
             public void handleDirEntry(SVNDirEntry dirEntry) throws SVNException {
                 dirEntry.setLock((SVNLock) locksMap.get(dirEntry.getURL()));
                 handler.handleDirEntry(dirEntry);
             }
         };
-        if (repos.checkPath("", rev) == SVNNodeKind.FILE) {
-            String name = SVNPathUtil.tail(repos.getLocation().getPath());
-            SVNURL fileULR = repos.getLocation();
-            repos.setLocation(repos.getLocation().removePathTail(), false);
-            Collection dirEntries = repos.getDir("", rev, null, (Collection) null);
 
-            SVNDirEntry fileEntry = null;
-            for (Iterator ents = dirEntries.iterator(); ents.hasNext();) {
-                SVNDirEntry dirEntry = (SVNDirEntry) ents.next();
-                if (name.equals(dirEntry.getName())) {
-                    fileEntry = dirEntry;
-                    break;
-                }
-            }
-            if (fileEntry != null) {
-                fileEntry.setRelativePath(name);
-                nestedHandler.handleDirEntry(fileEntry);
-            } else {
-                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_NOT_FOUND, "URL ''{0}'' non-existent in that revision", fileULR);
-                SVNErrorManager.error(err);
-            }
-        } else if (depth == SVNDepth.DEPTH_FILES || depth == SVNDepth.DEPTH_IMMEDIATES ||
-                   depth == SVNDepth.DEPTH_INFINITY) {
+        nestedHandler.handleDirEntry(entry);
+        if (entry.getKind() == SVNNodeKind.DIR && (depth == SVNDepth.DEPTH_FILES || 
+                depth == SVNDepth.DEPTH_IMMEDIATES ||
+                depth == SVNDepth.DEPTH_INFINITY)) {
             list(repos, "", rev, depth, nestedHandler);
         }
     }

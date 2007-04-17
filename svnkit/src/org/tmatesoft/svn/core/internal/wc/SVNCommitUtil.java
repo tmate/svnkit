@@ -336,12 +336,9 @@ public class SVNCommitUtil {
             String targetName = "".equals(target) ? "" : SVNPathUtil.tail(target);
             String parentPath = SVNPathUtil.removeTail(target);
             SVNAdminArea dir = baseAccess.probeRetrieve(targetFile);
-            SVNEntry entry = baseAccess.getEntry(targetFile, false);
+            SVNEntry entry = baseAccess.getVersionedEntry(targetFile, false);
             String url = null;
-            if (entry == null) {
-                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_NOT_FOUND, "''{0}'' is not under version control", targetFile);
-                SVNErrorManager.error(err);
-            } else if (entry.getURL() == null) {
+            if (entry.getURL() == null) {
                 SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_MISSING_URL, "''{0}'' has no URL", targetFile);
                 SVNErrorManager.error(err);
             } else {

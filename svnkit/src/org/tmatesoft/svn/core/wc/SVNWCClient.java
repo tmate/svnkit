@@ -436,12 +436,8 @@ public class SVNWCClient extends SVNBasicClient {
         propValue = validatePropertyValue(propName, propValue, force);
         SVNWCAccess wcAccess = createWCAccess();
         try {
-            SVNAdminArea area = wcAccess.probeOpen(path, true, recursive ? SVNWCAccess.INFINITE_DEPTH : 1);//wcAccess.open(path, true, recursive ? SVNWCAccess2.INFINITE_DEPTH : 1);
-            SVNEntry entry = wcAccess.getEntry(path, false);
-            if (entry == null) {
-                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.UNVERSIONED_RESOURCE, "''{0}'' is not under version control", path);
-                SVNErrorManager.error(err);
-            }
+            SVNAdminArea area = wcAccess.probeOpen(path, true, recursive ? SVNWCAccess.INFINITE_DEPTH : 1);
+            SVNEntry entry = wcAccess.getVersionedEntry(path, false);
             doSetLocalProperty(area, entry.isDirectory() ? area.getThisDirName() : entry.getName(), propName, propValue, force, recursive, true, handler);
         } finally {
             wcAccess.close();
@@ -693,11 +689,7 @@ public class SVNWCClient extends SVNBasicClient {
 
         try {
             SVNAdminArea area = wcAccess.probeOpen(path, false, recursive ? SVNWCAccess.INFINITE_DEPTH : 0);
-            SVNEntry entry = wcAccess.getEntry(path, false);
-            if (entry == null) {
-                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_NOT_FOUND, "''{0}'' is not under version control", path);
-                SVNErrorManager.error(err);
-            }
+            SVNEntry entry = wcAccess.getVersionedEntry(path, false);
             if (revision != SVNRevision.WORKING && revision != SVNRevision.BASE && revision != SVNRevision.COMMITTED) {
                 SVNURL url = entry.getSVNURL();
                 SVNRepository repository = createRepository(null, path, pegRevision, revision);
@@ -1210,9 +1202,11 @@ public class SVNWCClient extends SVNBasicClient {
     private void doRevert(File path, SVNAdminArea parent, boolean recursive, boolean useCommitTimes) throws SVNException {
         checkCancelled();
         SVNAdminArea dir = parent.getWCAccess().probeRetrieve(path);
-        SVNEntry entry = dir.getWCAccess().getEntry(path, false);
-        if (entry == null) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.UNVERSIONED_RESOURCE, "Cannot revert: ''{0}'' is not under version control", path);
+        SVNEntry entry = null;
+        try {
+            entry = dir.getWCAccess().getVersionedEntry(path, false);
+        } catch (SVNException svne) {
+            SVNErrorMessage err = svne.getErrorMessage().wrap("Cannot revert.");
             SVNErrorManager.error(err);
         }
         if (entry.getKind() == SVNNodeKind.DIR) {
@@ -1453,11 +1447,7 @@ public class SVNWCClient extends SVNBasicClient {
         try {
             wcAccess.probeOpen(path, true, recursive ? SVNWCAccess.INFINITE_DEPTH : 0);
             if (!recursive) {
-                SVNEntry entry = wcAccess.getEntry(path, false);
-                if (entry == null) {
-                    SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_NOT_FOUND, "''{0}'' is not under version control", path);
-                    SVNErrorManager.error(err);
-                }
+                SVNEntry entry = wcAccess.getVersionedEntry(path, false);
                 resolveEntry(wcAccess, path, entry);
             } else {
                 resolveAll(wcAccess, path);
@@ -1530,11 +1520,7 @@ public class SVNWCClient extends SVNBasicClient {
                     LockInfo lockInfo = (LockInfo) entriesMap.get(fullURL);
                     SVNAdminArea dir = wcAccess.probeRetrieve(lockInfo.myFile);
                     if (error == null) {
-                        SVNEntry entry = wcAccess.getEntry(lockInfo.myFile, false);
-                        if (entry == null) {
-                            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.UNVERSIONED_RESOURCE, "''{0}'' is not under version control", lockInfo.myFile);
-                            SVNErrorManager.error(err);
-                        }
+                        SVNEntry entry = wcAccess.getVersionedEntry(lockInfo.myFile, false);
                         entry.setLockToken(lock.getID());
                         entry.setLockComment(lock.getComment());
                         entry.setLockOwner(lock.getOwner());
@@ -1637,11 +1623,7 @@ public class SVNWCClient extends SVNBasicClient {
                     SVNEventAction action = null;
                     SVNAdminArea dir = wcAccess.probeRetrieve(lockInfo.myFile);
                     if (error == null || (error != null && error.getErrorCode() != SVNErrorCode.FS_LOCK_OWNER_MISMATCH)) {
-                        SVNEntry entry = wcAccess.getEntry(lockInfo.myFile, false);
-                        if (entry == null) {
-                            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.UNVERSIONED_RESOURCE, "''{0}'' is not under version control", lockInfo.myFile);
-                            SVNErrorManager.error(err);
-                        }
+                        SVNEntry entry = wcAccess.getVersionedEntry(lockInfo.myFile, false);
                         entry.setLockToken(null);
                         entry.setLockComment(null);
                         entry.setLockOwner(null);
@@ -1736,11 +1718,7 @@ public class SVNWCClient extends SVNBasicClient {
         wcAccess.probeOpen(new File(commonParentPath).getAbsoluteFile(), true, depth);
         for (int i = 0; i < paths.length; i++) {
             File file = new File(commonParentPath, paths[i]);
-            SVNEntry entry = wcAccess.getEntry(file, false);
-            if (entry == null) {
-                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.UNVERSIONED_RESOURCE, "''{0}'' is not under version control", file.getName());
-                SVNErrorManager.error(err);
-            }
+            SVNEntry entry = wcAccess.getVersionedEntry(file, false);
             if (entry.getURL() == null) {
                 SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_MISSING_URL, "''{0}'' has no URL", file);
                 SVNErrorManager.error(err);
@@ -1861,11 +1839,7 @@ public class SVNWCClient extends SVNBasicClient {
             SVNURL url = null;
             try {
                 wcAccess.probeOpen(path, false, 0);
-                SVNEntry entry = wcAccess.getEntry(path, false);
-                if (entry == null) {
-                    SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.UNVERSIONED_RESOURCE, "''{0}'' is not under version control", path);
-                    SVNErrorManager.error(err);
-                }
+                SVNEntry entry = wcAccess.getVersionedEntry(path, false);
                 url = entry.getSVNURL();
                 if (url == null) {
                     SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_MISSING_URL, "''{0}'' has no URL", path);
@@ -1881,11 +1855,7 @@ public class SVNWCClient extends SVNBasicClient {
         SVNWCAccess wcAccess = createWCAccess();
         try {
             wcAccess.probeOpen(path, false, recursive ? SVNWCAccess.INFINITE_DEPTH : 0);
-            SVNEntry entry = wcAccess.getEntry(path, false);
-            if (entry == null) {
-                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.UNVERSIONED_RESOURCE, "''{0}'' is not under version control", path);
-                SVNErrorManager.error(err);
-            }
+            SVNEntry entry = wcAccess.getVersionedEntry(path, false);
             if (entry.isFile()) {
                 reportEntry(path, entry, handler);
             } else if (entry.isDirectory()) {
@@ -1908,12 +1878,7 @@ public class SVNWCClient extends SVNBasicClient {
     }
 
     private void reportAllEntries(SVNWCAccess wcAccess, File path, ISVNInfoHandler handler) throws SVNException {
-        SVNEntry entry = wcAccess.getEntry(path, false);
-        if (entry == null) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.UNVERSIONED_RESOURCE, "''{0}'' is not under version control", path);
-            SVNErrorManager.error(err);
-        }
-        
+        SVNEntry entry = wcAccess.getVersionedEntry(path, false);
         reportEntry(path, entry, handler);
         if (entry.isDirectory()) {
             SVNAdminArea dir = wcAccess.retrieve(path);
@@ -2511,11 +2476,8 @@ public class SVNWCClient extends SVNBasicClient {
 
         try {
             SVNAdminArea area = wcAccess.open(path.getParentFile(), false, 0);
-            SVNEntry entry = wcAccess.getEntry(path, false);
-            if (entry == null) {
-                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.UNVERSIONED_RESOURCE, "''{0}'' is not under version control or doesn''t exist", path, SVNErrorMessage.TYPE_WARNING);
-                SVNErrorManager.error(err);
-            } else if (entry.getKind() != SVNNodeKind.FILE) {
+            SVNEntry entry = wcAccess.getVersionedEntry(path, false);
+            if (entry.getKind() != SVNNodeKind.FILE) {
                 SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.UNVERSIONED_RESOURCE, "''{0}'' refers to a directory", path, SVNErrorMessage.TYPE_WARNING);
                 SVNErrorManager.error(err);
             }

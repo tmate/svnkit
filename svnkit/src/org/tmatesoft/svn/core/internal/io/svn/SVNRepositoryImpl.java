@@ -339,9 +339,11 @@ public class SVNRepositoryImpl extends SVNRepository implements ISVNReporter {
             final SVNURL url = getLocation().setPath(getFullPath(path), false);
             ISVNDirEntryHandler handler = new ISVNDirEntryHandler() {
                 public void handleDirEntry(SVNDirEntry dirEntry) throws SVNException {
-                    dirEntry = new SVNDirEntry(url.appendPath(dirEntry.getName(), false), dirEntry.getName(), 
-                            dirEntry.getKind(), dirEntry.getSize(), dirEntry.hasProperties(), dirEntry.getRevision(), dirEntry.getDate(), dirEntry.getAuthor());
-                    entries.add(dirEntry);
+                    if (entries != null) {
+                        dirEntry = new SVNDirEntry(url.appendPath(dirEntry.getName(), false), dirEntry.getName(), 
+                                dirEntry.getKind(), dirEntry.getSize(), dirEntry.hasProperties(), dirEntry.getRevision(), dirEntry.getDate(), dirEntry.getAuthor());
+                        entries.add(dirEntry);
+                    }
                 }            
             };
             path = getRepositoryPath(path);
@@ -366,7 +368,7 @@ public class SVNRepositoryImpl extends SVNRepository implements ISVNReporter {
                 read("()))", null, true);
             }
             // get comments.
-            if (includeComment) {
+            if (includeComment && entries != null) {
                 Map messages = new HashMap();
                 for(Iterator ents = entries.iterator(); ents.hasNext();) {
                     SVNDirEntry entry = (SVNDirEntry) ents.next();
@@ -996,27 +998,16 @@ public class SVNRepositoryImpl extends SVNRepository implements ISVNReporter {
 
     public void linkPath(SVNURL url, String path, String lockToken, long revison, SVNDepth depth, boolean startEmpty) throws SVNException {
         assertValidRevision(revison);
-        if (lockToken == null) {
-            write("(w(ssnww))", new Object[] { "link-path", path,
-                    url.toString(), getRevisionObject(revison),
-                    Boolean.valueOf(startEmpty), SVNDepth.asString(depth) });
-        } else {
-            write("(w(ssnw(s)w))", new Object[] { "link-path", path,
-                    url.toString(), getRevisionObject(revison),
-                    Boolean.valueOf(startEmpty), lockToken, SVNDepth.asString(depth) });
-        }
+        write("(w(ssnw(s)w))", new Object[] { "link-path", path,
+                url.toString(), getRevisionObject(revison),
+                Boolean.valueOf(startEmpty), lockToken, SVNDepth.asString(depth) });
     }
 
     public void setPath(String path, String lockToken, long revision, SVNDepth depth, boolean startEmpty) throws SVNException {
         assertValidRevision(revision);
-        if (lockToken == null) {
-            write("(w(snww))", new Object[] { "set-path", path,
-                    getRevisionObject(revision), Boolean.valueOf(startEmpty), SVNDepth.asString(depth) });
-        } else {
-            write("(w(snw(s)w))", new Object[] { "set-path", path,
-                    getRevisionObject(revision), Boolean.valueOf(startEmpty),
-                    lockToken, SVNDepth.asString(depth) });
-        }
+        write("(w(snw(s)w))", new Object[] { "set-path", path,
+                getRevisionObject(revision), Boolean.valueOf(startEmpty),
+                lockToken, SVNDepth.asString(depth) });
     }
 
     public void diff(SVNURL url, long targetRevision, long revision, String target, boolean ignoreAncestry, SVNDepth depth, boolean getContents, ISVNReporterBaton reporter, ISVNEditor editor) throws SVNException {
