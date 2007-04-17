@@ -208,12 +208,13 @@ public abstract class SVNAdminAreaFactory implements Comparable {
         
         if (wcExists) {
             SVNWCAccess wcAccess = SVNWCAccess.newInstance(null);
-            SVNAdminArea adminArea = wcAccess.open(dir, false, 0);
-            SVNEntry entry = adminArea.getEntry(adminArea.getThisDirName(), false);
-            wcAccess.closeAdminArea(dir);
-            if (entry == null) {
-                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_NOT_FOUND, "No entry for ''{0}''", dir);
-                SVNErrorManager.error(err);
+            SVNAdminArea adminArea = null;
+            SVNEntry entry = null;
+            try {
+                adminArea = wcAccess.open(dir, false, 0);
+                entry = adminArea.getVersionedEntry(adminArea.getThisDirName(), false);
+            } finally {
+                wcAccess.closeAdminArea(dir);
             }
             if (!entry.isScheduledForDeletion()) {
                 if (entry.getRevision() != revision) {

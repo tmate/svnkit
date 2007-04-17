@@ -58,7 +58,7 @@ public class SVNReporter implements ISVNReporterBaton {
             SVNWCAccess wcAccess = myInfo.getWCAccess();
             SVNEntry targetEntry = wcAccess.getEntry(myTarget, false);
             if (targetEntry == null || (targetEntry.isDirectory() && targetEntry.isScheduledForAddition())) {
-                SVNEntry parentEntry = wcAccess.getEntry(myTarget.getParentFile(), false);
+                SVNEntry parentEntry = wcAccess.getVersionedEntry(myTarget.getParentFile(), false);
                 long revision = parentEntry.getRevision();
                 if (myDepth == SVNDepth.DEPTH_UNKNOWN) {
                     myDepth = parentEntry.getDepth();
@@ -72,11 +72,7 @@ public class SVNReporter implements ISVNReporterBaton {
             SVNEntry parentEntry = null;
             long revision = targetEntry.getRevision();
             if (!SVNRevision.isValidRevisionNumber(revision)) {
-                 parentEntry = wcAccess.getEntry(myTarget.getParentFile(), false);
-                if (parentEntry == null) {
-                    SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.UNVERSIONED_RESOURCE, "''{0}'' is not under version control", myTarget.getParentFile());
-                    SVNErrorManager.error(err);
-                }
+                parentEntry = wcAccess.getVersionedEntry(myTarget.getParentFile(), false);
                 revision = parentEntry.getRevision();
             }
             if (myDepth == SVNDepth.DEPTH_UNKNOWN) {

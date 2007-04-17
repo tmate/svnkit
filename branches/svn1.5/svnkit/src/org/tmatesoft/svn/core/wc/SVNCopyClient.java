@@ -41,6 +41,7 @@ import org.tmatesoft.svn.core.internal.wc.SVNCommitUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNCommitter;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.internal.wc.SVNEventFactory;
+import org.tmatesoft.svn.core.internal.wc.SVNFileListUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNFileType;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNPropertiesManager;
@@ -49,6 +50,7 @@ import org.tmatesoft.svn.core.internal.wc.admin.SVNAdminArea;
 import org.tmatesoft.svn.core.internal.wc.admin.SVNEntry;
 import org.tmatesoft.svn.core.internal.wc.admin.SVNWCAccess;
 import org.tmatesoft.svn.core.io.ISVNEditor;
+import org.tmatesoft.svn.core.io.SVNLocationEntry;
 import org.tmatesoft.svn.core.io.SVNRepository;
 
 /**
@@ -442,12 +444,11 @@ public class SVNCopyClient extends SVNBasicClient {
         if (srcRevision.isValid() && srcRevision != SVNRevision.WORKING) {
             SVNWCAccess wcAccess = createWCAccess();
             wcAccess.probeOpen(srcPath, false, 0); 
-            SVNEntry srcEntry = wcAccess.getEntry(srcPath, false);
-            wcAccess.close();
-            
-            if (srcEntry == null) {
-                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.UNVERSIONED_RESOURCE, "''{0}'' is not under version control", srcPath);
-                SVNErrorManager.error(err);
+            SVNEntry srcEntry = null;
+            try {
+                srcEntry = wcAccess.getVersionedEntry(srcPath, false);
+            } finally {
+                wcAccess.close();
             }
             if (srcEntry.getURL() == null) {
                 SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_MISSING_URL, "''{0}'' does not seem to have a URL associated with it", srcPath);
@@ -499,13 +500,7 @@ public class SVNCopyClient extends SVNBasicClient {
         ISVNEditor commitEditor = null;
         try {
             Map commitables = new TreeMap();
-            SVNEntry entry = wcAccess.getEntry(srcPath, false);
-            if (entry == null) {
-                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_NOT_FOUND, "''{0}'' is not under version control", srcPath);
-                SVNErrorManager.error(err);
-                return SVNCommitInfo.NULL;
-            }
-            
+            SVNEntry entry = wcAccess.getVersionedEntry(srcPath, false);
             SVNCommitUtil.harvestCommitables(commitables, dirArea, srcPath, null, entry, dstURL.toString(), entry.getURL(), 
                     true, false, false, null, true, false, getCommitParameters());
             items = (SVNCommitItem[]) commitables.values().toArray(new SVNCommitItem[commitables.values().size()]);
@@ -695,12 +690,7 @@ public class SVNCopyClient extends SVNBasicClient {
     }
     
     private String getUUIDFromPath (SVNWCAccess wcAccess, File path) throws SVNException {
-        SVNEntry entry = wcAccess.getEntry(path, true);
-        if (entry == null) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_NOT_FOUND, "Can''t find entry for ''{0}''", path);
-            SVNErrorManager.error(err);
-        }
-        
+        SVNEntry entry = wcAccess.getVersionedEntry(path, true);
         String uuid = null;
         if (entry.getUUID() != null) {
             uuid = entry.getUUID();
@@ -759,11 +749,7 @@ public class SVNCopyClient extends SVNBasicClient {
             SVNURL srcURL = null;
             try {
                 wcAccess.probeOpen(srcPath, false, 0);
-                SVNEntry srcEntry = wcAccess.getEntry(srcPath, false);
-                if (srcEntry == null) {
-                    SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_NOT_FOUND, "''{0}'' is not under version control", srcPath);
-                    SVNErrorManager.error(err);
-                }
+                SVNEntry srcEntry = wcAccess.getVersionedEntry(srcPath, false);
                 if (srcEntry.getURL() == null) {
                     SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_MISSING_URL, "''{0}'' has no URL", srcPath);
                     SVNErrorManager.error(err);
@@ -840,18 +826,9 @@ public class SVNCopyClient extends SVNBasicClient {
             SVNWCAccess copyAccess = createWCAccess();
             try {
                 SVNAdminArea srcArea = copyAccess.probeOpen(srcPath, false, SVNWCAccess.INFINITE_DEPTH);
-                SVNEntry dstEntry = adminArea.getEntry(adminArea.getThisDirName(), false);
-                if (dstEntry == null) {
-                    SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_NOT_FOUND, "''{0}'' is not under version control", adminArea.getRoot());
-                    SVNErrorManager.error(err);
-                }
-                
-                SVNEntry srcEntry = copyAccess.getEntry(srcPath, false);
-                if (srcEntry == null) {
-                    SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_NOT_FOUND, "''{0}'' is not under version control", srcPath);
-                    SVNErrorManager.error(err);
-                }
-                
+                SVNEntry dstEntry = adminArea.getVersionedEntry(adminArea.getThisDirName(), false);
+                SVNEntry srcEntry = copyAccess.getVersionedEntry(srcPath, false);
+
                 if (srcEntry.getRepositoryRoot() != null && dstEntry.getRepositoryRoot() != null &&
                         !srcEntry.getRepositoryRoot().equals(dstEntry.getRepositoryRoot())) {
                     SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_INVALID_SCHEDULE, "Cannot copy to ''{0}'', as it is not from repository ''{1}''; it is from ''{2}''", new Object[] {adminArea.getRoot(), srcEntry.getRepositoryRoot(), dstEntry.getRepositoryRoot()});
@@ -864,9 +841,17 @@ public class SVNCopyClient extends SVNBasicClient {
                 }
                 
                 if (srcType == SVNFileType.FILE) {
-                    copyFile(adminArea, srcArea, srcPath, dstPath.getName());
+                    if (srcEntry.isScheduledForAddition() && !srcEntry.isCopied()) {
+                        copyAddedFile(adminArea, srcPath, dstPath.getName(), true);
+                    } else {
+                        copyFile(adminArea, srcArea, srcPath, dstPath.getName());
+                    }
                 } else if (srcType == SVNFileType.DIRECTORY) {
-                    copyDir(adminArea, srcArea, srcPath, dstPath.getName());
+                    if (srcEntry.isScheduledForAddition() && !srcEntry.isCopied()) {
+                        copyAddedDir(adminArea, srcArea, srcPath, dstPath.getName(), true);
+                    } else {
+                        copyDir(adminArea, srcArea, srcPath, dstPath.getName());
+                    }
                 }
             } finally {
                 copyAccess.close();
@@ -880,6 +865,47 @@ public class SVNCopyClient extends SVNBasicClient {
         
     }
 
+    private void copyAddedFile(SVNAdminArea dstParent, File srcPath, String dstName, boolean isAdded) throws SVNException {
+        File dstPath = dstParent.getFile(dstName);
+        SVNFileUtil.copyFile(srcPath, dstPath, false);
+        if (isAdded) {
+            SVNWCManager.add(dstPath, dstParent, null, SVNRepository.INVALID_REVISION);
+        }
+    }
+    
+    private void copyAddedDir(SVNAdminArea dstParent, SVNAdminArea srcArea, File srcPath, String dstName, boolean isAdded) throws SVNException {
+        File dstPath = dstParent.getFile(dstName);
+        if (!isAdded) {
+            SVNFileUtil.copyDirectory(srcPath, dstPath, true, srcArea.getWCAccess());
+        } else {
+            checkCancelled();
+            if (!dstPath.exists()) {
+                dstPath.mkdirs();
+            }
+            
+            SVNWCManager.add(dstPath, dstParent, null, SVNRepository.INVALID_REVISION);
+            SVNAdminArea dstChildArea = dstParent.getWCAccess().retrieve(dstPath);
+            SVNAdminArea srcChildArea = srcArea.getWCAccess().retrieve(srcPath);
+            File[] entries = SVNFileListUtil.listFiles(srcPath);
+            
+            for (int i = 0; entries != null && i < entries.length; i++) {
+                checkCancelled();
+                File fsEntry = entries[i];
+                String name = fsEntry.getName();
+                if (SVNFileUtil.getAdminDirectoryName().equals(name)) {
+                    continue;
+                }
+            
+                SVNEntry entry = srcChildArea.getEntry(name, true);
+                if (fsEntry.isDirectory()) {
+                    copyAddedDir(dstChildArea, srcChildArea, fsEntry, name, entry != null);
+                } else if (fsEntry.isFile()) {
+                    copyAddedFile(dstChildArea, fsEntry, name, entry != null);
+                }
+            }
+        }
+    }
+    
     private void copyFile(SVNAdminArea dstParent, SVNAdminArea srcArea,  File srcPath, String dstName) throws SVNException {
         SVNWCAccess wcAccess = dstParent.getWCAccess();
         File dstPath = dstParent.getFile(dstName);
@@ -896,19 +922,30 @@ public class SVNCopyClient extends SVNBasicClient {
                 SVNErrorManager.error(err);
             }
         }
-        SVNEntry srcEntry = srcArea.getWCAccess().getEntry(srcPath, false);
-        if (srcEntry == null) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.UNVERSIONED_RESOURCE, "Cannot copy or move ''{0}'': it''s not under version control", srcPath);
-            SVNErrorManager.error(err);
-        }
-        if (srcEntry.isScheduledForAddition() || srcEntry.getURL() == null || srcEntry.isCopied()) {
+        SVNEntry srcEntry = srcArea.getWCAccess().getVersionedEntry(srcPath, false);
+        if ((srcEntry.isScheduledForAddition() && !srcEntry.isCopied()) || srcEntry.getURL() == null) {
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.UNSUPPORTED_FEATURE, "Cannot copy or move ''{0}'': it''s not in repository yet; try committing first", srcPath);
             SVNErrorManager.error(err);
         }
+        
+        String copyFromURL = null;
+        long copyFromRevision = SVNRepository.INVALID_REVISION;
+        if (srcEntry.isCopied()) {
+            if (srcEntry.getCopyFromURL() != null) {
+                copyFromURL = srcEntry.getCopyFromURL();
+                copyFromRevision = srcEntry.getCopyFromRevision();
+            } else {
+                SVNLocationEntry copyFromEntry = getCopyFromInfoFromParent(srcPath, srcArea);
+                copyFromURL = copyFromEntry.getPath();
+                copyFromRevision = copyFromEntry.getRevision();
+            }
+        } else {
+            copyFromURL = srcEntry.getURL();
+            copyFromRevision = srcEntry.getRevision();
+        }
+        
         File textBase = srcArea.getBaseFile(srcPath.getName(), false);
         File tmpTextBase = dstParent.getBaseFile(dstName, true);
-        String copyFromURL = srcEntry.getURL();
-        long copyFromRevision = srcEntry.getRevision();
         
         Map baseProperties = srcArea.getBaseProperties(srcEntry.getName()).asMap();
         Map properties = srcArea.getProperties(srcEntry.getName()).asMap();
@@ -925,12 +962,8 @@ public class SVNCopyClient extends SVNBasicClient {
     }
 
     private void copyDir(SVNAdminArea dstParent, SVNAdminArea srcArea, File srcPath, String dstName) throws SVNException {
-        SVNEntry srcEntry = srcArea.getWCAccess().getEntry(srcPath, false);
-        if (srcEntry == null) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_NOT_FOUND, "'{0}'' is not under version control", srcPath);
-            SVNErrorManager.error(err);
-        }
-        if (srcEntry.isScheduledForAddition() || srcEntry.getURL() == null || srcEntry.isCopied()) {
+        SVNEntry srcEntry = srcArea.getWCAccess().getVersionedEntry(srcPath, false);
+        if ((srcEntry.isScheduledForAddition() && !srcEntry.isCopied()) || srcEntry.getURL() == null) {
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.UNSUPPORTED_FEATURE, "Cannot copy or move ''{0}'': it''s not in repository yet; try committing first", srcPath);
             SVNErrorManager.error(err);
         }
@@ -940,14 +973,33 @@ public class SVNCopyClient extends SVNBasicClient {
         SVNWCClient wcClient = new SVNWCClient((ISVNAuthenticationManager) null, (ISVNOptions) null);
         wcClient.doCleanup(dstPath);
         
-        SVNWCAccess tmpAccess = SVNWCAccess.newInstance(null);
+        SVNWCAccess access = SVNWCAccess.newInstance(null);
         try {
-            SVNAdminArea tmpDir = tmpAccess.open(dstPath, true, SVNWCAccess.INFINITE_DEPTH);
+            SVNAdminArea tmpDir = access.open(dstPath, true, SVNWCAccess.INFINITE_DEPTH);
             postCopyCleanup(tmpDir);
+
+            String copyFromURL = null;
+            long copyFromRevision = SVNRepository.INVALID_REVISION;
+            if (srcEntry.isCopied()) {
+                if (srcEntry.getCopyFromURL() != null) {
+                    copyFromURL = srcEntry.getCopyFromURL();
+                    copyFromRevision = srcEntry.getCopyFromRevision();
+                } else {
+                    SVNLocationEntry copyFromEntry = getCopyFromInfoFromParent(srcPath, srcArea);
+                    copyFromURL = copyFromEntry.getPath();
+                    copyFromRevision = copyFromEntry.getRevision();
+                    Map attributes = new HashMap();
+                    attributes.put(SVNProperty.URL, copyFromURL);
+                    tmpDir.modifyEntry(tmpDir.getThisDirName(), attributes, true, false);
+                }
+            } else {
+                copyFromURL = srcEntry.getURL();
+                copyFromRevision = srcEntry.getRevision();
+            }
+            SVNWCManager.add(dstPath, dstParent, SVNURL.parseURIEncoded(copyFromURL), copyFromRevision);
         } finally {
-            tmpAccess.close();
+            access.close();
         }
-        SVNWCManager.add(dstPath, dstParent, srcEntry.getSVNURL(), srcEntry.getRevision());
     }
 
     static void postCopyCleanup(SVNAdminArea dir) throws SVNException {
@@ -993,6 +1045,36 @@ public class SVNCopyClient extends SVNBasicClient {
         }
     }
 
+    private SVNLocationEntry getCopyFromInfoFromParent(File path, SVNAdminArea adminArea) throws SVNException {
+        String copyFromURL = null;
+        long copyFromRevision = SVNRepository.INVALID_REVISION; 
+        File parentPath = path.getParentFile();
+        String name = path.getName();
+        while (copyFromURL == null) {
+            SVNEntry entry = null;
+            if (parentPath.equals(adminArea.getRoot()) || SVNPathUtil.isChildOf(adminArea.getRoot(), parentPath)) {
+                SVNAdminArea parentArea = adminArea.getWCAccess().retrieve(parentPath);
+                entry = parentArea.getVersionedEntry(parentArea.getThisDirName(), false);
+            } else {
+                SVNWCAccess access = SVNWCAccess.newInstance(null);
+                try {
+                    access.probeOpen(parentPath, false, SVNWCAccess.INFINITE_DEPTH);
+                    entry = access.getVersionedEntry(parentPath, false);
+                } finally {
+                    access.close();
+                }
+            }
+            if (entry.getCopyFromURL() != null) {
+                copyFromURL = SVNPathUtil.append(entry.getCopyFromURL(), SVNEncodingUtil.uriEncode(name));
+                copyFromRevision = entry.getCopyFromRevision();
+            } else {
+                name = SVNPathUtil.append(parentPath.getName(), name);
+                parentPath = parentPath.getParentFile();
+            }
+        }
+        return new SVNLocationEntry(copyFromRevision, copyFromURL);
+    }
+    
     private static class CopyCommitPathHandler implements ISVNCommitPathHandler {
         
         private String mySrcPath;

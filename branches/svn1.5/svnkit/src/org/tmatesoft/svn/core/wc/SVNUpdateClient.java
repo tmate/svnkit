@@ -280,11 +280,7 @@ public class SVNUpdateClient extends SVNBasicClient {
             SVNAdminAreaInfo info = wcAccess.openAnchor(file, true, SVNWCAccess.INFINITE_DEPTH);
             final SVNReporter reporter = new SVNReporter(info, file, true, depth, getDebugLog());
             SVNAdminArea anchorArea = info.getAnchor();
-            SVNEntry entry = anchorArea.getEntry(anchorArea.getThisDirName(), false);
-            if (entry == null) {
-                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.UNVERSIONED_RESOURCE, "''{0}'' is not under version control", anchorArea.getRoot());
-                SVNErrorManager.error(err);
-            }
+            SVNEntry entry = anchorArea.getVersionedEntry(anchorArea.getThisDirName(), false);
             SVNURL sourceURL = entry.getSVNURL();
             if (sourceURL == null) {
                 SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_MISSING_URL, "Directory ''{0}'' has no URL", anchorArea.getRoot());
@@ -542,12 +538,13 @@ public class SVNUpdateClient extends SVNBasicClient {
     private void copyVersionedDir(File from, File to, SVNRevision revision, String eolStyle, boolean force, SVNDepth depth) throws SVNException {
         SVNWCAccess wcAccess = createWCAccess();
         SVNAdminArea adminArea = wcAccess.probeOpen(from, false, 0);
-        SVNEntry entry = wcAccess.getEntry(from, false);
-        if (entry == null) {
+        
+        SVNEntry entry = null;
+        try {
+            entry = wcAccess.getVersionedEntry(from, false);
+        } catch (SVNException svne) {
             wcAccess.close();
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_NOT_FOUND, "''{0}'' is not under version control or doesn''t exist", from,
-                    SVNErrorMessage.TYPE_WARNING);
-            SVNErrorManager.error(err);
+            throw svne;
         }
         
         if (revision == SVNRevision.WORKING && entry.isScheduledForDeletion()) {

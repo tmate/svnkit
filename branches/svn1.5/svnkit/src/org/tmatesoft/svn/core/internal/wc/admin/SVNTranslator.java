@@ -90,7 +90,7 @@ public class SVNTranslator {
         byte[] eols;
         if (keywords != null) {            
             if (expand) {
-                SVNEntry entry = adminArea.getEntry(name, true);
+                SVNEntry entry = adminArea.getVersionedEntry(name, true);
                 ISVNOptions options = adminArea.getWCAccess().getOptions();
                 String url = entry.getURL();
                 String author = entry.getAuthor();
@@ -169,7 +169,7 @@ public class SVNTranslator {
             if (toNormalFormat) {
                 translateToNormalForm(src, result, eolStyle, forceEOLRepair, keywords, special);
             } else {
-                SVNEntry entry = dir.getEntry(name, true);
+                SVNEntry entry = dir.getVersionedEntry(name, true);
                 ISVNOptions options = dir.getWCAccess().getOptions();
                 String url = entry.getURL();
                 String author = entry.getAuthor();

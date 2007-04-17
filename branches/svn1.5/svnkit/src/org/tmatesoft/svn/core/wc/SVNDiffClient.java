@@ -673,11 +673,8 @@ public class SVNDiffClient extends SVNBasicClient {
             File anchorPath = info.getAnchor().getRoot();
             String target = "".equals(info.getTargetName()) ? null : info.getTargetName();
             
-            SVNEntry anchorEntry = info.getAnchor().getEntry("", false);
-            if (anchorEntry == null) {
-                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_NOT_FOUND, "''{0}'' is not under version control", anchorPath);
-                SVNErrorManager.error(err);
-            } else if (anchorEntry.getURL() == null) {
+            SVNEntry anchorEntry = info.getAnchor().getVersionedEntry("", false);
+            if (anchorEntry.getURL() == null) {
                 SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_MISSING_URL, "''{0}'' has no URL", anchorPath);
                 SVNErrorManager.error(err);
             }
@@ -718,11 +715,8 @@ public class SVNDiffClient extends SVNBasicClient {
             File anchorPath = info.getAnchor().getRoot();
             String target = "".equals(info.getTargetName()) ? null : info.getTargetName();
             
-            SVNEntry anchorEntry = info.getAnchor().getEntry("", false);
-            if (anchorEntry == null) {
-                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_NOT_FOUND, "''{0}'' is not under version control", anchorPath);
-                SVNErrorManager.error(err);
-            } else if (anchorEntry.getURL() == null) {
+            SVNEntry anchorEntry = info.getAnchor().getVersionedEntry("", false);
+            if (anchorEntry.getURL() == null) {
                 SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_MISSING_URL, "''{0}'' has no URL", anchorPath);
                 SVNErrorManager.error(err);
             }
@@ -770,11 +764,7 @@ public class SVNDiffClient extends SVNBasicClient {
         SVNWCAccess wcAccess = createWCAccess();
         try {
             SVNAdminAreaInfo info = wcAccess.openAnchor(path1, false, recursive ? SVNWCAccess.INFINITE_DEPTH: 0);
-            SVNEntry entry = wcAccess.getEntry(path1, false);
-            if (entry == null) {
-                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_NOT_FOUND, "''{0}'' is not under version control", path1);
-                SVNErrorManager.error(err);
-            }
+            wcAccess.getVersionedEntry(path1, false);
             long rev = getRevisionNumber(revision1, null, path1);
             AbstractDiffCallback callback = new SVNDiffCallback(info, getDiffGenerator(), 
                     rev, -1, result);
@@ -998,11 +988,7 @@ public class SVNDiffClient extends SVNBasicClient {
         try {
             dstPath = new File(SVNPathUtil.validateFilePath(dstPath.getAbsolutePath()));
             SVNAdminAreaInfo info = wcAccess.openAnchor(dstPath, !dryRun, SVNDepth.recurseFromDepth(depth) ? SVNWCAccess.INFINITE_DEPTH : 0);
-            SVNEntry targetEntry = wcAccess.getEntry(dstPath, false);
-            if (targetEntry == null) {
-                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_NOT_FOUND, "''{0}'' is not under version control", dstPath);
-                SVNErrorManager.error(err);
-            }
+            SVNEntry targetEntry = wcAccess.getVersionedEntry(dstPath, false);
             if (depth == null || depth == SVNDepth.DEPTH_UNKNOWN) {
                 depth = targetEntry.getDepth();
             }
@@ -1079,12 +1065,7 @@ public class SVNDiffClient extends SVNBasicClient {
         try {
             dstPath = new File(SVNPathUtil.validateFilePath(dstPath.getAbsolutePath()));
             SVNAdminAreaInfo info = wcAccess.openAnchor(dstPath, !dryRun, SVNDepth.recurseFromDepth(depth) ? SVNWCAccess.INFINITE_DEPTH : 0);
-            
-            SVNEntry targetEntry = wcAccess.getEntry(dstPath, false);
-            if (targetEntry == null) {
-                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_NOT_FOUND, "''{0}'' is not under version control", dstPath);
-                SVNErrorManager.error(err);
-            }
+            SVNEntry targetEntry = wcAccess.getVersionedEntry(dstPath, false);
             if (depth == null || depth == SVNDepth.DEPTH_UNKNOWN) {
                 depth = targetEntry.getDepth();
             }
@@ -1161,12 +1142,7 @@ public class SVNDiffClient extends SVNBasicClient {
         try {
             dstPath = new File(SVNPathUtil.validateFilePath(dstPath.getAbsolutePath()));
             SVNAdminAreaInfo info = wcAccess.openAnchor(dstPath, !dryRun, SVNDepth.recurseFromDepth(depth) ? SVNWCAccess.INFINITE_DEPTH : 0);
-            
-            SVNEntry targetEntry = wcAccess.getEntry(dstPath, false);
-            if (targetEntry == null) {
-                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_NOT_FOUND, "''{0}'' is not under version control", dstPath);
-                SVNErrorManager.error(err);
-            }
+            SVNEntry targetEntry = wcAccess.getVersionedEntry(dstPath, false);
             if (depth == null || depth == SVNDepth.DEPTH_UNKNOWN) {
                 depth = targetEntry.getDepth();
             }
@@ -1238,12 +1214,7 @@ public class SVNDiffClient extends SVNBasicClient {
         try {
             dstPath = new File(SVNPathUtil.validateFilePath(dstPath.getAbsolutePath())).getAbsoluteFile();
             SVNAdminAreaInfo info = wcAccess.openAnchor(dstPath, !dryRun, SVNDepth.recurseFromDepth(depth) ? SVNWCAccess.INFINITE_DEPTH : 0);
-            SVNEntry targetEntry = wcAccess.getEntry(dstPath, false);
-            
-            if (targetEntry == null) {
-                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_NOT_FOUND, "''{0}'' is not under version control", dstPath);
-                SVNErrorManager.error(err);
-            }
+            SVNEntry targetEntry = wcAccess.getVersionedEntry(dstPath, false);
             if (depth == null || depth == SVNDepth.DEPTH_UNKNOWN) {
                 depth = targetEntry.getDepth();
             }
@@ -1315,12 +1286,7 @@ public class SVNDiffClient extends SVNBasicClient {
         dstPath = new File(SVNPathUtil.validateFilePath(dstPath.getAbsolutePath())).getAbsoluteFile();
         try {
             SVNAdminAreaInfo info = wcAccess.openAnchor(dstPath, !dryRun, SVNDepth.recurseFromDepth(depth) ? SVNWCAccess.INFINITE_DEPTH : 0);
-            
-            SVNEntry targetEntry = wcAccess.getEntry(dstPath, false);
-            if (targetEntry == null) {
-                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_NOT_FOUND, "''{0}'' is not under version control", dstPath);
-                SVNErrorManager.error(err);
-            }
+            SVNEntry targetEntry = wcAccess.getVersionedEntry(dstPath, false);
             if (depth == null || depth == SVNDepth.DEPTH_UNKNOWN) {
                 depth = targetEntry.getDepth();
             }
@@ -1404,12 +1370,7 @@ public class SVNDiffClient extends SVNBasicClient {
             dstPath = new File(SVNPathUtil.validateFilePath(dstPath.getAbsolutePath())).getAbsoluteFile();
             path1 = new File(SVNPathUtil.validateFilePath(path1.getAbsolutePath())).getAbsoluteFile();
             SVNAdminAreaInfo info = wcAccess.openAnchor(dstPath.getAbsoluteFile(), !dryRun, SVNDepth.recurseFromDepth(depth) ? SVNWCAccess.INFINITE_DEPTH : 0);
-            
-            SVNEntry targetEntry = wcAccess.getEntry(dstPath, false);
-            if (targetEntry == null) {
-                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_NOT_FOUND, "''{0}'' is not under version control", dstPath);
-                SVNErrorManager.error(err);
-            }
+            SVNEntry targetEntry = wcAccess.getVersionedEntry(dstPath, false);
             if (depth == null || depth == SVNDepth.DEPTH_UNKNOWN) {
                 depth = targetEntry.getDepth();
             }
