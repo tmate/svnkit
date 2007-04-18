@@ -223,29 +223,108 @@ public class SVNWCClient extends SVNBasicClient {
      * @see                       #doGetFileContents(SVNURL, SVNRevision, SVNRevision, boolean, OutputStream)                           
      */
     public void doGetFileContents(File path, SVNRevision pegRevision, SVNRevision revision, boolean expandKeywords, OutputStream dst) throws SVNException {
-        if (dst == null) {
-            return;
-        }
-        if (revision == null || !revision.isValid()) {
-            revision = SVNRevision.BASE;
-        } else if (revision == SVNRevision.COMMITTED) {
-            revision = SVNRevision.BASE;
-        }
-        if ((!pegRevision.isValid() || pegRevision == SVNRevision.BASE || pegRevision == SVNRevision.WORKING) && 
-                (!revision.isValid() || revision == SVNRevision.BASE || revision == SVNRevision.WORKING)) {
-            if (pegRevision == null || !pegRevision.isValid()) {
-                pegRevision = SVNRevision.BASE;
-            } else if (pegRevision == SVNRevision.COMMITTED) {
-                pegRevision = SVNRevision.BASE;
+        try {
+            if (dst == null) {
+                return;
             }
-            doGetLocalFileContents(path, dst, revision, expandKeywords);
-        } else {
-            SVNRepository repos = createRepository(null, path, pegRevision, revision);
+            if (revision == null || !revision.isValid()) {
+                revision = SVNRevision.BASE;
+            } else if (revision == SVNRevision.COMMITTED) {
+                revision = SVNRevision.BASE;
+            }
+            if ((!pegRevision.isValid() || pegRevision == SVNRevision.BASE || pegRevision == SVNRevision.WORKING) && 
+                    (!revision.isValid() || revision == SVNRevision.BASE || revision == SVNRevision.WORKING)) {
+                if (pegRevision == null || !pegRevision.isValid()) {
+                    pegRevision = SVNRevision.BASE;
+                } else if (pegRevision == SVNRevision.COMMITTED) {
+                    pegRevision = SVNRevision.BASE;
+                }
+                doGetLocalFileContents(path, dst, revision, expandKeywords);
+            } else {
+                SVNRepository repos = createRepository(null, path, pegRevision, revision);
+                checkCancelled();
+                long revNumber = getRevisionNumber(revision, repos, path);
+                SVNNodeKind kind = repos.checkPath("", revNumber);
+                if (kind == SVNNodeKind.DIR) {
+                    SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.CLIENT_IS_DIRECTORY, "URL ''{0}'' refers to a directory", repos.getLocation());
+                    SVNErrorManager.error(err);
+                }
+                checkCancelled();
+                if (!expandKeywords) {
+                    repos.getFile("", revNumber, null, new SVNCancellableOutputStream(dst, this));
+                } else {
+                    Map properties = new HashMap();
+                    repos.getFile("", revNumber, properties, null);
+                    checkCancelled();
+
+                    String keywords = (String) properties.get(SVNProperty.KEYWORDS);
+                    String eol = (String) properties.get(SVNProperty.EOL_STYLE);
+                    if (keywords != null || eol != null) {
+                        String cmtRev = (String) properties.get(SVNProperty.COMMITTED_REVISION);
+                        String cmtDate = (String) properties.get(SVNProperty.COMMITTED_DATE);
+                        String author = (String) properties.get(SVNProperty.LAST_AUTHOR);
+                        Map keywordsMap = SVNTranslator.computeKeywords(keywords, expandKeywords ? repos.getLocation().toString() : null, author, cmtDate, cmtRev, getOptions());
+                        OutputStream translatingStream = new SVNTranslatorOutputStream(dst, SVNTranslator.getEOL(eol), false, keywordsMap, expandKeywords); 
+                        repos.getFile("", revNumber, null, new SVNCancellableOutputStream(translatingStream, getEventDispatcher()));
+                        try {
+                            translatingStream.close();
+                        } catch (IOExceptionWrapper ioew) {
+                            throw ioew.getOriginalException();
+                        } catch (IOException e) {
+                            SVNErrorManager.error(SVNErrorMessage.create(SVNErrorCode.IO_ERROR, e.getMessage()));
+                        }
+                    } else {
+                        repos.getFile("", revNumber, null, new SVNCancellableOutputStream(dst, getEventDispatcher()));
+                    }
+                }
+                try {
+                    dst.flush();
+                } catch (IOException e) {
+                    SVNErrorManager.error(SVNErrorMessage.create(SVNErrorCode.IO_ERROR, e.getMessage()));
+                }
+            }
+        } catch (SVNException svne) {
+            SVNErrorCode errCode = svne.getErrorMessage().getErrorCode();
+            if (errCode == SVNErrorCode.UNVERSIONED_RESOURCE || errCode == SVNErrorCode.ENTRY_NOT_FOUND
+                    || errCode == SVNErrorCode.CLIENT_IS_DIRECTORY) {
+                svne.getErrorMessage().setType(SVNErrorMessage.TYPE_WARNING);
+            }
+            throw svne;
+        }
+    }
+    
+    /**
+     * Gets contents of a file of a particular revision from a repository. 
+     * 
+     * @param  url                a file item's repository location 
+     * @param  pegRevision        a revision in which the file item is first looked up
+     * @param  revision           a target revision
+     * @param  expandKeywords     if <span class="javakeyword">true</span> then
+     *                            all keywords presenting in the file and listed in 
+     *                            the file's {@link org.tmatesoft.svn.core.SVNProperty#KEYWORDS svn:keywords}
+     *                            property (if set) will be substituted, otherwise not 
+     * @param  dst                the destination where the file contents will be written to
+     * @throws SVNException       if one of the following is true:
+     *                            <ul>
+     *                            <li><code>url</code> refers to a directory 
+     *                            <li>it's impossible to create temporary files
+     *                            ({@link java.io.File#createTempFile(java.lang.String, java.lang.String) createTempFile()}
+     *                            fails) necessary for file translating
+     *                            </ul> 
+     * @see                       #doGetFileContents(File, SVNRevision, SVNRevision, boolean, OutputStream)                           
+     */
+    public void doGetFileContents(SVNURL url, SVNRevision pegRevision, SVNRevision revision, boolean expandKeywords, OutputStream dst) throws SVNException {
+        try {
+            revision = revision == null || !revision.isValid() ? SVNRevision.HEAD : revision;
+            // now get contents from URL.
+            SVNRepository repos = createRepository(url, null, pegRevision, revision);
             checkCancelled();
-            long revNumber = getRevisionNumber(revision, repos, path);
-            SVNNodeKind kind = repos.checkPath("", revNumber);
-            if (kind == SVNNodeKind.DIR) {
-                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.CLIENT_IS_DIRECTORY, "URL ''{0}'' refers to a directory", repos.getLocation());
+            long revNumber = getRevisionNumber(revision, repos, null);
+            checkCancelled();
+            SVNNodeKind nodeKind = repos.checkPath("", revNumber);
+            checkCancelled();
+            if (nodeKind == SVNNodeKind.DIR) {
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.CLIENT_IS_DIRECTORY, "URL ''{0}'' refers to a directory", url, SVNErrorMessage.TYPE_WARNING);
                 SVNErrorManager.error(err);
             }
             checkCancelled();
@@ -281,74 +360,13 @@ public class SVNWCClient extends SVNBasicClient {
             } catch (IOException e) {
                 SVNErrorManager.error(SVNErrorMessage.create(SVNErrorCode.IO_ERROR, e.getMessage()));
             }
-        }
-    }
-    
-    /**
-     * Gets contents of a file of a particular revision from a repository. 
-     * 
-     * @param  url                a file item's repository location 
-     * @param  pegRevision        a revision in which the file item is first looked up
-     * @param  revision           a target revision
-     * @param  expandKeywords     if <span class="javakeyword">true</span> then
-     *                            all keywords presenting in the file and listed in 
-     *                            the file's {@link org.tmatesoft.svn.core.SVNProperty#KEYWORDS svn:keywords}
-     *                            property (if set) will be substituted, otherwise not 
-     * @param  dst                the destination where the file contents will be written to
-     * @throws SVNException       if one of the following is true:
-     *                            <ul>
-     *                            <li><code>url</code> refers to a directory 
-     *                            <li>it's impossible to create temporary files
-     *                            ({@link java.io.File#createTempFile(java.lang.String, java.lang.String) createTempFile()}
-     *                            fails) necessary for file translating
-     *                            </ul> 
-     * @see                       #doGetFileContents(File, SVNRevision, SVNRevision, boolean, OutputStream)                           
-     */
-    public void doGetFileContents(SVNURL url, SVNRevision pegRevision, SVNRevision revision, boolean expandKeywords, OutputStream dst) throws SVNException {
-        revision = revision == null || !revision.isValid() ? SVNRevision.HEAD : revision;
-        // now get contents from URL.
-        SVNRepository repos = createRepository(url, null, pegRevision, revision);
-        checkCancelled();
-        long revNumber = getRevisionNumber(revision, repos, null);
-        checkCancelled();
-        SVNNodeKind nodeKind = repos.checkPath("", revNumber);
-        checkCancelled();
-        if (nodeKind == SVNNodeKind.DIR) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.CLIENT_IS_DIRECTORY, "URL ''{0}'' refers to a directory", url, SVNErrorMessage.TYPE_WARNING);
-            SVNErrorManager.error(err);
-        }
-        checkCancelled();
-        if (!expandKeywords) {
-            repos.getFile("", revNumber, null, new SVNCancellableOutputStream(dst, this));
-        } else {
-            Map properties = new HashMap();
-            repos.getFile("", revNumber, properties, null);
-            checkCancelled();
-
-            String keywords = (String) properties.get(SVNProperty.KEYWORDS);
-            String eol = (String) properties.get(SVNProperty.EOL_STYLE);
-            if (keywords != null || eol != null) {
-                String cmtRev = (String) properties.get(SVNProperty.COMMITTED_REVISION);
-                String cmtDate = (String) properties.get(SVNProperty.COMMITTED_DATE);
-                String author = (String) properties.get(SVNProperty.LAST_AUTHOR);
-                Map keywordsMap = SVNTranslator.computeKeywords(keywords, expandKeywords ? repos.getLocation().toString() : null, author, cmtDate, cmtRev, getOptions());
-                OutputStream translatingStream = new SVNTranslatorOutputStream(dst, SVNTranslator.getEOL(eol), false, keywordsMap, expandKeywords); 
-                repos.getFile("", revNumber, null, new SVNCancellableOutputStream(translatingStream, getEventDispatcher()));
-                try {
-                    translatingStream.close();
-                } catch (IOExceptionWrapper ioew) {
-                    throw ioew.getOriginalException();
-                } catch (IOException e) {
-                    SVNErrorManager.error(SVNErrorMessage.create(SVNErrorCode.IO_ERROR, e.getMessage()));
-                }
-            } else {
-                repos.getFile("", revNumber, null, new SVNCancellableOutputStream(dst, getEventDispatcher()));
+        } catch (SVNException svne) {
+            SVNErrorCode errCode = svne.getErrorMessage().getErrorCode();
+            if (errCode == SVNErrorCode.UNVERSIONED_RESOURCE || errCode == SVNErrorCode.ENTRY_NOT_FOUND
+                    || errCode == SVNErrorCode.CLIENT_IS_DIRECTORY) {
+                svne.getErrorMessage().setType(SVNErrorMessage.TYPE_WARNING);
             }
-        }
-        try {
-            dst.flush();
-        } catch (IOException e) {
-            SVNErrorManager.error(SVNErrorMessage.create(SVNErrorCode.IO_ERROR, e.getMessage()));
+            throw svne;
         }
     }
     
@@ -439,6 +457,12 @@ public class SVNWCClient extends SVNBasicClient {
             SVNAdminArea area = wcAccess.probeOpen(path, true, recursive ? SVNWCAccess.INFINITE_DEPTH : 1);
             SVNEntry entry = wcAccess.getVersionedEntry(path, false);
             doSetLocalProperty(area, entry.isDirectory() ? area.getThisDirName() : entry.getName(), propName, propValue, force, recursive, true, handler);
+        } catch (SVNException svne) {
+            SVNErrorCode errCode = svne.getErrorMessage().getErrorCode();
+            if (errCode == SVNErrorCode.ENTRY_NOT_FOUND || errCode == SVNErrorCode.UNVERSIONED_RESOURCE) {
+                svne.getErrorMessage().setType(SVNErrorMessage.TYPE_WARNING);
+            }
+            throw svne;
         } finally {
             wcAccess.close();
         }
@@ -722,6 +746,12 @@ public class SVNWCClient extends SVNBasicClient {
                     }
                 }
             }
+        } catch (SVNException svne) {
+            SVNErrorCode errCode = svne.getErrorMessage().getErrorCode();
+            if (errCode == SVNErrorCode.UNVERSIONED_RESOURCE || errCode == SVNErrorCode.ENTRY_NOT_FOUND) {
+                svne.getErrorMessage().setType(SVNErrorMessage.TYPE_WARNING);
+            }
+            throw svne;
         } finally {
             wcAccess.close();
         }
@@ -996,74 +1026,82 @@ public class SVNWCClient extends SVNBasicClient {
      * for now."
      */
     public void doAdd(File path, boolean force, boolean mkdir, boolean climbUnversionedParents, boolean recursive, boolean includeIgnored) throws SVNException {
-        path = new File(SVNPathUtil.validateFilePath(path.getAbsolutePath()));
-        if (!mkdir && climbUnversionedParents) {
-            // check if parent is versioned. if not, add it.
-            SVNWCAccess wcAccess = createWCAccess();
-            try {
-                wcAccess.open(path.getParentFile(), false, 0);
-            } catch (SVNException e) {
-                if (e.getErrorMessage().getErrorCode() == SVNErrorCode.WC_NOT_DIRECTORY) {
-                    doAdd(path.getParentFile(), false, false, climbUnversionedParents, false);
-                } else {
+        try {
+            path = new File(SVNPathUtil.validateFilePath(path.getAbsolutePath()));
+            if (!mkdir && climbUnversionedParents) {
+                // check if parent is versioned. if not, add it.
+                SVNWCAccess wcAccess = createWCAccess();
+                try {
+                    wcAccess.open(path.getParentFile(), false, 0);
+                } catch (SVNException e) {
+                    if (e.getErrorMessage().getErrorCode() == SVNErrorCode.WC_NOT_DIRECTORY) {
+                        doAdd(path.getParentFile(), false, false, climbUnversionedParents, false);
+                    } else {
+                        throw e;
+                    }
+                } finally {
+                    wcAccess.close();
+                }
+            }
+            if (force && mkdir && SVNFileType.getType(path) == SVNFileType.DIRECTORY) {
+                // directory is already there.
+                doAdd(path, force, false, true, false, true);
+                return;
+            } else if (mkdir) {
+                // attempt to create dir
+                File parent = path;
+                File firstCreated = path;
+                while(parent != null && SVNFileType.getType(parent) == SVNFileType.NONE) {
+                    firstCreated = parent;
+                    parent = parent.getParentFile();
+                }            
+                boolean created = path.mkdirs();
+                if (!created) {
+                    // delete created dirs.
+                    SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, "Cannot create new directory ''{0}''", path);
+                    while(parent == null ? path != null : !path.equals(parent)) {
+                        SVNFileUtil.deleteAll(path, true);
+                        path = path.getParentFile();
+                    }
+                    SVNErrorManager.error(err);
+                }
+                try {
+                    doAdd(firstCreated, false, false, climbUnversionedParents, true, true);
+                } catch (SVNException e) {
+                    SVNFileUtil.deleteAll(firstCreated, true);
                     throw e;
                 }
-            } finally {
+                return;
+            }
+            SVNWCAccess wcAccess = createWCAccess();
+            try {
+                SVNAdminArea dir = null;
+                if (path.isDirectory()) {
+                    dir = wcAccess.open(SVNWCUtil.isVersionedDirectory(path.getParentFile()) ? path.getParentFile() : path, true, 0);
+                } else {
+                    dir = wcAccess.open(path.getParentFile(), true, 0);
+                }
+                SVNFileType fileType = SVNFileType.getType(path);
+                if (fileType == SVNFileType.DIRECTORY && recursive) {
+                    addDirectory(path, dir, force, includeIgnored);
+                } else if (fileType == SVNFileType.FILE || fileType == SVNFileType.SYMLINK) {
+                    addFile(path, fileType, dir);
+                } else {
+                    SVNWCManager.add(path, dir, null, SVNRevision.UNDEFINED);
+                }
+            } catch (SVNException e) {
+                if (!(force && e.getErrorMessage().getErrorCode() == SVNErrorCode.ENTRY_EXISTS)) {
+                    throw e;
+                }
+            } finally {        
                 wcAccess.close();
             }
-        }
-        if (force && mkdir && SVNFileType.getType(path) == SVNFileType.DIRECTORY) {
-            // directory is already there.
-            doAdd(path, force, false, true, false, true);
-            return;
-        } else if (mkdir) {
-            // attempt to create dir
-            File parent = path;
-            File firstCreated = path;
-            while(parent != null && SVNFileType.getType(parent) == SVNFileType.NONE) {
-                firstCreated = parent;
-                parent = parent.getParentFile();
-            }            
-            boolean created = path.mkdirs();
-            if (!created) {
-                // delete created dirs.
-                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, "Cannot create new directory ''{0}''", path);
-                while(parent == null ? path != null : !path.equals(parent)) {
-                    SVNFileUtil.deleteAll(path, true);
-                    path = path.getParentFile();
-                }
-                SVNErrorManager.error(err);
+        } catch (SVNException svne) {
+            SVNErrorCode errCode = svne.getErrorMessage().getErrorCode();
+            if (errCode == SVNErrorCode.ENTRY_EXISTS || errCode == SVNErrorCode.WC_PATH_NOT_FOUND) {
+                svne.getErrorMessage().setType(SVNErrorMessage.TYPE_WARNING);
             }
-            try {
-                doAdd(firstCreated, false, false, climbUnversionedParents, true, true);
-            } catch (SVNException e) {
-                SVNFileUtil.deleteAll(firstCreated, true);
-                throw e;
-            }
-            return;
-        }
-        SVNWCAccess wcAccess = createWCAccess();
-        try {
-            SVNAdminArea dir = null;
-            if (path.isDirectory()) {
-                dir = wcAccess.open(SVNWCUtil.isVersionedDirectory(path.getParentFile()) ? path.getParentFile() : path, true, 0);
-            } else {
-                dir = wcAccess.open(path.getParentFile(), true, 0);
-            }
-            SVNFileType fileType = SVNFileType.getType(path);
-            if (fileType == SVNFileType.DIRECTORY && recursive) {
-                addDirectory(path, dir, force, includeIgnored);
-            } else if (fileType == SVNFileType.FILE || fileType == SVNFileType.SYMLINK) {
-                addFile(path, fileType, dir);
-            } else {
-                SVNWCManager.add(path, dir, null, SVNRevision.UNDEFINED);
-            }
-        } catch (SVNException e) {
-            if (!(force && e.getErrorMessage().getErrorCode() == SVNErrorCode.ENTRY_EXISTS)) {
-                throw e;
-            }
-        } finally {        
-            wcAccess.close();
+            throw svne;
         }
     }
     
