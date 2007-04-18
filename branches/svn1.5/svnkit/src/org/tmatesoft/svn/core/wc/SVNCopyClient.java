@@ -974,12 +974,11 @@ public class SVNCopyClient extends SVNBasicClient {
         wcClient.doCleanup(dstPath);
         
         SVNWCAccess access = SVNWCAccess.newInstance(null);
+        String copyFromURL = null;
+        long copyFromRevision = SVNRepository.INVALID_REVISION;
         try {
             SVNAdminArea tmpDir = access.open(dstPath, true, SVNWCAccess.INFINITE_DEPTH);
             postCopyCleanup(tmpDir);
-
-            String copyFromURL = null;
-            long copyFromRevision = SVNRepository.INVALID_REVISION;
             if (srcEntry.isCopied()) {
                 if (srcEntry.getCopyFromURL() != null) {
                     copyFromURL = srcEntry.getCopyFromURL();
@@ -996,10 +995,10 @@ public class SVNCopyClient extends SVNBasicClient {
                 copyFromURL = srcEntry.getURL();
                 copyFromRevision = srcEntry.getRevision();
             }
-            SVNWCManager.add(dstPath, dstParent, SVNURL.parseURIEncoded(copyFromURL), copyFromRevision);
         } finally {
             access.close();
         }
+        SVNWCManager.add(dstPath, dstParent, SVNURL.parseURIEncoded(copyFromURL), copyFromRevision);
     }
 
     static void postCopyCleanup(SVNAdminArea dir) throws SVNException {
