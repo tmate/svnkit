@@ -151,11 +151,25 @@ public class SVNCommandLine {
 
             if (argument.startsWith("--")) {
                 // long argument (--no-ignore)
+                int equationInd = argument.indexOf('='); 
+                String originalArgument = argument;
+                if (equationInd != -1) {
+                    argument = argument.substring(0, equationInd);
+                }
                 SVNArgument svnArgument = SVNArgument.findArgument(argument, validArguments);
                 if (svnArgument != null) {
                     if (svnArgument.hasValue()) {
-                        previousArgument = svnArgument;
-                        previousArgumentName = argument;
+                        if (equationInd != -1) {
+                            Object value = svnArgument.parseValue(originalArgument.substring(equationInd + 1));
+                            if (value != null) {
+                                myBinaryArguments.put(svnArgument, value);
+                            }
+                            previousArgument = null;
+                            previousArgumentName = null;
+                        } else {
+                            previousArgument = svnArgument;
+                            previousArgumentName = argument;
+                        }
                     } else {
                         myUnaryArguments.add(svnArgument);
                     }

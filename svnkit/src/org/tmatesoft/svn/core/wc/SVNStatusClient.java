@@ -213,8 +213,7 @@ public class SVNStatusClient extends SVNBasicClient {
         if (handler == null) {
             return -1;
         }
-        //TODO(sd): This is a shim, we should use depth for real.
-        boolean recursive = SVNDepth.recurseFromDepth(depth);
+        
         SVNWCAccess wcAccess = createWCAccess();
         SVNStatusEditor editor = null;
         final boolean[] deletedInRepository = new boolean[] {false};
@@ -227,13 +226,20 @@ public class SVNStatusClient extends SVNBasicClient {
             }
         };
         try {
-            SVNAdminAreaInfo info = wcAccess.openAnchor(path, false, recursive ? -1 : 1);
+            SVNAdminAreaInfo info = null;
+            try {
+                SVNAdminArea anchor = wcAccess.open(path, false, SVNDepth.recurseFromDepth(depth) ? -1 : 1);
+                info = new SVNAdminAreaInfo(wcAccess, anchor, anchor, "");
+            } catch (SVNException svne) {
+                if (svne.getErrorMessage().getErrorCode() == SVNErrorCode.WC_NOT_DIRECTORY) {
+                    info = wcAccess.openAnchor(path, false, SVNDepth.recurseFromDepth(depth) ? -1 : 1);
+                } else {
+                    throw svne;
+                }
+            }
             SVNEntry entry = null;
             if (depth == null || depth == SVNDepth.DEPTH_UNKNOWN) {
-                entry = wcAccess.getEntry(info.getAnchor().getRoot(), false);                
-                if (entry != null) {
-                    depth = entry.getDepth();
-                }
+                depth = SVNDepth.DEPTH_INFINITY;
             }
             Map externals = null;
             if (collectParentExternals) {
@@ -262,14 +268,12 @@ public class SVNStatusClient extends SVNBasicClient {
                     if (!entry.isScheduledForAddition()) {
                         deletedInRepository[0] = true;
                     }
-                    //TODO(sd): ...and this would take depth, not recurse... 
-                    editor = new SVNStatusEditor(getOptions(), wcAccess, info, includeIgnored, reportAll, recursive, realHandler);
+                    editor = new SVNStatusEditor(getOptions(), wcAccess, info, includeIgnored, reportAll, depth, realHandler);
                     editor.setExternals(externals);
                     checkCancelled();
                     editor.closeEdit();
                 } else {
-                    //TODO(sd): ...and this would take depth, not recurse... 
-                    editor = new SVNRemoteStatusEditor(getOptions(), wcAccess, info, includeIgnored, reportAll, recursive, realHandler);
+                    editor = new SVNRemoteStatusEditor(getOptions(), wcAccess, info, includeIgnored, reportAll, depth, realHandler);
                     editor.setExternals(externals);
                     SVNRepository locksRepos = createRepository(url, false);
                     checkCancelled();
@@ -283,7 +287,7 @@ public class SVNStatusClient extends SVNBasicClient {
                     getEventDispatcher().handleEvent(event, ISVNEventHandler.UNKNOWN);
                 }
             } else {
-                editor = new SVNStatusEditor(getOptions(), wcAccess, info, includeIgnored, reportAll, recursive, handler);
+                editor = new SVNStatusEditor(getOptions(), wcAccess, info, includeIgnored, reportAll, depth, handler);
                 editor.setExternals(externals);
                 editor.closeEdit();
             }         

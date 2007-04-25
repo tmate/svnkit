@@ -57,14 +57,17 @@ public class SVNCommitCommand extends SVNCommand {
             matchTabsInPath(getCommandLine().getPathAt(i), err);
             localPaths[i] = new File(getCommandLine().getPathAt(i));
         }
-        getClientManager().setEventHandler(new SVNCommandEventProcessor(out, err, false));
+        boolean quiet = getCommandLine().hasArgument(SVNArgument.QUIET);
+        if (!quiet) {
+            getClientManager().setEventHandler(new SVNCommandEventProcessor(out, err, false));
+        }
         SVNCommitClient client = getClientManager().getCommitClient();
         SVNCommitInfo result = client.doCommit(localPaths, keepLocks, message, false, SVNDepth.recurseFromDepth(depth));
-        if (result != SVNCommitInfo.NULL) {
+        if (result != SVNCommitInfo.NULL && !quiet) {
             out.println();
             out.println("Committed revision " + result.getNewRevision() + ".");
         }
-        if (result.getErrorMessage() != null && result.getErrorMessage().getErrorCode() == SVNErrorCode.REPOS_POST_COMMIT_HOOK_FAILED) {
+        if (result.getErrorMessage() != null && result.getErrorMessage().getErrorCode() == SVNErrorCode.REPOS_POST_COMMIT_HOOK_FAILED && !quiet) {
             out.println();
             out.println(result.getErrorMessage());
         }

@@ -364,7 +364,7 @@ public class SVNLogRunner {
                 String leaveConglictsAttr = (String) attributes.get(SVNLog.ATTR6);
                 boolean leaveConflicts = Boolean.TRUE.toString().equals(leaveConglictsAttr);
                 SVNStatusType mergeResult = adminArea.mergeText(fileName, adminArea.getFile(leftPath),
-                        adminArea.getFile(rightPath), targetLabel, leftLabel, rightLabel, leaveConflicts, false);
+                        adminArea.getFile(rightPath), targetLabel, leftLabel, rightLabel, null, leaveConflicts, false, null, null);
     
                 if (props.getPropertyValue(SVNProperty.EXECUTABLE) != null) {
                     SVNFileUtil.setExecutable(target, true);

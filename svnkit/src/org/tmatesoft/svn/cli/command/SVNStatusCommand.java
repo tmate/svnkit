@@ -82,7 +82,7 @@ public class SVNStatusCommand extends SVNCommand {
 
         SVNDepth depth = SVNDepth.DEPTH_UNKNOWN;
         if (getCommandLine().hasArgument(SVNArgument.NON_RECURSIVE)) {
-            depth = SVNDepth.fromRecurse(false);
+            depth = SVNDepth.DEPTH_IMMEDIATES;
         }
         String depthStr = (String) getCommandLine().getArgumentValue(SVNArgument.DEPTH);
         if (depthStr != null) {

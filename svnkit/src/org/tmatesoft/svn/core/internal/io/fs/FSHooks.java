@@ -14,7 +14,9 @@ package org.tmatesoft.svn.core.internal.io.fs;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.io.UnsupportedEncodingException;
 
 import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
@@ -280,34 +282,36 @@ public class FSHooks {
             hookProcess.destroy();
         }
 
-        if (errorGobbler.getError() != null) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, errorGobbler.getError().getLocalizedMessage());
-            SVNErrorManager.error(err, errorGobbler.getError());
-        }
-
-        if (rc != 0) {
-            if (!readErrorStream) {
-                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.REPOS_HOOK_FAILURE, "''{0}'' hook failed; no error output available", hookName);
-                SVNErrorManager.error(err);
-            } else {
-                String errString = errorGobbler.getResult();
-                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.REPOS_HOOK_FAILURE, "''{0}'' hook failed with error output:\n{1}", new Object[] {
-                        hookName, errString
-                });
-                SVNErrorManager.error(err);
+        if (rc == 0 ) {
+            if (errorGobbler.getError() != null) {
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.REPOS_HOOK_FAILURE, "''{0}'' hook succeeded, but error output could not be read", hookName);
+                SVNErrorManager.error(err, errorGobbler.getError());
             }
+        } else {
+            String stdErrMessage = errorGobbler.getError() != null ? "[Error output could not be read.]" : errorGobbler.getResult();
+            String errorMessage = "''{0}'' hook failed (exited with a non-zero exitcode of {1,number,integer}).  ";
+            if (stdErrMessage != null && stdErrMessage.length() > 0) {
+                errorMessage += "The following error output was produced by the hook:\n" + stdErrMessage;
+            } else {
+                errorMessage += "No error output was produced by the hook.";
+            }
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.REPOS_HOOK_FAILURE, errorMessage, new Object[] {hookName, new Integer(rc)});
+            SVNErrorManager.error(err);
         }
     }
 
     private static class StreamGobbler extends Thread {
-
-        InputStream is;
+        InputStreamReader is;
         StringBuffer result;
         IOException error;
         private boolean myIsClosed;
 
         StreamGobbler(InputStream is) {
-            this.is = is;
+            try {
+                this.is = new InputStreamReader(is, "UTF-8");
+            } catch (UnsupportedEncodingException e) {
+                this.is = new InputStreamReader(is);
+            }
             result = new StringBuffer();
         }
         
