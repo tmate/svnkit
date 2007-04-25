@@ -548,24 +548,6 @@ public abstract class SVNAdminArea {
 
     public SVNStatusType mergeText(String localPath, File base,
             File latest, String localLabel, String baseLabel,
-            String latestLabel, boolean leaveConflict, boolean dryRun) throws SVNException {
-        return mergeText(localPath, base, latest, localLabel, baseLabel, latestLabel, null, leaveConflict, dryRun, null);
-    }
-
-    public SVNStatusType mergeText(String localPath, File base,
-            File latest, String localLabel, String baseLabel,
-            String latestLabel, boolean leaveConflict, boolean dryRun, SVNDiffOptions options) throws SVNException {
-        return mergeText(localPath, base, latest, localLabel, baseLabel, latestLabel, null, leaveConflict, dryRun, options);
-    }
-
-    public SVNStatusType mergeText(String localPath, File base,
-            File latest, String localLabel, String baseLabel,
-            String latestLabel, Map propChanges, boolean leaveConflict, boolean dryRun, SVNDiffOptions options) throws SVNException {
-        return mergeText(localPath, base, latest, localLabel, baseLabel, latestLabel, propChanges, leaveConflict, dryRun, options, null);
-    }
-    
-    public SVNStatusType mergeText(String localPath, File base,
-            File latest, String localLabel, String baseLabel,
             String latestLabel, Map propChanges, boolean leaveConflict, boolean dryRun, SVNDiffOptions options, SVNLog log) throws SVNException {
         SVNEntry entry = getEntry(localPath, false);
         if (entry == null) {

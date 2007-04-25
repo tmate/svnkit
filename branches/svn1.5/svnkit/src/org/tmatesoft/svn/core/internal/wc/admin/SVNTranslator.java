@@ -11,6 +11,7 @@
  */
 package org.tmatesoft.svn.core.internal.wc.admin;
 
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
@@ -107,7 +108,6 @@ public class SVNTranslator {
             eols = getWorkingEOL(eolStyle);
         }
         
-        
         translate(src, dst2, eols, keywordsMap, special, expand);
     }
 
@@ -132,7 +132,6 @@ public class SVNTranslator {
                 SVNFileUtil.detranslateSymlink(src, dst);
             }
             return;
-
         }        
         if (eol == null && (keywords == null || keywords.isEmpty())) {
             // no expansion, fast copy.
@@ -152,6 +151,57 @@ public class SVNTranslator {
         }
     }
 
+    public static InputStream getTranslatedStream(SVNAdminArea adminArea, String name, boolean translateToNormalForm, boolean repairEOL) throws SVNException {
+        String eolStyle = adminArea.getProperties(name).getPropertyValue(SVNProperty.EOL_STYLE);
+        String keywords = adminArea.getProperties(name).getPropertyValue(SVNProperty.KEYWORDS);
+        boolean special = adminArea.getProperties(name).getPropertyValue(SVNProperty.SPECIAL) != null;
+        File src = adminArea.getFile(name);
+        if (special) {
+            if (SVNFileUtil.isWindows || SVNFileUtil.isOpenVMS) {
+                return SVNFileUtil.openFileForReading(src);
+            }
+            if (SVNFileType.getType(src) != SVNFileType.SYMLINK) {
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, "Cannot detranslate symbolic link ''{0}''; file does not exist or not a symbolic link", src);
+                SVNErrorManager.error(err);
+            }
+            String linkPath = SVNFileUtil.getSymlinkName(src);
+            ByteArrayOutputStream os = new ByteArrayOutputStream();
+            try {
+                os.write("link ".getBytes("UTF-8"));
+                os.write(linkPath.getBytes("UTF-8"));
+            } catch (IOException e) {
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, e.getLocalizedMessage());
+                SVNErrorManager.error(err, e);
+            } finally {
+                SVNFileUtil.closeFile(os);
+            }
+            return new ByteArrayInputStream(os.toByteArray());
+        } 
+        boolean translationRequired = special || keywords != null || eolStyle != null;
+        if (translationRequired) {
+            byte[] eol = getBaseEOL(eolStyle);
+            if (translateToNormalForm) {
+                if (eolStyle != null && eol == null) {
+                    SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_UNKNOWN_EOL);
+                    SVNErrorManager.error(err);
+                }
+                Map keywordsMap = computeKeywords(keywords, null, null, null, null, null);
+                boolean repair = (eolStyle != null && eol != null && !NATIVE_STYLE.equals(eolStyle)) || repairEOL; 
+                return new SVNTranslatorInputStream(SVNFileUtil.openFileForReading(src), eol, repair, keywordsMap, false);
+            }
+
+            SVNEntry entry = adminArea.getVersionedEntry(name, false);
+            ISVNOptions options = adminArea.getWCAccess().getOptions();
+            String url = entry.getURL();
+            String author = entry.getAuthor();
+            String date = entry.getCommittedDate();
+            String rev = Long.toString(entry.getCommittedRevision());
+            Map keywordsMap = computeKeywords(keywords, url, author, date, rev, options);
+            return new SVNTranslatorInputStream(SVNFileUtil.openFileForReading(src), eol, true, keywordsMap, true);
+        }
+        return SVNFileUtil.openFileForReading(src);
+    }
+    
     public static File getTranslatedFile(SVNAdminArea dir, String name, File src, boolean forceEOLRepair, boolean useGlobalTmp, boolean forceCopy, boolean toNormalFormat) throws SVNException {
         String eolStyle = dir.getProperties(name).getPropertyValue(SVNProperty.EOL_STYLE);
         String keywords = dir.getProperties(name).getPropertyValue(SVNProperty.KEYWORDS);
@@ -169,7 +219,7 @@ public class SVNTranslator {
             if (toNormalFormat) {
                 translateToNormalForm(src, result, eolStyle, forceEOLRepair, keywords, special);
             } else {
-                SVNEntry entry = dir.getVersionedEntry(name, true);
+                SVNEntry entry = dir.getVersionedEntry(name, false);
                 ISVNOptions options = dir.getWCAccess().getOptions();
                 String url = entry.getURL();
                 String author = entry.getAuthor();
@@ -293,10 +343,12 @@ public class SVNTranslator {
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, e.getLocalizedMessage());
             SVNErrorManager.error(err, e);
         } finally {
-            try {
-                dst.flush(); 
-            } catch (IOException ioe) {
-                //
+            if (dst != null) {
+                try {
+                    dst.flush(); 
+                } catch (IOException ioe) {
+                    //
+                }
             }
             SVNFileUtil.closeFile(src);
             SVNFileUtil.closeFile(translatingStream);

@@ -19,6 +19,7 @@ import java.util.Map;
 import java.util.TreeMap;
 
 import org.tmatesoft.svn.core.SVNCommitInfo;
+import org.tmatesoft.svn.core.SVNDepth;
 import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNLock;
@@ -53,8 +54,8 @@ public class SVNRemoteStatusEditor extends SVNStatusEditor implements ISVNEditor
     private DirectoryInfo myDirectoryInfo;
     private FileInfo myFileInfo;
 
-    public SVNRemoteStatusEditor(ISVNOptions options, SVNWCAccess wcAccess, SVNAdminAreaInfo info, boolean noIgnore, boolean reportAll, boolean descend, ISVNStatusHandler handler) throws SVNException {
-        super(options, wcAccess, info, noIgnore, reportAll, descend, handler);
+    public SVNRemoteStatusEditor(ISVNOptions options, SVNWCAccess wcAccess, SVNAdminAreaInfo info, boolean noIgnore, boolean reportAll, SVNDepth depth, ISVNStatusHandler handler) throws SVNException {
+        super(options, wcAccess, info, noIgnore, reportAll, depth, handler);
         myAnchorStatus = createStatus(info.getAnchor().getRoot());
     }
 
@@ -135,7 +136,7 @@ public class SVNRemoteStatusEditor extends SVNStatusEditor implements ISVNEditor
                 tweakStatusHash(parent, myDirectoryInfo, myDirectoryInfo.myPath, contentsStatus, propertiesStatus, null);
             }
         }
-        if (parent != null && isDescend()) {
+        if (parent != null && myDirectoryInfo.myDepth != SVNDepth.DEPTH_EXCLUDE) {
             boolean wasDeleted = false;
             SVNStatus dirStatus = (SVNStatus) parent.myChildrenStatuses.get(myDirectoryInfo.myPath);
             if (dirStatus != null && 
@@ -143,7 +144,7 @@ public class SVNRemoteStatusEditor extends SVNStatusEditor implements ISVNEditor
                     dirStatus.getRemoteContentsStatus() == SVNStatusType.STATUS_REPLACED)) {
                 wasDeleted = true;
             }
-            handleStatusHash(dirStatus != null ? dirStatus.getEntry() : null, myDirectoryInfo.myChildrenStatuses, wasDeleted, true);
+            handleStatusHash(dirStatus != null ? dirStatus.getEntry() : null, myDirectoryInfo.myChildrenStatuses, wasDeleted, myDirectoryInfo.myDepth);
             if (isSendableStatus(dirStatus)) {
                 getDefaultHandler().handleStatus(dirStatus);
             }
@@ -153,16 +154,16 @@ public class SVNRemoteStatusEditor extends SVNStatusEditor implements ISVNEditor
                 File targetPath = getAnchor().getFile(getAdminAreaInfo().getTargetName());
                 SVNStatus tgtStatus = (SVNStatus) myDirectoryInfo.myChildrenStatuses.get(targetPath);
                 if (tgtStatus != null) {
-                    if (isDescend() && tgtStatus.getKind() == SVNNodeKind.DIR) {
+                    if (getDepth() != SVNDepth.DEPTH_EXCLUDE && tgtStatus.getKind() == SVNNodeKind.DIR) {
                         SVNAdminArea dir = getWCAccess().retrieve(targetPath);
-                        getDirStatus(null, dir, null, true, isReportAll(), isNoIgnore(), null, true, getDefaultHandler());
+                        getDirStatus(null, dir, null, getDepth(), isReportAll(), isNoIgnore(), null, true, getDefaultHandler());
                     }
                     if (isSendableStatus(tgtStatus)) {
                         getDefaultHandler().handleStatus(tgtStatus);
                     }
                 }
             } else {
-                handleStatusHash(myAnchorStatus.getEntry(), myDirectoryInfo.myChildrenStatuses, false, isDescend());
+                handleStatusHash(myAnchorStatus.getEntry(), myDirectoryInfo.myChildrenStatuses, false, getDepth());
                 if (myDirectoryInfo != null && myDirectoryInfo.myParent == null) {
                     tweakAnchorStatus(myDirectoryInfo);
                 }
@@ -246,7 +247,7 @@ public class SVNRemoteStatusEditor extends SVNStatusEditor implements ISVNEditor
     public void absentFile(String path) throws SVNException {
     }
     
-    private void handleStatusHash(SVNEntry dirEntry, Map hash, boolean deleted, boolean descend) throws SVNException {
+    private void handleStatusHash(SVNEntry dirEntry, Map hash, boolean deleted, SVNDepth depth) throws SVNException {
         ISVNStatusHandler handler = deleted ? this : getDefaultHandler();
         for(Iterator paths = hash.keySet().iterator(); paths.hasNext();) {
             File path = (File) paths.next();
@@ -254,9 +255,11 @@ public class SVNRemoteStatusEditor extends SVNStatusEditor implements ISVNEditor
             
             if (getWCAccess().isMissing(path)) {
                 status.setContentsStatus(SVNStatusType.STATUS_MISSING);
-            } else if (descend && status.getEntry() != null && status.getKind() == SVNNodeKind.DIR) {
+            } else if (status.getEntry() != null && status.getKind() == SVNNodeKind.DIR && 
+                    (depth == SVNDepth.DEPTH_UNKNOWN || depth == SVNDepth.DEPTH_IMMEDIATES || 
+                     depth == SVNDepth.DEPTH_INFINITY)) {
                 SVNAdminArea dir = getWCAccess().retrieve(path);
-                getDirStatus(dirEntry, dir, null, true, isReportAll(), isNoIgnore(), null, true, handler);
+                getDirStatus(dirEntry, dir, null, depth, isReportAll(), isNoIgnore(), null, true, handler);
             }
             if (deleted) {
                 status.setRemoteStatus(SVNStatusType.STATUS_DELETED, null, null, null);
@@ -378,6 +381,19 @@ public class SVNRemoteStatusEditor extends SVNStatusEditor implements ISVNEditor
             myRemoteRevision = SVNRevision.UNDEFINED;
             myRemoteKind = SVNNodeKind.DIR;
 
+            if (myParent != null) {
+                if (myParent.myDepth == SVNDepth.DEPTH_IMMEDIATES) {
+                    myDepth = SVNDepth.DEPTH_EMPTY;
+                } else if (myParent.myDepth == SVNDepth.DEPTH_FILES || myParent.myDepth == SVNDepth.DEPTH_EMPTY) {
+                    myDepth = SVNDepth.DEPTH_EXCLUDE;
+                } else if (myParent.myDepth == SVNDepth.DEPTH_UNKNOWN) {
+                    myDepth = SVNDepth.DEPTH_UNKNOWN;
+                } else {
+                    myDepth = SVNDepth.DEPTH_INFINITY;
+                }
+            } else {
+                myDepth = getDepth();
+            }
             // this dir's status in parent.
             SVNStatus parentStatus = null;
             if (myParent != null) {
@@ -388,15 +404,23 @@ public class SVNRemoteStatusEditor extends SVNStatusEditor implements ISVNEditor
             if (parentStatus != null) {
                 SVNStatusType textStatus = parentStatus.getContentsStatus();
                 if (textStatus != SVNStatusType.STATUS_UNVERSIONED &&
-                        textStatus != SVNStatusType.STATUS_DELETED &&
                         textStatus != SVNStatusType.STATUS_MISSING &&
                         textStatus != SVNStatusType.STATUS_OBSTRUCTED &&
                         textStatus != SVNStatusType.STATUS_EXTERNAL &&
                         textStatus != SVNStatusType.STATUS_IGNORED &&
                         parentStatus.getKind() == SVNNodeKind.DIR && 
-                        (isDescend() || myParent == null)) {
+                        (myDepth == SVNDepth.DEPTH_UNKNOWN || 
+                         myDepth == SVNDepth.DEPTH_FILES || 
+                         myDepth == SVNDepth.DEPTH_IMMEDIATES || 
+                         myDepth == SVNDepth.DEPTH_INFINITY)) {
                     SVNAdminArea dir = getWCAccess().retrieve(myPath);
-                    getDirStatus(null, dir, null, false, true, true, null, true, this);
+                    getDirStatus(null, dir, null, SVNDepth.DEPTH_IMMEDIATES, true, true, null, true, this);
+                    SVNStatus thisDirStatus = (SVNStatus)myChildrenStatuses.get(myPath);
+                    if (thisDirStatus != null && thisDirStatus.getEntry() != null && (
+                            myDepth == SVNDepth.DEPTH_UNKNOWN || 
+                            myDepth.compareTo(parentStatus.getEntry().getDepth()) > 0)) {
+                        myDepth = thisDirStatus.getEntry().getDepth();
+                    }
                 }
             }       
         }
@@ -424,7 +448,7 @@ public class SVNRemoteStatusEditor extends SVNStatusEditor implements ISVNEditor
         public String myName;
         public SVNURL myURL;
         public DirectoryInfo myParent;
-        
+        public SVNDepth myDepth;
         public SVNRevision myRemoteRevision;
         public Date myRemoteDate;
         public String myRemoteAuthor;

@@ -740,8 +740,8 @@ public class SVNCommitClient extends SVNBasicClient {
                 if (e instanceof SVNCancelException) {
                     throw e;
                 }
-                SVNErrorMessage err = SVNErrorMessage.create(e.getErrorMessage().getErrorCode(), "Commit failed (details follow):");
-                err.setChildErrorMessage(e.getErrorMessage());
+                SVNErrorMessage err = e.getErrorMessage().wrap("Commit failed (details follow):");//SVNErrorMessage.create(e.getErrorMessage().getErrorCode(), "Commit failed (details follow):");
+//                err.setChildErrorMessage(e.getErrorMessage());
                 infos.add(new SVNCommitInfo(-1, null, null, err));
                 dispatchEvent(new SVNEvent(err), ISVNEventHandler.UNKNOWN);
                 continue;

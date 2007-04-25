@@ -16,7 +16,7 @@ package org.tmatesoft.svn.core;
  * @version 1.1.2
  * @author  TMate Software Ltd.
  */
-public class SVNDepth {
+public class SVNDepth implements Comparable {
     
     public static final SVNDepth DEPTH_UNKNOWN = new SVNDepth(-2, "unknown"); 
     /* Exclude (remove, whatever) directory D.
@@ -48,6 +48,14 @@ public class SVNDepth {
         return getName();
     }
     
+    public int compareTo(Object o) {
+        if (o == null || o.getClass() != SVNDepth.class) {
+            return -1;
+        }
+        SVNDepth otherDepth = ((SVNDepth) o);
+        return myId == otherDepth.myId ? 0 : (myId > otherDepth.myId ? 1 : -1);
+    }
+
     public static String asString(SVNDepth depth) {
         if (depth != null) {
             return depth.getName();
