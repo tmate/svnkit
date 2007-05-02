@@ -79,6 +79,8 @@ public class SVN {
         ourArguments.add(SVNArgument.IGNORE_WS_CHANGE);
         ourArguments.add(SVNArgument.KEEP_LOCAL);
         ourArguments.add(SVNArgument.DEPTH);
+        ourArguments.add(SVNArgument.WITH_REVPROP);
+        ourArguments.add(SVNArgument.ENCODING);
     }
 
     public static void main(String[] args) {

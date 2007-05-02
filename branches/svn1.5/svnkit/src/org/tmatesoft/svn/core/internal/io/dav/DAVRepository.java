@@ -67,6 +67,12 @@ class DAVRepository extends SVNRepository {
     private DAVConnection myConnection;
     private IHTTPConnectionFactory myConnectionFactory;
     
+    private static boolean ourIsKeepCredentials = Boolean.valueOf(System.getProperty("svnkit.http.keepCredentials", Boolean.TRUE.toString())).booleanValue();
+    
+    public static void setKeepCredentials(boolean keepCredentials) {
+        ourIsKeepCredentials = keepCredentials;
+    }
+    
     protected DAVRepository(IHTTPConnectionFactory connectionFactory, SVNURL location, ISVNSession options) {
         super(location, options);
         myConnectionFactory = connectionFactory;
@@ -526,6 +532,9 @@ class DAVRepository extends SVNRepository {
     }
 
     private void closeConnection() {
+        if (myConnection != null && !ourIsKeepCredentials) {
+            myConnection.clearAuthenticationCache();
+        }
         if (getOptions().keepConnection(this)) {
             unlock();
             return;
@@ -617,6 +626,10 @@ class DAVRepository extends SVNRepository {
     }
 
     public ISVNEditor getCommitEditor(String logMessage, Map locks, boolean keepLocks, ISVNWorkspaceMediator mediator) throws SVNException {
+        return getCommitEditor(logMessage, locks, keepLocks, null, mediator);
+    }
+
+    protected ISVNEditor getCommitEditorInternal(Map locks, boolean keepLocks, Map revProps, ISVNWorkspaceMediator mediator) throws SVNException {
         try {
             openConnection();
             Map translatedLocks = null;
@@ -638,7 +651,7 @@ class DAVRepository extends SVNRepository {
                 }
             }
             myConnection.setLocks(translatedLocks, keepLocks);
-            return new DAVCommitEditor(this, myConnection, logMessage, mediator, new Runnable() {
+            return new DAVCommitEditor(this, myConnection, revProps, mediator, new Runnable() {
                 public void run() {
                     closeConnection();
                 }
@@ -901,5 +914,6 @@ class DAVRepository extends SVNRepository {
             closeConnection();
         }
     }
+
 }
 

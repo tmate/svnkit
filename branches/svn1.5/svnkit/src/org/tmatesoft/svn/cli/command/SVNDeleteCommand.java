@@ -17,6 +17,7 @@ import java.io.InputStream;
 import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Map;
 
 import org.tmatesoft.svn.cli.SVNArgument;
 import org.tmatesoft.svn.cli.SVNCommand;
@@ -63,7 +64,8 @@ public class SVNDeleteCommand extends SVNCommand {
         for (int i = 0; i < svnUrls.length; i++) {
             svnUrls[i] = SVNURL.parseURIEncoded(urlsArray[i]);
         }
-        SVNCommitInfo info = client.doDelete(svnUrls, commitMessage);
+        Map revProps = (Map) getCommandLine().getArgumentValue(SVNArgument.WITH_REVPROP); 
+        SVNCommitInfo info = client.doDelete(svnUrls, commitMessage, revProps);
         if (info != SVNCommitInfo.NULL) {
             out.println();
             out.println("Committed revision " + info.getNewRevision() + ".");

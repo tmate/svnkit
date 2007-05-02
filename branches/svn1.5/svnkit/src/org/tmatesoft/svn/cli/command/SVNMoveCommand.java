@@ -15,6 +15,7 @@ package org.tmatesoft.svn.cli.command;
 import java.io.File;
 import java.io.InputStream;
 import java.io.PrintStream;
+import java.util.Map;
 
 import org.tmatesoft.svn.cli.SVNArgument;
 import org.tmatesoft.svn.cli.SVNCommand;
@@ -64,7 +65,8 @@ public class SVNMoveCommand extends SVNCommand {
         String commitMessage = (String) getCommandLine().getArgumentValue(SVNArgument.MESSAGE);
         getClientManager().setEventHandler(new SVNCommandEventProcessor(out, err, false));
         SVNCopyClient updater = getClientManager().getCopyClient();
-        SVNCommitInfo result = updater.doCopy(SVNURL.parseURIEncoded(srcURL), srcRevision, SVNURL.parseURIDecoded(dstURL), true, commitMessage);
+        Map revProps = (Map) getCommandLine().getArgumentValue(SVNArgument.WITH_REVPROP); 
+        SVNCommitInfo result = updater.doCopy(SVNURL.parseURIEncoded(srcURL), SVNRevision.UNDEFINED, srcRevision, SVNURL.parseURIDecoded(dstURL), true, false, commitMessage, revProps);
         if (result != SVNCommitInfo.NULL) {
             out.println();
             out.println("Committed revision " + result.getNewRevision() + ".");

@@ -188,7 +188,7 @@ public class JavaHLObjectFactory {
                 repositoryTextStatus, repositoryPropStatus, locked, copied, conflictOld, conflictNew, conflictWorking, urlCopiedFrom, revisionCopiedFrom,
                 switched, lockToken, lockOwner, lockComment, lockCreationDate, reposLock,
                 /* remote: rev, date, kind, author */
-                reposRev, reposDate, reposKind, reposAuthor);
+                reposRev, reposDate, reposKind, reposAuthor, status.getChangelist());
         return st;
     }
 
@@ -244,7 +244,9 @@ public class JavaHLObjectFactory {
         if(dirEntry == null){
             return null;
         }
+        //TODO: what should we pass here in the 2nd parameter - a real abs path??? 
         return new DirEntry(
+                dirEntry.getRelativePath(),
                 dirEntry.getRelativePath(),
                 getNodeKind(dirEntry.getKind()),
                 dirEntry.getSize(),

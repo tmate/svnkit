@@ -86,6 +86,7 @@ public class SVNProplistCommand extends SVNCommand implements ISVNPropertyHandle
 
     private File myCurrentFile;
     private SVNURL myCurrentURL;
+    private long myCurrentRev = -1;
 
     public void handleProperty(File path, SVNPropertyData property) throws SVNException {
         if (!path.equals(myCurrentFile)) {
@@ -101,13 +102,8 @@ public class SVNProplistCommand extends SVNCommand implements ISVNPropertyHandle
     }
 
     public void handleProperty(SVNURL url, SVNPropertyData property) throws SVNException {
-        if (!myIsRevProp) {
-            if (!url.equals(myCurrentURL)) {
-                myOut.println("Properties on '" + url + "':");
-                myCurrentURL = url;
-            }
-        } else if (myCurrentURL == null){
-            myOut.println("Unversioned properties on revision " + url + ":");
+        if (!url.equals(myCurrentURL)) {
+            myOut.println("Properties on '" + url + "':");
             myCurrentURL = url;
         }
         myOut.print("  ");
@@ -118,6 +114,16 @@ public class SVNProplistCommand extends SVNCommand implements ISVNPropertyHandle
         myOut.println();
     }
     
-    public void handleProperty(long revision, SVNPropertyData property) throws SVNException {        
+    public void handleProperty(long revision, SVNPropertyData property) throws SVNException {
+        if (myCurrentRev < 0) {
+            myCurrentRev = revision;
+            myOut.println("Unversioned properties on revision " + revision + ":");
+        }
+        myOut.print("  ");
+        myOut.print(property.getName());
+        if (myIsVerbose) {
+            myOut.print(" : " + property.getValue());
+        }
+        myOut.println();
     }
 }

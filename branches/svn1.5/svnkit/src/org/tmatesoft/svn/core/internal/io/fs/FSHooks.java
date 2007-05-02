@@ -13,14 +13,12 @@ package org.tmatesoft.svn.core.internal.io.fs;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.io.OutputStream;
-import java.io.UnsupportedEncodingException;
 
 import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
+import org.tmatesoft.svn.core.internal.util.SVNStreamGobbler;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.internal.wc.SVNFileType;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
@@ -138,7 +136,7 @@ public class FSHooks {
         try {
             String executableName = hookFile.getName().toLowerCase();
             if ((executableName.endsWith(".bat") || executableName.endsWith(".cmd")) && SVNFileUtil.isWindows) {
-                String cmd = "cmd /C \"" + "\"" + hookFile.getAbsolutePath() + "\" " + "\"" + reposPath + "\" " + (path != null ? "\"" + path + "\" " : "") + "\"" + username + "\"";
+                String cmd = "cmd /C " + "\"" + hookFile.getAbsolutePath() + "\" " + "\"" + reposPath + "\" " + (path != null ? "\"" + path + "\" " : "") + "\"" + username + "\"";
                 hookProc = Runtime.getRuntime().exec(cmd);
             } else {
                 if (path != null) {
@@ -263,8 +261,8 @@ public class FSHooks {
             }
         }
 
-        StreamGobbler inputGobbler = new StreamGobbler(hookProcess.getInputStream());
-        StreamGobbler errorGobbler = new StreamGobbler(hookProcess.getErrorStream());
+        SVNStreamGobbler inputGobbler = new SVNStreamGobbler(hookProcess.getInputStream());
+        SVNStreamGobbler errorGobbler = new SVNStreamGobbler(hookProcess.getErrorStream());
         inputGobbler.start();
         errorGobbler.start();
 
@@ -300,49 +298,4 @@ public class FSHooks {
         }
     }
 
-    private static class StreamGobbler extends Thread {
-        InputStreamReader is;
-        StringBuffer result;
-        IOException error;
-        private boolean myIsClosed;
-
-        StreamGobbler(InputStream is) {
-            try {
-                this.is = new InputStreamReader(is, "UTF-8");
-            } catch (UnsupportedEncodingException e) {
-                this.is = new InputStreamReader(is);
-            }
-            result = new StringBuffer();
-        }
-        
-        public void close() {
-            myIsClosed = true;
-            SVNFileUtil.closeFile(is);
-        }
-
-        public void run() {
-            try {
-                int r;
-                while ((r = is.read()) >= 0) {
-                    result.append((char) (r & 0xFF));
-                }
-            } catch (IOException ioe) {
-                if (!myIsClosed) {
-                    error = ioe;
-                }
-            } finally {
-                if (!myIsClosed) {
-                    SVNFileUtil.closeFile(is);
-                }
-            }
-        }
-
-        public String getResult() {
-            return result.toString();
-        }
-
-        public IOException getError() {
-            return error;
-        }
-    }
 }

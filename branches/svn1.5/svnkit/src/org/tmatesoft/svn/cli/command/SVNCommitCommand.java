@@ -24,6 +24,7 @@ import org.tmatesoft.svn.core.wc.SVNCommitClient;
 import java.io.File;
 import java.io.InputStream;
 import java.io.PrintStream;
+import java.util.Map;
 
 /**
  * @version 1.1.1
@@ -61,8 +62,9 @@ public class SVNCommitCommand extends SVNCommand {
         if (!quiet) {
             getClientManager().setEventHandler(new SVNCommandEventProcessor(out, err, false));
         }
+        Map revProps = (Map) getCommandLine().getArgumentValue(SVNArgument.WITH_REVPROP); 
         SVNCommitClient client = getClientManager().getCommitClient();
-        SVNCommitInfo result = client.doCommit(localPaths, keepLocks, message, false, SVNDepth.recurseFromDepth(depth));
+        SVNCommitInfo result = client.doCommit(localPaths, keepLocks, message, revProps, false, SVNDepth.recurseFromDepth(depth));
         if (result != SVNCommitInfo.NULL && !quiet) {
             out.println();
             out.println("Committed revision " + result.getNewRevision() + ".");

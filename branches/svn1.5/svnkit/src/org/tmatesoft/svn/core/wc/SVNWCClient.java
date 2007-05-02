@@ -24,6 +24,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 
+import org.tmatesoft.svn.core.SVNCommitInfo;
 import org.tmatesoft.svn.core.SVNDirEntry;
 import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
@@ -58,6 +59,7 @@ import org.tmatesoft.svn.core.internal.wc.admin.SVNTranslator;
 import org.tmatesoft.svn.core.internal.wc.admin.SVNTranslatorOutputStream;
 import org.tmatesoft.svn.core.internal.wc.admin.SVNVersionedProperties;
 import org.tmatesoft.svn.core.internal.wc.admin.SVNWCAccess;
+import org.tmatesoft.svn.core.io.ISVNEditor;
 import org.tmatesoft.svn.core.io.ISVNLockHandler;
 import org.tmatesoft.svn.core.io.SVNRepository;
 
@@ -150,6 +152,7 @@ public class SVNWCClient extends SVNBasicClient {
     };
     
     private ISVNAddParameters myAddParameters;
+    private ISVNCommitHandler myCommitHandler;
 
     /**
      * Constructs and initializes an <b>SVNWCClient</b> object
@@ -185,6 +188,45 @@ public class SVNWCClient extends SVNBasicClient {
     public void setAddParameters(ISVNAddParameters addParameters) {
         myAddParameters = addParameters;
     }
+    
+    /**
+     * Returns the specified commit handler (if set) being in use or a default one 
+     * (<b>DefaultSVNCommitHandler</b>) if no special 
+     * implementations of <b>ISVNCommitHandler</b> were 
+     * previousely provided.
+     *   
+     * @return  the commit handler being in use or a default one
+     * @see     #setCommitHandler(ISVNCommitHandler)
+     * @see     DefaultSVNCommitHandler 
+     */
+    public ISVNCommitHandler getCommitHandler() {
+        if (myCommitHandler == null) {
+            myCommitHandler = new DefaultSVNCommitHandler();
+        }
+        return myCommitHandler;
+    }
+
+    /**
+     * Sets an implementation of <b>ISVNCommitHandler</b> to 
+     * the commit handler that will be used during commit operations to handle 
+     * commit log messages. The handler will receive a clien's log message and items 
+     * (represented as <b>SVNCommitItem</b> objects) that will be 
+     * committed. Depending on implementor's aims the initial log message can
+     * be modified (or something else) and returned back. 
+     * 
+     * <p>
+     * If using <b>SVNWCClient</b> without specifying any
+     * commit handler then a default one will be used - {@link DefaultSVNCommitHandler}.
+     * 
+     * @param handler               an implementor's handler that will be used to handle 
+     *                              commit log messages
+     * @see   #getCommitHandler()
+     * @see   ISVNCommitHandler
+     */
+    public void setCommitHandler(ISVNCommitHandler handler) {
+        myCommitHandler = handler;
+    }
+
     
     protected ISVNAddParameters getAddParameters() {
         if (myAddParameters == null) {
@@ -467,7 +509,63 @@ public class SVNWCClient extends SVNBasicClient {
             wcAccess.close();
         }
     }
-    
+
+    public SVNCommitInfo doSetProperty(SVNURL url, String propName, String propValue, SVNRevision baseRevision, String commitMessage, Map revisionProperties, boolean force, ISVNPropertyHandler handler) throws SVNException {
+        propName = validatePropertyName(propName);
+        if (SVNRevisionProperty.isRevisionProperty(propName)) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.CLIENT_PROPERTY_NAME, "Revision property ''{0}'' not allowed in this context", propName);
+            SVNErrorManager.error(err);
+        } else if (SVNProperty.isWorkingCopyProperty(propName)) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.CLIENT_PROPERTY_NAME, "''{0}'' is a wcprop, thus not accessible to clients", propName);
+            SVNErrorManager.error(err);
+        } else if (SVNProperty.isEntryProperty(propName)) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.CLIENT_PROPERTY_NAME, "''{0}'' is an entry property, thus not accessible to clients", propName);
+            SVNErrorManager.error(err);
+        }
+        propValue = validatePropertyValue(propName, propValue, force);
+        SVNRepository repos = createRepository(url, true);
+        long revNumber = SVNRepository.INVALID_REVISION;
+        try {
+            revNumber = getRevisionNumber(baseRevision, repos, null);
+        } catch (SVNException svne) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.CLIENT_BAD_REVISION, "Setting property on non-local target ''{0}'' needs a base revision", url.toDecodedString());
+            SVNErrorManager.error(err);
+        }
+
+        SVNNodeKind kind = repos.checkPath("", revNumber);
+        if (kind == SVNNodeKind.NONE) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_NOT_FOUND, "Path ''{0}'' does not exist in revision {1,number,integer}", new Object[]{url.getPath(), new Long(revNumber)});
+            SVNErrorManager.error(err);
+        }
+        Collection commitItems = new ArrayList(2);
+        commitItems.add(new SVNCommitItem(null, url, null, 
+                kind, SVNRevision.create(revNumber), SVNRevision.UNDEFINED, 
+                false, false, true, false, false, false));
+        commitMessage = getCommitHandler().getCommitMessage(commitMessage, (SVNCommitItem[]) commitItems.toArray(new SVNCommitItem[commitItems.size()]));                
+        if (commitMessage == null) {
+            return SVNCommitInfo.NULL;
+        }
+        commitMessage = SVNCommitClient.validateCommitMessage(commitMessage);
+        ISVNEditor commitEditor = repos.getCommitEditor(commitMessage, null, true, revisionProperties, null);
+        try {
+            commitEditor.openRoot(revNumber);
+            if (kind == SVNNodeKind.FILE) {
+                commitEditor.openFile("", revNumber);
+                commitEditor.changeFileProperty("", propName, propValue);
+                commitEditor.closeFile("", null);
+            } else {
+                commitEditor.changeDirProperty(propName, propValue);
+            }
+            commitEditor.closeDir();
+        } catch (SVNException svne) {
+            commitEditor.abortEdit();
+        }
+        if (handler != null) {
+            handler.handleProperty(url, new SVNPropertyData(propName, propValue));
+        }
+        return commitEditor.closeEdit();
+    }
+
     /**
      * Sets, edits or deletes an unversioned revision property.
      * This method uses a Working Copy item to obtain the URL of 
@@ -1321,14 +1419,24 @@ public class SVNWCClient extends SVNBasicClient {
         boolean reverted = false;
         SVNVersionedProperties baseProperties = null;
         Map command = new HashMap();
+        boolean revertBase = false;
         
         if (entry.isScheduledForReplacement()) {
+            revertBase = true;
             String propRevertPath = SVNAdminUtil.getPropRevertPath(name, entry.getKind(), false);
-            if (dir.getFile(propRevertPath).isFile()) {
-                baseProperties = dir.getRevertProperties(name);
-                command.put(SVNLog.NAME_ATTR, propRevertPath);
-                log.addCommand(SVNLog.DELETE, command, false);
-                command.clear();
+            boolean exists = dir.getFile(propRevertPath).isFile(); 
+            if (!exists) {
+                propRevertPath = SVNAdminUtil.getPropBasePath(name, entry.getKind(), false);
+                exists = dir.getFile(propRevertPath).isFile();
+                revertBase = false;
+            }
+            if (exists) {
+                baseProperties = revertBase ? dir.getRevertProperties(name) : dir.getBaseProperties(name);
+                if (revertBase) {
+                    command.put(SVNLog.NAME_ATTR, propRevertPath);
+                    log.addCommand(SVNLog.DELETE, command, false);
+                    command.clear();
+                }
                 reverted = true;
             }
         }

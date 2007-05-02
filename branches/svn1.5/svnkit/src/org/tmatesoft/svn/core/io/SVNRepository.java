@@ -15,6 +15,7 @@ import java.io.OutputStream;
 import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.Map;
 
@@ -28,6 +29,8 @@ import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNLock;
 import org.tmatesoft.svn.core.SVNLogEntry;
 import org.tmatesoft.svn.core.SVNNodeKind;
+import org.tmatesoft.svn.core.SVNProperty;
+import org.tmatesoft.svn.core.SVNRevisionProperty;
 import org.tmatesoft.svn.core.SVNURL;
 import org.tmatesoft.svn.core.auth.ISVNAuthenticationManager;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
@@ -1641,6 +1644,20 @@ public abstract class SVNRepository {
      * @see                     <a href="http://svnkit.com/kb/dev-guide-commit-operation.html">Using ISVNEditor in commit operations</a>
      */    
     public abstract ISVNEditor getCommitEditor(String logMessage, Map locks, boolean keepLocks, final ISVNWorkspaceMediator mediator) throws SVNException;
+
+    public ISVNEditor getCommitEditor(String logMessage, Map locks, boolean keepLocks, Map revProps, final ISVNWorkspaceMediator mediator) throws SVNException {
+        if (hasSVNProperties(revProps)) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.CLIENT_PROPERTY_NAME, "Standard properties can't be set explicitly as revision properties");
+            SVNErrorManager.error(err);
+        }
+        revProps = revProps == null ? new HashMap() : revProps;
+        if (logMessage != null) {
+            revProps.put(SVNRevisionProperty.LOG, logMessage);
+        }
+        return getCommitEditorInternal(locks, keepLocks, revProps, mediator);
+    }
+    
+    protected abstract ISVNEditor getCommitEditorInternal(Map locks, boolean keepLocks, Map revProps, final ISVNWorkspaceMediator mediator) throws SVNException;
     
     /**
      * Gets the lock for the file located at the specified path.
@@ -1869,6 +1886,19 @@ public abstract class SVNRepository {
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.CLIENT_BAD_REVISION, "Invalid revision number ''{0}''", new Long(revision));
             SVNErrorManager.error(err);
         }
+    }
+    
+    protected static boolean hasSVNProperties(Map props) {
+        if (props == null) {
+            return false;
+        }
+        for (Iterator names = props.keySet().iterator(); names.hasNext();) {
+            String propName = (String) names.next();
+            if (SVNProperty.isSVNProperty(propName)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     // all paths are uri-decoded.

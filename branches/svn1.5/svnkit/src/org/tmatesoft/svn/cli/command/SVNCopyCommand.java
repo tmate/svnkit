@@ -15,6 +15,7 @@ package org.tmatesoft.svn.cli.command;
 import java.io.File;
 import java.io.InputStream;
 import java.io.PrintStream;
+import java.util.Map;
 
 import org.tmatesoft.svn.cli.SVNArgument;
 import org.tmatesoft.svn.cli.SVNCommand;
@@ -104,8 +105,8 @@ public class SVNCopyCommand extends SVNCommand {
         String commitMessage = getCommitMessage();
         getClientManager().setEventHandler(new SVNCommandEventProcessor(out, err, false));
         SVNCopyClient updater = getClientManager().getCopyClient();
-
-        SVNCommitInfo result = updater.doCopy(SVNURL.parseURIEncoded(srcURL), pegRevision, srcRevision, SVNURL.parseURIEncoded(dstURL), false, false, commitMessage);
+        Map revProps = (Map) getCommandLine().getArgumentValue(SVNArgument.WITH_REVPROP); 
+        SVNCommitInfo result = updater.doCopy(SVNURL.parseURIEncoded(srcURL), pegRevision, srcRevision, SVNURL.parseURIEncoded(dstURL), false, false, commitMessage, revProps);
         if (result != SVNCommitInfo.NULL) {
             out.println();
             out.println("Committed revision " + result.getNewRevision() + ".");
@@ -143,7 +144,8 @@ public class SVNCopyCommand extends SVNCommand {
 
         SVNRevision srcRevision = SVNRevision.parse((String) getCommandLine().getArgumentValue(SVNArgument.REVISION));
         updater.setEventHandler(null);
-        SVNCommitInfo info = updater.doCopy(new File(srcPath), srcRevision, SVNURL.parseURIEncoded(dstURL), message);
+        Map revProps = (Map) getCommandLine().getArgumentValue(SVNArgument.WITH_REVPROP); 
+        SVNCommitInfo info = updater.doCopy(new File(srcPath), srcRevision, SVNURL.parseURIEncoded(dstURL), false, message, revProps);
         if (info != SVNCommitInfo.NULL) {
             out.println();
             out.println("Committed revision " + info.getNewRevision() + ".");

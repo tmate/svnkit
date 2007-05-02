@@ -13,10 +13,15 @@
 package org.tmatesoft.svn.cli;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.Set;
 
+import org.tmatesoft.svn.core.SVNErrorCode;
+import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
+import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 
 /**
  * @version 1.1.1
@@ -86,7 +91,9 @@ public abstract class SVNArgument {
     public static final SVNArgument SHOW_IDS = createUnaryArgument(new String[] { "--show-ids" });
     public static final SVNArgument FULL_PATHS = createUnaryArgument(new String[] { "--full-paths" });
     public static final SVNArgument DEPTH = createStringArgument(new String[] { "--depth" });
-    
+    public static final SVNArgument WITH_REVPROP = createStringArgument(new String[] { "--with-revprop" });
+    public static final SVNArgument ENCODING = createStringArgument(new String[] { "--encoding" });
+
     public static SVNArgument findArgument(String name, Set validArguments) {
         for (Iterator arguments = validArguments.iterator(); arguments.hasNext();) {
             SVNArgument argument = (SVNArgument) arguments.next();
@@ -149,6 +156,25 @@ public abstract class SVNArgument {
         }
 
         public Object parseValue(String value) throws SVNException {
+            if (this == SVNArgument.WITH_REVPROP) {
+                if (value == null || value.length() == 0) {
+                    SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.CL_ARG_PARSING_ERROR, "Revision property pair is empty");
+                    SVNErrorManager.error(err);
+                }
+                Map revProps = new HashMap();
+                String propName = null;
+                String propValue = null;
+                int equationInd = value.indexOf('=');
+                if (equationInd != -1) {
+                    propName = value.substring(0, equationInd);
+                    propValue = value.substring(equationInd + 1);
+                } else {
+                    propName = value;
+                    propValue = "";
+                }
+                revProps.put(propName, propValue);
+                return revProps;
+            } 
             return value;
         }
     }

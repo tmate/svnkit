@@ -155,7 +155,6 @@ public class SVNCommitter implements ISVNCommitPathHandler {
 
             File tmpFile = dir.getBaseFile(name, true);
             myTmpFiles.add(tmpFile);
-//            SVNTranslator.translate(dir, name, name, SVNFileUtil.getBasePath(tmpFile), false);
 
             String checksum = null;
             if (!item.isAdded()) {
@@ -181,7 +180,6 @@ public class SVNCommitter implements ISVNCommitPathHandler {
                 targetIS = SVNTranslator.getTranslatedStream(dir, name, true, false);
                 tmpBaseStream = SVNFileUtil.openFileForWriting(tmpFile);
                 CopyingStream localStream = new CopyingStream(tmpBaseStream, targetIS);
-//                targetIS = tmpFile.exists() ? SVNFileUtil.openFileForReading(tmpFile) : SVNFileUtil.DUMMY_IN;
                 newChecksum = myDeltaGenerator.sendDelta(path, sourceIS, 0, localStream, editor, true);
             } catch (SVNException svne) {
                 SVNErrorMessage err = svne.getErrorMessage().wrap("While preparing ''{0}'' for commit", dir.getFile(name));
