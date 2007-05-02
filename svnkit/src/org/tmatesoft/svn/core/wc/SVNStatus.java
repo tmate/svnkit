@@ -126,6 +126,7 @@ public class SVNStatus {
     private Date myLocalContentsDate;
     private Date myLocalPropertiesDate;
     private SVNEntry myEntry;
+    private String myChangelist;
 
     /**
      * Constructs an <b>SVNStatus</b> object filling it with status information
@@ -627,5 +628,9 @@ public class SVNStatus {
      */
     public SVNEntry getEntry() {
         return myEntry;
+    }
+
+    public String getChangelist() {
+        return myChangelist;
     }
 }

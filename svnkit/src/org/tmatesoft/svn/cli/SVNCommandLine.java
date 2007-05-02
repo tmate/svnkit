@@ -142,7 +142,17 @@ public class SVNCommandLine {
                 }
                 
                 Object value = previousArgument.parseValue(argument);
-                myBinaryArguments.put(previousArgument, value);
+                if (previousArgument == SVNArgument.WITH_REVPROP) {
+                    Map revPropPair = (Map) value;
+                    Map revProps = (Map) myBinaryArguments.get(previousArgument);
+                    if (revProps != null) {
+                        revProps.putAll(revPropPair);
+                    } else {
+                        myBinaryArguments.put(previousArgument, revPropPair);
+                    }
+                } else {
+                    myBinaryArguments.put(previousArgument, value);
+                }
 
                 previousArgument = null;
                 previousArgumentName = null;

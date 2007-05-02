@@ -31,6 +31,7 @@ import org.tigris.subversion.javahl.Info;
 import org.tigris.subversion.javahl.Info2;
 import org.tigris.subversion.javahl.InfoCallback;
 import org.tigris.subversion.javahl.JavaHLObjectFactory;
+import org.tigris.subversion.javahl.ListCallback;
 import org.tigris.subversion.javahl.LogMessage;
 import org.tigris.subversion.javahl.LogMessageCallback;
 import org.tigris.subversion.javahl.MergeInfo;
@@ -1425,5 +1426,8 @@ public class SVNClientImpl implements SVNClientInterface {
     }
 
     public void status(String path, int depth, boolean onServer, boolean getAll, boolean noIgnore, boolean ignoreExternals, StatusCallback callback) throws ClientException {
+    }
+
+    public void list(String url, Revision revision, Revision pegRevision, int depth, int direntFields, boolean fetchLocks, ListCallback callback) throws ClientException {
     }
 }

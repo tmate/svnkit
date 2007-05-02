@@ -27,6 +27,7 @@ import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNURL;
 import org.tmatesoft.svn.core.internal.util.SVNFormatUtil;
+import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 import org.tmatesoft.svn.core.wc.ISVNPropertyHandler;
 import org.tmatesoft.svn.core.wc.SVNPropertyData;
 import org.tmatesoft.svn.core.wc.SVNRevision;
@@ -79,16 +80,8 @@ public class SVNPropsetCommand extends SVNCommand {
                 SVNErrorMessage msg = SVNErrorMessage.create(SVNErrorCode.CL_ARG_PARSING_ERROR, e.getLocalizedMessage());
                 throw new SVNException(msg, e);
             } finally {
-                try {
-                    os.close();
-                } catch (IOException e1) {
-                }
-                if (is != null) {
-                    try {
-                        is.close();
-                    } catch (IOException e) {
-                    }
-                }
+                SVNFileUtil.closeFile(os);
+                SVNFileUtil.closeFile(is);
             }
             propertyValue = os.toString();
             pathIndex = 1;
@@ -110,6 +103,7 @@ public class SVNPropsetCommand extends SVNCommand {
                                 out.println("property '" + propertyName +"' set on repository revision " + url);
                             }
                             public void handleProperty(long revision, SVNPropertyData property) throws SVNException {
+                                out.println("property '" + propertyName +"' set on repository revision " + revision);
                             }
                 });
 
@@ -125,6 +119,7 @@ public class SVNPropsetCommand extends SVNCommand {
                                 out.println("property '" + propertyName +"' set on repository revision " + url);
                             }
                             public void handleProperty(long revision, SVNPropertyData property) throws SVNException {
+                                out.println("property '" + propertyName +"' set on repository revision " + revision);
                             }
                 });
             }

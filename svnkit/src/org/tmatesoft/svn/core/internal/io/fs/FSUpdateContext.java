@@ -36,7 +36,6 @@ import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 import org.tmatesoft.svn.core.io.ISVNEditor;
 import org.tmatesoft.svn.core.io.diff.SVNDeltaGenerator;
-import org.tmatesoft.svn.util.SVNDebugLog;
 
 /**
  * @version 1.1.1
@@ -537,7 +536,6 @@ public class FSUpdateContext {
             diffDirs(sourceRevision, sourcePath, targetPath, editPath, pathInfo != null ? pathInfo.isStartEmpty() : false, depthBeneathHere);
             getEditor().closeDir();
         } else {
-            SVNDebugLog.getDefaultLog().info("processing file: " + editPath);
             if (related) {
                 getEditor().openFile(editPath, sourceRevision);
             } else {

@@ -107,6 +107,8 @@ public class SVNWCManager {
         }
         if (replace) {
             command.put(SVNProperty.CHECKSUM, null);
+            command.put(SVNProperty.HAS_PROPS, Boolean.FALSE.toString());
+            command.put(SVNProperty.HAS_PROP_MODS, Boolean.FALSE.toString());
         }
         command.put(SVNProperty.SCHEDULE, SVNProperty.SCHEDULE_ADD);
         command.put(SVNProperty.KIND, SVNFileType.getNodeKind(fileType).toString());
@@ -486,6 +488,13 @@ public class SVNWCManager {
             
             if (dir.getFile(basePropsPath).isFile()) {
                 command.put(SVNLog.NAME_ATTR, basePropsPath);
+                command.put(SVNLog.DEST_ATTR, revertPropsPath);
+                log.addCommand(SVNLog.MOVE, command, false);
+                command.clear();
+            } else {
+                String emptyPropPath = SVNAdminUtil.getPropBasePath(fileName, SVNNodeKind.FILE, true);
+                SVNProperties.setProperties(Collections.EMPTY_MAP, null, dir.getFile(emptyPropPath), SVNProperties.SVN_HASH_TERMINATOR);
+                command.put(SVNLog.NAME_ATTR, emptyPropPath);
                 command.put(SVNLog.DEST_ATTR, revertPropsPath);
                 log.addCommand(SVNLog.MOVE, command, false);
                 command.clear();

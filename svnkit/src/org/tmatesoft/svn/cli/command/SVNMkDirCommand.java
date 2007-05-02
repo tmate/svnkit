@@ -18,6 +18,7 @@ import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
+import java.util.Map;
 
 import org.tmatesoft.svn.cli.SVNArgument;
 import org.tmatesoft.svn.cli.SVNCommand;
@@ -94,7 +95,8 @@ public class SVNMkDirCommand extends SVNCommand {
         for (int i = 0; i < svnURLs.length; i++) {
             svnURLs[i] = SVNURL.parseURIEncoded(paths[i]);
         }
-        SVNCommitInfo info = client.doMkDir(svnURLs, message == null ? "" : message);
+        Map revProps = (Map) getCommandLine().getArgumentValue(SVNArgument.WITH_REVPROP); 
+        SVNCommitInfo info = client.doMkDir(svnURLs, message == null ? "" : message, revProps);
         if (info != SVNCommitInfo.NULL) {
             out.println();
             out.println("Committed revision " + info.getNewRevision() + ".");

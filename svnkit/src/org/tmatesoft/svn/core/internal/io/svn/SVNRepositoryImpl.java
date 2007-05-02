@@ -1107,4 +1107,41 @@ public class SVNRepositoryImpl extends SVNRepository implements ISVNReporter {
             closeConnection();
         }
     }
+
+    protected ISVNEditor getCommitEditorInternal(Map locks, boolean keepLocks, Map revProps, ISVNWorkspaceMediator mediator) throws SVNException {
+        try {
+            openConnection();
+            String logMessage = (String) revProps.get(SVNRevisionProperty.LOG);
+            if (revProps.size() > 1 && !myConnection.isCommitRevprops()) {
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.RA_NOT_IMPLEMENTED, "Server doesn't support setting arbitrary revision properties during commit");
+                SVNErrorManager.error(err);
+            }
+
+            write("(w(s(*l)w(*l)))", new Object[] { "commit", logMessage,
+                    locks, Boolean.valueOf(keepLocks), revProps });
+            
+            authenticate();
+            read("[()]", null, true);
+            return new SVNCommitEditor(this, myConnection,
+                    new SVNCommitEditor.ISVNCommitCallback() {
+                        public void run(SVNException error) {
+                            try {
+                                closeConnection();
+                            } catch (SVNException e1) {
+                            }
+                            if (error != null) {
+                                try {
+                                    closeSession();
+                                } catch (SVNException e) {
+                                }
+                            }
+                        }
+                    });
+        } catch (SVNException e) {
+            closeConnection();
+            closeSession();
+            throw e;
+        }
+        
+    }
 }

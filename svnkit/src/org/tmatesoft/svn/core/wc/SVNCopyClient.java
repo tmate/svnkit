@@ -267,10 +267,11 @@ public class SVNCopyClient extends SVNBasicClient {
      *                           </ul>
      */
     public SVNCommitInfo doCopy(SVNURL srcURL, SVNRevision srcRevision, SVNURL dstURL, boolean isMove, boolean failWhenDstExists, String commitMessage) throws SVNException {
-        return doCopy(srcURL, SVNRevision.UNDEFINED, srcRevision, dstURL, isMove, failWhenDstExists, commitMessage);
+        return doCopy(srcURL, SVNRevision.UNDEFINED, srcRevision, dstURL, isMove, failWhenDstExists, commitMessage, null);
     }
     
-    public SVNCommitInfo doCopy(SVNURL srcURL, SVNRevision pegRevision, SVNRevision srcRevision, SVNURL dstURL, boolean isMove, boolean failWhenDstExists, String commitMessage) throws SVNException {
+
+    public SVNCommitInfo doCopy(SVNURL srcURL, SVNRevision pegRevision, SVNRevision srcRevision, SVNURL dstURL, boolean isMove, boolean failWhenDstExists, String commitMessage, Map revisionProperties) throws SVNException {
         if (pegRevision == SVNRevision.BASE || pegRevision == SVNRevision.COMMITTED || pegRevision == SVNRevision.PREVIOUS) {
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.CLIENT_BAD_REVISION, "Revision type requires a working copy path, not a URL");
             SVNErrorManager.error(err);
@@ -356,7 +357,7 @@ public class SVNCopyClient extends SVNBasicClient {
         }
 
         commitMessage = SVNCommitClient.validateCommitMessage(commitMessage);
-        ISVNEditor commitEditor = repository.getCommitEditor(commitMessage, null, false, null);
+        ISVNEditor commitEditor = repository.getCommitEditor(commitMessage, null, false, revisionProperties, null);
         ISVNCommitPathHandler committer = new CopyCommitPathHandler(srcPath, srcRevNumber, srcKind, dstPath, isMove, isResurrect);
         Collection paths = isMove ? Arrays.asList(new String[] { srcPath, dstPath }) : Collections.singletonList(dstPath);
 
@@ -439,6 +440,10 @@ public class SVNCopyClient extends SVNBasicClient {
      *                          </ul>
      */
     public SVNCommitInfo doCopy(File srcPath, SVNRevision srcRevision, SVNURL dstURL, boolean failWhenDstExists, String commitMessage) throws SVNException {
+        return doCopy(srcPath, srcRevision, dstURL, failWhenDstExists, commitMessage, null);
+    }
+    
+    public SVNCommitInfo doCopy(File srcPath, SVNRevision srcRevision, SVNURL dstURL, boolean failWhenDstExists, String commitMessage, Map revisionProperties) throws SVNException {
         // may be url->url.
         srcPath = new File(SVNPathUtil.validateFilePath(srcPath.getAbsolutePath()));
         if (srcRevision.isValid() && srcRevision != SVNRevision.WORKING) {
@@ -454,7 +459,7 @@ public class SVNCopyClient extends SVNBasicClient {
                 SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_MISSING_URL, "''{0}'' does not seem to have a URL associated with it", srcPath);
                 SVNErrorManager.error(err);
             }
-            return doCopy(srcEntry.getSVNURL(), srcRevision, dstURL, false, failWhenDstExists, commitMessage);
+            return doCopy(srcEntry.getSVNURL(), SVNRevision.UNDEFINED, srcRevision, dstURL, false, failWhenDstExists, commitMessage, revisionProperties);
         }
         SVNWCAccess wcAccess = createWCAccess();
 		SVNAdminArea adminArea = wcAccess.probeOpen(srcPath, false, SVNWCAccess.INFINITE_DEPTH);
@@ -516,7 +521,7 @@ public class SVNCopyClient extends SVNBasicClient {
             tmpFiles = mediator.getTmpFiles();
 
             commitMessage = SVNCommitClient.validateCommitMessage(commitMessage);
-            commitEditor = repository.getCommitEditor(commitMessage, null, false, mediator);
+            commitEditor = repository.getCommitEditor(commitMessage, null, false, revisionProperties, mediator);
             info = SVNCommitter.commit(tmpFiles, commitables, repository.getRepositoryRoot(true).getPath(), commitEditor);
             commitEditor = null;
         } finally {

@@ -15,6 +15,7 @@ package org.tmatesoft.svn.cli.command;
 import java.io.File;
 import java.io.InputStream;
 import java.io.PrintStream;
+import java.util.Map;
 
 import org.tmatesoft.svn.cli.SVNArgument;
 import org.tmatesoft.svn.cli.SVNCommand;
@@ -55,7 +56,7 @@ public class SVNImportCommand extends SVNCommand {
         boolean disableAutoProps = getCommandLine().hasArgument(SVNArgument.NO_AUTO_PROPS);
         boolean enableAutoProps = getCommandLine().hasArgument(SVNArgument.AUTO_PROPS);
         String message = (String) getCommandLine().getArgumentValue(SVNArgument.MESSAGE);
-
+        Map revProps = (Map) getCommandLine().getArgumentValue(SVNArgument.WITH_REVPROP); 
         getClientManager().setEventHandler(new SVNCommandEventProcessor(out, err, false));
         SVNCommitClient commitClient = getClientManager().getCommitClient();
 
@@ -72,7 +73,7 @@ public class SVNImportCommand extends SVNCommand {
          * svn_depth_files being useful for import, but we
          * don't have that (yet)." 
          */
-        SVNCommitInfo info = commitClient.doImport(new File(path), SVNURL.parseURIEncoded(url), message, useGlobalIgnores, SVNDepth.recurseFromDepth(depth));
+        SVNCommitInfo info = commitClient.doImport(new File(path), SVNURL.parseURIEncoded(url), message, revProps, useGlobalIgnores, SVNDepth.recurseFromDepth(depth));
         if (info != SVNCommitInfo.NULL) {
             out.println();
             out.println("Imported revision " + info.getNewRevision() + ".");

@@ -28,11 +28,13 @@ import java.util.StringTokenizer;
 import java.util.TimeZone;
 import java.util.regex.Pattern;
 
+import org.tmatesoft.svn.core.SVNURL;
+import org.tmatesoft.svn.core.internal.io.svn.ISVNConnector;
+import org.tmatesoft.svn.core.internal.io.svn.SVNTunnelConnector;
 import org.tmatesoft.svn.core.wc.ISVNMerger;
 import org.tmatesoft.svn.core.wc.ISVNMergerFactory;
 import org.tmatesoft.svn.core.wc.ISVNOptions;
 import org.tmatesoft.svn.core.wc.SVNWCUtil;
-
 
 /**
  * @version 1.1.1
@@ -45,6 +47,7 @@ public class DefaultSVNOptions implements ISVNOptions, ISVNMergerFactory {
     private static final String AUTOPROPS_GROUP = "auto-props";
     private static final String SVNKIT_GROUP = "svnkit";
     private static final String OLD_SVNKIT_GROUP = "javasvn";
+    private static final String HELPERS_GROUP = "helpers";
     
     private static final String USE_COMMIT_TIMES = "use-commit-times";
     private static final String GLOBAL_IGNORES = "global-ignores";
@@ -52,6 +55,7 @@ public class DefaultSVNOptions implements ISVNOptions, ISVNMergerFactory {
     private static final String STORE_AUTH_CREDS = "store-auth-creds";
     private static final String KEYWORD_TIMEZONE = "keyword_timezone";
     private static final String KEYWORD_LOCALE = "keyword_locale";
+    private static final String EDITOR_CMD = "editor-cmd";
     
     private static final String DEFAULT_IGNORES = "*.o *.lo *.la #*# .*.rej *.rej .*~ *~ .#* .DS_Store";    
     private static final String YES = "yes";
@@ -217,6 +221,10 @@ public class DefaultSVNOptions implements ISVNOptions, ISVNMergerFactory {
         }
     }
 
+    public String getEditor() {
+        return getConfigFile().getPropertyValue(HELPERS_GROUP, EDITOR_CMD);
+    }
+
     public void deleteAutoProperty(String pattern) {
         getConfigFile().setPropertyValue(AUTOPROPS_GROUP, pattern, null, !myIsReadonly);
     }
@@ -358,12 +366,17 @@ public class DefaultSVNOptions implements ISVNOptions, ISVNMergerFactory {
         return new DefaultSVNMerger(conflictStart, conflictSeparator, conflictEnd);
     }
 
-    public String getTunnelDefinition(String subProtocolName) {
+    public ISVNConnector createTunnelConnector(SVNURL url) {
+	    String subProtocolName = url.getProtocol().substring("svn+".length());
         if (subProtocolName == null) {
             return null;
         }
         Map tunnels = getConfigFile().getProperties("tunnels");
-        return (String) tunnels.get(subProtocolName);
+	    final String tunnel = (String)tunnels.get(subProtocolName);
+	    if (tunnel == null) {
+		    return null;
+	    }
+	    return new SVNTunnelConnector(subProtocolName, tunnel);
     }
 
     public DateFormat getKeywordDateFormat() {

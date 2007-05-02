@@ -823,6 +823,21 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
         return commitEditor;
     }
 
+    protected ISVNEditor getCommitEditorInternal(Map locks, boolean keepLocks, Map revProps, ISVNWorkspaceMediator mediator) throws SVNException {
+        try {
+            openRepository();
+        } catch (SVNException svne) {
+            closeRepository();
+            throw svne;
+        }
+        revProps = revProps == null ? new HashMap() : revProps;
+        if (!revProps.containsKey(SVNRevisionProperty.AUTHOR)) {
+            revProps.put(SVNRevisionProperty.AUTHOR, getUserName());
+        }
+        FSCommitEditor commitEditor = new FSCommitEditor(getRepositoryPath(""), locks, keepLocks, null, myFSFS, this, revProps);
+        return commitEditor;
+    }
+
     public SVNLock getLock(String path) throws SVNException {
         try {
             openRepository();
