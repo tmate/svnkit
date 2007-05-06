@@ -76,6 +76,7 @@ public class SVNRevertCommand extends SVNCommand {
                     SVNErrorMessage error = svne.getErrorMessage().wrap("Try 'svn revert --recursive' instead?");
                     SVNErrorManager.error(error);
                 }
+                throw svne;
             }
         }
     }
