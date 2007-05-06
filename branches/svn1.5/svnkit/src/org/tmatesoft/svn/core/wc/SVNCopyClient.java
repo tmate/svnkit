@@ -47,6 +47,7 @@ import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNPropertiesManager;
 import org.tmatesoft.svn.core.internal.wc.SVNWCManager;
 import org.tmatesoft.svn.core.internal.wc.admin.SVNAdminArea;
+import org.tmatesoft.svn.core.internal.wc.admin.SVNAdminAreaFactory;
 import org.tmatesoft.svn.core.internal.wc.admin.SVNEntry;
 import org.tmatesoft.svn.core.internal.wc.admin.SVNWCAccess;
 import org.tmatesoft.svn.core.io.ISVNEditor;
@@ -459,7 +460,7 @@ public class SVNCopyClient extends SVNBasicClient {
                 SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_MISSING_URL, "''{0}'' does not seem to have a URL associated with it", srcPath);
                 SVNErrorManager.error(err);
             }
-            return doCopy(srcEntry.getSVNURL(), SVNRevision.UNDEFINED, srcRevision, dstURL, false, failWhenDstExists, commitMessage, revisionProperties);
+            return doCopy(srcEntry.getSVNURL(), SVNRevision.create(srcEntry.getRevision()), srcRevision, dstURL, false, failWhenDstExists, commitMessage, revisionProperties);
         }
         SVNWCAccess wcAccess = createWCAccess();
 		SVNAdminArea adminArea = wcAccess.probeOpen(srcPath, false, SVNWCAccess.INFINITE_DEPTH);
@@ -752,18 +753,20 @@ public class SVNCopyClient extends SVNBasicClient {
             // url->wc copy
             SVNWCAccess wcAccess = createWCAccess();
             SVNURL srcURL = null;
+            SVNRevision pegRevision = SVNRevision.UNDEFINED;
             try {
                 wcAccess.probeOpen(srcPath, false, 0);
                 SVNEntry srcEntry = wcAccess.getVersionedEntry(srcPath, false);
                 if (srcEntry.getURL() == null) {
-                    SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_MISSING_URL, "''{0}'' has no URL", srcPath);
+                    SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_MISSING_URL, "''{0}'' does not seem to have a URL associated with it", srcPath);
                     SVNErrorManager.error(err);
                 }
                 srcURL = srcEntry.getSVNURL();
+                pegRevision = SVNRevision.create(srcEntry.getRevision());
             } finally {
                 wcAccess.close();
             }
-            doCopy(srcURL, srcRevision, dstPath);
+            doCopy(srcURL, pegRevision, srcRevision, dstPath);
             return;
         }
         // 1. can't copy src to its own child
@@ -816,14 +819,14 @@ public class SVNCopyClient extends SVNBasicClient {
                     }
                 }
                 
-                if (!force) {
-                    try {
-                        SVNWCManager.canDelete(srcPath, false, getOptions());
-                    } catch (SVNException svne) {
-                        SVNErrorMessage err = svne.getErrorMessage().wrap("Move will not be attempted unless forced");
-                        SVNErrorManager.error(err, svne);
-                    }
-                }
+//                if (!force) {
+//                    try {
+//                        SVNWCManager.canDelete(srcPath, false, getOptions());
+//                    } catch (SVNException svne) {
+//                        SVNErrorMessage err = svne.getErrorMessage().wrap("Move will not be attempted unless forced");
+//                       SVNErrorManager.error(err, svne);
+//                  }
+//                }
             } else {
                 adminArea = wcAccess.open(dstParent, true, 0);
             }
@@ -975,6 +978,7 @@ public class SVNCopyClient extends SVNBasicClient {
         
         File dstPath = dstParent.getFile(dstName);
         SVNFileUtil.copyDirectory(srcPath, dstPath, true, srcArea.getWCAccess());
+        
         SVNWCClient wcClient = new SVNWCClient((ISVNAuthenticationManager) null, (ISVNOptions) null);
         wcClient.doCleanup(dstPath);
         
@@ -992,10 +996,10 @@ public class SVNCopyClient extends SVNBasicClient {
                     SVNLocationEntry copyFromEntry = getCopyFromInfoFromParent(srcPath, srcArea);
                     copyFromURL = copyFromEntry.getPath();
                     copyFromRevision = copyFromEntry.getRevision();
-                    Map attributes = new HashMap();
-                    attributes.put(SVNProperty.URL, copyFromURL);
-                    tmpDir.modifyEntry(tmpDir.getThisDirName(), attributes, true, false);
                 }
+                Map attributes = new HashMap();
+                attributes.put(SVNProperty.URL, copyFromURL);
+                tmpDir.modifyEntry(tmpDir.getThisDirName(), attributes, true, false);
             } else {
                 copyFromURL = srcEntry.getURL();
                 copyFromRevision = srcEntry.getRevision();

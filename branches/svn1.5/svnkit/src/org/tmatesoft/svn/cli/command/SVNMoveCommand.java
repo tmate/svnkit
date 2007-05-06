@@ -24,6 +24,7 @@ import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNURL;
+import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.wc.SVNCopyClient;
 import org.tmatesoft.svn.core.wc.SVNRevision;
 
@@ -78,7 +79,13 @@ public class SVNMoveCommand extends SVNCommand {
             SVNErrorMessage msg = SVNErrorMessage.create(SVNErrorCode.CL_INSUFFICIENT_ARGS, "Please enter SRC and DST path");
             throw new SVNException(msg);
         }
-
+        String commitMessage = (String) getCommandLine().getArgumentValue(SVNArgument.MESSAGE);
+        Map revisionProps = (Map) getCommandLine().getArgumentValue(SVNArgument.WITH_REVPROP);
+        boolean hasFile = getCommandLine().hasArgument(SVNArgument.FILE);
+        if (commitMessage != null || hasFile || revisionProps != null) {
+            SVNErrorMessage error = SVNErrorMessage.create(SVNErrorCode.CL_UNNECESSARY_LOG_MESSAGE, "Local, non-commit operations do not take a log message or revision properties");
+            SVNErrorManager.error(error);
+        }
         final String absoluteSrcPath = getCommandLine().getPathAt(0);
         final String absoluteDstPath = getCommandLine().getPathAt(1);
         if (matchTabsInPath(absoluteDstPath, err) || matchTabsInPath(absoluteSrcPath, err)) {
