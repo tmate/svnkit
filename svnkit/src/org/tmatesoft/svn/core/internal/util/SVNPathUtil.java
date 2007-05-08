@@ -200,7 +200,7 @@ public class SVNPathUtil {
         for (int i = 0; i < path.length(); i++) {
             char ch = path.charAt(i);
             if (SVNEncodingUtil.isASCIIControlChar(ch)) {
-                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_PATH_SYNTAX, "Invalid control character ''{0}'' in path ''{1}''", new String[] {"''0x" + SVNFormatUtil.getHexNumberFromByte((byte)ch) + "''", path});
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_PATH_SYNTAX, "Invalid control character ''{0}'' in path ''{1}''", new String[] {"0x" + SVNFormatUtil.getHexNumberFromByte((byte)ch), path});
                 SVNErrorManager.error(err);
             }
         }

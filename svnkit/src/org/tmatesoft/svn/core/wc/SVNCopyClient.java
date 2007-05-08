@@ -19,6 +19,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.Map;
 import java.util.TreeMap;
 
@@ -47,7 +48,6 @@ import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNPropertiesManager;
 import org.tmatesoft.svn.core.internal.wc.SVNWCManager;
 import org.tmatesoft.svn.core.internal.wc.admin.SVNAdminArea;
-import org.tmatesoft.svn.core.internal.wc.admin.SVNAdminAreaFactory;
 import org.tmatesoft.svn.core.internal.wc.admin.SVNEntry;
 import org.tmatesoft.svn.core.internal.wc.admin.SVNWCAccess;
 import org.tmatesoft.svn.core.io.ISVNEditor;
@@ -545,6 +545,86 @@ public class SVNCopyClient extends SVNBasicClient {
         return info != null ? info : SVNCommitInfo.NULL;
     }
     
+    public SVNCommitInfo doCopy(SVNCopySource[] sources, SVNURL dstURL, boolean isMove, boolean failWhenDstExists, String commitMessage, Map revisionProperties) throws SVNException {
+        boolean srcsAreURLs = sources[0].isURL();
+        for (int i = 0; i < sources.length; i++) {
+            SVNCopySource source = sources[i]; 
+            SVNRevision pegRevision = source.getPegRevision();
+            if (source.isURL() && (pegRevision == SVNRevision.COMMITTED || 
+                    pegRevision == SVNRevision.BASE || pegRevision == SVNRevision.PREVIOUS)) {
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.CLIENT_BAD_REVISION, "Revision type requires a working copy path, not a URL");
+                SVNErrorManager.error(err);
+            }
+        }
+        if (sources.length > 1) {
+            for (int i = 0; i < sources.length; i++) {
+                SVNCopySource source = sources[i];
+                if (srcsAreURLs != source.isURL()) {
+                    SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.UNSUPPORTED_FEATURE, "Cannot mix repository and working copy sources");
+                    SVNErrorManager.error(err);
+                }
+                resolveRevisions(source);
+                String name = source.getName();
+                source.setDestinationURL(dstURL.appendPath(name, false));
+            }            
+        } else {
+            SVNCopySource source = sources[0];
+            resolveRevisions(source);
+            source.setDestinationURL(dstURL);
+        }
+        
+        if (isMove) {
+            if (srcsAreURLs) {
+                for (int i = 0; i < sources.length; i++) {
+                    SVNCopySource source = sources[i];
+                    if (source.getURL().equals(dstURL)) {
+                        SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.UNSUPPORTED_FEATURE, "Cannot move URL ''{0}'' into itself", source.getURL());
+                        SVNErrorManager.error(err);
+                    }
+                }                
+            } else {
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.UNSUPPORTED_FEATURE, "Moves between the working copy and the repository are not supported");
+                SVNErrorManager.error(err);
+            }
+        } else {
+            if (!srcsAreURLs) {
+                boolean needRepoRevision = false;
+                for (int i = 0; i < sources.length; i++) {
+                    SVNCopySource source = sources[i];
+                    if (source.getRevision() != SVNRevision.UNDEFINED && source.getRevision() != SVNRevision.WORKING) {
+                        needRepoRevision = true;
+                        break;
+                    }
+                }
+                if (needRepoRevision) {
+                    SVNWCAccess wcAccess = createWCAccess();
+                    for (int i = 0; i < sources.length; i++) {
+                        SVNCopySource source = sources[i];
+                        wcAccess.probeOpen(source.getPath(), false, 0); 
+                        SVNEntry srcEntry = null;
+                        try {
+                            srcEntry = wcAccess.getVersionedEntry(source.getPath(), false);
+                        } finally {
+                            wcAccess.close();
+                        }
+                        if (srcEntry.getURL() == null) {
+                            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_MISSING_URL, "''{0}'' does not seem to have a URL associated with it", source.getPath());
+                            SVNErrorManager.error(err);
+                        }
+                        source.setPath(null);
+                        source.setURL(srcEntry.getSVNURL());
+                        source.setPegRevision(SVNRevision.create(srcEntry.getRevision()));
+                    }
+                    srcsAreURLs = true;
+                }
+            }
+        }
+        if (srcsAreURLs) {
+            return copyReposToRepos(sources, dstURL, isMove, failWhenDstExists, commitMessage, revisionProperties);
+        } 
+        return copyLocalToRepos(sources, dstURL, isMove, failWhenDstExists, commitMessage, revisionProperties);
+    }
+
     /**
      * Copies a source URL to a destination Working Copy path. 
      * 
@@ -695,7 +775,7 @@ public class SVNCopyClient extends SVNBasicClient {
         return revision;
     }
     
-    private String getUUIDFromPath (SVNWCAccess wcAccess, File path) throws SVNException {
+    private String getUUIDFromPath(SVNWCAccess wcAccess, File path) throws SVNException {
         SVNEntry entry = wcAccess.getVersionedEntry(path, true);
         String uuid = null;
         if (entry.getUUID() != null) {
@@ -1053,6 +1133,271 @@ public class SVNCopyClient extends SVNBasicClient {
         }
     }
 
+    private SVNCommitInfo copyLocalToRepos(SVNCopySource[] sources, SVNURL dstURL, boolean isMove, boolean failWhenDstExists, String commitMessage, Map revisionProperties) throws SVNException {
+        String topSrcPath = sources[0].getPath().getAbsolutePath();
+        for (int i = 1; i < sources.length; i++) {
+            SVNCopySource source = sources[i];
+            topSrcPath = SVNPathUtil.getCommonPathAncestor(topSrcPath, source.getPath().getAbsolutePath());
+        }
+        File topSrcFile = new File(topSrcPath);
+        
+        SVNWCAccess wcAccess = createWCAccess();
+        SVNAdminArea adminArea = wcAccess.probeOpen(topSrcFile, false, SVNWCAccess.INFINITE_DEPTH);
+        wcAccess.setAnchor(adminArea.getRoot());
+        
+        SVNURL topDstURL = sources[0].getDstURL().removePathTail();
+        for (int i = 1; i < sources.length; i++) {
+            SVNCopySource source = sources[i];
+            topDstURL = SVNURLUtil.getCommonURLAncestor(topDstURL, source.getDstURL());
+        }        
+
+        SVNRepository repository = createRepository(topDstURL, true);
+        boolean gotReposRoot = false;
+        for (int i = 0; i < sources.length; i++) {
+            SVNCopySource source = sources[i];
+            SVNEntry entry = wcAccess.getVersionedEntry(source.getPath(), false);
+            SVNURL srcURL = entry.getSVNURL();
+            SVNURL reposRoot = entry.getRepositoryRootURL();
+            if (reposRoot == null) {
+                reposRoot = repository.getRepositoryRoot(!gotReposRoot);
+                gotReposRoot = true;
+            }
+            String srcPath = SVNPathUtil.getPathAsChild(reposRoot.getPath(), srcURL.getPath());
+            if (srcPath == null || "".equals(srcPath)) {
+                srcPath = "/";
+            } else {
+                srcPath = !srcPath.startsWith("/") ? "/" + srcPath : srcPath;    
+            }
+            source.setSrcPath(srcPath);
+            source.setSrcRevisionNumber(entry.getRevision());
+            String dstPath = SVNPathUtil.getPathAsChild(topDstURL.getPath(), source.getDstURL().getPath());
+            SVNNodeKind dstKind = repository.checkPath(dstPath, -1);
+            if (dstKind == SVNNodeKind.DIR) {
+                if (failWhenDstExists) {
+                    SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_ALREADY_EXISTS, "Path ''{0}'' already exists", source.getDstURL());
+                    SVNErrorManager.error(err);
+                }
+                source.setDestinationURL(source.getDstURL().appendPath(source.getPath().getName(), false));
+            } else if (dstKind == SVNNodeKind.FILE) {
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_ALREADY_EXISTS, "File ''{0}'' already exists", source.getDstURL());
+                SVNErrorManager.error(err);
+            }
+
+            source.setDstPath(dstPath);
+        }
+        
+        Collection commitItems = new LinkedList();
+
+        for (int i = 0; i < sources.length; i++) {
+            SVNCopySource source = sources[i];
+            SVNCommitItem item = new SVNCommitItem(null, source.getDstURL(), null, 
+                        SVNNodeKind.NONE, SVNRevision.UNDEFINED, SVNRevision.UNDEFINED, 
+                        true, false, false, false, true, false);
+            item.setWCAccess(adminArea.getWCAccess());
+            commitItems.add(item);
+        }
+        
+        commitMessage = getCommitHandler().getCommitMessage(commitMessage, (SVNCommitItem[]) commitItems.toArray(new SVNCommitItem[commitItems.size()]));
+        if (commitMessage == null) {
+            return SVNCommitInfo.NULL;
+        }
+
+//        SVNAdminArea dirArea = null;
+//        if (SVNFileType.getType(topSrcFile) == SVNFileType.DIRECTORY) {
+//            dirArea = wcAccess.retrieve(topSrcFile);
+//        } else {
+//            dirArea = adminArea;
+//        }
+        
+        Collection tmpFiles = null;
+        SVNCommitInfo info = null;
+        ISVNEditor commitEditor = null;
+        try {
+            Map commitables = new TreeMap();
+            for (int i = 0; i < sources.length; i++) {
+                SVNCopySource source = sources[i];
+                SVNEntry entry = wcAccess.getVersionedEntry(source.getPath(), false);
+                SVNAdminArea dirArea = null;
+                if (entry.isDirectory()) {
+                    dirArea = wcAccess.retrieve(source.getPath());
+                } else {
+                    dirArea = wcAccess.retrieve(source.getPath().getParentFile());
+                }
+                SVNCommitUtil.harvestCommitables(commitables, dirArea, source.getPath(), null, 
+                        entry, source.getDstURL().toString(), entry.getURL(), 
+                        true, false, false, null, true, false, getCommitParameters());
+                
+            }
+            
+            SVNCommitItem[] items = (SVNCommitItem[]) commitables.values().toArray(new SVNCommitItem[commitables.values().size()]);
+            for (int i = 0; i < items.length; i++) {
+                items[i].setWCAccess(wcAccess);
+            }
+            
+            commitables = new TreeMap();
+            topDstURL = SVNURL.parseURIEncoded(SVNCommitUtil.translateCommitables(items, commitables));
+
+            repository = createRepository(topDstURL, true);
+            SVNCommitMediator mediator = new SVNCommitMediator(commitables);
+            tmpFiles = mediator.getTmpFiles();
+
+            commitMessage = SVNCommitClient.validateCommitMessage(commitMessage);
+            commitEditor = repository.getCommitEditor(commitMessage, null, true, revisionProperties, mediator);
+            info = SVNCommitter.commit(tmpFiles, commitables, repository.getRepositoryRoot(true).getPath(), commitEditor);
+            commitEditor = null;
+        } finally {
+            if (tmpFiles != null) {
+                for (Iterator files = tmpFiles.iterator(); files.hasNext();) {
+                    File file = (File) files.next();
+                    file.delete();
+                }
+            }
+            if (commitEditor != null && info == null) {
+                commitEditor.abortEdit();
+            }
+            if (wcAccess != null) {
+                wcAccess.close();
+            }
+        }
+        if (info != null && info.getNewRevision() >= 0) { 
+            dispatchEvent(SVNEventFactory.createCommitCompletedEvent(null, info.getNewRevision()), ISVNEventHandler.UNKNOWN);
+        }
+        return info != null ? info : SVNCommitInfo.NULL;
+    }
+    
+    private SVNCommitInfo copyReposToRepos(SVNCopySource[] sources, SVNURL dstURL, boolean isMove, boolean failWhenDstExists, String commitMessage, Map revisionProperties) throws SVNException {
+        SVNURL topSrcURL = sources[0].getURL();
+        for (int i = 1; i < sources.length; i++) {
+            SVNCopySource source = sources[i];
+            topSrcURL = SVNURLUtil.getCommonURLAncestor(topSrcURL, source.getURL());
+        }
+        SVNURL topURL = SVNURLUtil.getCommonURLAncestor(topSrcURL, dstURL);
+        if (topURL == null) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.UNSUPPORTED_FEATURE, "Source and dest appear not to be in the same repository (src: ''{0}''; dst: ''{1}'')", new Object[] {sources[0].getURL(), dstURL});
+            SVNErrorManager.error(err);
+        }
+        for (int i = 0; i < sources.length; i++) {
+            SVNCopySource source = sources[i];
+            if (source.getURL().equals(source.getDstURL())) {
+                source.setRessurection(true);
+                topURL = source.getURL().removePathTail();
+            }
+        }
+        SVNRepository repository = createRepository(topURL, false);
+        SVNURL repositoryRoot = repository.getRepositoryRoot(true);
+        for (int i = 0; i < sources.length; i++) {
+            SVNCopySource source = sources[i];
+            if (!source.getDstURL().equals(repositoryRoot) && source.getURL().getPath().startsWith(source.getDstURL().getPath() + "/")) {
+                source.setRessurection(true);
+                topURL = topURL.removePathTail();
+                repository = createRepository(topURL, false);
+            }
+        }        
+
+        long latestRevision = repository.getLatestRevision();
+        for (int i = 0; i < sources.length; i++) {
+            SVNCopySource source = sources[i];
+            long srcRevNumber = getRevisionNumber(source.getRevision(), repository, null);
+            if (srcRevNumber < 0) {
+                srcRevNumber = latestRevision;
+            }
+            source.setSrcRevisionNumber(srcRevNumber);
+
+            SVNRepositoryLocation[] locs = getLocations(source.getURL(), null, null, source.getPegRevision(), source.getRevision(), SVNRevision.UNDEFINED);
+            source.setURL(locs[0].getURL());
+
+            // substring one more char, because path always starts with /, and we need relative path.
+            String srcPath = SVNPathUtil.getPathAsChild(topURL.getURIEncodedPath(), source.getURL().getURIEncodedPath()); 
+            srcPath = srcPath == null ? "" : SVNEncodingUtil.uriDecode(srcPath);
+            String dstPath = SVNPathUtil.getPathAsChild(topURL.getPath(), source.getDstURL().getPath());
+            dstPath = dstPath == null ? "" : SVNEncodingUtil.uriDecode(dstPath);
+            
+            if ("".equals(srcPath) && isMove) {
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.UNSUPPORTED_FEATURE, "Cannot move URL ''{0}'' into itself", source.getURL());
+                SVNErrorManager.error(err);
+            }
+    
+            SVNNodeKind srcKind = repository.checkPath(srcPath, srcRevNumber);
+            if (srcKind == SVNNodeKind.NONE) {
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_NOT_FOUND, "Path ''{0}'' does not exist in revision {1}", new Object[] {source.getURL(), new Long(srcRevNumber)});
+                SVNErrorManager.error(err);
+            }
+            source.setSrcKind(srcKind);
+            SVNNodeKind dstKind = repository.checkPath(dstPath, latestRevision);
+            if (dstKind == SVNNodeKind.DIR) {
+                if (failWhenDstExists) {
+                    SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_ALREADY_EXISTS, "Path ''{0}'' already exists", dstPath);
+                    SVNErrorManager.error(err);
+                }
+                dstPath = SVNPathUtil.append(dstPath, SVNPathUtil.tail(source.getURL().getPath()));
+                if (repository.checkPath(dstPath, latestRevision) != SVNNodeKind.NONE) {
+                    SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_ALREADY_EXISTS, "Path ''{0}'' already exists", dstPath);
+                    SVNErrorManager.error(err);
+                }
+            } else if (dstKind == SVNNodeKind.FILE) {
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_ALREADY_EXISTS, "Path ''{0}'' already exists", dstPath);
+                SVNErrorManager.error(err);
+            }
+            source.setSrcPath(srcPath);
+            source.setDstPath(dstPath);
+        }
+        
+        Collection commitItems = new LinkedList();
+        Map actionHash = new HashMap();
+        for (int i = 0; i < sources.length; i++) {
+            SVNCopySource source = sources[i];
+            commitItems.add(new SVNCommitItem(null, source.getDstURL(), source.getURL(), 
+                    source.getSrcKind(), SVNRevision.UNDEFINED, SVNRevision.create(source.getSrcRevisionNumber()), 
+                    true, false, false, false, true, false));
+            actionHash.put(source.getDstPath(), source);
+            if (isMove && !source.isRessurection()) {
+                commitItems.add(new SVNCommitItem(null, source.getURL(), null, 
+                        source.getSrcKind(), SVNRevision.create(source.getSrcRevisionNumber()), 
+                        SVNRevision.UNDEFINED, false, true, false, false, false, false));
+                actionHash.put(source.getSrcPath(), source);                
+            }
+        }        
+        
+        commitMessage = getCommitHandler().getCommitMessage(commitMessage, (SVNCommitItem[]) commitItems.toArray(new SVNCommitItem[commitItems.size()]));
+        if (commitMessage == null) {
+            return SVNCommitInfo.NULL;
+        }
+
+        commitMessage = SVNCommitClient.validateCommitMessage(commitMessage);
+        Collection paths = new LinkedList();
+        for (int i = 0; i < sources.length; i++) {
+            SVNCopySource source = sources[i];
+            
+            //TODO:merge-tracking stuff
+            
+            paths.add(source.getDstPath());
+            if (isMove && !source.isRessurection()) {
+                paths.add(source.getSrcPath());
+            }
+        }
+        
+        ISVNEditor commitEditor = repository.getCommitEditor(commitMessage, null, true, revisionProperties, null);
+        ISVNCommitPathHandler committer = new CopyCommitPathHandler2(actionHash, isMove);
+
+        SVNCommitInfo result = null;
+        try {
+            SVNCommitUtil.driveCommitEditor(committer, paths, commitEditor, latestRevision);
+            result = commitEditor.closeEdit();
+        } catch (SVNException e) {
+            try {
+                commitEditor.abortEdit();
+            } catch (SVNException inner) {
+                //
+            }
+            SVNErrorMessage err = e.getErrorMessage().wrap("Commit failed (details follow):");
+            SVNErrorManager.error(err);
+        }
+        if (result != null && result.getNewRevision() >= 0) { 
+            dispatchEvent(SVNEventFactory.createCommitCompletedEvent(null, result.getNewRevision()), ISVNEventHandler.UNKNOWN);
+        }
+        return result != null ? result : SVNCommitInfo.NULL;
+    }
+    
     private SVNLocationEntry getCopyFromInfoFromParent(File path, SVNAdminArea adminArea) throws SVNException {
         String copyFromURL = null;
         long copyFromRevision = SVNRepository.INVALID_REVISION; 
@@ -1135,4 +1480,70 @@ public class SVNCopyClient extends SVNBasicClient {
             return closeDir;
         }
     }
+
+    private static class CopyCommitPathHandler2 implements ISVNCommitPathHandler {
+        
+        private Map myPathInfos;
+        private boolean myIsMove;
+        
+        public CopyCommitPathHandler2(Map pathInfos, boolean isMove) {
+            myPathInfos = pathInfos;
+            myIsMove = isMove;
+        }
+        
+        public boolean handleCommitPath(String commitPath, ISVNEditor commitEditor) throws SVNException {
+            SVNCopySource pathInfo = (SVNCopySource) myPathInfos.get(commitPath);
+            boolean doAdd = false;
+            boolean doDelete = false;
+            if (pathInfo.isRessurection()) {
+                if (!myIsMove) {
+                    doAdd = true;
+                }
+            } else {
+                if (myIsMove) {
+                    if (commitPath.equals(pathInfo.getSrcPath())) {
+                        doDelete = true;
+                    } else {
+                        doAdd = true;
+                    }
+                } else {
+                    doAdd = true;
+                }
+            }
+            if (doDelete) {
+                commitEditor.deleteEntry(commitPath, -1);
+            }
+            boolean closeDir = false;
+            if (doAdd) {
+                SVNPathUtil.checkPathIsValid(commitPath);
+                if (pathInfo.getSrcKind() == SVNNodeKind.DIR) {
+                    commitEditor.addDir(commitPath, pathInfo.getSrcPath(), pathInfo.getSrcRevisionNumber());
+                    closeDir = true;
+                } else {
+                    commitEditor.addFile(commitPath, pathInfo.getSrcPath(), pathInfo.getSrcRevisionNumber());
+                    commitEditor.closeFile(commitPath, null);
+                }
+            }
+            return closeDir;
+        }
+        
+    }
+
+    private void resolveRevisions(SVNCopySource source) {
+        SVNRevision pegRevision = source.getPegRevision() == null ? SVNRevision.UNDEFINED : source.getPegRevision();
+        SVNRevision revision = source.getRevision() == null ? SVNRevision.UNDEFINED : source.getRevision();
+        if (pegRevision == SVNRevision.UNDEFINED) {
+            if (source.isURL()) {
+                pegRevision = SVNRevision.HEAD;
+            } else {
+                pegRevision = SVNRevision.WORKING;
+            }
+        }
+        if (revision == SVNRevision.UNDEFINED) {
+            revision = pegRevision;
+        }
+        source.setPegRevision(pegRevision);
+        source.setRevision(revision);
+    }
+
 }
