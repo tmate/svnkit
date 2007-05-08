@@ -26,6 +26,7 @@ import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNURL;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.wc.SVNCopyClient;
+import org.tmatesoft.svn.core.wc.SVNCopySource;
 import org.tmatesoft.svn.core.wc.SVNRevision;
 
 /**
@@ -51,31 +52,40 @@ public class SVNMoveCommand extends SVNCommand {
 	}
 
 	private void runRemote(PrintStream out, PrintStream err) throws SVNException {
-        if (getCommandLine().getURLCount() != 2) {
+        if (getCommandLine().getURLCount() < 2) {
             SVNErrorMessage msg = SVNErrorMessage.create(SVNErrorCode.CL_INSUFFICIENT_ARGS, "Please enter SRC and DST URLs");
             throw new SVNException(msg);
         }
-        String srcURL = getCommandLine().getURL(0);
-        SVNRevision srcRevision = SVNRevision.parse((String) getCommandLine().getArgumentValue(SVNArgument.REVISION));
-        String dstURL = getCommandLine().getURL(1);
 
-        if (matchTabsInURL(srcURL, err) || matchTabsInURL(dstURL, err)) {
+        String dstURL = getCommandLine().getURL(getCommandLine().getURLCount() - 1);
+        if (matchTabsInURL(dstURL, err)) {
             return;
         }
-
+        SVNURL dstSVNURL = SVNURL.parseURIEncoded(dstURL);
         String commitMessage = (String) getCommandLine().getArgumentValue(SVNArgument.MESSAGE);
         getClientManager().setEventHandler(new SVNCommandEventProcessor(out, err, false));
         SVNCopyClient updater = getClientManager().getCopyClient();
         Map revProps = (Map) getCommandLine().getArgumentValue(SVNArgument.WITH_REVPROP); 
-        SVNCommitInfo result = updater.doCopy(SVNURL.parseURIEncoded(srcURL), SVNRevision.UNDEFINED, srcRevision, SVNURL.parseURIDecoded(dstURL), true, false, commitMessage, revProps);
+        SVNRevision srcRevision = SVNRevision.parse((String) getCommandLine().getArgumentValue(SVNArgument.REVISION));
+
+        SVNCopySource[] sources = new SVNCopySource[getCommandLine().getURLCount() - 1]; 
+        for (int i = 0; i < getCommandLine().getURLCount() - 1; i++) {
+            String srcURL = getCommandLine().getURL(i);
+            if (matchTabsInURL(srcURL, err)) {
+                return;
+            }
+            sources[i] = new SVNCopySource(SVNRevision.UNDEFINED, srcRevision, SVNURL.parseURIEncoded(srcURL));
+        }
+        SVNCommitInfo result = updater.doCopy(sources, dstSVNURL, true, false, commitMessage, revProps);
         if (result != SVNCommitInfo.NULL) {
             out.println();
             out.println("Committed revision " + result.getNewRevision() + ".");
         }
+
 	}
 
 	private void runLocally(final PrintStream out, PrintStream err) throws SVNException {
-        if (getCommandLine().getPathCount() != 2) {
+        if (getCommandLine().getPathCount() < 2) {
             SVNErrorMessage msg = SVNErrorMessage.create(SVNErrorCode.CL_INSUFFICIENT_ARGS, "Please enter SRC and DST path");
             throw new SVNException(msg);
         }
@@ -86,14 +96,20 @@ public class SVNMoveCommand extends SVNCommand {
             SVNErrorMessage error = SVNErrorMessage.create(SVNErrorCode.CL_UNNECESSARY_LOG_MESSAGE, "Local, non-commit operations do not take a log message or revision properties");
             SVNErrorManager.error(error);
         }
-        final String absoluteSrcPath = getCommandLine().getPathAt(0);
-        final String absoluteDstPath = getCommandLine().getPathAt(1);
-        if (matchTabsInPath(absoluteDstPath, err) || matchTabsInPath(absoluteSrcPath, err)) {
+        final String absoluteDstPath = getCommandLine().getPathAt(getCommandLine().getPathCount() - 1);
+        File absoluteDstFile = new File(absoluteDstPath);
+        if (matchTabsInPath(absoluteDstPath, err)) {
             return;
         }
-        getClientManager().setEventHandler(new SVNCommandEventProcessor(out, err, false));
-        SVNCopyClient updater = getClientManager().getCopyClient();
-        boolean force = getCommandLine().hasArgument(SVNArgument.FORCE);
-        updater.doCopy(new File(absoluteSrcPath), SVNRevision.WORKING, new File(absoluteDstPath), force, true);
-	}
+        for (int i = 0; i < getCommandLine().getPathCount() - 1; i++) {
+            final String absoluteSrcPath = getCommandLine().getPathAt(i);
+            if (matchTabsInPath(absoluteSrcPath, err)) {
+                return;
+            }
+            getClientManager().setEventHandler(new SVNCommandEventProcessor(out, err, false));
+            SVNCopyClient updater = getClientManager().getCopyClient();
+            boolean force = getCommandLine().hasArgument(SVNArgument.FORCE);
+            updater.doCopy(new File(absoluteSrcPath), SVNRevision.WORKING, absoluteDstFile, force, true);
+        }
+    }
 }

@@ -26,6 +26,7 @@ import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNURL;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.wc.SVNCopyClient;
+import org.tmatesoft.svn.core.wc.SVNCopySource;
 import org.tmatesoft.svn.core.wc.SVNRevision;
 
 /**
@@ -50,8 +51,16 @@ public class SVNCopyCommand extends SVNCommand {
                         SVNErrorMessage msg = SVNErrorMessage.create(SVNErrorCode.CL_UNNECESSARY_LOG_MESSAGE, "Local, non-commit operations do not take a log message or revision properties.");
                         throw new SVNException(msg);
                     }
+                    if (getCommandLine().getPathCount() > 1) {
+                        SVNErrorMessage error = SVNErrorMessage.create(SVNErrorCode.UNSUPPORTED_FEATURE, "Cannot mix repository and working copy sources");
+                        SVNErrorManager.error(error);
+                    }
                     runRemoteToLocal(out, err);
                 } else {
+                    if (getCommandLine().getURLCount() > 1) {
+                        SVNErrorMessage error = SVNErrorMessage.create(SVNErrorCode.UNSUPPORTED_FEATURE, "Cannot mix repository and working copy sources");
+                        SVNErrorManager.error(error);
+                    }
                     runLocalToRemote(out, err);
                 }
             } else {
@@ -69,66 +78,70 @@ public class SVNCopyCommand extends SVNCommand {
     }
 
     private void runLocally(final PrintStream out, PrintStream err) throws SVNException {
-        if (getCommandLine().getPathCount() != 2) {
+        if (getCommandLine().getPathCount() < 2) {
             SVNErrorMessage msg = SVNErrorMessage.create(SVNErrorCode.CL_INSUFFICIENT_ARGS, "Please enter SRC and DST path");
             throw new SVNException(msg);
         }
 
-        String absoluteSrcPath = getCommandLine().getPathAt(0);
-        SVNRevision pegRevision = SVNRevision.UNDEFINED;
-        if (absoluteSrcPath.indexOf('@') > 0) {
-            pegRevision = SVNRevision.parse(absoluteSrcPath.substring(absoluteSrcPath.lastIndexOf('@') + 1));
-            absoluteSrcPath = absoluteSrcPath.substring(0, absoluteSrcPath.lastIndexOf('@'));
-        }
-        pegRevision = resolvePegRevision(pegRevision, false, true);
-        final String absoluteDstPath = getCommandLine().getPathAt(1);
-        if (matchTabsInPath(absoluteDstPath, err) || matchTabsInPath(absoluteSrcPath, err)) {
+        final String absoluteDstPath = getCommandLine().getPathAt(getCommandLine().getPathCount() - 1);
+        if (matchTabsInPath(absoluteDstPath, err)) {
             return;
         }
-
+        File absoluteDstFile = new File(absoluteDstPath);
         getClientManager().setEventHandler(new SVNCommandEventProcessor(out, err, false));
         SVNCopyClient updater = getClientManager().getCopyClient();
         boolean force = getCommandLine().hasArgument(SVNArgument.FORCE);
-        SVNRevision srcRevision = SVNRevision.parse((String) getCommandLine().getArgumentValue(SVNArgument.REVISION));
-        if (srcRevision == null || srcRevision == SVNRevision.UNDEFINED) {
-            srcRevision = pegRevision;
+
+        for (int i = 0; i < getCommandLine().getPathCount() - 1; i++) {
+            String absoluteSrcPath = getCommandLine().getPathAt(i);
+            SVNRevision pegRevision = SVNRevision.UNDEFINED;
+            if (absoluteSrcPath.indexOf('@') > 0) {
+                pegRevision = SVNRevision.parse(absoluteSrcPath.substring(absoluteSrcPath.lastIndexOf('@') + 1));
+                absoluteSrcPath = absoluteSrcPath.substring(0, absoluteSrcPath.lastIndexOf('@'));
+            }
+            pegRevision = resolvePegRevision(pegRevision, false, true);
+            if (matchTabsInPath(absoluteSrcPath, err)) {
+                return;
+            }
+            SVNRevision srcRevision = SVNRevision.parse((String) getCommandLine().getArgumentValue(SVNArgument.REVISION));
+            if (srcRevision == null || srcRevision == SVNRevision.UNDEFINED) {
+                srcRevision = pegRevision;
+            }
+            updater.doCopy(new File(absoluteSrcPath), srcRevision, absoluteDstFile, force, false);
         }
-        updater.doCopy(new File(absoluteSrcPath), srcRevision, new File(absoluteDstPath), force, false);
     }
 
     private void runRemote(PrintStream out, PrintStream err) throws SVNException {
-        if (getCommandLine().getURLCount() != 2) {
+        if (getCommandLine().getURLCount() < 2) {
             SVNErrorMessage msg = SVNErrorMessage.create(SVNErrorCode.CL_INSUFFICIENT_ARGS, "Please enter SRC and DST URLs");
             throw new SVNException(msg);
         }
         
-        String srcURL = getCommandLine().getURL(0);
-        SVNRevision pegRevision = SVNRevision.UNDEFINED;
-        if (srcURL != null && srcURL.indexOf('@') > 0) {
-            pegRevision = SVNRevision.parse(srcURL.substring(srcURL.lastIndexOf('@') + 1));
-            srcURL = srcURL.substring(0, srcURL.lastIndexOf('@'));
-        }
-        pegRevision = resolvePegRevision(pegRevision, true, true);
-        if (pegRevision == SVNRevision.BASE || pegRevision == SVNRevision.COMMITTED || 
-                pegRevision == SVNRevision.PREVIOUS) {
-            SVNErrorMessage error = SVNErrorMessage.create(SVNErrorCode.CLIENT_BAD_REVISION, "Revision type requires a working copy path, not a URL");
-            SVNErrorManager.error(error);
-        }
-        SVNRevision srcRevision = SVNRevision.parse((String) getCommandLine().getArgumentValue(SVNArgument.REVISION));
-        if (srcRevision == null || srcRevision == SVNRevision.UNDEFINED) {
-            srcRevision = pegRevision;
-        }
-        String dstURL = getCommandLine().getURL(1);
-
-        if (matchTabsInURL(srcURL, err) || matchTabsInURL(dstURL, err)) {
+        String dstURL = getCommandLine().getURL(getCommandLine().getURLCount() - 1);
+        if (matchTabsInURL(dstURL, err)) {
             return;
         }
-
+        SVNURL dstSVNURL = SVNURL.parseURIEncoded(dstURL);
         String commitMessage = getCommitMessage();
         getClientManager().setEventHandler(new SVNCommandEventProcessor(out, err, false));
         SVNCopyClient updater = getClientManager().getCopyClient();
         Map revProps = (Map) getCommandLine().getArgumentValue(SVNArgument.WITH_REVPROP); 
-        SVNCommitInfo result = updater.doCopy(SVNURL.parseURIEncoded(srcURL), pegRevision, srcRevision, SVNURL.parseURIEncoded(dstURL), false, false, commitMessage, revProps);
+
+        SVNCopySource[] sources = new SVNCopySource[getCommandLine().getURLCount() - 1]; 
+        for (int i = 0; i < getCommandLine().getURLCount() - 1; i++) {
+            String srcURL = getCommandLine().getURL(i);
+            SVNRevision pegRevision = SVNRevision.UNDEFINED;
+            if (srcURL != null && srcURL.indexOf('@') > 0) {
+                pegRevision = SVNRevision.parse(srcURL.substring(srcURL.lastIndexOf('@') + 1));
+                srcURL = srcURL.substring(0, srcURL.lastIndexOf('@'));
+            }
+            SVNRevision srcRevision = SVNRevision.parse((String) getCommandLine().getArgumentValue(SVNArgument.REVISION));
+            if (matchTabsInURL(srcURL, err)) {
+                return;
+            }
+            sources[i] = new SVNCopySource(pegRevision, srcRevision, SVNURL.parseURIEncoded(srcURL));
+        }
+        SVNCommitInfo result = updater.doCopy(sources, dstSVNURL, false, false, commitMessage, revProps);
         if (result != SVNCommitInfo.NULL) {
             out.println();
             out.println("Committed revision " + result.getNewRevision() + ".");
@@ -136,52 +149,65 @@ public class SVNCopyCommand extends SVNCommand {
     }
 
     private void runRemoteToLocal(final PrintStream out, PrintStream err) throws SVNException {
-        String srcURL = getCommandLine().getURL(0);
-        SVNRevision pegRevision = SVNRevision.UNDEFINED;
-        if (srcURL != null && srcURL.indexOf('@') > 0) {
-            pegRevision = SVNRevision.parse(srcURL.substring(srcURL.lastIndexOf('@') + 1));
-            srcURL = srcURL.substring(0, srcURL.lastIndexOf('@'));
-        }
-        pegRevision = resolvePegRevision(pegRevision, true, true);
-        if (pegRevision == SVNRevision.BASE || pegRevision == SVNRevision.COMMITTED || 
-                pegRevision == SVNRevision.PREVIOUS) {
-            SVNErrorMessage error = SVNErrorMessage.create(SVNErrorCode.CLIENT_BAD_REVISION, "Revision type requires a working copy path, not a URL");
-            SVNErrorManager.error(error);
-        }
-
         String dstPath = getCommandLine().getPathAt(0);
-        SVNRevision revision = SVNRevision.parse((String) getCommandLine().getArgumentValue(SVNArgument.REVISION));
-        if (revision == null || revision == SVNRevision.UNDEFINED) {
-            revision = pegRevision;
+        if (matchTabsInPath(dstPath, err)) {
+            return;
         }
         getClientManager().setEventHandler(new SVNCommandEventProcessor(out, err, false));
         SVNCopyClient updater = getClientManager().getCopyClient();
-        updater.doCopy(SVNURL.parseURIEncoded(srcURL), pegRevision, revision, new File(dstPath));
+        for (int i = 0; i < getCommandLine().getURLCount(); i++) {
+            String srcURL = getCommandLine().getURL(i);
+            SVNRevision pegRevision = SVNRevision.UNDEFINED;
+            if (srcURL != null && srcURL.indexOf('@') > 0) {
+                pegRevision = SVNRevision.parse(srcURL.substring(srcURL.lastIndexOf('@') + 1));
+                srcURL = srcURL.substring(0, srcURL.lastIndexOf('@'));
+            }
+            pegRevision = resolvePegRevision(pegRevision, true, true);
+            if (pegRevision == SVNRevision.BASE || pegRevision == SVNRevision.COMMITTED || 
+                    pegRevision == SVNRevision.PREVIOUS) {
+                SVNErrorMessage error = SVNErrorMessage.create(SVNErrorCode.CLIENT_BAD_REVISION, "Revision type requires a working copy path, not a URL");
+                SVNErrorManager.error(error);
+            }
+            SVNRevision revision = SVNRevision.parse((String) getCommandLine().getArgumentValue(SVNArgument.REVISION));
+            if (revision == null || revision == SVNRevision.UNDEFINED) {
+                revision = pegRevision;
+            }
+            updater.doCopy(SVNURL.parseURIEncoded(srcURL), pegRevision, revision, new File(dstPath));
+        }        
     }
     
     private void runLocalToRemote(final PrintStream out, PrintStream err) throws SVNException {
         final String dstURL = getCommandLine().getURL(0);
-        String srcPath = getCommandLine().getPathAt(0);
-        SVNRevision pegRevision = SVNRevision.UNDEFINED;
-        if (srcPath.indexOf('@') > 0) {
-            pegRevision = SVNRevision.parse(srcPath.substring(srcPath.lastIndexOf('@') + 1));
-            srcPath = srcPath.substring(0, srcPath.lastIndexOf('@'));
-        }
-        pegRevision = resolvePegRevision(pegRevision, false, true);
-        if (matchTabsInPath(srcPath, err) || matchTabsInURL(dstURL, err)) {
+        if (matchTabsInURL(dstURL, err)) {
             return;
         }
-        
+
         String message = getCommitMessage();
+        Map revProps = (Map) getCommandLine().getArgumentValue(SVNArgument.WITH_REVPROP); 
         getClientManager().setEventHandler(new SVNCommandEventProcessor(out, err, false));
         SVNCopyClient updater = getClientManager().getCopyClient();
-        SVNRevision srcRevision = SVNRevision.parse((String) getCommandLine().getArgumentValue(SVNArgument.REVISION));
-        if (srcRevision == null || srcRevision == SVNRevision.UNDEFINED) {
-            srcRevision = pegRevision;
-        }
         updater.setEventHandler(null);
-        Map revProps = (Map) getCommandLine().getArgumentValue(SVNArgument.WITH_REVPROP); 
-        SVNCommitInfo info = updater.doCopy(new File(srcPath), srcRevision, SVNURL.parseURIEncoded(dstURL), false, message, revProps);
+
+        SVNCopySource[] sources = new SVNCopySource[getCommandLine().getPathCount()];
+        for (int i = 0; i < getCommandLine().getPathCount(); i++) {
+            String srcPath = getCommandLine().getPathAt(i);
+            SVNRevision pegRevision = SVNRevision.UNDEFINED;
+            if (srcPath.indexOf('@') > 0) {
+                pegRevision = SVNRevision.parse(srcPath.substring(srcPath.lastIndexOf('@') + 1));
+                srcPath = srcPath.substring(0, srcPath.lastIndexOf('@'));
+            }
+            pegRevision = resolvePegRevision(pegRevision, false, true);
+            if (matchTabsInPath(srcPath, err)) {
+                return;
+            }
+            SVNRevision srcRevision = SVNRevision.parse((String) getCommandLine().getArgumentValue(SVNArgument.REVISION));
+            if (srcRevision == null || srcRevision == SVNRevision.UNDEFINED) {
+                srcRevision = pegRevision;
+            }
+            sources[i] = new SVNCopySource(pegRevision, srcRevision, new File(srcPath));
+        }
+        
+        SVNCommitInfo info = updater.doCopy(sources, SVNURL.parseURIEncoded(dstURL), false, false, message, revProps);
         if (info != SVNCommitInfo.NULL) {
             out.println();
             out.println("Committed revision " + info.getNewRevision() + ".");
