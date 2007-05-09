@@ -54,6 +54,7 @@ import org.tmatesoft.svn.core.ISVNDirEntryHandler;
 import org.tmatesoft.svn.core.ISVNLogEntryHandler;
 import org.tmatesoft.svn.core.SVNCancelException;
 import org.tmatesoft.svn.core.SVNCommitInfo;
+import org.tmatesoft.svn.core.SVNDepth;
 import org.tmatesoft.svn.core.SVNDirEntry;
 import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNException;
@@ -1290,7 +1291,19 @@ public class SVNClientImpl implements SVNClientInterface {
     }
 
     public long checkout(String moduleName, String destPath, Revision revision, Revision pegRevision, boolean recurse, boolean ignoreExternals, boolean allowUnverObstructions) throws ClientException {
-        return 0;
+        SVNUpdateClient updater = getSVNUpdateClient();
+        boolean oldIgnoreExternals = updater.isIgnoreExternals(); 
+        updater.setIgnoreExternals(ignoreExternals);
+        try {
+            File path = new File(destPath).getAbsoluteFile();
+            return updater.doCheckout(SVNURL.parseURIEncoded(moduleName), path, JavaHLObjectFactory.getSVNRevision(pegRevision),
+                    JavaHLObjectFactory.getSVNRevision(revision), recurse, allowUnverObstructions);
+        } catch (SVNException e) {
+            throwException(e);
+        } finally {
+            updater.setIgnoreExternals(oldIgnoreExternals);
+        }
+        return -1;
     }
 
     public void copy(CopySource[] sources, String destPath, String message, boolean copyAsChild) throws ClientException {
@@ -1367,7 +1380,19 @@ public class SVNClientImpl implements SVNClientInterface {
     }
 
     public long checkout(String moduleName, String destPath, Revision revision, Revision pegRevision, int depth, boolean ignoreExternals, boolean allowUnverObstructions) throws ClientException {
-        return 0;
+        SVNUpdateClient updater = getSVNUpdateClient();
+        boolean oldIgnoreExternals = updater.isIgnoreExternals(); 
+        updater.setIgnoreExternals(ignoreExternals);
+        try {
+            File path = new File(destPath).getAbsoluteFile();
+            return updater.doCheckout(SVNURL.parseURIEncoded(moduleName), path, JavaHLObjectFactory.getSVNRevision(pegRevision),
+                    JavaHLObjectFactory.getSVNRevision(revision), JavaHLObjectFactory.getSVNDepth(depth), allowUnverObstructions);
+        } catch (SVNException e) {
+            throwException(e);
+        } finally {
+            updater.setIgnoreExternals(oldIgnoreExternals);
+        }
+        return -1;
     }
 
     public void diff(String target1, Revision revision1, String target2, Revision revision2, String outFileName, int depth, boolean ignoreAncestry, boolean noDiffDeleted, boolean force) throws ClientException {
@@ -1414,18 +1439,92 @@ public class SVNClientImpl implements SVNClientInterface {
     }
 
     public Status[] status(String path, int depth, boolean onServer, boolean getAll, boolean noIgnore, boolean ignoreExternals) throws ClientException {
-        return null;
+        if (path == null) {
+            return null;
+        }
+        final Collection statuses = new ArrayList();
+        SVNStatusClient stClient = getSVNStatusClient();
+        boolean oldIgnoreExternals = stClient.isIgnoreExternals();
+        stClient.setIgnoreExternals(ignoreExternals);
+        try {
+            stClient.doStatus(new File(path).getAbsoluteFile(), SVNRevision.HEAD, 
+                    JavaHLObjectFactory.getSVNDepth(depth), onServer, getAll, noIgnore, 
+                    !ignoreExternals, new ISVNStatusHandler(){
+                public void handleStatus(SVNStatus status) {
+                    statuses.add(JavaHLObjectFactory.createStatus(status.getFile().getPath(), status));
+                }
+            });
+        } catch (SVNException e) {
+            throwException(e);
+        } finally {
+            stClient.setIgnoreExternals(oldIgnoreExternals);
+        }
+        return (Status[]) statuses.toArray(new Status[statuses.size()]);
     }
 
     public long update(String path, Revision revision, int depth, boolean ignoreExternals, boolean allowUnverObstructions) throws ClientException {
-        return 0;
+        SVNUpdateClient updater = getSVNUpdateClient();
+        boolean oldIgnore = updater.isIgnoreExternals();
+        updater.setIgnoreExternals(ignoreExternals);
+        updater.setEventPathPrefix("");
+        try {
+            return updater.doUpdate(new File(path).getAbsoluteFile(), JavaHLObjectFactory.getSVNRevision(revision), JavaHLObjectFactory.getSVNDepth(depth), allowUnverObstructions);
+        } catch (SVNException e) {
+            throwException(e);
+        } finally {
+            updater.setIgnoreExternals(oldIgnore);
+            updater.setEventPathPrefix(null);
+            SVNFileUtil.sleepForTimestamp();
+        }
+        return -1;
     }
 
     public long[] update(String[] path, Revision revision, int depth, boolean ignoreExternals, boolean allowUnverObstructions) throws ClientException {
-        return null;
+        if(path == null || path.length == 0){
+            return new long[]{};
+        }
+        long[] updated = new long[path.length];
+        SVNUpdateClient updater = getSVNUpdateClient();
+        boolean oldIgnore = updater.isIgnoreExternals();
+        updater.setIgnoreExternals(ignoreExternals);
+        updater.setEventPathPrefix("");
+        SVNDepth svnDepth = JavaHLObjectFactory.getSVNDepth(depth);
+        SVNRevision rev = JavaHLObjectFactory.getSVNRevision(revision);
+        try {
+            for (int i = 0; i < updated.length; i++) {
+                updated[i] = updater.doUpdate(new File(path[i]).getAbsoluteFile(), rev, svnDepth, allowUnverObstructions); 
+            }
+        } catch (SVNException e) {
+            throwException(e);
+        } finally {
+            updater.setIgnoreExternals(oldIgnore);
+            updater.setEventPathPrefix(null);
+            SVNFileUtil.sleepForTimestamp();
+        }
+        return updated;
     }
 
     public void status(String path, int depth, boolean onServer, boolean getAll, boolean noIgnore, boolean ignoreExternals, StatusCallback callback) throws ClientException {
+        if (path == null) {
+            return;
+        }
+        SVNStatusClient stClient = getSVNStatusClient();
+        boolean oldIgnoreExternals = stClient.isIgnoreExternals();
+        stClient.setIgnoreExternals(ignoreExternals);
+        final StatusCallback statusCallback = callback;  
+        try {
+            stClient.doStatus(new File(path).getAbsoluteFile(), SVNRevision.HEAD, 
+                    JavaHLObjectFactory.getSVNDepth(depth), onServer, getAll, noIgnore, 
+                    !ignoreExternals, new ISVNStatusHandler(){
+                public void handleStatus(SVNStatus status) {
+                    statusCallback.doStatus(JavaHLObjectFactory.createStatus(status.getFile().getPath(), status));
+                }
+            });
+        } catch (SVNException e) {
+            throwException(e);
+        } finally {
+            stClient.setIgnoreExternals(oldIgnoreExternals);
+        }
     }
 
     public void list(String url, Revision revision, Revision pegRevision, int depth, int direntFields, boolean fetchLocks, ListCallback callback) throws ClientException {

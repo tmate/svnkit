@@ -19,6 +19,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 
+import org.tmatesoft.svn.core.SVNDepth;
 import org.tmatesoft.svn.core.SVNDirEntry;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNLock;
@@ -205,6 +206,23 @@ public class JavaHLObjectFactory {
         return (SVNRevision)REVISION_KIND_CONVERSION_MAP.get(new Integer(r.getKind()));
     }
 
+    public static SVNDepth getSVNDepth(int depth) {
+        switch (depth) {
+            case Depth.empty:
+                return SVNDepth.DEPTH_EMPTY;
+            case Depth.exclude:
+                return SVNDepth.DEPTH_EXCLUDE;
+            case Depth.files:
+                return SVNDepth.DEPTH_FILES;
+            case Depth.immediates:
+                return SVNDepth.DEPTH_IMMEDIATES;
+            case Depth.infinity:
+                return SVNDepth.DEPTH_INFINITY;
+            default:
+                return SVNDepth.DEPTH_UNKNOWN;
+        }
+    }
+    
     public static int getNodeKind(SVNNodeKind svnKind){
         if(svnKind == SVNNodeKind.DIR ){
             return NodeKind.dir;
