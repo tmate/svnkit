@@ -4,6 +4,7 @@ blame ALL
 cat ALL
 commit ALL
 copy ALL
+depth ALL
 diff ALL
 export ALL
 externals ALL 

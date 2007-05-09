@@ -650,6 +650,8 @@ public class SVNCopyClient extends SVNBasicClient {
     }
     
     public long doCopy(SVNURL srcURL, SVNRevision pegRevision, SVNRevision srcRevision, File dstPath) throws SVNException {
+        dstPath = new File(SVNPathUtil.validateFilePath(dstPath.getAbsolutePath())).getAbsoluteFile();
+
         if (pegRevision == SVNRevision.BASE || pegRevision == SVNRevision.COMMITTED || pegRevision == SVNRevision.PREVIOUS) {
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.CLIENT_BAD_REVISION, "Revision type requires a working copy path, not a URL");
             SVNErrorManager.error(err);

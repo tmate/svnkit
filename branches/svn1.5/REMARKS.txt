@@ -6,6 +6,7 @@
 3) new copy functionality: ((+))
      - copying local items added with history +
      - copying local items scheduled for addition without history +
+     - copying multiple sources to URL +
 4) xml-safety check for lock comments
 5) what was SVNErrorMessage.TYPE_WARNING used for export operations? ...did it as in Subversion ((+))
 6) new repository format for FSFS: 
@@ -26,7 +27,7 @@
 11) commit with --with-revprop switch ((+/-))
 12) SVNPropeditCommand ((+))
 13) SVNWCClient.doSetProperty(SVNURL url, ...) ((+))
-14) replacement with history performed by SVNKit fails:       !! ISSUE !! ASSIGNED...
+14) replacement with history performed by SVNKit fails: ((+/-))      
  - say, we've got a versioned file without props at all
  - we create a file with the same name in the same repository 
    in a different location and with some props attached to it
@@ -48,7 +49,13 @@
               at org.tmatesoft.svn.cli.command.SVNCopyCommand.runRemoteToLocal(SVNCopyCommand.java:128)
               at org.tmatesoft.svn.cli.command.SVNCopyCommand.run(SVNCopyCommand.java:50)
               at org.tmatesoft.svn.cli.SVN.main(SVN.java:149)
-
-15) revert of replacement (that added new .base props) leaves .base props of 
-the reverted file if there were no .revert-base prop file                       !! ISSUE !! ASSIGNED...
-Remarks: need to change copy (add empty .revert-base prop file) ((+/-))
+    As it's been discovered the problem is in relative File representations with file names only
+    This exact problem (with copying) is resolved but the common problem with relative file names 
+    keeps unresolved... !!ISSUE!!
+15) revert of replacement (that added new .base props) leaves .base props of ((+))
+the reverted file if there were no .revert-base prop file
+Remarks: need to change copy (add empty .revert-base prop file) ((+))
+16) copying multiple sources to repository ((+))
+   * TEST: move url1 url1  +
+17) JavaHL implementation   
+18) cancellation during jsvn* clients' execution (shutdown hook for Runtime?)
