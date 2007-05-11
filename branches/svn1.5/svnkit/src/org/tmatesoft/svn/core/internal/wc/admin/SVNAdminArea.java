@@ -327,7 +327,10 @@ public abstract class SVNAdminArea {
             }
         }
 
-        if (newRevision >= 0 && !entry.isScheduledForAddition() && !entry.isScheduledForReplacement() && 
+        if (newRevision >= 0 && 
+                !entry.isScheduledForAddition() && 
+                !entry.isScheduledForReplacement() &&
+                !entry.isCopied() &&
                 entry.getRevision() != newRevision) {
             rewrite = true;
             entry.setRevision(newRevision);
@@ -1383,7 +1386,7 @@ public abstract class SVNAdminArea {
         
         SVNAdminArea anchor = getWCAccess().retrieve(getWCAccess().getAnchor());
         String path = getRelativePath(anchor);
-        path = "".equals(target) ? path : SVNPathUtil.append(path, target);
+        path = getThisDirName().equals(target) ? path : SVNPathUtil.append(path, target);
         if (!explicitCommitPaths.contains(path)) {
             // if this item is explicitly copied -> skip it.
             SVNEntry entry = getEntry(target, true);
@@ -1395,7 +1398,10 @@ public abstract class SVNAdminArea {
         SVNLog log = getLog();
         //
         String checksum = null;
-        if (!"".equals(target)) {
+        if (!getThisDirName().equals(target)) {
+            loggyRemoveRevertFile(target, true, log);
+            loggyRemoveRevertFile(target, false, log);
+            
             File baseFile = getBaseFile(target, true);
             SVNFileType baseType = SVNFileType.getType(baseFile);
             if (baseType == SVNFileType.NONE) {
@@ -1406,9 +1412,8 @@ public abstract class SVNAdminArea {
                 checksum = SVNFileUtil.computeChecksum(baseFile);
             }
             recursive = false;
-        } else {
-
-        }
+        } 
+        
         Map command = new HashMap();
         if (info != null) {
             command.put(SVNLog.NAME_ATTR, target);
@@ -1453,14 +1458,14 @@ public abstract class SVNAdminArea {
         if (recursive) {
             for (Iterator ents = entries(true); ents.hasNext();) {
                 SVNEntry entry = (SVNEntry) ents.next();
-                if ("".equals(entry.getName())) {
+                if (getThisDirName().equals(entry.getName())) {
                     continue;
                 }
                 if (entry.getKind() == SVNNodeKind.DIR) {
                     File childPath = getFile(entry.getName());
                     SVNAdminArea childDir = getWCAccess().retrieve(childPath);
                     if (childDir != null) {
-                        childDir.commit("", info, null, removeLock, true, explicitCommitPaths, params);
+                        childDir.commit(getThisDirName(), info, null, removeLock, true, explicitCommitPaths, params);
                     }
                 } else {
                     commit(entry.getName(), info, null, removeLock, false, explicitCommitPaths, params);
@@ -1475,5 +1480,22 @@ public abstract class SVNAdminArea {
 
     protected void setLocked(boolean locked) {
         myWasLocked = locked;
+    }
+    
+    private void loggyRemoveRevertFile(String name, boolean isProp, SVNLog log) throws SVNException {
+        String revertPath = null;
+        if (isProp) {
+            revertPath = SVNAdminUtil.getPropRevertPath(name, SVNNodeKind.FILE, false);
+        } else {
+            revertPath = SVNAdminUtil.getTextRevertPath(name, false);
+        }
+
+        File revertFile = getFile(revertPath);
+        if (revertFile.isFile()) {
+            Map command = new HashMap();
+            command.put(SVNLog.NAME_ATTR, revertPath);
+            log.addCommand(SVNLog.DELETE, command, false);
+            command.clear();
+        }
     }
 }

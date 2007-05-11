@@ -358,6 +358,10 @@ public class SVNErrorCode implements Serializable {
     public static final SVNErrorCode CLIENT_PROPERTY_NAME = new SVNErrorCode(CLIENT_CATEGORY, 11, "Bad property name");
     public static final SVNErrorCode CLIENT_UNRELATED_RESOURCES = new SVNErrorCode(CLIENT_CATEGORY, 12, "Two versioned resources are unrelated");
     public static final SVNErrorCode CLIENT_MISSING_LOCK_TOKEN = new SVNErrorCode(CLIENT_CATEGORY, 13, "Path has no lock token");
+    /**
+     * @since SVN 1.5
+     */
+    public static final SVNErrorCode CLIENT_MULTIPLE_SOURCES_DISALLOWED = new SVNErrorCode(CLIENT_CATEGORY, 14, "Operation does not support multiple sources");
     
     public static final SVNErrorCode BASE = new SVNErrorCode(MISC_CATEGORY, 0, "A problem occurred; see later errors for details");
     public static final SVNErrorCode PLUGIN_LOAD_FAILURE = new SVNErrorCode(MISC_CATEGORY, 1, "Failure loading plugin");    
