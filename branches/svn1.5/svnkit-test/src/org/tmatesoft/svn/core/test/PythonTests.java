@@ -76,34 +76,42 @@ public class PythonTests {
         }
         String url = "file://" + absTestsRootLocation;
         if (Boolean.TRUE.toString().equals(properties.getProperty("python.file"))) {
+            boolean started = false;
             try {
                 for (int i = 0; i < ourLoggers.length; i++) {
                     ourLoggers[i].startServer("file", url);
                 }
+                started = true;
                 runPythonTests(properties, defaultTestSuite, url);
             } catch (Throwable th) {
                 th.printStackTrace();
             } finally {
-                for (int i = 0; i < ourLoggers.length; i++) {
-                    ourLoggers[i].endServer("file", url);
+                if (started) {
+                    for (int i = 0; i < ourLoggers.length; i++) {
+                        ourLoggers[i].endServer("file", url);
+                    }
                 }
             }
         }
 
         url = "svn://localhost";
         if (Boolean.TRUE.toString().equals(properties.getProperty("python.svn"))) {
+            boolean started = false;
 			try {
 				startSVNServe(properties);
                 for (int i = 0; i < ourLoggers.length; i++) {
                     ourLoggers[i].startServer("svnserve", url);
                 }
+                started = false;
 				runPythonTests(properties, defaultTestSuite, url);
 			} catch (Throwable th) {
 				th.printStackTrace();
 			} finally {
 				stopSVNServe();
-                for (int i = 0; i < ourLoggers.length; i++) {
-                    ourLoggers[i].endServer("svnserve", url);
+                if (started) {
+                    for (int i = 0; i < ourLoggers.length; i++) {
+                        ourLoggers[i].endServer("svnserve", url);
+                    }
                 }
 			}
 		}
@@ -111,19 +119,23 @@ public class PythonTests {
 		if (Boolean.TRUE.toString().equals(properties.getProperty("python.http"))) {
 			url = "http://localhost:" + properties.getProperty("apache.port", "8082");
 			properties.setProperty("apache.conf", "apache/python.template.conf");
+            boolean started = false;
 			try {
 				startApache(properties);
 			    for (int i = 0; i < ourLoggers.length; i++) {
                     ourLoggers[i].startServer("apache", url);
                 }
+                started = true;
 				runPythonTests(properties, defaultTestSuite, url);
 			} catch (Throwable th) {
 				th.printStackTrace();
 			} finally {
 				try {
 					stopApache(properties);
-                    for (int i = 0; i < ourLoggers.length; i++) {
-                        ourLoggers[i].endServer("apache", url);
+                    if (started) {
+                        for (int i = 0; i < ourLoggers.length; i++) {
+                            ourLoggers[i].endServer("apache", url);
+                        }
                     }
                 } catch (Throwable th) {
 					th.printStackTrace();
