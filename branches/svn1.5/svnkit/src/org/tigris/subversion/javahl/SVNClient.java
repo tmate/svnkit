@@ -529,4 +529,16 @@ public class SVNClient implements SVNClientInterface {
     public void list(String url, Revision revision, Revision pegRevision, int depth, int direntFields, boolean fetchLocks, ListCallback callback) throws ClientException {
         myDelegate.list(url, revision, pegRevision, depth, direntFields, fetchLocks, callback);
     }
+
+    public void copy(CopySource[] sources, String destPath, String message, boolean copyAsChild, boolean makeParents) throws ClientException {
+        myDelegate.copy(sources, destPath, message, copyAsChild, makeParents);
+    }
+
+    public void mkdir(String[] path, String message, boolean makeParents) throws ClientException {
+        myDelegate.mkdir(path, message, makeParents);
+    }
+
+    public void move(String[] srcPaths, String destPath, String message, boolean force, boolean moveAsChild, boolean makeParents) throws ClientException {
+        myDelegate.move(srcPaths, destPath, message, force, moveAsChild, makeParents);
+    }
 }

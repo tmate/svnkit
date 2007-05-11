@@ -1529,4 +1529,13 @@ public class SVNClientImpl implements SVNClientInterface {
 
     public void list(String url, Revision revision, Revision pegRevision, int depth, int direntFields, boolean fetchLocks, ListCallback callback) throws ClientException {
     }
+
+    public void copy(CopySource[] sources, String destPath, String message, boolean copyAsChild, boolean makeParents) throws ClientException {
+    }
+
+    public void mkdir(String[] path, String message, boolean makeParents) throws ClientException {
+    }
+
+    public void move(String[] srcPaths, String destPath, String message, boolean force, boolean moveAsChild, boolean makeParents) throws ClientException {
+    }
 }
