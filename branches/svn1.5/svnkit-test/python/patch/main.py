@@ -117,17 +117,20 @@ except ImportError:
 
 # The locations of the svn, svnadmin and svnlook binaries, relative to
 # the only scripts that import this file right now (they live in ../).
-#svn_binary = 'svn' + _exe
-svn_binary = os.path.abspath('../../../build/lib/jsvn' + _bat)
-#svn_binary = 'I:/Workspace/svn_trunk/subversion/svn/svn.exe'
-#svnadmin_binary = 'svnadmin' + _exe
-svnadmin_binary = os.path.abspath('../../../build/lib/jsvnadmin' + _bat)
-#svnlook_binary = 'svnlook' + _exe
-svnlook_binary = os.path.abspath('../../../build/lib/jsvnlook' + _bat)
-#svnsync_binary = 'svnsync' + _exe
-svnsync_binary = os.path.abspath('../../../build/lib/jsvnsync' + _bat)
-#svnversion_binary = 'svnversion' + _exe
-svnversion_binary = os.path.abspath('../../../build/lib/jsvnversion' + _bat)
+# Use --bin to override these defaults.
+#svn_binary = os.path.abspath('../../svn/svn' + _exe)
+#svnadmin_binary = os.path.abspath('../../svnadmin/svnadmin' + _exe)
+#svnlook_binary = os.path.abspath('../../svnlook/svnlook' + _exe)
+#svnsync_binary = os.path.abspath('../../svnsync/svnsync' + _exe)
+#svnversion_binary = os.path.abspath('../../svnversion/svnversion' + _exe)
+
+svn_binary = os.path.abspath('%ant.dir%/build/lib/jsvn' + _bat)
+svnadmin_binary = os.path.abspath('%ant.dir%/build/lib/jsvnadmin' + _bat)
+svnlook_binary = os.path.abspath('%ant.dir%/build/lib/jsvnlook' + _bat)
+svnsync_binary = os.path.abspath('%ant.dir%/build/lib/jsvnsync' + _bat)
+svnversion_binary = os.path.abspath('%ant.dir%/build/lib/jsvnversion' + _bat)
+
+
 
 # The location of our mock svneditor script.
 svneditor_script = os.path.join(sys.path[0], 'svneditor.py')
@@ -144,7 +147,7 @@ wc_author2 = 'jconstant' # use the same password as wc_author
 verbose_mode = False
 
 # Global variable indicating if we want test data cleaned up after success
-cleanup_mode = False
+cleanup_mode = True
 
 # Global variable indicating if svnserve should use Cyrus SASL
 enable_sasl = False
@@ -164,6 +167,9 @@ fs_type = None
 # All temporary repositories and working copies are created underneath
 # this dir, so there's one point at which to mount, e.g., a ramdisk.
 work_dir = "svn-test-work"
+
+# Constant for the merge info property.
+SVN_PROP_MERGE_INFO = "svn:mergeinfo"
 
 # Where we want all the repositories and working copies to live.
 # Each test will have its own!
@@ -586,6 +592,42 @@ def compare_unordered_output(expected, actual):
     except ValueError:
       raise Failure("Expected output does not match actual output")
 
+def skip_test_when_no_authz_available():
+  "skip this test when authz is not available"
+  if test_area_url.startswith('file://'):
+    raise Skip
+
+def write_restrictive_svnserve_conf(repo_dir):
+  "Create a restrictive authz file ( no anynomous access )."
+
+  fp = open(get_svnserve_conf_file_path(repo_dir), 'w')
+  fp.write("[general]\nanon-access = none\nauth-access = write\n"
+           "authz-db = authz\n")
+  if enable_sasl == 1:
+    fp.write("realm = svntest\n[sasl]\nuse-sasl = true\n");
+  else:
+    fp.write("password-db = passwd\n")
+  fp.close()
+
+def write_authz_file(sbox, rules, sections=None):
+  """Write an authz file to SBOX, appropriate for the RA method used,
+with authorizations rules RULES mapping paths to strings containing
+the rules. You can add sections SECTIONS (ex. groups, aliases...) with
+an appropriate list of mappings.
+"""
+  fp = open(sbox.authz_file, 'w')
+  if sbox.repo_url.startswith("http"):
+    prefix = sbox.name + ":"
+  else:
+    prefix = ""
+  if sections:
+    for p, r in sections.items():
+      fp.write("[%s]\n%s\n" % (p, r))
+
+  for p, r in rules.items():
+    fp.write("[%s%s]\n%s\n" % (prefix, p, r))
+  fp.close()
+
 def use_editor(func):
   os.environ['SVN_EDITOR'] = svneditor_script
   os.environ['SVNTEST_EDITOR_FUNC'] = func
@@ -912,7 +954,7 @@ def usage():
   prog_name = os.path.basename(sys.argv[0])
   print "%s [--url] [--fs-type] [--verbose] [--enable-sasl] [--cleanup] \\" \
         % prog_name
-  print "%s [<test> ...]" % (" " * len(prog_name))
+  print "%s [--bin] [<test> ...]" % (" " * len(prog_name))
   print "%s [--list] [<test> ...]\n" % prog_name
   print "Arguments:"
   print " test          The number of the test to run (multiple okay), " \
@@ -925,6 +967,7 @@ def usage():
   print " --cleanup     Whether to clean up"
   print " --enable-sasl Whether to enable SASL authentication"
   print " --parallel    Run the tests in parallel"
+  print " --bin         Use the svn binaries installed in this path"
   print " --help        This information"
 
 
@@ -946,16 +989,21 @@ def run_tests(test_list, serial_only = False):
   global cleanup_mode
   global enable_sasl
   global is_child_process
-
+  global svn_binary
+  global svnadmin_binary
+  global svnlook_binary
+  global svnsync_binary
+  global svnversion_binary
+  
   testnums = []
   # Should the tests be listed (as opposed to executed)?
   list_tests = False
 
   parallel = 0
-
+  svn_bin = None
   opts, args = my_getopt(sys.argv[1:], 'vhpc',
                          ['url=', 'fs-type=', 'verbose', 'cleanup', 'list',
-                          'enable-sasl', 'help', 'parallel'])
+                          'enable-sasl', 'help', 'parallel', 'bin='])
 
   for arg in args:
     if arg == "list":
@@ -1000,33 +1048,29 @@ def run_tests(test_list, serial_only = False):
     elif opt == '-c':
       is_child_process = True
 
+    elif opt == '--bin':
+      svn_bin = val
+
   if test_area_url[-1:] == '/': # Normalize url to have no trailing slash
     test_area_url = test_area_url[:-1]
 
   ######################################################################
   # Initialization
-  
+  if not svn_bin is None:
+    svn_binary = os.path.join(svn_bin, 'svn' + _exe)
+    svnadmin_binary = os.path.join(svn_bin, 'svnadmin' + _exe)
+    svnlook_binary = os.path.join(svn_bin, 'svnlook' + _exe)
+    svnsync_binary = os.path.join(svn_bin, 'svnsync' + _exe)
+    svnversion_binary = os.path.join(svn_bin, 'svnversion' + _exe)
+
   # Cleanup: if a previous run crashed or interrupted the python
   # interpreter, then `temp_dir' was never removed.  This can cause wonkiness.
   if not is_child_process:
     safe_rmtree(temp_dir)
 
-  # Calculate pristine_url from test_area_url.
-  pristine_url = test_area_url + '/' + pristine_dir
-  if windows:
-    pristine_url = pristine_url.replace('\\', '/')  
-  
-  # Setup the pristine repository (and working copy)
-  actions.setup_pristine_repository()
-
   if not testnums:
     # If no test numbers were listed explicitly, include all of them:
     testnums = range(1, len(test_list))
-
-  # don't run tests in parallel when the tests don't support it or there 
-  # are only a few tests to run.
-  if serial_only or len(testnums) < 2:
-    parallel = 0
 
   if list_tests:
     print "Test #  Mode   Test Description"
@@ -1036,6 +1080,16 @@ def run_tests(test_list, serial_only = False):
 
     # done. just exit with success.
     sys.exit(0)
+
+  # don't run tests in parallel when the tests don't support it or there 
+  # are only a few tests to run.
+  if serial_only or len(testnums) < 2:
+    parallel = 0
+
+  # Calculate pristine_url from test_area_url.
+  pristine_url = test_area_url + '/' + pristine_dir
+  if windows:
+    pristine_url = pristine_url.replace('\\', '/')  
 
   # Setup the pristine repository (and working copy)
   actions.setup_pristine_repository()
