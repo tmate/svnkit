@@ -541,4 +541,8 @@ public class SVNClient implements SVNClientInterface {
     public void move(String[] srcPaths, String destPath, String message, boolean force, boolean moveAsChild, boolean makeParents) throws ClientException {
         myDelegate.move(srcPaths, destPath, message, force, moveAsChild, makeParents);
     }
+
+    public void properties(String path, Revision revision, Revision pegRevision, int depth, ProplistCallback callback) throws ClientException {
+        myDelegate.properties(path, revision, pegRevision, depth, callback);
+    }
 }

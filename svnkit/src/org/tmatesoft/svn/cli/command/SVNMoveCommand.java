@@ -67,6 +67,7 @@ public class SVNMoveCommand extends SVNCommand {
         SVNCopyClient updater = getClientManager().getCopyClient();
         Map revProps = (Map) getCommandLine().getArgumentValue(SVNArgument.WITH_REVPROP); 
         SVNRevision srcRevision = SVNRevision.parse((String) getCommandLine().getArgumentValue(SVNArgument.REVISION));
+        boolean makeParents = getCommandLine().hasArgument(SVNArgument.MAKE_PARENTS);
 
         SVNCopySource[] sources = new SVNCopySource[getCommandLine().getURLCount() - 1]; 
         for (int i = 0; i < getCommandLine().getURLCount() - 1; i++) {
@@ -76,7 +77,7 @@ public class SVNMoveCommand extends SVNCommand {
             }
             sources[i] = new SVNCopySource(SVNRevision.UNDEFINED, srcRevision, SVNURL.parseURIEncoded(srcURL));
         }
-        SVNCommitInfo result = updater.doCopy(sources, dstSVNURL, true, false, commitMessage, revProps);
+        SVNCommitInfo result = updater.doCopy(sources, dstSVNURL, true, false, makeParents, commitMessage, revProps);
         if (result != SVNCommitInfo.NULL) {
             out.println();
             out.println("Committed revision " + result.getNewRevision() + ".");
@@ -89,7 +90,9 @@ public class SVNMoveCommand extends SVNCommand {
             SVNErrorMessage msg = SVNErrorMessage.create(SVNErrorCode.CL_INSUFFICIENT_ARGS, "Please enter SRC and DST path");
             throw new SVNException(msg);
         }
+        
         String commitMessage = (String) getCommandLine().getArgumentValue(SVNArgument.MESSAGE);
+        boolean makeParents = getCommandLine().hasArgument(SVNArgument.MAKE_PARENTS);
         Map revisionProps = (Map) getCommandLine().getArgumentValue(SVNArgument.WITH_REVPROP);
         boolean hasFile = getCommandLine().hasArgument(SVNArgument.FILE);
         if (commitMessage != null || hasFile || revisionProps != null) {
@@ -101,15 +104,18 @@ public class SVNMoveCommand extends SVNCommand {
         if (matchTabsInPath(absoluteDstPath, err)) {
             return;
         }
+        
+        SVNCopySource[] sources = new SVNCopySource[getCommandLine().getPathCount() - 1];
         for (int i = 0; i < getCommandLine().getPathCount() - 1; i++) {
             final String absoluteSrcPath = getCommandLine().getPathAt(i);
             if (matchTabsInPath(absoluteSrcPath, err)) {
                 return;
             }
-            getClientManager().setEventHandler(new SVNCommandEventProcessor(out, err, false));
-            SVNCopyClient updater = getClientManager().getCopyClient();
-            boolean force = getCommandLine().hasArgument(SVNArgument.FORCE);
-            updater.doCopy(new File(absoluteSrcPath), SVNRevision.WORKING, absoluteDstFile, force, true);
+            sources[i] = new SVNCopySource(SVNRevision.UNDEFINED, SVNRevision.WORKING, new File(absoluteSrcPath));
         }
+
+        getClientManager().setEventHandler(new SVNCommandEventProcessor(out, err, false));
+        SVNCopyClient updater = getClientManager().getCopyClient();
+        updater.doCopy(sources, absoluteDstFile, true, makeParents);
     }
 }
