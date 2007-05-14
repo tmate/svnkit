@@ -506,35 +506,11 @@ public class SVNClientImpl implements SVNClientInterface {
     }
 
     public void copy(String srcPath, String destPath, String message, Revision revision) throws ClientException {
-        SVNCopyClient client = getSVNCopyClient();
-        SVNRevision srcRevision = JavaHLObjectFactory.getSVNRevision(revision);
-        try {
-            if(isURL(srcPath) && isURL(destPath)){
-                client.doCopy(SVNURL.parseURIEncoded(srcPath), srcRevision, SVNURL.parseURIEncoded(destPath), false, message);
-            } else if (isURL(srcPath) && !isURL(destPath)) {
-                client.doCopy(SVNURL.parseURIEncoded(srcPath), srcRevision, new File(destPath).getAbsoluteFile());
-            } else if (!isURL(srcPath) && isURL(destPath)) {
-                client.doCopy(new File(srcPath).getAbsoluteFile(), srcRevision, SVNURL.parseURIEncoded(destPath), message);
-            } else if (!isURL(srcPath) && !isURL(destPath)) {
-                client.doCopy(new File(srcPath).getAbsoluteFile(), srcRevision, new File(destPath).getAbsoluteFile(), false, false);
-            }
-        } catch (SVNException e) {
-            throwException(e);
-        }
+        copy(new CopySource[]{new CopySource(srcPath, revision, revision)}, destPath, message, false);
     }
 
     public void move(String srcPath, String destPath, String message, Revision revision, boolean force) throws ClientException {
-        SVNCopyClient client = getSVNCopyClient();
-        SVNRevision srcRevision = JavaHLObjectFactory.getSVNRevision(revision);
-        try {
-            if(isURL(srcPath) && isURL(destPath)){
-                client.doCopy(SVNURL.parseURIEncoded(srcPath), srcRevision, SVNURL.parseURIEncoded(destPath), true, message);
-            } else if (!isURL(srcPath) && !isURL(destPath)) {
-                client.doCopy(new File(srcPath).getAbsoluteFile(), srcRevision, new File(destPath).getAbsoluteFile(), force, true);
-            }
-        } catch (SVNException e) {
-            throwException(e);
-        }
+        move(new String[] {srcPath}, destPath, message, force, false);
     }
 
     public void move(String srcPath, String destPath, String message, boolean force) throws ClientException {
@@ -1309,33 +1285,7 @@ public class SVNClientImpl implements SVNClientInterface {
     }
 
     public void copy(CopySource[] sources, String destPath, String message, boolean copyAsChild) throws ClientException {
-        if (sources.length > 1 && !copyAsChild) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.CLIENT_MULTIPLE_SOURCES_DISALLOWED);
-            SVNException ex = new SVNException(err);
-            throwException(ex);
-        }
-        SVNCopyClient client = getSVNCopyClient();
-        SVNCopySource[] srcs = new SVNCopySource[sources.length];
-        try {
-            for (int i = 0; i < sources.length; i++) {
-                if (isURL(sources[i].getPath())) {
-                    srcs[i] = new SVNCopySource(JavaHLObjectFactory.getSVNRevision(sources[i].getPegRevision()), 
-                            JavaHLObjectFactory.getSVNRevision(sources[i].getRevision()), SVNURL.parseURIEncoded(sources[i].getPath())); 
-                } else {
-                    srcs[i] = new SVNCopySource(JavaHLObjectFactory.getSVNRevision(sources[i].getPegRevision()), 
-                            JavaHLObjectFactory.getSVNRevision(sources[i].getRevision()), new File(sources[i].getPath()).getAbsoluteFile()); 
-                }
-            }
-
-            if(isURL(destPath)){
-                client.doCopy(srcs, SVNURL.parseURIEncoded(destPath), false, !copyAsChild, message, null);
-            } else {
-                client.doCopy(srcs, new File(destPath).getAbsoluteFile(), false, false);
-            } 
-        } catch (SVNException e) {
-            throwException(e);
-        }
-
+        copy(sources, destPath, message, copyAsChild, false);
     }
 
     public void diffSummarize(String target1, Revision revision1, String target2, Revision revision2, boolean recurse, boolean ignoreAncestry, DiffSummaryReceiver receiver) throws ClientException {
@@ -1356,30 +1306,7 @@ public class SVNClientImpl implements SVNClientInterface {
     }
 
     public void move(String[] srcPaths, String destPath, String message, boolean force, boolean moveAsChild) throws ClientException {
-        if (srcPaths.length > 1 && !moveAsChild) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.CLIENT_MULTIPLE_SOURCES_DISALLOWED);
-            SVNException ex = new SVNException(err);
-            throwException(ex);
-        }
-        SVNCopyClient client = getSVNCopyClient();
-        SVNRevision srcRevision = JavaHLObjectFactory.getSVNRevision(Revision.WORKING);
-        SVNCopySource[] sources = new SVNCopySource[srcPaths.length]; 
-        try {
-            for (int i = 0; i < srcPaths.length; i++) {
-                if (isURL(srcPaths[i])) {
-                    sources[i] = new SVNCopySource(SVNRevision.UNDEFINED, srcRevision, SVNURL.parseURIEncoded(srcPaths[i]));
-                } else {
-                    sources[i] = new SVNCopySource(SVNRevision.UNDEFINED, srcRevision, new File(srcPaths[i]).getAbsoluteFile());
-                }
-            }
-            if(isURL(destPath)){
-                client.doCopy(sources, SVNURL.parseURIEncoded(destPath), true, !moveAsChild, message, null);
-            } else {
-                client.doCopy(sources, new File(destPath).getAbsoluteFile(), force, true);
-            }
-        } catch (SVNException e) {
-            throwException(e);
-        }
+        move(srcPaths, destPath, message, force, moveAsChild, false);
     }
 
     public void setProgressListener(ProgressListener listener) {
@@ -1665,6 +1592,101 @@ public class SVNClientImpl implements SVNClientInterface {
         notImplementedYet(null);
     }
     
+    public void copy(CopySource[] sources, String destPath, String message, boolean copyAsChild, boolean makeParents) throws ClientException {
+        if (sources.length > 1 && !copyAsChild) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.CLIENT_MULTIPLE_SOURCES_DISALLOWED);
+            SVNException ex = new SVNException(err);
+            throwException(ex);
+        }
+        SVNCopyClient client = getSVNCopyClient();
+        SVNCopySource[] srcs = new SVNCopySource[sources.length];
+        try {
+            for (int i = 0; i < sources.length; i++) {
+                if (isURL(sources[i].getPath())) {
+                    srcs[i] = new SVNCopySource(JavaHLObjectFactory.getSVNRevision(sources[i].getPegRevision()), 
+                            JavaHLObjectFactory.getSVNRevision(sources[i].getRevision()), SVNURL.parseURIEncoded(sources[i].getPath())); 
+                } else {
+                    srcs[i] = new SVNCopySource(JavaHLObjectFactory.getSVNRevision(sources[i].getPegRevision()), 
+                            JavaHLObjectFactory.getSVNRevision(sources[i].getRevision()), new File(sources[i].getPath()).getAbsoluteFile()); 
+                }
+            }
+
+            if(isURL(destPath)){
+                client.doCopy(srcs, SVNURL.parseURIEncoded(destPath), false, !copyAsChild, makeParents, message, null);
+            } else {
+                client.doCopy(srcs, new File(destPath).getAbsoluteFile(), false, makeParents);
+            } 
+        } catch (SVNException e) {
+            throwException(e);
+        }
+    }
+
+    public void mkdir(String[] path, String message, boolean makeParents) throws ClientException {
+        SVNCommitClient client = getSVNCommitClient();
+        List urls = new ArrayList();
+        List paths = new ArrayList();
+        for (int i = 0; i < path.length; i++) {
+            if (isURL(path[i])) {
+                try {
+                    urls.add(SVNURL.parseURIEncoded(path[i]));
+                } catch (SVNException e) {
+                    throwException(e);
+                }
+            } else {
+                paths.add(new File(path[i]));
+            }
+        }
+        SVNURL[] svnURLs = (SVNURL[]) urls.toArray(new SVNURL[urls.size()]);
+        File[] files = (File[]) paths.toArray(new File[paths.size()]);
+        if (svnURLs.length > 0) {
+            try {
+                client.doMkDir(svnURLs, message, null, makeParents);
+            } catch (SVNException e) {
+                throwException(e);
+            }
+        }
+        if (files.length > 0) {
+            for (int i = 0; i < files.length; i++) {
+                File file = files[i];
+                try {
+                    getSVNWCClient().doAdd(file, false, true, false, false, false);
+                } catch (SVNException e) {
+                    throwException(e);
+                }
+            }
+        }
+    }
+
+    public void move(String[] srcPaths, String destPath, String message, boolean force, boolean moveAsChild, boolean makeParents) throws ClientException {
+        if (srcPaths.length > 1 && !moveAsChild) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.CLIENT_MULTIPLE_SOURCES_DISALLOWED);
+            SVNException ex = new SVNException(err);
+            throwException(ex);
+        }
+        SVNCopyClient client = getSVNCopyClient();
+        SVNRevision srcRevision = JavaHLObjectFactory.getSVNRevision(Revision.WORKING);
+        SVNCopySource[] sources = new SVNCopySource[srcPaths.length]; 
+        try {
+            for (int i = 0; i < srcPaths.length; i++) {
+                if (isURL(srcPaths[i])) {
+                    sources[i] = new SVNCopySource(SVNRevision.UNDEFINED, srcRevision, SVNURL.parseURIEncoded(srcPaths[i]));
+                } else {
+                    sources[i] = new SVNCopySource(SVNRevision.UNDEFINED, srcRevision, new File(srcPaths[i]).getAbsoluteFile());
+                }
+            }
+            if(isURL(destPath)){
+                client.doCopy(sources, SVNURL.parseURIEncoded(destPath), true, !moveAsChild, makeParents, message, null);
+            } else {
+                client.doCopy(sources, new File(destPath).getAbsoluteFile(), true, makeParents);
+            }
+        } catch (SVNException e) {
+            throwException(e);
+        }
+    }
+
+    public void properties(String path, Revision revision, Revision pegRevision, int depth, ProplistCallback callback) throws ClientException {
+    }
+
     private void notImplementedYet() throws ClientException {
         notImplementedYet(null);
     }
@@ -1674,13 +1696,5 @@ public class SVNClientImpl implements SVNClientInterface {
                 message == null ? "Requested SVNAdmin functionality is not yet implemented" : message);
         JavaHLObjectFactory.throwException(new SVNException(err), this);
     }
-
-    public void copy(CopySource[] sources, String destPath, String message, boolean copyAsChild, boolean makeParents) throws ClientException {
-    }
-
-    public void mkdir(String[] path, String message, boolean makeParents) throws ClientException {
-    }
-
-    public void move(String[] srcPaths, String destPath, String message, boolean force, boolean moveAsChild, boolean makeParents) throws ClientException {
-    }
+    
 }

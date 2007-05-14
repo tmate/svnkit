@@ -18,6 +18,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -304,10 +305,19 @@ public class SVNCommitClient extends SVNBasicClient {
      *                          repositories
      */
     public SVNCommitInfo doMkDir(SVNURL[] urls, String commitMessage) throws SVNException {
-        return doMkDir(urls, commitMessage, null);
+        return doMkDir(urls, commitMessage, null, false);
     }
     
-    public SVNCommitInfo doMkDir(SVNURL[] urls, String commitMessage, Map revisionProperties) throws SVNException {
+    public SVNCommitInfo doMkDir(SVNURL[] urls, String commitMessage, Map revisionProperties, boolean makeParents) throws SVNException {
+        if (makeParents) {
+            List allURLs = new LinkedList();
+            for (int i = 0; i < urls.length; i++) {
+                SVNURL url = urls[i];
+                addURLParents(allURLs, url);
+            }
+            urls = (SVNURL[]) allURLs.toArray(new SVNURL[allURLs.size()]);
+        }
+        
         if (urls == null || urls.length == 0) {
             return SVNCommitInfo.NULL;
         }
@@ -1031,6 +1041,16 @@ public class SVNCommitClient extends SVNBasicClient {
         return packetsArray;        
     }
 
+    private void addURLParents(List targets, SVNURL url) throws SVNException {
+        SVNURL parentURL = url.removePathTail();
+        SVNRepository repos = createRepository(parentURL, true);
+        SVNNodeKind kind = repos.checkPath("", SVNRepository.INVALID_REVISION);
+        if (kind == SVNNodeKind.NONE) {
+            addURLParents(targets, parentURL);
+        }
+        targets.add(url);
+    }
+    
     private boolean importDir(SVNDeltaGenerator deltaGenerator, File rootFile, File dir, String importPath, boolean useGlobalIgnores, boolean recursive, ISVNEditor editor) throws SVNException {
         checkCancelled();
         File[] children = SVNFileListUtil.listFiles(dir);

@@ -81,6 +81,7 @@ public class SVN {
         ourArguments.add(SVNArgument.DEPTH);
         ourArguments.add(SVNArgument.WITH_REVPROP);
         ourArguments.add(SVNArgument.ENCODING);
+        ourArguments.add(SVNArgument.MAKE_PARENTS);
     }
 
     public static void main(String[] args) {
