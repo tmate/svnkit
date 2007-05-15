@@ -1021,10 +1021,11 @@ public class SVNRepositoryImpl extends SVNRepository implements ISVNReporter {
                 Boolean.valueOf(ignoreAncestry), url.toString() } :
                         new Object[] { "diff", getRevisionObject(targetRevision),
                     target, Boolean.valueOf(recursive),
-                    Boolean.valueOf(ignoreAncestry), url.toString(), Boolean.valueOf(getContents) };
+                    Boolean.valueOf(ignoreAncestry), url.toString(), 
+                    Boolean.valueOf(getContents), SVNDepth.asString(depth) };
         try {
             openConnection();
-            write(getContents ? "(w((n)swws))" : "(w((n)swwsw))", buffer);
+            write("(w((n)swwsww))", buffer);
             authenticate();
             reporter.report(this);
             authenticate();
@@ -1043,10 +1044,10 @@ public class SVNRepositoryImpl extends SVNRepository implements ISVNReporter {
         boolean recursive = SVNDepth.recurseFromDepth(depth);
         target = target == null ? "" : target;
         Object[] buffer = new Object[] { "status", target,
-                Boolean.valueOf(recursive), getRevisionObject(revision) };
+                Boolean.valueOf(recursive), getRevisionObject(revision), SVNDepth.asString(depth) };
         try {
             openConnection();
-            write("(w(sw(n)))", buffer);
+            write("(w(sw(n)w))", buffer);
             authenticate();
             reporter.report(this);
             authenticate();
@@ -1068,10 +1069,10 @@ public class SVNRepositoryImpl extends SVNRepository implements ISVNReporter {
             SVNErrorManager.error(SVNErrorMessage.create(SVNErrorCode.BAD_URL, "URL can not be NULL"));
         }
         Object[] buffer = new Object[] { "switch", getRevisionObject(revision),
-                target, Boolean.valueOf(recursive), url.toString() };
+                target, Boolean.valueOf(recursive), url.toString(), SVNDepth.asString(depth) };
         try {
             openConnection();
-            write("(w((n)sws))", buffer);
+            write("(w((n)swsw))", buffer);
             authenticate();
             reporter.report(this);
             authenticate();
@@ -1090,10 +1091,10 @@ public class SVNRepositoryImpl extends SVNRepository implements ISVNReporter {
         target = target == null ? "" : target;
         boolean recursive = SVNDepth.recurseFromDepth(depth);
         Object[] buffer = new Object[] { "update", getRevisionObject(revision),
-                target, Boolean.valueOf(recursive) };
+                target, Boolean.valueOf(recursive), SVNDepth.asString(depth) };
         try {
             openConnection();
-            write("(w((n)sw))", buffer);
+            write("(w((n)sww))", buffer);
             authenticate();
             reporter.report(this);
             authenticate();

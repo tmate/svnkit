@@ -93,7 +93,7 @@ public abstract class SVNArgument {
     public static final SVNArgument DEPTH = createStringArgument(new String[] { "--depth" });
     public static final SVNArgument WITH_REVPROP = createStringArgument(new String[] { "--with-revprop" });
     public static final SVNArgument ENCODING = createStringArgument(new String[] { "--encoding" });
-    public static final SVNArgument MAKE_PARENTS = createUnaryArgument(new String[] { "--make-parents" });
+    public static final SVNArgument MAKE_PARENTS = createUnaryArgument(new String[] { "--parents" });
     
     public static SVNArgument findArgument(String name, Set validArguments) {
         for (Iterator arguments = validArguments.iterator(); arguments.hasNext();) {
