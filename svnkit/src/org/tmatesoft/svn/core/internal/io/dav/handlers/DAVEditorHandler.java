@@ -72,6 +72,11 @@ public class DAVEditorHandler extends BasicDAVDeltaHandler {
         if (depth == SVNDepth.DEPTH_FILES || depth == SVNDepth.DEPTH_EMPTY) {
             buffer.append("<S:recursive>no</S:recursive>\n");
         }
+        
+        buffer.append("<S:depth>");
+        buffer.append(SVNDepth.asString(depth));
+        buffer.append("</S:depth>\n");
+        
         if (ignoreAncestry) {
             buffer.append("<S:ignore-ancestry>yes</S:ignore-ancestry>\n");
         }

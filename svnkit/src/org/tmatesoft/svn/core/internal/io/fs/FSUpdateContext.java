@@ -671,11 +671,8 @@ public class FSUpdateContext {
     
     public void writePathInfoToReportFile(String path, String linkPath, String lockToken, long revision, boolean startEmpty, SVNDepth depth) throws SVNException {
         if (depth == null || depth == SVNDepth.DEPTH_UNKNOWN) {
-            depth = myDepth;
-            if (depth == null || depth == SVNDepth.DEPTH_UNKNOWN) {
-                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.REPOS_BAD_ARGS, "Unsupported report depth ''{0}'' for path ''{1}''", new Object[] {depth != null ? depth.getName() : "null", path});
-                SVNErrorManager.error(err);
-            }            
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.REPOS_BAD_ARGS, "Unsupported report depth ''{0}''", depth != null ? depth.getName() : "null");
+            SVNErrorManager.error(err);
         }
         String anchorRelativePath = SVNPathUtil.append(getReportTarget(), path);
         String revisionRep = FSRepository.isValidRevision(revision) ? "+" + String.valueOf(revision) + ":" : "-";

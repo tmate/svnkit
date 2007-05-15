@@ -18,7 +18,9 @@ import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.tigris.subversion.javahl.BlameCallback;
 import org.tigris.subversion.javahl.ClientException;
@@ -1430,6 +1432,29 @@ public class SVNClientImpl implements SVNClientInterface {
     }
 
     public void properties(String path, Revision revision, Revision pegRevision, boolean recurse, ProplistCallback callback) throws ClientException {
+        if(path == null || callback == null){
+            return;
+        }
+        SVNWCClient client = getSVNWCClient();
+        SVNRevision svnRevision = JavaHLObjectFactory.getSVNRevision(revision);
+        SVNRevision svnPegRevision = JavaHLObjectFactory.getSVNRevision(pegRevision);
+        JavaHLPropertyHandler propHandler = new JavaHLPropertyHandler(myOwner);
+        try {
+            if(isURL(path)){
+                client.doGetProperty(SVNURL.parseURIEncoded(path), null, svnPegRevision, svnRevision, recurse, propHandler);
+            }else{
+                client.doGetProperty(new File(path).getAbsoluteFile(), null, svnPegRevision, svnRevision, recurse, propHandler);
+            }
+        } catch (SVNException e) {
+            throwException(e);
+        }
+        
+        PropertyData[] properties = propHandler.getAllPropertyData();
+        Map propsMap = new HashMap();
+        for (int i = 0; i < properties.length; i++) {
+            propsMap.put(properties[i].getName(), properties[i].getValue());
+        }
+        callback.singlePath(path, propsMap);
     }
 
     public long checkout(String moduleName, String destPath, Revision revision, Revision pegRevision, int depth, boolean ignoreExternals, boolean allowUnverObstructions) throws ClientException {
