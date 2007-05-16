@@ -292,7 +292,21 @@ public class SVNUpdateClient extends SVNBasicClient {
                 SVNRepositoryLocation[] locs = getLocations(url, null, null, pegRevision, SVNRevision.create(revNumber), SVNRevision.UNDEFINED);
                 url = locs[0].getURL();
             }
-
+            
+            SVNURL sourceRoot = repository.getRepositoryRoot(true);
+            if (!SVNPathUtil.isAncestor(sourceRoot.toString(), url.toString())) {
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_INVALID_SWITCH, "''{0}''\nis not the same repository as\n''{1}''",
+                        new Object[] {url.toString(), sourceRoot.toString()});
+                SVNErrorManager.error(err);
+            }
+            repository = createRepository(sourceRoot, true);
+            SVNNodeKind targetKind = repository.checkPath(SVNPathUtil.getPathAsChild(sourceRoot.toDecodedString(), url.toDecodedString()), revNumber);
+            if (targetKind == SVNNodeKind.NONE) {
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_INVALID_SWITCH, "Destination does not exist: ''{0}''", url.toString());
+                SVNErrorManager.error(err);
+            }
+            repository = createRepository(sourceURL, true);
+            
             SVNUpdateEditor editor = new SVNUpdateEditor(info, url.toString(), isLeaveConflictsUnresolved(), force, depth);
             String target = "".equals(info.getTargetName()) ? null : info.getTargetName();
             repository.update(url, revNumber, target, depth, reporter, SVNCancellableEditor.newInstance(editor, this, getDebugLog()));
