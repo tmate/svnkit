@@ -1510,6 +1510,29 @@ public class SVNClientImpl implements SVNClientInterface {
     }
 
     public void info2(String pathOrUrl, Revision revision, Revision pegRevision, boolean recurse, InfoCallback callback) throws ClientException {
+        SVNWCClient client = getSVNWCClient();
+        final InfoCallback infoCallback = callback; 
+        ISVNInfoHandler handler = new ISVNInfoHandler(){
+            public void handleInfo(SVNInfo info) {
+                infoCallback.singleInfo(JavaHLObjectFactory.createInfo2(info));
+            }
+        };
+        try {
+            if(isURL(pathOrUrl)){
+                client.doInfo(SVNURL.parseURIEncoded(pathOrUrl),
+                        JavaHLObjectFactory.getSVNRevision(pegRevision),
+                        JavaHLObjectFactory.getSVNRevision(revision),
+                        recurse, handler);
+            }else{
+                client.doInfo(new File(pathOrUrl).getAbsoluteFile(),
+                        JavaHLObjectFactory.getSVNRevision(revision),
+                        recurse, handler);
+            }
+        } catch (SVNException e) {
+            if (e.getErrorMessage().getErrorCode() != SVNErrorCode.UNVERSIONED_RESOURCE) {
+                throwException(e);
+            }
+        }
     }
 
     public void logMessages(String path, Revision pegRevision, Revision revisionStart, Revision revisionEnd, boolean stopOnCopy, boolean discoverPath, long limit, LogMessageCallback callback) throws ClientException {
@@ -1710,6 +1733,30 @@ public class SVNClientImpl implements SVNClientInterface {
     }
 
     public void properties(String path, Revision revision, Revision pegRevision, int depth, ProplistCallback callback) throws ClientException {
+        if(path == null || callback == null){
+            return;
+        }
+        SVNWCClient client = getSVNWCClient();
+        SVNRevision svnRevision = JavaHLObjectFactory.getSVNRevision(revision);
+        SVNRevision svnPegRevision = JavaHLObjectFactory.getSVNRevision(pegRevision);
+        JavaHLPropertyHandler propHandler = new JavaHLPropertyHandler(myOwner);
+        try {
+            if(isURL(path)){
+                client.doGetProperty(SVNURL.parseURIEncoded(path), null, svnPegRevision, svnRevision, JavaHLObjectFactory.getSVNDepth(depth), propHandler);
+            }else{
+                client.doGetProperty(new File(path).getAbsoluteFile(), null, svnPegRevision, svnRevision, JavaHLObjectFactory.getSVNDepth(depth), propHandler);
+            }
+        } catch (SVNException e) {
+            throwException(e);
+        }
+        
+        PropertyData[] properties = propHandler.getAllPropertyData();
+        Map propsMap = new HashMap();
+        for (int i = 0; i < properties.length; i++) {
+            propsMap.put(properties[i].getName(), properties[i].getValue());
+        }
+        callback.singlePath(path, propsMap);
+    
     }
 
     private void notImplementedYet() throws ClientException {
