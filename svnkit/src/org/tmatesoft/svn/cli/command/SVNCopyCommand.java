@@ -90,7 +90,7 @@ public class SVNCopyCommand extends SVNCommand {
         File absoluteDstFile = new File(absoluteDstPath);
         getClientManager().setEventHandler(new SVNCommandEventProcessor(out, err, false));
         SVNCopyClient updater = getClientManager().getCopyClient();
-        boolean makeParents = getCommandLine().hasArgument(SVNArgument.MAKE_PARENTS);
+        boolean makeParents = getCommandLine().hasArgument(SVNArgument.PARENTS);
         SVNCopySource[] sources = new SVNCopySource[getCommandLine().getPathCount() - 1]; 
 
         for (int i = 0; i < getCommandLine().getPathCount() - 1; i++) {
@@ -124,7 +124,7 @@ public class SVNCopyCommand extends SVNCommand {
         getClientManager().setEventHandler(new SVNCommandEventProcessor(out, err, false));
         SVNCopyClient updater = getClientManager().getCopyClient();
         Map revProps = (Map) getCommandLine().getArgumentValue(SVNArgument.WITH_REVPROP); 
-        boolean makeParents = getCommandLine().hasArgument(SVNArgument.MAKE_PARENTS);
+        boolean makeParents = getCommandLine().hasArgument(SVNArgument.PARENTS);
         SVNCopySource[] sources = new SVNCopySource[getCommandLine().getURLCount() - 1]; 
         
         for (int i = 0; i < getCommandLine().getURLCount() - 1; i++) {
@@ -155,7 +155,7 @@ public class SVNCopyCommand extends SVNCommand {
             return;
         }
 
-        boolean makeParents = getCommandLine().hasArgument(SVNArgument.MAKE_PARENTS);
+        boolean makeParents = getCommandLine().hasArgument(SVNArgument.PARENTS);
         getClientManager().setEventHandler(new SVNCommandEventProcessor(out, err, false));
         SVNCopyClient updater = getClientManager().getCopyClient();
         SVNCopySource[] sources = new SVNCopySource[getCommandLine().getURLCount()];
@@ -184,7 +184,7 @@ public class SVNCopyCommand extends SVNCommand {
         getClientManager().setEventHandler(new SVNCommandEventProcessor(out, err, false));
         SVNCopyClient updater = getClientManager().getCopyClient();
         updater.setEventHandler(null);
-        boolean makeParents = getCommandLine().hasArgument(SVNArgument.MAKE_PARENTS);
+        boolean makeParents = getCommandLine().hasArgument(SVNArgument.PARENTS);
 
         SVNCopySource[] sources = new SVNCopySource[getCommandLine().getPathCount()];
         for (int i = 0; i < getCommandLine().getPathCount(); i++) {

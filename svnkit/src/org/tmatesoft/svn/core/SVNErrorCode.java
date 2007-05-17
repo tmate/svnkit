@@ -362,6 +362,7 @@ public class SVNErrorCode implements Serializable {
      * @since SVN 1.5
      */
     public static final SVNErrorCode CLIENT_MULTIPLE_SOURCES_DISALLOWED = new SVNErrorCode(CLIENT_CATEGORY, 14, "Operation does not support multiple sources");
+    public static final SVNErrorCode CLIENT_NO_VERSIONED_PARENT = new SVNErrorCode(CLIENT_CATEGORY, 15, "No versioned parent directories");
     
     public static final SVNErrorCode BASE = new SVNErrorCode(MISC_CATEGORY, 0, "A problem occurred; see later errors for details");
     public static final SVNErrorCode PLUGIN_LOAD_FAILURE = new SVNErrorCode(MISC_CATEGORY, 1, "Failure loading plugin");    

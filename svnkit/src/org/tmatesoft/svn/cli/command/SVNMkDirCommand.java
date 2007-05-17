@@ -96,7 +96,7 @@ public class SVNMkDirCommand extends SVNCommand {
             svnURLs[i] = SVNURL.parseURIEncoded(paths[i]);
         }
         Map revProps = (Map) getCommandLine().getArgumentValue(SVNArgument.WITH_REVPROP); 
-        boolean makeParents = getCommandLine().hasArgument(SVNArgument.MAKE_PARENTS);
+        boolean makeParents = getCommandLine().hasArgument(SVNArgument.PARENTS);
         SVNCommitInfo info = client.doMkDir(svnURLs, message == null ? "" : message, revProps, makeParents);
         if (info != SVNCommitInfo.NULL) {
             out.println();

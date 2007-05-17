@@ -67,7 +67,7 @@ public class SVNMoveCommand extends SVNCommand {
         SVNCopyClient updater = getClientManager().getCopyClient();
         Map revProps = (Map) getCommandLine().getArgumentValue(SVNArgument.WITH_REVPROP); 
         SVNRevision srcRevision = SVNRevision.parse((String) getCommandLine().getArgumentValue(SVNArgument.REVISION));
-        boolean makeParents = getCommandLine().hasArgument(SVNArgument.MAKE_PARENTS);
+        boolean makeParents = getCommandLine().hasArgument(SVNArgument.PARENTS);
 
         SVNCopySource[] sources = new SVNCopySource[getCommandLine().getURLCount() - 1]; 
         for (int i = 0; i < getCommandLine().getURLCount() - 1; i++) {
@@ -92,7 +92,7 @@ public class SVNMoveCommand extends SVNCommand {
         }
         
         String commitMessage = (String) getCommandLine().getArgumentValue(SVNArgument.MESSAGE);
-        boolean makeParents = getCommandLine().hasArgument(SVNArgument.MAKE_PARENTS);
+        boolean makeParents = getCommandLine().hasArgument(SVNArgument.PARENTS);
         Map revisionProps = (Map) getCommandLine().getArgumentValue(SVNArgument.WITH_REVPROP);
         boolean hasFile = getCommandLine().hasArgument(SVNArgument.FILE);
         if (commitMessage != null || hasFile || revisionProps != null) {
