@@ -1178,7 +1178,12 @@ public class SVNWCClient extends SVNBasicClient {
                     wcAccess.open(path.getParentFile(), false, 0);
                 } catch (SVNException e) {
                     if (e.getErrorMessage().getErrorCode() == SVNErrorCode.WC_NOT_DIRECTORY) {
-                        doAdd(path.getParentFile(), false, false, climbUnversionedParents, false);
+                        if (path.getParentFile() == null) {
+                            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.CLIENT_NO_VERSIONED_PARENT);
+                            SVNErrorManager.error(err);
+                        } else {
+                            doAdd(path.getParentFile(), false, false, climbUnversionedParents, false);
+                        }
                     } else {
                         throw e;
                     }

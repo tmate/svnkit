@@ -19,9 +19,6 @@ package org.tmatesoft.svn.core;
 public class SVNDepth implements Comparable {
     
     public static final SVNDepth DEPTH_UNKNOWN = new SVNDepth(-2, "unknown"); 
-    /* Exclude (remove, whatever) directory D.
-     * TODO(sd): This depth may turn out to be unnecessary. 
-     */
     public static final SVNDepth DEPTH_EXCLUDE = new SVNDepth(-1, "exclude"); 
     public static final SVNDepth DEPTH_EMPTY = new SVNDepth(0, "empty"); 
     public static final SVNDepth DEPTH_FILES = new SVNDepth(1, "files"); 

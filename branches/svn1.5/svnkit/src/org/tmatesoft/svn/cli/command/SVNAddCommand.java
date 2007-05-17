@@ -44,7 +44,8 @@ public class SVNAddCommand extends SVNCommand {
         boolean force = getCommandLine().hasArgument(SVNArgument.FORCE);
         boolean disableAutoProps = getCommandLine().hasArgument(SVNArgument.NO_AUTO_PROPS);
         boolean enableAutoProps = getCommandLine().hasArgument(SVNArgument.AUTO_PROPS);
-        
+        boolean addParents = getCommandLine().hasArgument(SVNArgument.PARENTS);
+
         getClientManager().setEventHandler(new SVNCommandEventProcessor(out, err, false));
         SVNWCClient wcClient = getClientManager().getWCClient();
 
@@ -58,7 +59,7 @@ public class SVNAddCommand extends SVNCommand {
         for (int i = 0; i < getCommandLine().getPathCount(); i++) {
             final String absolutePath = getCommandLine().getPathAt(i);
             matchTabsInPath(absolutePath, err);
-            wcClient.doAdd(new File(absolutePath), force, false, false, recursive, noIgnore);
+            wcClient.doAdd(new File(absolutePath), force, false, addParents, recursive, noIgnore);
         }
     }
     
