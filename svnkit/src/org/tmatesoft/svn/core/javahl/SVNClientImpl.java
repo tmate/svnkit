@@ -410,6 +410,16 @@ public class SVNClientImpl implements SVNClientInterface {
         }
     }
 
+    public void add(String path, boolean recurse, boolean force, boolean noIgnores, boolean addParents) throws ClientException {
+        SVNWCClient wcClient = getSVNWCClient();
+        try {
+            wcClient.doAdd(new File(path).getAbsoluteFile(), force, false, addParents, recurse, noIgnores);
+        } catch (SVNException e) {
+            throwException(e);
+        }
+    }
+
+
     public long update(String path, Revision revision, boolean recurse) throws ClientException {
         SVNUpdateClient client = getSVNUpdateClient();
         try {
@@ -1426,9 +1436,6 @@ public class SVNClientImpl implements SVNClientInterface {
     public PropertyData getMergeInfoProperty(String path) throws SubversionException {
         notImplementedYet();
         return null;
-    }
-
-    public void merge(String path, Revision pegRevision, RevisionRange[] revisions, String localPath, boolean force, boolean recurse, boolean ignoreAncestry, boolean dryRun) throws ClientException {
     }
 
     public void properties(String path, Revision revision, Revision pegRevision, boolean recurse, ProplistCallback callback) throws ClientException {
