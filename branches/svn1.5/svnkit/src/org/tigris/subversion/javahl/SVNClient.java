@@ -446,10 +446,6 @@ public class SVNClient implements SVNClientInterface {
         return myDelegate.getMergeInfoProperty(path);
     }
 
-    public void merge(String path, Revision pegRevision, RevisionRange[] revisions, String localPath, boolean force, boolean recurse, boolean ignoreAncestry, boolean dryRun) throws ClientException {
-        myDelegate.merge(path, pegRevision, revisions, localPath, force, recurse, ignoreAncestry, dryRun);
-    }
-
     public void properties(String path, Revision revision, Revision pegRevision, boolean recurse, ProplistCallback callback) throws ClientException {
         myDelegate.properties(path, revision, pegRevision, recurse, callback);
     }
@@ -544,5 +540,8 @@ public class SVNClient implements SVNClientInterface {
 
     public void properties(String path, Revision revision, Revision pegRevision, int depth, ProplistCallback callback) throws ClientException {
         myDelegate.properties(path, revision, pegRevision, depth, callback);
+    }
+
+    public void add(String path, boolean recurse, boolean force, boolean noIgnores, boolean addParents) throws ClientException {
     }
 }
