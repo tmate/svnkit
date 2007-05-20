@@ -19,6 +19,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
@@ -267,6 +268,10 @@ class DAVRepository extends SVNRepository {
     }
 
     public long getDir(String path, long revision, final Map properties, final ISVNDirEntryHandler handler) throws SVNException {
+        return getDir(path, revision, properties, SVNDirEntry.DIRENT_ALL, handler);
+    }
+
+    public long getDir(String path, long revision, Map properties, int entryFields, ISVNDirEntryHandler handler) throws SVNException {
         long dirRevision = revision;
         try {
             openConnection();
@@ -278,10 +283,40 @@ class DAVRepository extends SVNRepository {
                 path = SVNPathUtil.append(info.baselineBase, info.baselinePath);
                 dirRevision = info.revision; 
             }
+            
+            DAVProperties deadProp = DAVUtil.getResourceProperties(myConnection, path, null, new DAVElement[] {DAVElement.DEADPROP_COUNT});
+            boolean supportsDeadPropCount = deadProp != null && deadProp.getPropertyValue(DAVElement.DEADPROP_COUNT) != null ;
+            
             if (handler != null) {
+                DAVElement[] whichProps = null;
+                if ((entryFields & SVNDirEntry.DIRENT_HAS_PROPERTIES) == 0 ||
+                        supportsDeadPropCount) {
+                    
+                    List individualProps = new LinkedList();
+                    
+                    if ((entryFields & SVNDirEntry.DIRENT_KIND) != 0) {
+                        individualProps.add(DAVElement.RESOURCE_TYPE);
+                    }
+                    if ((entryFields & SVNDirEntry.DIRENT_SIZE) != 0) {
+                        individualProps.add(DAVElement.GET_CONTENT_LENGTH);
+                    }
+                    if ((entryFields & SVNDirEntry.DIRENT_HAS_PROPERTIES) != 0) {
+                        individualProps.add(DAVElement.DEADPROP_COUNT);
+                    }
+                    if ((entryFields & SVNDirEntry.DIRENT_CREATED_REVISION) != 0) {
+                        individualProps.add(DAVElement.VERSION_NAME);
+                    }
+                    if ((entryFields & SVNDirEntry.DIRENT_TIME) != 0) {
+                        individualProps.add(DAVElement.CREATION_DATE);
+                    }
+                    if ((entryFields & SVNDirEntry.DIRENT_LAST_AUTHOR) != 0) {
+                        individualProps.add(DAVElement.CREATOR_DISPLAY_NAME);
+                    }
+                    whichProps = (DAVElement[]) individualProps.toArray(new DAVElement[individualProps.size()]);
+                }
                 final int parentPathSegments = SVNPathUtil.getSegmentsCount(path);
                 Map dirEntsMap = new HashMap();
-                HTTPStatus status = DAVUtil.getProperties(myConnection, path, DAVUtil.DEPTH_ONE, null, null, dirEntsMap);
+                HTTPStatus status = DAVUtil.getProperties(myConnection, path, DAVUtil.DEPTH_ONE, null, whichProps, dirEntsMap);
                 if (status.getError() != null) {
                     SVNErrorManager.error(status.getError());
                 }
@@ -292,27 +327,64 @@ class DAVRepository extends SVNRepository {
                     if (parentPathSegments == SVNPathUtil.getSegmentsCount(href)) {
                         continue;
                     }
+                    
                     String name = SVNEncodingUtil.uriDecode(SVNPathUtil.tail(href));
-                    SVNNodeKind kind = SVNNodeKind.FILE;
-                    Object revisionStr = child.getPropertyValue(DAVElement.VERSION_NAME);
-                    long lastRevision = Long.parseLong(revisionStr.toString());
-                    String sizeStr = child.getPropertyValue(DAVElement.GET_CONTENT_LENGTH);
-                    long size = sizeStr == null ? 0 : Long.parseLong(sizeStr);
-                    if (child.isCollection()) {
-                        kind = SVNNodeKind.DIR;
+                    
+                    SVNNodeKind kind = SVNNodeKind.UNKNOWN;
+                    if ((entryFields & SVNDirEntry.DIRENT_KIND) != 0) {
+                        kind = child.isCollection() ? SVNNodeKind.DIR : SVNNodeKind.FILE;  
                     }
-                    String author = child.getPropertyValue(DAVElement.CREATOR_DISPLAY_NAME);
-                    String dateStr = child.getPropertyValue(DAVElement.CREATION_DATE);
-                    Date date = dateStr != null ? SVNTimeUtil.parseDate(dateStr) : null;
-                    boolean hasProperties = false;
-                    for(Iterator props = child.getProperties().keySet().iterator(); props.hasNext();) {
-                        DAVElement property = (DAVElement) props.next();
-                        if (DAVElement.SVN_CUSTOM_PROPERTY_NAMESPACE.equals(property.getNamespace()) || 
-                                DAVElement.SVN_SVN_PROPERTY_NAMESPACE.equals(property.getNamespace())) {
-                            hasProperties = true;
-                            break;
+                    
+                    long size = 0;
+                    if ((entryFields & SVNDirEntry.DIRENT_SIZE) != 0) {
+                        String sizeStr = child.getPropertyValue(DAVElement.GET_CONTENT_LENGTH);
+                        if (sizeStr != null) {
+                            size = Long.parseLong(sizeStr);    
                         }
                     }
+
+                    boolean hasProperties = false;
+                    if ((entryFields & SVNDirEntry.DIRENT_HAS_PROPERTIES) != 0) {
+                        if (supportsDeadPropCount) {
+                            String propVal = child.getPropertyValue(DAVElement.DEADPROP_COUNT);
+                            if (propVal == null) {
+                                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.INCOMPLETE_DATA, "Server response missing the expected deadprop-count property");
+                                SVNErrorManager.error(err);
+                            } else {
+                                long propCount = Long.parseLong(propVal);
+                                hasProperties = propCount > 0;
+                            }
+                        } else {
+                            for(Iterator props = child.getProperties().keySet().iterator(); props.hasNext();) {
+                                DAVElement property = (DAVElement) props.next();
+                                if (DAVElement.SVN_CUSTOM_PROPERTY_NAMESPACE.equals(property.getNamespace()) || 
+                                        DAVElement.SVN_SVN_PROPERTY_NAMESPACE.equals(property.getNamespace())) {
+                                    hasProperties = true;
+                                    break;
+                                }
+                            }
+                        }
+                    }                    
+                    
+                    long lastRevision = INVALID_REVISION;
+                    if ((entryFields & SVNDirEntry.DIRENT_CREATED_REVISION) != 0) {
+                        Object revisionStr = child.getPropertyValue(DAVElement.VERSION_NAME);
+                        lastRevision = Long.parseLong(revisionStr.toString());
+                    }
+
+                    Date date = null;
+                    if ((entryFields & SVNDirEntry.DIRENT_TIME) != 0) {
+                        String dateStr = child.getPropertyValue(DAVElement.CREATION_DATE);
+                        if (dateStr != null) {
+                            date = SVNTimeUtil.parseDate(dateStr);    
+                        }
+                    }
+
+                    String author = null;
+                    if ((entryFields & SVNDirEntry.DIRENT_LAST_AUTHOR) != 0) {
+                        author = child.getPropertyValue(DAVElement.CREATOR_DISPLAY_NAME);
+                    }
+                    
                     SVNURL childURL = getLocation().setPath(fullPath, true);
                     childURL = childURL.appendPath(name, false);
                     SVNDirEntry dirEntry = new SVNDirEntry(childURL, name, kind, size, hasProperties, lastRevision, date, author);

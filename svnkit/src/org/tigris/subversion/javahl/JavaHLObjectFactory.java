@@ -30,6 +30,7 @@ import org.tmatesoft.svn.core.SVNProperty;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
 import org.tmatesoft.svn.core.javahl.SVNClientImpl;
 import org.tmatesoft.svn.core.wc.SVNCommitItem;
+import org.tmatesoft.svn.core.wc.SVNDiffStatus;
 import org.tmatesoft.svn.core.wc.SVNEvent;
 import org.tmatesoft.svn.core.wc.SVNEventAction;
 import org.tmatesoft.svn.core.wc.SVNInfo;
@@ -221,6 +222,21 @@ public class JavaHLObjectFactory {
             default:
                 return SVNDepth.DEPTH_UNKNOWN;
         }
+    }
+    
+    public static DiffSummary createDiffSummary(SVNDiffStatus status) {
+        int diffStatus = -1;
+        if (status.getModificationType() == SVNStatusType.STATUS_NORMAL || 
+                status.getModificationType() == SVNStatusType.STATUS_NONE) {
+            diffStatus = 0;
+        } else if (status.getModificationType() == SVNStatusType.STATUS_ADDED) {
+            diffStatus = 1;
+        } else if (status.getModificationType() == SVNStatusType.STATUS_MODIFIED) {
+            diffStatus = 2;
+        } else if (status.getModificationType() == SVNStatusType.STATUS_DELETED) {
+            diffStatus = 3;
+        }
+        return new DiffSummary(status.getPath(), diffStatus, status.isPropertiesModified(), getNodeKind(status.getKind()));
     }
     
     public static int getNodeKind(SVNNodeKind svnKind){

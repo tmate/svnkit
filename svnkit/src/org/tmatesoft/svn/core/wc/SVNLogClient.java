@@ -592,16 +592,16 @@ public class SVNLogClient extends SVNBasicClient {
      * @see                   #doList(SVNURL, SVNRevision, SVNRevision, boolean, ISVNDirEntryHandler)  
      */
     public void doList(File path, SVNRevision pegRevision, SVNRevision revision, boolean fetchLocks, boolean recursive, ISVNDirEntryHandler handler) throws SVNException {
-        doList(path, pegRevision, revision, fetchLocks, recursive ? SVNDepth.DEPTH_INFINITY : SVNDepth.DEPTH_IMMEDIATES, handler);
+        doList(path, pegRevision, revision, fetchLocks, recursive ? SVNDepth.DEPTH_INFINITY : SVNDepth.DEPTH_IMMEDIATES, SVNDirEntry.DIRENT_ALL, handler);
     }
     
-    public void doList(File path, SVNRevision pegRevision, SVNRevision revision, boolean fetchLocks, SVNDepth depth, ISVNDirEntryHandler handler) throws SVNException {
+    public void doList(File path, SVNRevision pegRevision, SVNRevision revision, boolean fetchLocks, SVNDepth depth, int entryFields, ISVNDirEntryHandler handler) throws SVNException {
         if (revision == null || !revision.isValid()) {
             revision = SVNRevision.BASE;
         }
         SVNRepository repos = createRepository(null, path, pegRevision, revision);
         long rev = getRevisionNumber(revision, repos, path);
-        doList(repos, rev, handler, fetchLocks, depth);
+        doList(repos, rev, handler, fetchLocks, depth, entryFields);
     }
 
     /**
@@ -654,16 +654,16 @@ public class SVNLogClient extends SVNBasicClient {
      * @see                   #doList(File, SVNRevision, SVNRevision, boolean, ISVNDirEntryHandler)   
      */
     public void doList(SVNURL url, SVNRevision pegRevision, SVNRevision revision, boolean fetchLocks, boolean recursive, ISVNDirEntryHandler handler) throws SVNException {
-        doList(url, pegRevision, revision, fetchLocks, recursive ? SVNDepth.DEPTH_INFINITY : SVNDepth.DEPTH_IMMEDIATES, handler);
+        doList(url, pegRevision, revision, fetchLocks, recursive ? SVNDepth.DEPTH_INFINITY : SVNDepth.DEPTH_IMMEDIATES, SVNDirEntry.DIRENT_ALL, handler);
     }
     
-    public void doList(SVNURL url, SVNRevision pegRevision, SVNRevision revision, boolean fetchLocks, SVNDepth depth, ISVNDirEntryHandler handler) throws SVNException {
+    public void doList(SVNURL url, SVNRevision pegRevision, SVNRevision revision, boolean fetchLocks, SVNDepth depth, int entryFields, ISVNDirEntryHandler handler) throws SVNException {
         long[] pegRev = new long[] {-1};
         SVNRepository repos = createRepository(url, null, pegRevision, revision, pegRev);
         if (pegRev[0] < 0) {
             pegRev[0] = getRevisionNumber(revision, repos, null);
         }
-        doList(repos, pegRev[0], handler, fetchLocks, depth);
+        doList(repos, pegRev[0], handler, fetchLocks, depth, entryFields);
     }
 
     /**
@@ -691,7 +691,7 @@ public class SVNLogClient extends SVNBasicClient {
         doList(url, pegRevision, revision, false, recursive, handler);
     }
 
-    private void doList(SVNRepository repos, long rev, final ISVNDirEntryHandler handler, boolean fetchLocks, SVNDepth depth) throws SVNException {
+    private void doList(SVNRepository repos, long rev, final ISVNDirEntryHandler handler, boolean fetchLocks, SVNDepth depth, int entryFields) throws SVNException {
         SVNURL url = repos.getLocation();
         SVNURL reposRoot = repos.getRepositoryRoot(true);
         SVNDirEntry entry = null;
@@ -712,7 +712,7 @@ public class SVNLogClient extends SVNBasicClient {
                 if (!url.equals(reposRoot)) {
                     String name = SVNPathUtil.tail(repos.getLocation().getPath());
                     repos.setLocation(repos.getLocation().removePathTail(), false);
-                    Collection dirEntries = repos.getDir("", rev, null, (Collection) null);
+                    Collection dirEntries = repos.getDir("", rev, null, entryFields, (Collection) null);
                     repos.setLocation(url, false);
                     
                     for (Iterator ents = dirEntries.iterator(); ents.hasNext();) {
@@ -727,7 +727,7 @@ public class SVNLogClient extends SVNBasicClient {
                     }
                 } else {
                     Map props = new HashMap();
-                    repos.getDir("", rev, props, (Collection) null);
+                    repos.getDir("", rev, props, entryFields, (Collection) null);
                     Map revProps = repos.getRevisionProperties(rev, null);
                     String author = (String) revProps.get(SVNRevisionProperty.AUTHOR);
                     String dateStr = (String) revProps.get(SVNRevisionProperty.DATE);
@@ -779,16 +779,16 @@ public class SVNLogClient extends SVNBasicClient {
         if (entry.getKind() == SVNNodeKind.DIR && (depth == SVNDepth.DEPTH_FILES || 
                 depth == SVNDepth.DEPTH_IMMEDIATES ||
                 depth == SVNDepth.DEPTH_INFINITY)) {
-            list(repos, "", rev, depth, nestedHandler);
+            list(repos, "", rev, depth, entryFields, nestedHandler);
         }
     }
 
-    private static void list(SVNRepository repository, String path, long rev, SVNDepth depth, ISVNDirEntryHandler handler) throws SVNException {
+    private static void list(SVNRepository repository, String path, long rev, SVNDepth depth, int entryFields, ISVNDirEntryHandler handler) throws SVNException {
         if (depth == SVNDepth.DEPTH_EMPTY) {
             return;
         }
         Collection entries = new TreeSet();
-        entries = repository.getDir(path, rev, null, entries);
+        entries = repository.getDir(path, rev, null, entryFields, entries);
 
         for (Iterator iterator = entries.iterator(); iterator.hasNext();) {
             SVNDirEntry entry = (SVNDirEntry) iterator.next();
@@ -799,7 +799,7 @@ public class SVNLogClient extends SVNBasicClient {
                 handler.handleDirEntry(entry);
             }
             if (entry.getKind() == SVNNodeKind.DIR && entry.getDate() != null && depth == SVNDepth.DEPTH_INFINITY) {
-                list(repository, childPath, rev, depth, handler);
+                list(repository, childPath, rev, depth, entryFields, handler);
             }
         }
     }
