@@ -33,6 +33,15 @@ import java.util.Date;
  */
 public class SVNDirEntry implements Comparable {
 
+    public static final int DIRENT_KIND = 0x00001;
+    public static final int DIRENT_SIZE = 0x00002;
+    public static final int DIRENT_HAS_PROPERTIES = 0x00004;
+    public static final int DIRENT_CREATED_REVISION = 0x00008;
+    public static final int DIRENT_TIME = 0x00010;
+    public static final int DIRENT_LAST_AUTHOR = 0x00020;
+    public static final int DIRENT_COMMIT_MESSAGE = 0x00040;
+    public static final int DIRENT_ALL = ~0;
+
     private String myName;
     private SVNNodeKind myKind;
     private long mySize;

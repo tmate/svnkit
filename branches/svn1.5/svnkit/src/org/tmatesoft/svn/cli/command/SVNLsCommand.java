@@ -33,7 +33,6 @@ import org.tmatesoft.svn.core.wc.SVNLogClient;
 import org.tmatesoft.svn.core.wc.SVNRevision;
 import org.tmatesoft.svn.core.wc.xml.SVNXMLDirEntryHandler;
 import org.tmatesoft.svn.core.wc.xml.SVNXMLSerializer;
-import org.tmatesoft.svn.util.SVNDebugLog;
 
 /**
  * @version 1.1.1
@@ -70,6 +69,7 @@ public class SVNLsCommand extends SVNCommand implements ISVNDirEntryHandler {
         }
         
         myIsVerbose = getCommandLine().hasArgument(SVNArgument.VERBOSE);
+        int entryFields = myIsVerbose ? SVNDirEntry.DIRENT_ALL : SVNDirEntry.DIRENT_KIND | SVNDirEntry.DIRENT_TIME;
         myPrintStream = out;
         boolean isXml = getCommandLine().hasArgument(SVNArgument.XML);
         SVNXMLSerializer serializer = isXml ? new SVNXMLSerializer(myPrintStream) : null;
@@ -90,19 +90,17 @@ public class SVNLsCommand extends SVNCommand implements ISVNDirEntryHandler {
             if (handler != null) {
                 handler.startTarget(url);
             }
-            SVNDebugLog.getDefaultLog().info("URL: " + url);
-            logClient.doList(SVNURL.parseURIEncoded(url), getCommandLine().getPegRevision(i), revision == null ? SVNRevision.UNDEFINED : revision, myIsVerbose || isXml, depth, isXml ? handler : (ISVNDirEntryHandler) this);
+            logClient.doList(SVNURL.parseURIEncoded(url), getCommandLine().getPegRevision(i), revision == null ? SVNRevision.UNDEFINED : revision, myIsVerbose || isXml, depth, entryFields, isXml ? handler : (ISVNDirEntryHandler) this);
             if (handler != null) {
                 handler.endTarget();
             }
         }
         for(int i = 0; i < getCommandLine().getPathCount(); i++) {
             File path = new File(getCommandLine().getPathAt(i)).getAbsoluteFile();
-            SVNDebugLog.getDefaultLog().info("Path: " + path);
             if (handler != null) {
                 handler.startTarget(path.getAbsolutePath().replace(File.separatorChar, '/'));
             }
-            logClient.doList(path, getCommandLine().getPathPegRevision(i), revision == null || !revision.isValid() ? SVNRevision.BASE : revision, myIsVerbose || isXml, depth, isXml ? handler : (ISVNDirEntryHandler) this);
+            logClient.doList(path, getCommandLine().getPathPegRevision(i), revision == null || !revision.isValid() ? SVNRevision.BASE : revision, myIsVerbose || isXml, depth, entryFields, isXml ? handler : (ISVNDirEntryHandler) this);
             if (handler != null) {
                 handler.endTarget();
             }

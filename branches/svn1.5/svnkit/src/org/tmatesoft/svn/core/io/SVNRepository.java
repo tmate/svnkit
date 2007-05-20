@@ -129,7 +129,7 @@ import org.tmatesoft.svn.util.SVNDebugLog;
  */
 public abstract class SVNRepository {
     public static final long INVALID_REVISION = -1;
-    
+
     protected String myRepositoryUUID;
     protected SVNURL myRepositoryRoot;
     protected SVNURL myLocation;
@@ -580,6 +580,8 @@ public abstract class SVNRepository {
      */
     public abstract long getDir(String path, long revision, Map properties, ISVNDirEntryHandler handler) throws SVNException; 
 
+    public abstract long getDir(String path, long revision, Map properties, int entryFields, ISVNDirEntryHandler handler) throws SVNException; 
+
     /**
      * Retrieves interesting file revisions for the specified file. 
 	 * 
@@ -898,6 +900,10 @@ public abstract class SVNRepository {
      * @see                 org.tmatesoft.svn.core.SVNDirEntry
      */
     public Collection getDir(String path, long revision, Map properties, Collection dirEntries) throws SVNException {
+        return getDir(path, revision, properties, SVNDirEntry.DIRENT_ALL, dirEntries);
+    }
+
+    public Collection getDir(String path, long revision, Map properties, int entryFields, Collection dirEntries) throws SVNException {
         final Collection result = dirEntries != null ? dirEntries : new LinkedList();
         ISVNDirEntryHandler handler;
         handler = new ISVNDirEntryHandler() {
@@ -905,10 +911,10 @@ public abstract class SVNRepository {
                 result.add(dirEntry);
             }
         };
-        getDir(path, revision, properties, handler);
+        getDir(path, revision, properties, entryFields, handler);
         return result;
     }
-    
+
     /**
      * Fetches the contents of a directory into the provided 
      * collection object and returns the directory entry itself. 

@@ -17,6 +17,8 @@ import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 
 import org.tmatesoft.svn.core.ISVNDirEntryHandler;
@@ -55,7 +57,13 @@ import org.tmatesoft.svn.core.io.SVNRepository;
  * @author  TMate Software Ltd.
  */
 public class SVNRepositoryImpl extends SVNRepository implements ISVNReporter {
-
+    private static final String DIRENT_KIND = "kind";
+    private static final String DIRENT_SIZE = "size";
+    private static final String DIRENT_HAS_PROPS = "has-props";
+    private static final String DIRENT_CREATED_REV = "created-rev";
+    private static final String DIRENT_TIME = "time";
+    private static final String DIRENT_LAST_AUTHOR = "last-author";
+        
     private SVNConnection myConnection;
     private String myRealm;
     private String myExternalUserName;
@@ -293,6 +301,10 @@ public class SVNRepositoryImpl extends SVNRepository implements ISVNReporter {
     }
 
     public long getDir(String path, long revision, Map properties, final ISVNDirEntryHandler handler) throws SVNException {
+        return getDir(path, revision, properties, SVNDirEntry.DIRENT_ALL, handler);
+    }
+
+    public long getDir(String path, long revision, Map properties, int entryFields, final ISVNDirEntryHandler handler) throws SVNException {
         Long rev = getRevisionObject(revision);
         try {
             openConnection();
@@ -301,10 +313,33 @@ public class SVNRepositoryImpl extends SVNRepository implements ISVNReporter {
             final SVNURL url = getLocation().setPath(fullPath, false);
             path = getRepositoryPath(path);
 
+            List individualProps = new LinkedList();
+            if ((entryFields & SVNDirEntry.DIRENT_KIND) != 0 ) {
+                individualProps.add(DIRENT_KIND);
+            }
+            if ((entryFields & SVNDirEntry.DIRENT_SIZE) != 0 ) {
+                individualProps.add(DIRENT_SIZE);
+            }
+            if ((entryFields & SVNDirEntry.DIRENT_HAS_PROPERTIES) != 0 ) {
+                individualProps.add(DIRENT_HAS_PROPS);
+            }
+            if ((entryFields & SVNDirEntry.DIRENT_CREATED_REVISION) != 0 ) {
+                individualProps.add(DIRENT_CREATED_REV);
+            }
+            if ((entryFields & SVNDirEntry.DIRENT_TIME) != 0 ) {
+                individualProps.add(DIRENT_TIME);
+            }
+            if ((entryFields & SVNDirEntry.DIRENT_LAST_AUTHOR) != 0 ) {
+                individualProps.add(DIRENT_LAST_AUTHOR);
+            }
+            
             Object[] buffer = new Object[] { "get-dir", path, rev,
                     Boolean.valueOf(properties != null),
-                    Boolean.valueOf(handler != null) };
-            write("(w(s(n)ww))", buffer);
+                    Boolean.valueOf(handler != null),
+                    individualProps.size() > 0 ? 
+                            (String[]) individualProps.toArray(new String[individualProps.size()]) : 
+                                null};
+            write("(w(s(n)ww(*w)))", buffer);
             authenticate();
 
             buffer[1] = properties;
