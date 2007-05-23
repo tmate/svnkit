@@ -537,16 +537,41 @@ public class SVNDiffClient extends SVNBasicClient {
         doDiffStatus(path1, rN, path2, rM, SVNDepth.fromRecurse(recursive), useAncestry, handler);
     }
     
+    public void doDiffStatus(File path, SVNRevision rN, SVNRevision rM, SVNRevision pegRevision, SVNDepth depth, boolean useAncestry,
+            ISVNDiffStatusHandler handler) throws SVNException {
+        if (handler == null) {
+            return;
+        }
+        
+        if (pegRevision == null) {
+            pegRevision = SVNRevision.UNDEFINED;
+        }
+        
+        if (!rN.isValid() || !rM.isValid()) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.CLIENT_BAD_REVISION, "Not all required revisions are specified");            
+            SVNErrorManager.error(err);
+        }
+        
+        boolean isPath1Local = rN == SVNRevision.WORKING || rN == SVNRevision.BASE; 
+        boolean isPath2Local = rM == SVNRevision.WORKING || rM == SVNRevision.BASE;
+        if (isPath1Local || isPath2Local) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.UNSUPPORTED_FEATURE, "Summarizing diff can only compare repository to repository");
+            SVNErrorManager.error(err);
+        } 
+        doDiffURLURL(null, path, rN, null, path, rM, pegRevision, depth, useAncestry, handler);        
+    }
+    
     public void doDiffStatus(File path1, SVNRevision rN, File path2, SVNRevision rM, SVNDepth depth, boolean useAncestry,
             ISVNDiffStatusHandler handler) throws SVNException {
         if (handler == null) {
             return;
         }
+        
         if (!rN.isValid() || !rM.isValid()) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.CLIENT_BAD_REVISION, "Both rN and rM revisions should be specified");            
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.CLIENT_BAD_REVISION, "Not all required revisions are specified");            
             SVNErrorManager.error(err);
         }
-
+        
         boolean isPath1Local = rN == SVNRevision.WORKING || rN == SVNRevision.BASE; 
         boolean isPath2Local = rM == SVNRevision.WORKING || rM == SVNRevision.BASE;
         if (isPath1Local || isPath2Local) {
@@ -583,7 +608,7 @@ public class SVNDiffClient extends SVNBasicClient {
             return;
         }
         if (!rN.isValid() || !rM.isValid()) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.CLIENT_BAD_REVISION, "Both rN and rM revisions should be specified");            
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.CLIENT_BAD_REVISION, "Not all required revisions are specified");            
             SVNErrorManager.error(err);
         }
         if (rN == SVNRevision.BASE || rN == SVNRevision.WORKING) {
@@ -653,6 +678,23 @@ public class SVNDiffClient extends SVNBasicClient {
         doDiffStatus(url1, rN, url2, rM, SVNDepth.fromRecurse(recursive), useAncestry, handler);
     }
     
+    public void doDiffStatus(SVNURL url, SVNRevision rN, SVNRevision rM, SVNRevision pegRevision, SVNDepth depth, boolean useAncestry,
+            ISVNDiffStatusHandler handler) throws SVNException {
+        if (handler == null) {
+            return;
+        }
+
+        if (pegRevision == null) {
+            pegRevision = SVNRevision.UNDEFINED;
+        }
+        
+        if (!rN.isValid() || !rM.isValid()) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.CLIENT_BAD_REVISION, "Both rN and rM revisions should be specified");            
+            SVNErrorManager.error(err);
+        }
+        doDiffURLURL(url, null, rN, url, null, rM, pegRevision, depth, useAncestry, handler);
+    }
+
     public void doDiffStatus(SVNURL url1, SVNRevision rN, SVNURL url2, SVNRevision rM, SVNDepth depth, boolean useAncestry,
             ISVNDiffStatusHandler handler) throws SVNException {
         if (handler == null) {

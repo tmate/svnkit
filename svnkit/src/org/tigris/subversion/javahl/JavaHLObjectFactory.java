@@ -314,6 +314,28 @@ public class JavaHLObjectFactory {
                 logEntry.getMessage());
     }
 
+    public static void handleLogMessage(SVNLogEntry logEntry, LogMessageCallback handler) {
+        if(logEntry == null || handler == null) {
+            return;
+        }
+        Map cpaths = logEntry.getChangedPaths();
+        ChangePath[] cp = null;
+        if (cpaths == null) {
+            cp = new ChangePath[]{};
+        } else {
+            Collection clientChangePaths = new ArrayList();
+            for (Iterator iter = cpaths.keySet().iterator(); iter.hasNext();) {
+                String path = (String) iter.next();
+                SVNLogEntryPath entryPath = (SVNLogEntryPath)cpaths.get(path);
+                if(entryPath != null){
+                    clientChangePaths.add(new ChangePath(path, entryPath.getCopyRevision(), entryPath.getCopyPath(), entryPath.getType()));
+                }
+            }
+            cp = (ChangePath[]) clientChangePaths.toArray(new ChangePath[clientChangePaths.size()]);
+        }
+        handler.singleMessage(cp, logEntry.getRevision(), logEntry.getAuthor(), logEntry.getDate().getTime() * 1000, logEntry.getMessage());
+    }
+
     public static CommitItem[] getCommitItems(SVNCommitItem[] commitables) {
         if(commitables == null){
             return null;
