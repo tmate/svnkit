@@ -114,6 +114,11 @@ public class JavaHLObjectFactory {
         ACTION_CONVERSION_MAP.put(SVNEventAction.UPDATE_EXTERNAL, new Integer(NotifyAction.update_external));
         ACTION_CONVERSION_MAP.put(SVNEventAction.UPDATE_UPDATE, new Integer(NotifyAction.update_update));
         ACTION_CONVERSION_MAP.put(SVNEventAction.UPDATE_NONE, new Integer(NotifyAction.update_update));
+        ACTION_CONVERSION_MAP.put(SVNEventAction.UPDATE_EXISTS, new Integer(NotifyAction.exists));
+        ACTION_CONVERSION_MAP.put(SVNEventAction.CHANGELIST_SET, new Integer(NotifyAction.changelist_set));
+        ACTION_CONVERSION_MAP.put(SVNEventAction.CHANGELIST_CLEAR, new Integer(NotifyAction.changelist_clear));
+        ACTION_CONVERSION_MAP.put(SVNEventAction.CHANGELIST_FAILED, new Integer(NotifyAction.changelist_failed));
+        
         // undocumented thing.
         ACTION_CONVERSION_MAP.put(SVNEventAction.COMMIT_COMPLETED, new Integer(-11));
     }
@@ -190,7 +195,7 @@ public class JavaHLObjectFactory {
                 repositoryTextStatus, repositoryPropStatus, locked, copied, conflictOld, conflictNew, conflictWorking, urlCopiedFrom, revisionCopiedFrom,
                 switched, lockToken, lockOwner, lockComment, lockCreationDate, reposLock,
                 /* remote: rev, date, kind, author */
-                reposRev, reposDate, reposKind, reposAuthor, status.getChangelist());
+                reposRev, reposDate, reposKind, reposAuthor, status.getChangelistName());
         return st;
     }
 

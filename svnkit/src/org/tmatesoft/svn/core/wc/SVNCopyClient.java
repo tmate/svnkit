@@ -1172,7 +1172,7 @@ public class SVNCopyClient extends SVNBasicClient {
                 }
                 SVNCommitUtil.harvestCommitables(commitables, dirArea, source.getPath(), null, 
                         entry, source.getDstURL().toString(), entry.getURL(), 
-                        true, false, false, null, true, false, getCommitParameters());
+                        true, false, false, null, true, false, null, getCommitParameters());
                 
             }
             

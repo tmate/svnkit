@@ -346,7 +346,8 @@ public class SVNRemoteStatusEditor extends SVNStatusEditor implements ISVNEditor
         if (status.getPropertiesStatus() != SVNStatusType.STATUS_NONE && status.getPropertiesStatus() != SVNStatusType.STATUS_NORMAL) {
             return true;
         }
-        return status.isLocked() || status.isSwitched() || status.getLocalLock() != null;
+        return status.isLocked() || status.isSwitched() || 
+        status.getLocalLock() != null || status.getChangelistName() != null;
     }
     
     private SVNStatus createStatus(File path) throws SVNException {

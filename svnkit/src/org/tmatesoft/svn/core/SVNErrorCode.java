@@ -232,6 +232,10 @@ public class SVNErrorCode implements Serializable {
     public static final SVNErrorCode WC_INVALID_SCHEDULE = new SVNErrorCode(WC_CATEGORY, 23, "Invalid schedule");
     public static final SVNErrorCode WC_INVALID_RELOCATION = new SVNErrorCode(WC_CATEGORY, 24, "Invalid relocation");
     public static final SVNErrorCode WC_INVALID_SWITCH = new SVNErrorCode(WC_CATEGORY, 25, "Invalid switch");
+    /**
+     * @since SVN 1.5
+     */
+    public static final SVNErrorCode WC_MISMATCHED_CHANGELIST = new SVNErrorCode(WC_CATEGORY, 26, "Changelist doesn't match");
     
     public static final SVNErrorCode FS_GENERAL = new SVNErrorCode(FS_CATEGORY, 0, "General filesystem error");
     public static final SVNErrorCode FS_CLEANUP = new SVNErrorCode(FS_CATEGORY, 1, "Error closing filesystem");

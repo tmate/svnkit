@@ -178,6 +178,17 @@ public class SVNLogRunner {
                 SVNErrorMessage err = SVNErrorMessage.create(code, "Error removing lock from entry for ''{0}''", fileName);
                 error = new SVNException(err, svne);
             }
+        } else if (SVNLog.DELETE_CHANGELIST.equals(name)) {
+            try {
+                Map entryAttrs = new HashMap();
+                entryAttrs.put(SVNProperty.CHANGELIST, null);
+                adminArea.modifyEntry(fileName, entryAttrs, false, false);
+                setEntriesChanged(true);
+            } catch (SVNException svne) {
+                SVNErrorCode code = count <= 1 ? SVNErrorCode.WC_BAD_ADM_LOG_START : SVNErrorCode.WC_BAD_ADM_LOG;
+                SVNErrorMessage err = SVNErrorMessage.create(code, "Error removing lock from entry for ''{0}''", fileName);
+                error = new SVNException(err, svne);
+            }
         } else if (SVNLog.DELETE.equals(name)) {
             File file = adminArea.getFile(fileName);
             SVNFileUtil.deleteFile(file);

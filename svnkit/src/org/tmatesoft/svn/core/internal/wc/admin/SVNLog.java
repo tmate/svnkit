@@ -30,6 +30,8 @@ import org.tmatesoft.svn.core.wc.SVNStatusType;
  * @author  TMate Software Ltd.
  */
 public abstract class SVNLog {
+    public static final String DELETE_CHANGELIST = "delete-changelist";
+
     public static final String DELETE_ENTRY = "delete-entry";
 
     public static final String MODIFY_ENTRY = "modify-entry";

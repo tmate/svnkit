@@ -208,4 +208,12 @@ public class SVNEventFactory {
         return new SVNEvent(null, adminArea.getRoot(), SVNEventAction.UPGRADE, SVNNodeKind.DIR, -1, null, null, null, null, null, null);
     }
 
+    public static SVNEvent createChangelistEvent(String path, String changelistName, 
+            SVNEventAction action, SVNErrorMessage message) {
+        SVNEvent event = new SVNEvent(null, null, SVNPathUtil.tail(path), action, null, -1, null, null, null, null, null, message);
+        event.setPath(path);
+        event.setChangelistName(changelistName);
+        return event;
+    }
+    
 }

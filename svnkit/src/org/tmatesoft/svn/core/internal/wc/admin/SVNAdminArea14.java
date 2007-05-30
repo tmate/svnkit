@@ -904,7 +904,7 @@ public class SVNAdminArea14 extends SVNAdminArea {
             return entry;
         }
         String changelist = parseString(line);
-        if (changelist != null) {//TODO: correct this later
+        if (changelist != null) {
             entryAttrs.put(SVNProperty.CHANGELIST, changelist);
         }
 
@@ -1322,8 +1322,7 @@ public class SVNAdminArea14 extends SVNAdminArea {
             ++emptyFields;
         }
         
-        //TODO: add changelist support here 
-        String changelist = null; 
+        String changelist = (String)entry.get(SVNProperty.CHANGELIST); 
         if (writeString(writer, changelist, emptyFields)) {
             emptyFields = 0;
         } else {

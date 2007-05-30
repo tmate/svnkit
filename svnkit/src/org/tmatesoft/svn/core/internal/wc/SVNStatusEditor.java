@@ -360,7 +360,7 @@ public class SVNStatusEditor {
                     SVNStatusType.STATUS_NONE, SVNStatusType.STATUS_NONE, false,
                     false, false, null, null, null, null,
                     null, SVNRevision.UNDEFINED,
-                    repositoryLock, null, null);
+                    repositoryLock, null, null, null);
             status.setRemoteStatus(SVNStatusType.STATUS_NONE, SVNStatusType.STATUS_NONE, repositoryLock, SVNNodeKind.NONE);
             SVNStatusType text = SVNStatusType.STATUS_NONE;
             SVNFileType fileType = SVNFileType.getType(file);
@@ -444,7 +444,8 @@ public class SVNStatusEditor {
         if (!reportAll) {
             if ((textStatus == SVNStatusType.STATUS_NONE || textStatus == SVNStatusType.STATUS_NORMAL) &&
                 (propStatus == SVNStatusType.STATUS_NONE || propStatus == SVNStatusType.STATUS_NORMAL) &&
-                !isLocked && !isSwitched && entry.getLockToken() == null && repositoryLock == null) {
+                !isLocked && !isSwitched && entry.getLockToken() == null && repositoryLock == null && 
+                entry.getChangelistName() == null) {
                 return null;
             }
         }
@@ -465,7 +466,7 @@ public class SVNStatusEditor {
                 isLocked, entry.isCopied(), isSwitched, 
                 conflictNew, conflictOld, conflictWrk, conflictProp, 
                 entry.getCopyFromURL(), SVNRevision.create(entry.getCopyFromRevision()),
-                repositoryLock, localLock, entry.asMap());
+                repositoryLock, localLock, entry.asMap(), entry.getChangelistName());
         status.setEntry(entry);
         return status;
     }
