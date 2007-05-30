@@ -242,7 +242,7 @@ public class SVNClientImpl implements SVNClientInterface {
                         SVNStatusType.STATUS_UNVERSIONED, SVNStatusType.STATUS_NONE,
                         SVNStatusType.STATUS_NONE, SVNStatusType.STATUS_NONE,
                         false, false, false, null, null, null, null, null, null,
-                        null, null, null);
+                        null, null, null, null);
             } else {
                 throwException(e);
             }
@@ -1994,6 +1994,11 @@ public class SVNClientImpl implements SVNClientInterface {
     
     }
 
+    public void logMessages(String path, Revision pegRevision, Revision revisionStart, Revision revisionEnd, boolean stopOnCopy, boolean discoverPath, boolean includeMergedRevisions, long limit, LogMessageCallback callback) throws ClientException {
+        //TODO: implement
+        notImplementedYet();
+    }
+
     private void notImplementedYet() throws ClientException {
         notImplementedYet(null);
     }
@@ -2003,5 +2008,6 @@ public class SVNClientImpl implements SVNClientInterface {
                 message == null ? "Requested SVNAdmin functionality is not yet implemented" : message);
         JavaHLObjectFactory.throwException(new SVNException(err), this);
     }
+
     
 }

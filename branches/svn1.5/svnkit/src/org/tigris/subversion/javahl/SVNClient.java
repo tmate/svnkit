@@ -543,5 +543,10 @@ public class SVNClient implements SVNClientInterface {
     }
 
     public void add(String path, boolean recurse, boolean force, boolean noIgnores, boolean addParents) throws ClientException {
+        myDelegate.add(path, recurse, force, noIgnores, addParents);
+    }
+
+    public void logMessages(String path, Revision pegRevision, Revision revisionStart, Revision revisionEnd, boolean stopOnCopy, boolean discoverPath, boolean includeMergedRevisions, long limit, LogMessageCallback callback) throws ClientException {
+        myDelegate.logMessages(path, pegRevision, revisionStart, revisionEnd, stopOnCopy, discoverPath, includeMergedRevisions, limit, callback);
     }
 }
