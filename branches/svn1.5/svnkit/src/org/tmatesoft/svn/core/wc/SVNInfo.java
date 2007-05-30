@@ -97,6 +97,7 @@ public class SVNInfo {
     private File myConflictWrkFile;
     private File myPropConflictFile;
     private SVNDepth myDepth;
+    private String myChangelistName;
     
     static SVNInfo createInfo(File file, SVNEntry entry) throws SVNException {
         if (entry == null) {
@@ -116,7 +117,7 @@ public class SVNInfo {
                         .getPropTime(), entry.getChecksum(), entry
                         .getConflictOld(), entry.getConflictNew(), entry
                         .getConflictWorking(), entry.getPropRejectFile(), lock, 
-                        entry.getDepth());
+                        entry.getDepth(), entry.getChangelistName());
     }
 
     static SVNInfo createInfo(String path, SVNURL reposRootURL, String uuid,
@@ -135,7 +136,7 @@ public class SVNInfo {
             long copyFromRevision, String textTime, String propTime,
             String checksum, String conflictOld, String conflictNew,
             String conflictWorking, String propRejectFile, SVNLock lock, 
-            SVNDepth depth) {
+            SVNDepth depth, String changelistName) {
         myFile = file;
         myURL = url;
         myRevision = SVNRevision.create(revision);
@@ -157,7 +158,8 @@ public class SVNInfo {
         myCopyFromRevision = SVNRevision.create(copyFromRevision);
 
         myLock = lock;
-
+        myChangelistName = changelistName;
+        
         if (file != null) {
             if (conflictOld != null) {
                 myConflictOldFile = new File(file.getParentFile(), conflictOld);
@@ -459,6 +461,10 @@ public class SVNInfo {
 
     public SVNDepth getDepth() {
         return myDepth;
+    }
+
+    public String getChangelistName() {
+        return myChangelistName;
     }
 
 }

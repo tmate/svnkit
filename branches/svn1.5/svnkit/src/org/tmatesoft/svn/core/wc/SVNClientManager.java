@@ -121,6 +121,7 @@ public class SVNClientManager implements ISVNRepositoryPool {
     private SVNStatusClient myStatusClient;
     private SVNUpdateClient myUpdateClient;
     private SVNWCClient myWCClient;
+    private SVNChangelistClient myChangelistClient;
     private SVNAdminClient myAdminClient;
     private SVNLookClient myLookClient;
     
@@ -303,6 +304,9 @@ public class SVNClientManager implements ISVNRepositoryPool {
         }
         if (myWCClient != null) {
             myWCClient.setEventHandler(handler);
+        }
+        if (myChangelistClient != null) {
+            myChangelistClient.setEventHandler(handler);
         }
         if (myAdminClient != null) {
             myAdminClient.setEventHandler(handler);
@@ -522,6 +526,15 @@ public class SVNClientManager implements ISVNRepositoryPool {
         return myWCClient;
     }
     
+    public SVNChangelistClient getChangelistClient() {
+        if (myChangelistClient == null) {
+            myChangelistClient = new SVNChangelistClient(this, myOptions);
+            myChangelistClient.setEventHandler(myEventHandler);
+            myChangelistClient.setDebugLog(getDebugLog());
+        }
+        return myChangelistClient;
+    }
+    
     /**
      * Returns the debug logger currently in use.  
      * 
@@ -571,6 +584,9 @@ public class SVNClientManager implements ISVNRepositoryPool {
         }
         if (myWCClient != null) {
             myWCClient.setDebugLog(log);
+        }
+        if (myChangelistClient != null) {
+            myChangelistClient.setDebugLog(log);
         }
         if (myAdminClient != null) {
             myAdminClient.setDebugLog(log);

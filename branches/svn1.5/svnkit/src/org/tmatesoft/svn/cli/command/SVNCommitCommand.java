@@ -51,6 +51,8 @@ public class SVNCommitCommand extends SVNCommand {
         }
         
         boolean keepLocks = getCommandLine().hasArgument(SVNArgument.NO_UNLOCK);
+        String changelistName = (String) getCommandLine().getArgumentValue(SVNArgument.CHANGELIST); 
+        boolean keepChangelist = getCommandLine().hasArgument(SVNArgument.KEEP_CHANGELIST);
         final String message = getCommitMessage();
 
         File[] localPaths = new File[getCommandLine().getPathCount()];
@@ -63,8 +65,11 @@ public class SVNCommitCommand extends SVNCommand {
             getClientManager().setEventHandler(new SVNCommandEventProcessor(out, err, false));
         }
         Map revProps = (Map) getCommandLine().getArgumentValue(SVNArgument.WITH_REVPROP); 
+        
         SVNCommitClient client = getClientManager().getCommitClient();
-        SVNCommitInfo result = client.doCommit(localPaths, keepLocks, message, revProps, false, SVNDepth.recurseFromDepth(depth));
+        SVNCommitInfo result = client.doCommit(localPaths, keepLocks, message, 
+                                               revProps, changelistName, keepChangelist, false, 
+                                               SVNDepth.recurseFromDepth(depth));
         if (result != SVNCommitInfo.NULL && !quiet) {
             out.println();
             out.println("Committed revision " + result.getNewRevision() + ".");

@@ -305,4 +305,5 @@ public abstract class SVNCommand {
         }
         return count;
     }
+    
 }

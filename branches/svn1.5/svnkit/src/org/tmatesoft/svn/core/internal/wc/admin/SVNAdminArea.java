@@ -1382,8 +1382,8 @@ public abstract class SVNAdminArea {
     }
     
     public void commit(String target, SVNCommitInfo info, Map wcPropChanges,
-            boolean removeLock, boolean recursive, Collection explicitCommitPaths, ISVNCommitParameters params) throws SVNException {
-        
+            boolean removeLock, boolean recursive, boolean removeChangelist, 
+            Collection explicitCommitPaths, ISVNCommitParameters params) throws SVNException {
         SVNAdminArea anchor = getWCAccess().retrieve(getWCAccess().getAnchor());
         String path = getRelativePath(anchor);
         path = getThisDirName().equals(target) ? path : SVNPathUtil.append(path, target);
@@ -1396,7 +1396,6 @@ public abstract class SVNAdminArea {
         }
 
         SVNLog log = getLog();
-        //
         String checksum = null;
         if (!getThisDirName().equals(target)) {
             loggyRemoveRevertFile(target, true, log);
@@ -1434,6 +1433,11 @@ public abstract class SVNAdminArea {
             log.addCommand(SVNLog.DELETE_LOCK, command, false);
             command.clear();
         }
+        if (removeChangelist) {
+            command.put(SVNLog.NAME_ATTR, target);
+            log.addCommand(SVNLog.DELETE_CHANGELIST, command, false);
+            command.clear();
+        }
         command.put(SVNLog.NAME_ATTR, target);
         command.put(SVNLog.REVISION_ATTR, info == null ? null : Long.toString(info.getNewRevision()));
         if (!explicitCommitPaths.contains(path)) {
@@ -1465,10 +1469,16 @@ public abstract class SVNAdminArea {
                     File childPath = getFile(entry.getName());
                     SVNAdminArea childDir = getWCAccess().retrieve(childPath);
                     if (childDir != null) {
-                        childDir.commit(getThisDirName(), info, null, removeLock, true, explicitCommitPaths, params);
+                        childDir.commit(getThisDirName(), info, null, removeLock, true, removeChangelist, explicitCommitPaths, params);
                     }
                 } else {
-                    commit(entry.getName(), info, null, removeLock, false, explicitCommitPaths, params);
+                    if (entry.isScheduledForDeletion()) {
+                        SVNEntry parentEntry = getEntry(getThisDirName(), true);
+                        if (parentEntry.isScheduledForReplacement()) {
+                            continue;
+                        }
+                    }
+                    commit(entry.getName(), info, null, removeLock, false, removeChangelist, explicitCommitPaths, params);
                 }
             }
         }

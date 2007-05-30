@@ -167,6 +167,14 @@ public class SVNEntry implements Comparable {
         return setAttributeValue(SVNProperty.REVISION, Long.toString(revision));
     }
 
+    public boolean setChangelistName(String changelistName) {
+        return setAttributeValue(SVNProperty.CHANGELIST, changelistName);
+    }
+    
+    public String getChangelistName() {
+        return (String)myAttributes.get(SVNProperty.CHANGELIST);
+    }
+    
     public boolean setWorkingSize(long size) {
         if (getKind() == SVNNodeKind.FILE) {
             return setAttributeValue(SVNProperty.WORKING_SIZE, Long.toString(size));

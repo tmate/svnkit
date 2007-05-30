@@ -1998,6 +1998,21 @@ public class SVNWCClient extends SVNBasicClient {
         doInfo(path, SVNRevision.UNDEFINED, revision, recursive, handler);
     }
     
+    public void doInfo(SVNChangeList changelist, SVNRevision revision, boolean recursive, ISVNInfoHandler handler) throws SVNException {
+        if (changelist == null) {
+            return;
+        }
+        
+        changelist.setOptions(getOptions());
+        changelist.setRepositoryPool(getRepositoryPool());
+        Collection changelistTargets = changelist.getChangelistPaths();
+        
+        for (Iterator paths = changelistTargets.iterator(); paths.hasNext();) {
+            File path = (File) paths.next();
+            doInfo(path, SVNRevision.UNDEFINED, revision, recursive, handler);
+        }
+    }
+    
     /**
      * Collects information about Working Copy item(s) and passes it to an 
      * info handler. 

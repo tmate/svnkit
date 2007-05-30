@@ -24,6 +24,7 @@ import java.util.Locale;
 import org.tmatesoft.svn.cli.SVNArgument;
 import org.tmatesoft.svn.cli.SVNCommand;
 import org.tmatesoft.svn.core.SVNDepth;
+import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNLock;
 import org.tmatesoft.svn.core.SVNNodeKind;
@@ -31,6 +32,7 @@ import org.tmatesoft.svn.core.SVNURL;
 import org.tmatesoft.svn.core.internal.util.SVNFormatUtil;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
 import org.tmatesoft.svn.core.wc.ISVNInfoHandler;
+import org.tmatesoft.svn.core.wc.SVNChangeList;
 import org.tmatesoft.svn.core.wc.SVNInfo;
 import org.tmatesoft.svn.core.wc.SVNRevision;
 import org.tmatesoft.svn.core.wc.SVNWCClient;
@@ -78,19 +80,45 @@ public class SVNInfoCommand extends SVNCommand implements ISVNInfoHandler {
             depth = SVNDepth.DEPTH_IMMEDIATES;
         }
         
+        String changelistName = (String) getCommandLine().getArgumentValue(SVNArgument.CHANGELIST); 
         ISVNInfoHandler infoHandler = getCommandLine().hasArgument(SVNArgument.XML) ? handler : (ISVNInfoHandler) this;
+        
+        SVNChangeList changelist = new SVNChangeList(changelistName, new File("."));
+
+        wcClient.doInfo(changelist, revision, SVNDepth.recurseFromDepth(depth), handler);
         for (int i = 0; i < getCommandLine().getPathCount(); i++) {
             myBaseFile = new File(getCommandLine().getPathAt(i));
             SVNRevision peg = getCommandLine().getPathPegRevision(i);
             handler.setTargetPath(myBaseFile);
-            wcClient.doInfo(myBaseFile, peg, revision, SVNDepth.recurseFromDepth(depth), infoHandler);
+            try {
+                wcClient.doInfo(myBaseFile, peg, revision, SVNDepth.recurseFromDepth(depth), infoHandler);
+            } catch (SVNException e) {
+                if (e.getErrorMessage().getErrorCode() == SVNErrorCode.UNVERSIONED_RESOURCE) {
+                    print(myBaseFile + ":  (Not a versioned resource)", myOut);
+                    print("", myOut);
+                    continue;
+                }
+                throw e;
+            }
         }
+            
         myBaseFile = null;
         for (int i = 0; i < getCommandLine().getURLCount(); i++) {
             String url = getCommandLine().getURL(i);
+            SVNURL svnURL = SVNURL.parseURIEncoded(url);
             SVNRevision peg = getCommandLine().getPegRevision(i);
-            wcClient.doInfo(SVNURL.parseURIEncoded(url), peg, revision, SVNDepth.recurseFromDepth(depth), infoHandler);
+            try {
+                wcClient.doInfo(svnURL, peg, revision, SVNDepth.recurseFromDepth(depth), infoHandler);
+            } catch (SVNException e) {
+                if (e.getErrorMessage().getErrorCode() == SVNErrorCode.RA_ILLEGAL_URL) {
+                    print(svnURL + ":  (Not a valid URL)", myOut);
+                    print("", myOut);
+                    continue;
+                }
+                throw e;
+            }
         }
+        
         if (getCommandLine().hasArgument(SVNArgument.XML)&& !getCommandLine().hasArgument(SVNArgument.INCREMENTAL)) {
             handler.endDocument();
         }
@@ -211,6 +239,9 @@ public class SVNInfoCommand extends SVNCommand implements ISVNInfoHandler {
                 }
                 myOut.print(":\n" + lock.getComment() + "\n");
             }
+        }
+        if (info.getChangelistName() != null) {
+            print("Changelist: " + info.getChangelistName(), myOut);
         }
         println(myOut);
     }

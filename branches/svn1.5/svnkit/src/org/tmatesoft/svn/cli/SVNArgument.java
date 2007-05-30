@@ -94,6 +94,9 @@ public abstract class SVNArgument {
     public static final SVNArgument WITH_REVPROP = createStringArgument(new String[] { "--with-revprop" });
     public static final SVNArgument ENCODING = createStringArgument(new String[] { "--encoding" });
     public static final SVNArgument PARENTS = createUnaryArgument(new String[] { "--parents" });
+    public static final SVNArgument CHANGELIST = createStringArgument(new String[] { "--changelist" });
+    public static final SVNArgument KEEP_CHANGELIST = createUnaryArgument(new String[] { "--keep-changelist" });
+    public static final SVNArgument REMOVE = createUnaryArgument(new String[] { "--remove" });
     
     public static SVNArgument findArgument(String name, Set validArguments) {
         for (Iterator arguments = validArguments.iterator(); arguments.hasNext();) {
