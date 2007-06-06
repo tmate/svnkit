@@ -19,21 +19,26 @@ import java.io.PrintStream;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.LinkedList;
 import java.util.Locale;
 
 import org.tmatesoft.svn.cli.SVNArgument;
 import org.tmatesoft.svn.cli.SVNCommand;
 import org.tmatesoft.svn.core.SVNDepth;
 import org.tmatesoft.svn.core.SVNErrorCode;
+import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNLock;
 import org.tmatesoft.svn.core.SVNNodeKind;
 import org.tmatesoft.svn.core.SVNURL;
 import org.tmatesoft.svn.core.internal.util.SVNFormatUtil;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
+import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.wc.ISVNInfoHandler;
 import org.tmatesoft.svn.core.wc.SVNChangeList;
+import org.tmatesoft.svn.core.wc.SVNCompositePathList;
 import org.tmatesoft.svn.core.wc.SVNInfo;
+import org.tmatesoft.svn.core.wc.SVNPathList;
 import org.tmatesoft.svn.core.wc.SVNRevision;
 import org.tmatesoft.svn.core.wc.SVNWCClient;
 import org.tmatesoft.svn.core.wc.xml.SVNXMLInfoHandler;
@@ -80,26 +85,48 @@ public class SVNInfoCommand extends SVNCommand implements ISVNInfoHandler {
             depth = SVNDepth.DEPTH_IMMEDIATES;
         }
         
-        String changelistName = (String) getCommandLine().getArgumentValue(SVNArgument.CHANGELIST); 
         ISVNInfoHandler infoHandler = getCommandLine().hasArgument(SVNArgument.XML) ? handler : (ISVNInfoHandler) this;
         
-        SVNChangeList changelist = new SVNChangeList(changelistName, new File("."));
-
-        wcClient.doInfo(changelist, revision, SVNDepth.recurseFromDepth(depth), handler);
-        for (int i = 0; i < getCommandLine().getPathCount(); i++) {
-            myBaseFile = new File(getCommandLine().getPathAt(i));
-            SVNRevision peg = getCommandLine().getPathPegRevision(i);
-            handler.setTargetPath(myBaseFile);
-            try {
-                wcClient.doInfo(myBaseFile, peg, revision, SVNDepth.recurseFromDepth(depth), infoHandler);
-            } catch (SVNException e) {
-                if (e.getErrorMessage().getErrorCode() == SVNErrorCode.UNVERSIONED_RESOURCE) {
-                    print(myBaseFile + ":  (Not a versioned resource)", myOut);
-                    print("", myOut);
-                    continue;
-                }
-                throw e;
+        String changelistName = (String) getCommandLine().getArgumentValue(SVNArgument.CHANGELIST); 
+        SVNChangeList changelist = null;
+        if (changelistName != null) {
+            changelist = SVNChangeList.create(changelistName, new File(".").getAbsoluteFile());
+            changelist.setOptions(getClientManager().getOptions());
+            changelist.setRepositoryPool(getClientManager().getRepositoryPool());
+            if (changelist.getPaths() == null || changelist.getPathsCount() == 0) {
+                SVNErrorMessage error = SVNErrorMessage.create(SVNErrorCode.CL_ARG_PARSING_ERROR, 
+                                    "no such changelist ''{0}''", changelistName); 
+                SVNErrorManager.error(error);
             }
+        }
+
+        File[] paths = getCommandLine().getPathCount() > 0 ? new File[getCommandLine().getPathCount()] : null;
+        LinkedList pegRevisions = new LinkedList();
+        for (int i = 0; i < getCommandLine().getPathCount(); i++) {
+            paths[i] = new File(getCommandLine().getPathAt(i));
+            pegRevisions.add(getCommandLine().getPathPegRevision(i));
+        }
+        
+        SVNPathList pathList = SVNPathList.create(paths, (SVNRevision[]) pegRevisions.toArray(new SVNRevision[pegRevisions.size()]));
+        SVNCompositePathList combinedPathList = SVNCompositePathList.create(pathList, changelist, false); 
+        
+        if (combinedPathList != null) {
+            File[] combinedPaths = combinedPathList.getPaths();
+            for (int i = 0; i < combinedPaths.length; i++) {
+                myBaseFile = combinedPaths[i];
+                SVNRevision pegRev = combinedPathList.getPegRevision(myBaseFile);
+                handler.setTargetPath(myBaseFile);
+                try {
+                    wcClient.doInfo(myBaseFile, pegRev, revision, SVNDepth.recurseFromDepth(depth), infoHandler);
+                } catch (SVNException e) {
+                    if (e.getErrorMessage().getErrorCode() == SVNErrorCode.UNVERSIONED_RESOURCE) {
+                        print(myBaseFile + ":  (Not a versioned resource)", myOut);
+                        print("", myOut);
+                        continue;
+                    }
+                    throw e;
+                }
+            }            
         }
             
         myBaseFile = null;
@@ -135,6 +162,15 @@ public class SVNInfoCommand extends SVNCommand implements ISVNInfoHandler {
     }
 
     public void handleInfo(SVNInfo info) {
+        if (info.getError() != null) {
+            if (info.getError().getErrorCode() == SVNErrorCode.UNVERSIONED_RESOURCE) {
+                print(info.getFile() + ":  (Not a versioned resource)", myOut);
+                print("", myOut);
+            } else {
+                print(info.getError().getMessage(), myOut);
+            }
+            return;
+        }
         if (!info.isRemote()) {
             print("Path: " + SVNFormatUtil.formatPath(info.getFile()), myOut);
         } else if (info.getPath() != null) {

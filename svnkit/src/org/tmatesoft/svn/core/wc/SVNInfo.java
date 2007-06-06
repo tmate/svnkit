@@ -16,6 +16,7 @@ import java.util.Date;
 
 import org.tmatesoft.svn.core.SVNDepth;
 import org.tmatesoft.svn.core.SVNDirEntry;
+import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNLock;
 import org.tmatesoft.svn.core.SVNNodeKind;
@@ -98,6 +99,7 @@ public class SVNInfo {
     private File myPropConflictFile;
     private SVNDepth myDepth;
     private String myChangelistName;
+    private SVNErrorMessage myError;
     
     static SVNInfo createInfo(File file, SVNEntry entry) throws SVNException {
         if (entry == null) {
@@ -130,6 +132,15 @@ public class SVNInfo {
                 dirEntry.getAuthor(), lock, SVNDepth.DEPTH_UNKNOWN);
     }
 
+    static SVNInfo createInfo(File file, SVNErrorMessage error) {
+        return new SVNInfo(file, error);
+    }
+    
+    protected SVNInfo(File file, SVNErrorMessage error) {
+        myFile = file;
+        myError = error;
+    }
+    
     protected SVNInfo(File file, SVNURL url, SVNURL rootURL, long revision, SVNNodeKind kind,
             String uuid, long committedRevision, String committedDate,
             String author, String schedule, SVNURL copyFromURL,
@@ -465,6 +476,10 @@ public class SVNInfo {
 
     public String getChangelistName() {
         return myChangelistName;
+    }
+
+    public SVNErrorMessage getError() {
+        return myError;
     }
 
 }

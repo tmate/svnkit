@@ -19,8 +19,15 @@ import java.util.Collection;
 
 import org.tmatesoft.svn.cli.SVNArgument;
 import org.tmatesoft.svn.cli.SVNCommand;
+import org.tmatesoft.svn.core.SVNErrorCode;
+import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNURL;
+import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
+import org.tmatesoft.svn.core.wc.SVNChangeList;
+import org.tmatesoft.svn.core.wc.SVNCompositePathList;
+import org.tmatesoft.svn.core.wc.SVNPathList;
+import org.tmatesoft.svn.core.wc.SVNRevision;
 import org.tmatesoft.svn.core.wc.SVNWCClient;
 
 /**
@@ -39,16 +46,27 @@ public class SVNLockCommand extends SVNCommand {
         getClientManager().setEventHandler(new SVNCommandEventProcessor(out, err, false));
         SVNWCClient wcClient = getClientManager().getWCClient();
         
+
+        String changelistName = (String) getCommandLine().getArgumentValue(SVNArgument.CHANGELIST); 
+        SVNChangeList changelist = null;
+        if (changelistName != null) {
+            changelist = SVNChangeList.create(changelistName, new File(".").getAbsoluteFile());
+            changelist.setOptions(getClientManager().getOptions());
+            changelist.setRepositoryPool(getClientManager().getRepositoryPool());
+            if (changelist.getPaths() == null || changelist.getPathsCount() == 0) {
+                SVNErrorMessage error = SVNErrorMessage.create(SVNErrorCode.CL_ARG_PARSING_ERROR, 
+                                    "no such changelist ''{0}''", changelistName); 
+                SVNErrorManager.error(error);
+            }
+        }
+        
         Collection files = new ArrayList();
         for (int i = 0; i < getCommandLine().getPathCount(); i++) {
             files.add(new File(getCommandLine().getPathAt(i)));
         }
         File[] filesArray = (File[]) files.toArray(new File[files.size()]);
-        if (filesArray.length > 0) {
-            wcClient.doLock(filesArray, force, message);
-        }
         files.clear();
-        
+
         for (int i = 0; i < getCommandLine().getURLCount(); i++) {
             files.add(getCommandLine().getURL(i));
         }
@@ -57,6 +75,21 @@ public class SVNLockCommand extends SVNCommand {
         for (int i = 0; i < urls.length; i++) {
             svnURLs[i] = SVNURL.parseURIEncoded(urls[i]);
         }
+        
+        SVNPathList pathList = SVNPathList.create(filesArray, SVNRevision.UNDEFINED);
+        SVNCompositePathList combinedPathList = SVNCompositePathList.create(pathList, changelist, false); 
+
+        int targetsNum = (combinedPathList != null ? combinedPathList.getPathsCount() : 0)  +
+                          urls.length;
+        if (targetsNum < 1) {
+            SVNErrorMessage error = SVNErrorMessage.create(SVNErrorCode.CL_INSUFFICIENT_ARGS);
+            SVNErrorManager.error(error);
+        }
+        
+        if (combinedPathList != null) {
+            wcClient.doLock(combinedPathList, force, message);
+        }
+        
         if (urls.length > 0) {
             wcClient.doLock(svnURLs, force, message);
         }

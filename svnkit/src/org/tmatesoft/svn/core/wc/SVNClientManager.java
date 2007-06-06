@@ -595,4 +595,8 @@ public class SVNClientManager implements ISVNRepositoryPool {
             myLookClient.setDebugLog(log);
         }
     }
+
+    public ISVNRepositoryPool getRepositoryPool() {
+        return myRepositoryPool;
+    }
 }

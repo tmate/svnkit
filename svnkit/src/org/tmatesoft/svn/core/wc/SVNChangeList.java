@@ -14,71 +14,80 @@ package org.tmatesoft.svn.core.wc;
 import java.io.File;
 import java.util.Collection;
 
-import org.tmatesoft.svn.core.SVNErrorCode;
-import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.auth.ISVNAuthenticationManager;
-import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 
 
 /**
  * @version 1.1.2
  * @author  TMate Software Ltd.
  */
-public class SVNChangeList {
+public class SVNChangeList implements ISVNPathList {
     private String myChangelistName;
-    private Collection myPaths;
     private File myRootPath;
+    private File[] myPaths;
+    private SVNRevision myPegRevision;
     private ISVNOptions myOptions;
     private ISVNRepositoryPool myRepositoryPool;
     private ISVNAuthenticationManager myAuthManager;    
     private SVNChangelistClient myChangelistClient;
     
-    public SVNChangeList(String changelistName) {
-        myChangelistName = changelistName;
-    }
-
-    public SVNChangeList(String changelistName, File rootPath) {
-        myChangelistName = changelistName;
-        myRootPath = rootPath;
+    public static SVNChangeList create(String changelistName, File wcPath) {
+        SVNChangeList list = new SVNChangeList();
+        list.myChangelistName = changelistName;;
+        list.myRootPath = wcPath;
+        return list;
     }
 
     public String getChangelistName() {
         return myChangelistName;
     }
     
-    public Collection getPaths() {
-        return myPaths;
-    }
-
     public File getRootPath() {
         return myRootPath;
     }
 
-    public void setRootPath(File rootPath) {
-        myRootPath = rootPath;
-    }
-    
-    public Collection getChangelistPaths() throws SVNException {
-        SVNChangelistClient client = getChangelistClient();
-        Collection changelistTargets = client.getChangelist(myRootPath, myChangelistName, (Collection) null);
-        if (changelistTargets.isEmpty()) {
-            SVNErrorMessage error = SVNErrorMessage.create(SVNErrorCode.CL_ARG_PARSING_ERROR, 
-                                    "no such changelist ''{0}''", myChangelistName); 
-            SVNErrorManager.error(error);
+    public File[] getPaths() throws SVNException {
+        if (myPaths == null) {
+            SVNChangelistClient client = getChangelistClient();
+            Collection changelistTargets = client.getChangelist(myRootPath, myChangelistName, (Collection) null);
+            if (changelistTargets != null) {
+                myPaths = (File[]) changelistTargets.toArray(new File[changelistTargets.size()]);
+            }
+            
         }
-        return changelistTargets;
+        return myPaths;
     }
 
-    protected void setAuthManager(ISVNAuthenticationManager authManager) {
+    public int getPathsCount() throws SVNException {
+        File[] paths = getPaths();
+        if (paths != null) {
+            return paths.length;
+        }
+        return 0;
+    }
+
+    public SVNRevision getPegRevision(File path) {
+        return myPegRevision != null ? myPegRevision : SVNRevision.UNDEFINED;
+    }
+
+    public SVNRevision getPegRevision() {
+        return myPegRevision != null ? myPegRevision : SVNRevision.UNDEFINED;
+    }
+
+    public void setPegRevision(SVNRevision pegRevision) {
+        myPegRevision = pegRevision;
+    }
+    
+    public void setAuthManager(ISVNAuthenticationManager authManager) {
         myAuthManager = authManager;
     }
     
-    protected void setOptions(ISVNOptions options) {
+    public void setOptions(ISVNOptions options) {
         myOptions = options;
     }
     
-    protected void setRepositoryPool(ISVNRepositoryPool repositoryPool) {
+    public void setRepositoryPool(ISVNRepositoryPool repositoryPool) {
         myRepositoryPool = repositoryPool;
     }
 
@@ -106,5 +115,5 @@ public class SVNChangeList {
         }
         return myChangelistClient;
     }
-    
+
 }
