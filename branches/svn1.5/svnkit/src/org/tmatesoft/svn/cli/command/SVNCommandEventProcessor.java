@@ -113,6 +113,20 @@ public class SVNCommandEventProcessor implements ISVNEventHandler {
             SVNCommand.println(myErrStream, "error: " + event.getErrorMessage());
         } else if (event.getAction() == SVNEventAction.LOCK_FAILED) {
             SVNCommand.println(myErrStream, "error: " + event.getErrorMessage());
+        } else if (event.getAction() == SVNEventAction.CHANGELIST_SET) {
+            String path = event.getPath();
+            if (event.getFile() != null) {
+                path = SVNFormatUtil.formatPath(event.getFile());
+            }
+            SVNCommand.println(myPrintStream, "Path '" + path + "' is now a member of changelist '" + event.getChangelistName() + "'.");
+        } else if (event.getAction() == SVNEventAction.CHANGELIST_CLEAR) {
+            String path = event.getPath();
+            if (event.getFile() != null) {
+                path = SVNFormatUtil.formatPath(event.getFile());
+            }
+            SVNCommand.println(myPrintStream, "Path '" + path + "' is no longer a member of a changelist.");
+        } else if (event.getAction() == SVNEventAction.CHANGELIST_FAILED) {
+            SVNCommand.println(myErrStream, "error: " + event.getErrorMessage());
         } else if (event.getAction() == SVNEventAction.UPDATE_ADD) {
             if (myIsExternal) {
                 myIsExternalChanged = true;

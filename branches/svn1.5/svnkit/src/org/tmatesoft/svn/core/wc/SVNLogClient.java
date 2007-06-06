@@ -362,6 +362,14 @@ public class SVNLogClient extends SVNBasicClient {
         doLog(paths, SVNRevision.UNDEFINED, startRevision, endRevision, stopOnCopy, reportPaths, limit, handler);
     }
     
+    public void doLog(ISVNPathList pathList, SVNRevision startRevision, SVNRevision endRevision, boolean stopOnCopy, boolean reportPaths, long limit, final ISVNLogEntryHandler handler) throws SVNException {
+        if (pathList == null) {
+            return;
+        }
+        File[] paths = pathList.getPaths();
+        doLog(paths, pathList.getPegRevision(), startRevision, endRevision, stopOnCopy, reportPaths, limit, handler);
+    }
+    
     /**
      * Gets commit log messages with other revision specific 
      * information from a repository (using Working Copy paths to get 
@@ -413,7 +421,7 @@ public class SVNLogClient extends SVNBasicClient {
      *                         </ul>
      */
     public void doLog(File[] paths, SVNRevision pegRevision, SVNRevision startRevision, SVNRevision endRevision, boolean stopOnCopy, boolean reportPaths, long limit, final ISVNLogEntryHandler handler) throws SVNException {
-        if (paths == null || paths.length == 0) {
+        if (paths == null || paths.length == 0 || handler == null) {
             return;
         }
         if (startRevision.isValid() && !endRevision.isValid()) {

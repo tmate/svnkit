@@ -486,7 +486,9 @@ public class JavaHLObjectFactory {
                 JavaHLObjectFactory.getStatusValue(event.getContentsStatus()),
                 JavaHLObjectFactory.getStatusValue(event.getPropertiesStatus()),
                 JavaHLObjectFactory.getLockStatusValue(event.getLockStatus()),
-                event.getRevision()
+                event.getRevision(),
+                event.getChangelistName(),
+                null//TODO: FIXME
                 );
     }
 
