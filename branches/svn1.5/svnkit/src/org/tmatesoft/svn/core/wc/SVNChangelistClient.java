@@ -53,6 +53,11 @@ public class SVNChangelistClient extends SVNBasicClient {
         setChangelist(paths, null, changelistName);
     }
     
+    public File[] getChangelist(File path, final String changelistName) throws SVNException {
+        Collection paths = getChangelist(path, changelistName, (Collection) null);
+        return paths != null ? (File[]) paths.toArray(new File[paths.size()]) : null;
+    }
+    
     public Collection getChangelist(File path, final String changelistName, Collection changelistTargets) throws SVNException {
         if (changelistName == null) {
             return null;
@@ -137,7 +142,7 @@ public class SVNChangelistClient extends SVNBasicClient {
                 SVNEntry entry = wcAccess.getEntry(path, false);
                 if (entry == null) {
                     SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.UNVERSIONED_RESOURCE, "''{0}'' is not under version control", path);
-                    SVNEvent event = SVNEventFactory.createChangelistEvent(path.getAbsolutePath(), null, SVNEventAction.CHANGELIST_FAILED, err);
+                    SVNEvent event = SVNEventFactory.createChangelistEvent(path, adminArea, null, SVNEventAction.CHANGELIST_FAILED, err);
                     dispatchEvent(event);
                     continue;
                 }
@@ -149,8 +154,8 @@ public class SVNChangelistClient extends SVNBasicClient {
                                 "''{0}'' is not currently a member of changelist ''{1}''.", 
                                 new Object[] {path, matchingChangelistName});
                         SVNEvent event = 
-                            SVNEventFactory.createChangelistEvent(path.getAbsolutePath(), 
-                                null, SVNEventAction.CHANGELIST_FAILED, err);
+                            SVNEventFactory.createChangelistEvent(path, 
+                                adminArea, null, SVNEventAction.CHANGELIST_FAILED, err);
                         dispatchEvent(event);
                         continue;
                     }
@@ -158,16 +163,17 @@ public class SVNChangelistClient extends SVNBasicClient {
                 Map attributes = new HashMap();
                 attributes.put(SVNProperty.CHANGELIST, changelistName);
                 entry = adminArea.modifyEntry(entry.getName(), attributes, true, false);
+
+                SVNEvent event = SVNEventFactory.createChangelistEvent(path, 
+                        adminArea, changelistName, 
+                        changelistName != null ? SVNEventAction.CHANGELIST_SET : 
+                            SVNEventAction.CHANGELIST_CLEAR, null);
+
+                dispatchEvent(event);
+
             } finally {
                 wcAccess.close();
             }
-            
-            SVNEvent event = SVNEventFactory.createChangelistEvent(path.getAbsolutePath(), 
-                    changelistName, 
-                    changelistName != null ? SVNEventAction.CHANGELIST_SET : 
-                        SVNEventAction.CHANGELIST_CLEAR, null);
-
-            dispatchEvent(event);
         }
     }
 }

@@ -15,8 +15,8 @@ package org.tmatesoft.svn.cli.command;
 import java.io.File;
 import java.io.InputStream;
 import java.io.PrintStream;
-import java.util.ArrayList;
 import java.util.Collection;
+import java.util.LinkedList;
 
 import org.tmatesoft.svn.cli.SVNArgument;
 import org.tmatesoft.svn.cli.SVNCommand;
@@ -46,7 +46,8 @@ public class SVNPropdelCommand extends SVNCommand implements ISVNEventHandler {
 
     private boolean myIsQuiet;
     private PrintStream myErrStream;
-    
+    private boolean myIsRecursive;
+
     public void run(InputStream in, PrintStream out, PrintStream err) throws SVNException {
         run(out, err);
     }
@@ -68,7 +69,7 @@ public class SVNPropdelCommand extends SVNCommand implements ISVNEventHandler {
                 SVNErrorManager.error(error);
             }
         }
-        Collection targets = new ArrayList();
+        Collection targets = new LinkedList();
         for (int i = 1; i < getCommandLine().getPathCount(); i++) {
             targets.add(new File(getCommandLine().getPathAt(i)).getAbsoluteFile());
         }
@@ -91,7 +92,7 @@ public class SVNPropdelCommand extends SVNCommand implements ISVNEventHandler {
             depth = SVNDepth.DEPTH_EMPTY;
         }
         
-        final boolean recursive = SVNDepth.recurseFromDepth(depth);
+        myIsRecursive = SVNDepth.recurseFromDepth(depth);
         boolean revProp = getCommandLine().hasArgument(SVNArgument.REV_PROP);
         boolean force = getCommandLine().hasArgument(SVNArgument.FORCE);
         myIsQuiet = getCommandLine().hasArgument(SVNArgument.QUIET);
@@ -105,50 +106,20 @@ public class SVNPropdelCommand extends SVNCommand implements ISVNEventHandler {
         SVNWCClient wcClient = getClientManager().getWCClient();
 
         if (revProp) {
-            if (revision.getDate() == null && 
-                    !SVNRevision.isValidRevisionNumber(revision.getNumber()) 
-                    && revision != SVNRevision.HEAD) {
-                SVNErrorMessage error = SVNErrorMessage.create(SVNErrorCode.CL_ARG_PARSING_ERROR, 
-                        "Must specify the revision as a number, a date or 'HEAD' when operating on a revision property");
-                SVNErrorManager.error(error);
-            }
-
             if (getCommandLine().hasURLs()) {
                 wcClient.doSetRevisionProperty(SVNURL.parseURIEncoded(getCommandLine().getURL(0)),
-                        revision, propertyName, null, force, new ISVNPropertyHandler() {
-                    public void handleProperty(File path, SVNPropertyData property) throws SVNException {
-                    }
-                    public void handleProperty(long revision, SVNPropertyData property) throws SVNException {
-                        if (!myIsQuiet) {
-                            out.println("Property '" + propertyName +"' deleted from repository revision " + revision);
-                        }
-                    }
-                    public void handleProperty(SVNURL url, SVNPropertyData property) throws SVNException {
-                    }
-                });
-
+                        revision, propertyName, null, force, new PropertyHandler(propertyName, out));
             } else {
                 File[] combinedPaths = combinedPathList.getPaths(); 
                 File tgt = combinedPaths[0];
-
-                wcClient.doSetRevisionProperty(tgt, revision, propertyName, null, force, new ISVNPropertyHandler() {
-                    public void handleProperty(File path, SVNPropertyData property) throws SVNException {
-                    }
-                    public void handleProperty(long revision, SVNPropertyData property) throws SVNException {
-                        if (!myIsQuiet) {
-                            out.println("Property '" + propertyName +"' deleted from repository revision " + revision);
-                        }
-                    }
-                    public void handleProperty(SVNURL url, SVNPropertyData property) throws SVNException {
-                    }
-                });
+                wcClient.doSetRevisionProperty(tgt, revision, propertyName, null, force, new PropertyHandler(propertyName, out));
             }
         } else if (revision != null && revision != SVNRevision.UNDEFINED) {
             SVNErrorMessage error = SVNErrorMessage.create(SVNErrorCode.CL_ARG_PARSING_ERROR, "Cannot specify revision for deleting versioned property ''{0}''", propertyName);
             SVNErrorManager.error(error);
         } else {
-            PropertyHandler handler = new PropertyHandler(recursive, propertyName, out);
-            wcClient.doSetProperty(combinedPathList, propertyName, null, force, recursive, handler);
+            PropertyHandler handler = new PropertyHandler(propertyName, out);
+            wcClient.doSetProperty(combinedPathList, propertyName, null, force, myIsRecursive, handler);
             handler.handlePendingFile();
         }
     }
@@ -164,12 +135,10 @@ public class SVNPropdelCommand extends SVNCommand implements ISVNEventHandler {
     
     private class PropertyHandler implements ISVNPropertyHandler {
         private File myCurrentFile;
-        private boolean myIsRecursive;
         private PrintStream myOutput;
         private String myPropertyName;
         
-        public PropertyHandler(boolean recursive, String propName, PrintStream out) {
-            myIsRecursive = recursive;
+        public PropertyHandler(String propName, PrintStream out) {
             myOutput = out;
             myPropertyName = propName;
         }
@@ -180,15 +149,29 @@ public class SVNPropdelCommand extends SVNCommand implements ISVNEventHandler {
                     if (myCurrentFile != null) {
                         String rootPath = myCurrentFile.getAbsolutePath();
                         if (path.getAbsolutePath().indexOf(rootPath) == -1) {
-                            myOutput.println("Property '" + property.getName() + "' deleted (recursively) from '" + SVNFormatUtil.formatPath(myCurrentFile) + "'.");
+                            myOutput.println("property '" + property.getName() + "' deleted (recursively) from '" + SVNFormatUtil.formatPath(myCurrentFile) + "'.");
                             myCurrentFile = path;
                         }
                     } else {
                         myCurrentFile = path;
                     }
-                    
                 } else {
-                    myOutput.println("Property '" + property.getName() + "' deleted from '" + SVNFormatUtil.formatPath(path) + "'.");
+                    myOutput.println("property '" + property.getName() + "' deleted from '" + SVNFormatUtil.formatPath(path) + "'.");
+                }
+            }
+        }
+
+        public void handleProperty(long revision, SVNPropertyData property) throws SVNException {
+            if (!myIsQuiet) {
+                myOutput.println("property '" + property.getName() +"' deleted from repository revision " + revision);
+            }
+        }
+        
+        public void handlePendingFile() {
+            if (!myIsQuiet) {
+                if (myIsRecursive && myCurrentFile != null) {
+                    myOutput.println("property '" + myPropertyName + "' deleted from '" + SVNFormatUtil.formatPath(myCurrentFile) + "'.");
+                    myCurrentFile = null;
                 }
             }
         }
@@ -196,16 +179,5 @@ public class SVNPropdelCommand extends SVNCommand implements ISVNEventHandler {
         public void handleProperty(SVNURL url, SVNPropertyData property) throws SVNException {
         }
         
-        public void handleProperty(long revision, SVNPropertyData property) throws SVNException {
-        }
-        
-        public void handlePendingFile() {
-            if (!myIsQuiet) {
-                if (myIsRecursive && myCurrentFile != null) {
-                    myOutput.println("Property '" + myPropertyName + "' deleted from '" + SVNFormatUtil.formatPath(myCurrentFile) + "'.");
-                    myCurrentFile = null;
-                }
-            }
-        }
     }    
 }

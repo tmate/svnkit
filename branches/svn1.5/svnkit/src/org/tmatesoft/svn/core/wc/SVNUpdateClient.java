@@ -146,6 +146,32 @@ public class SVNUpdateClient extends SVNBasicClient {
         return doUpdate(file, revision, SVNDepth.fromRecurse(recursive), force);
     }    
     
+    public void doUpdate(ISVNPathList pathList, SVNRevision revision, SVNDepth depth, boolean force) throws SVNException {
+        if (pathList == null) {
+            return;
+        }
+        
+        for (Iterator paths = pathList.getPathsIterator(); paths.hasNext();) {
+            checkCancelled();
+            File path = (File) paths.next();
+            try {
+                doUpdate(path, revision, depth, force);
+            } catch (SVNException svne) {
+                if (svne.getErrorMessage().getErrorCode() == SVNErrorCode.WC_NOT_DIRECTORY) {
+                    SVNEvent skipEvent = SVNEventFactory.createSkipEvent(path.getParentFile(), 
+                                                                         path, 
+                                                                         SVNEventAction.SKIP, 
+                                                                         SVNEventAction.UPDATE_COMPLETED, 
+                                                                         null);
+                    dispatchEvent(skipEvent);
+                } else {
+                    dispatchEvent(new SVNEvent(svne.getErrorMessage()));
+                }
+                continue;
+            }
+        }
+    }
+    
     /* TODO(sd): "In the SVNDepth.DEPTH_IMMEDIATES case, shouldn't we update
      * the presence/absence of subdirs, even though we don't update
      * inside the subdirs themselves?"

@@ -86,6 +86,7 @@ import org.tmatesoft.svn.core.wc.ISVNInfoHandler;
 import org.tmatesoft.svn.core.wc.ISVNOptions;
 import org.tmatesoft.svn.core.wc.ISVNPropertyHandler;
 import org.tmatesoft.svn.core.wc.ISVNStatusHandler;
+import org.tmatesoft.svn.core.wc.SVNChangelistClient;
 import org.tmatesoft.svn.core.wc.SVNClientManager;
 import org.tmatesoft.svn.core.wc.SVNCommitClient;
 import org.tmatesoft.svn.core.wc.SVNCommitItem;
@@ -432,28 +433,7 @@ public class SVNClientImpl implements SVNClientInterface {
     }
 
     public long commit(String[] path, String message, boolean recurse, boolean noUnlock) throws ClientException {
-        if(path == null || path.length == 0){
-            return 0;
-        }
-        SVNCommitClient client = getSVNCommitClient();
-        File[] files = new File[path.length];
-        for (int i = 0; i < path.length; i++) {
-            files[i] = new File(path[i]).getAbsoluteFile();
-        }
-        try {
-            if(myMessageHandler != null){
-                client.setCommitHandler(new ISVNCommitHandler(){
-                    public String getCommitMessage(String cmessage, SVNCommitItem[] commitables) {
-                        CommitItem[] items = JavaHLObjectFactory.getCommitItems(commitables);
-                        return myMessageHandler.getLogMessage(items);
-                    }
-                });
-            }
-            return client.doCommit(files, noUnlock, message, !recurse, recurse).getNewRevision();
-        } catch (SVNException e) {
-            throwException(e);
-        }
-        return -1;
+        return commit(path, message, recurse, noUnlock, false, null);
     }
 
     public long[] commit(String[] path, String message, boolean recurse, boolean noUnlock, boolean atomicCommit) throws ClientException {
@@ -1152,6 +1132,10 @@ public class SVNClientImpl implements SVNClientInterface {
         return getClientManager().getLogClient();
     }
 
+    protected SVNChangelistClient getChangelistClient(){
+        return getClientManager().getChangelistClient();
+    }
+
     protected CommitMessage getCommitMessage() {
         return myMessageHandler;
     }
@@ -1302,25 +1286,90 @@ public class SVNClientImpl implements SVNClientInterface {
     }
 
     public void addToChangelist(String[] paths, String changelist) throws ClientException {
-        // TODO Auto-generated method stub
-        notImplementedYet();
+        if(paths == null || paths.length == 0 || 
+                changelist == null || "".equals(changelist)){
+            return;
+        }        
+        
+        SVNChangelistClient changelistClient = getChangelistClient();
+        File[] files = new File[paths.length];
+        for (int i = 0; i < paths.length; i++) {
+            files[i] = new File(paths[i]).getAbsoluteFile();
+        }
+
+        try {
+            changelistClient.addToChangelist(files, changelist);
+        } catch (SVNException e) {
+            throwException(e);
+        }
     }
 
     public String[] getChangelist(String changelist, String rootPath) throws ClientException {
-        // TODO Auto-generated method stub
-        notImplementedYet();
-        return null;
+        if(changelist == null || "".equals(changelist)){
+            return new String[]{};
+        }        
+        
+        SVNChangelistClient changelistClient = getChangelistClient();
+        File[] files = null;
+        try {
+            files = changelistClient.getChangelist(new File(rootPath).getAbsoluteFile(), 
+                                                   changelist);
+        } catch (SVNException e) {
+            throwException(e);
+        }
+        
+        if (files != null) {
+            String[] paths = new String[files.length];
+            for (int i = 0; i < files.length; i++) {
+                paths[i] = files[i].getAbsolutePath();
+            }
+            return paths;
+        }
+        return new String[]{};
     }
 
     public void removeFromChangelist(String[] paths, String changelist) throws ClientException {
-        // TODO Auto-generated method stub
-        notImplementedYet();
+        if(paths == null || paths.length == 0 || 
+                changelist == null || "".equals(changelist)){
+            return;
+        }        
+        
+        SVNChangelistClient changelistClient = getChangelistClient();
+        File[] files = new File[paths.length];
+        for (int i = 0; i < paths.length; i++) {
+            files[i] = new File(paths[i]).getAbsoluteFile();
+        }
+
+        try {
+            changelistClient.removeFromChangelist(files, changelist);
+        } catch (SVNException e) {
+            throwException(e);
+        }
     }
 
     public long commit(String[] path, String message, boolean recurse, boolean noUnlock, boolean keepChangelist, String changelistName) throws ClientException {
-        // TODO Auto-generated method stub
-        notImplementedYet();
-        return 0;
+        if(path == null || path.length == 0){
+            return 0;
+        }
+        SVNCommitClient client = getSVNCommitClient();
+        File[] files = new File[path.length];
+        for (int i = 0; i < path.length; i++) {
+            files[i] = new File(path[i]).getAbsoluteFile();
+        }
+        try {
+            if(myMessageHandler != null){
+                client.setCommitHandler(new ISVNCommitHandler(){
+                    public String getCommitMessage(String cmessage, SVNCommitItem[] commitables) {
+                        CommitItem[] items = JavaHLObjectFactory.getCommitItems(commitables);
+                        return myMessageHandler.getLogMessage(items);
+                    }
+                });
+            }
+            return client.doCommit(files, noUnlock, message, null, changelistName, keepChangelist, !recurse, recurse).getNewRevision();
+        } catch (SVNException e) {
+            throwException(e);
+        }
+        return -1;
     }
 
     public void remove(String[] path, String message, boolean force, boolean keepLocal) throws ClientException {
@@ -1999,6 +2048,11 @@ public class SVNClientImpl implements SVNClientInterface {
         notImplementedYet();
     }
 
+    public void logMessages(String path, Revision pegRevision, Revision revisionStart, Revision revisionEnd, boolean stopOnCopy, boolean discoverPath, boolean includeMergedRevisions, boolean omitLogText, long limit, LogMessageCallback callback) throws ClientException {
+        //TODO: implement
+        notImplementedYet();
+    }
+
     private void notImplementedYet() throws ClientException {
         notImplementedYet(null);
     }
@@ -2009,5 +2063,4 @@ public class SVNClientImpl implements SVNClientInterface {
         JavaHLObjectFactory.throwException(new SVNException(err), this);
     }
 
-    
 }

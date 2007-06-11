@@ -12,7 +12,10 @@
 package org.tmatesoft.svn.core.wc;
 
 import java.io.File;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 
 import org.tmatesoft.svn.core.SVNException;
@@ -22,11 +25,12 @@ import org.tmatesoft.svn.core.SVNException;
  * @version 1.1.2
  * @author  TMate Software Ltd.
  */
-public class SVNPathList implements ISVNPathList {
+public class SVNPathList implements ISVNPathList, Iterator {
     private File[] myPaths;
     private SVNRevision myPegRevision;
     private Map myPathsToPegRevisions;
-    
+    private Iterator myPathsIterator;
+
     public static SVNPathList create(File[] paths, SVNRevision pegRevision) {
         if (paths == null || paths.length == 0) {
             return null;
@@ -75,8 +79,11 @@ public class SVNPathList implements ISVNPathList {
     }
 
     public SVNRevision getPegRevision(File path) {
-        SVNRevision rev = (SVNRevision) myPathsToPegRevisions.get(path);
-        return rev != null ? rev : SVNRevision.UNDEFINED;
+        if (myPathsToPegRevisions != null) {
+            SVNRevision rev = (SVNRevision) myPathsToPegRevisions.get(path);
+            return rev != null ? rev : getPegRevision();
+        }
+        return getPegRevision();
     }
 
     public SVNRevision getPegRevision() {
@@ -84,6 +91,37 @@ public class SVNPathList implements ISVNPathList {
             return myPegRevision;
         }
         return SVNRevision.UNDEFINED;
+    }
+
+    public Iterator getPathsIterator() throws SVNException {
+        if (myPathsIterator != null) {
+            return myPathsIterator;
+        }
+        Collection paths = Arrays.asList(getPaths());
+        myPathsIterator = paths.iterator();
+        return this;
+    }
+
+    public boolean hasNext() {
+        if (myPathsIterator != null) {
+            boolean hasNext = myPathsIterator.hasNext();
+            if (!hasNext) {
+                myPathsIterator = null;
+            }
+            return hasNext;
+        }
+        return false;
+    }
+
+    public Object next() {
+        if (myPathsIterator != null) {
+            return myPathsIterator.next();
+        }
+        return null;
+    }
+
+    public void remove() {
+        //do nothing
     }
     
 }

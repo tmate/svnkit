@@ -12,6 +12,7 @@
 package org.tmatesoft.svn.core.wc;
 
 import java.io.File;
+import java.util.Iterator;
 
 import org.tmatesoft.svn.core.SVNException;
 
@@ -23,6 +24,8 @@ import org.tmatesoft.svn.core.SVNException;
 public interface ISVNPathList {
     
     public File[] getPaths() throws SVNException;
+    
+    public Iterator getPathsIterator() throws SVNException;
     
     public int getPathsCount() throws SVNException;
     

@@ -73,10 +73,10 @@ public class SVNPropeditCommand extends SVNCommand implements ISVNPropertyHandle
         boolean quiet = getCommandLine().hasArgument(SVNArgument.QUIET);
 
         if (revProps) {
-            if (revision.getDate() == null && !SVNRevision.isValidRevisionNumber(revision.getNumber()) && revision != SVNRevision.HEAD) {
+/*            if (revision.getDate() == null && !SVNRevision.isValidRevisionNumber(revision.getNumber()) && revision != SVNRevision.HEAD) {
                 SVNErrorMessage error = SVNErrorMessage.create(SVNErrorCode.CL_ARG_PARSING_ERROR, "Must specify the revision as a number, a date or 'HEAD' when operating on a revision property");
                 SVNErrorManager.error(error);
-            }
+            }*/
             final SVNPropertyData prop[] = new SVNPropertyData[1];
             final long rev[] = new long[1]; 
             ISVNPropertyHandler getHandler = new ISVNPropertyHandler() {

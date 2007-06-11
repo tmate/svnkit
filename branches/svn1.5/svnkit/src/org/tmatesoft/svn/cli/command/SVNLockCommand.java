@@ -14,8 +14,8 @@ package org.tmatesoft.svn.cli.command;
 import java.io.File;
 import java.io.InputStream;
 import java.io.PrintStream;
-import java.util.ArrayList;
 import java.util.Collection;
+import java.util.LinkedList;
 
 import org.tmatesoft.svn.cli.SVNArgument;
 import org.tmatesoft.svn.cli.SVNCommand;
@@ -41,12 +41,6 @@ public class SVNLockCommand extends SVNCommand {
     }
 
     public void run(PrintStream out, PrintStream err) throws SVNException {
-        boolean force = getCommandLine().hasArgument(SVNArgument.FORCE);
-        String message = (String) getCommandLine().getArgumentValue(SVNArgument.MESSAGE);
-        getClientManager().setEventHandler(new SVNCommandEventProcessor(out, err, false));
-        SVNWCClient wcClient = getClientManager().getWCClient();
-        
-
         String changelistName = (String) getCommandLine().getArgumentValue(SVNArgument.CHANGELIST); 
         SVNChangeList changelist = null;
         if (changelistName != null) {
@@ -59,8 +53,11 @@ public class SVNLockCommand extends SVNCommand {
                 SVNErrorManager.error(error);
             }
         }
+
+        boolean force = getCommandLine().hasArgument(SVNArgument.FORCE);
+        String message = (String) getCommandLine().getArgumentValue(SVNArgument.MESSAGE);
         
-        Collection files = new ArrayList();
+        Collection files = new LinkedList();
         for (int i = 0; i < getCommandLine().getPathCount(); i++) {
             files.add(new File(getCommandLine().getPathAt(i)));
         }
@@ -85,6 +82,9 @@ public class SVNLockCommand extends SVNCommand {
             SVNErrorMessage error = SVNErrorMessage.create(SVNErrorCode.CL_INSUFFICIENT_ARGS);
             SVNErrorManager.error(error);
         }
+
+        getClientManager().setEventHandler(new SVNCommandEventProcessor(out, err, false));
+        SVNWCClient wcClient = getClientManager().getWCClient();
         
         if (combinedPathList != null) {
             wcClient.doLock(combinedPathList, force, message);

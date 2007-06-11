@@ -258,6 +258,24 @@ public class SVNDiffClient extends SVNBasicClient {
         doDiff(path, pegRevision, rN, rM, SVNDepth.fromRecurse(recursive), useAncestry, result);
     }
     
+    public void doDiff(ISVNPathList pathList, SVNRevision rN, SVNRevision rM, SVNDepth depth, boolean useAncestry,
+            OutputStream result) throws SVNException {
+        if (pathList == null) {
+            return;
+        }
+        
+        for (Iterator paths = pathList.getPathsIterator(); paths.hasNext();) {
+            File path = (File) paths.next();
+            SVNRevision pegRevision = pathList.getPegRevision(path);
+            try {
+                doDiff(path, pegRevision, rN, rM, depth, useAncestry, result);
+            } catch (SVNException svne) {
+                dispatchEvent(new SVNEvent(svne.getErrorMessage()));
+                continue;
+            }
+        }
+    }
+    
     public void doDiff(File path, SVNRevision pegRevision, SVNRevision rN, SVNRevision rM, SVNDepth depth, boolean useAncestry,
             OutputStream result) throws SVNException {
         if (!rN.isValid() || !rM.isValid()) {
@@ -365,6 +383,25 @@ public class SVNDiffClient extends SVNBasicClient {
         doDiff(path1, rN, url2, rM, SVNDepth.fromRecurse(recursive), useAncestry, result);
     }
     
+    public void doDiff(ISVNPathList pathList, SVNURL[] urls, SVNRevision rM, SVNDepth depth, boolean useAncestry,
+            OutputStream result) throws SVNException {
+        if (pathList == null || urls == null) {
+            return;
+        }
+        int i = 0;
+        for (Iterator paths = pathList.getPathsIterator(); paths.hasNext() && i < urls.length; i++) {
+            File path = (File) paths.next();
+            SVNRevision rN = pathList.getPegRevision(path);
+            SVNURL url = urls[i];
+            try {
+                doDiff(path, rN, url, rM, depth, useAncestry, result);
+            } catch (SVNException svne) {
+                dispatchEvent(new SVNEvent(svne.getErrorMessage()));
+                continue;
+            }
+        }
+    }
+    
     public void doDiff(File path1, SVNRevision rN, SVNURL url2, SVNRevision rM, SVNDepth depth, boolean useAncestry,
             OutputStream result) throws SVNException {
         if (!rN.isValid() || !rM.isValid()) {
@@ -419,6 +456,25 @@ public class SVNDiffClient extends SVNBasicClient {
     public void doDiff(SVNURL url1, SVNRevision rN, File path2, SVNRevision rM, boolean recursive, boolean useAncestry,
             OutputStream result) throws SVNException {
         doDiff(url1, rN, path2, rM, SVNDepth.fromRecurse(recursive), useAncestry, result);
+    }
+
+    public void doDiff(SVNURL[] urls, SVNRevision rN, ISVNPathList pathList, SVNDepth depth, boolean useAncestry,
+            OutputStream result) throws SVNException {
+        if (pathList == null || urls == null) {
+            return;
+        }
+        int i = 0;
+        for (Iterator paths = pathList.getPathsIterator(); paths.hasNext() && i < urls.length; i++) {
+            File path = (File) paths.next();
+            SVNRevision rM = pathList.getPegRevision(path);
+            SVNURL url = urls[i];
+            try {
+                doDiff(url, rN, path, rM, depth, useAncestry, result);
+            } catch (SVNException svne) {
+                dispatchEvent(new SVNEvent(svne.getErrorMessage()));
+                continue;
+            }
+        }
     }
     
     public void doDiff(SVNURL url1, SVNRevision rN, File path2, SVNRevision rM, SVNDepth depth, boolean useAncestry,
@@ -495,6 +551,27 @@ public class SVNDiffClient extends SVNBasicClient {
         doDiff(path1, rN, path2, rM, SVNDepth.fromRecurse(recursive), useAncestry, result);
     }
     
+    public void doDiff(ISVNPathList pathList1, ISVNPathList pathList2, SVNDepth depth, boolean useAncestry,
+            OutputStream result) throws SVNException {
+        if (pathList1 == null || pathList2 == null) {
+            return;
+        }
+        
+        for (Iterator paths1 = pathList1.getPathsIterator(), 
+                paths2 = pathList2.getPathsIterator(); paths1.hasNext() && paths2.hasNext();) {
+            File path1 = (File) paths1.next();
+            File path2 = (File) paths2.next();
+            SVNRevision rN = pathList1.getPegRevision(path1);
+            SVNRevision rM = pathList2.getPegRevision(path2);
+            try {
+                doDiff(path1, rN, path2, rM, depth, useAncestry, result);
+            } catch (SVNException svne) {
+                dispatchEvent(new SVNEvent(svne.getErrorMessage()));
+                continue;
+            }
+        }
+    }
+    
     public void doDiff(File path1, SVNRevision rN, File path2, SVNRevision rM, SVNDepth depth, boolean useAncestry,
             OutputStream result) throws SVNException {
         if (!rN.isValid() || !rM.isValid()) {
@@ -561,6 +638,26 @@ public class SVNDiffClient extends SVNBasicClient {
         doDiffURLURL(null, path, rN, null, path, rM, pegRevision, depth, useAncestry, handler);        
     }
     
+    public void doDiffStatus(ISVNPathList pathList1, ISVNPathList pathList2, SVNDepth depth, boolean useAncestry,
+            ISVNDiffStatusHandler handler) throws SVNException {
+        if (pathList1 == null || pathList2 == null) {
+            return;
+        }
+        for (Iterator paths1 = pathList1.getPathsIterator(), 
+                paths2 = pathList2.getPathsIterator(); paths1.hasNext() && paths2.hasNext();) {
+            File path1 = (File) paths1.next();
+            File path2 = (File) paths2.next();
+            SVNRevision rN = pathList1.getPegRevision(path1);
+            SVNRevision rM = pathList2.getPegRevision(path2);
+            try {
+                doDiffStatus(path1, rN, path2, rM, depth, useAncestry, handler);
+            } catch (SVNException svne) {
+                dispatchEvent(new SVNEvent(svne.getErrorMessage()));
+                continue;
+            }
+        }        
+    }
+    
     public void doDiffStatus(File path1, SVNRevision rN, File path2, SVNRevision rM, SVNDepth depth, boolean useAncestry,
             ISVNDiffStatusHandler handler) throws SVNException {
         if (handler == null) {
@@ -602,6 +699,25 @@ public class SVNDiffClient extends SVNBasicClient {
         doDiffStatus(path1, rN, url2, rM, SVNDepth.fromRecurse(recursive), useAncestry, handler);
     }
     
+    public void doDiffStatus(ISVNPathList pathList, SVNURL[] urls, SVNRevision rM, SVNDepth depth, boolean useAncestry,
+            ISVNDiffStatusHandler handler) throws SVNException {
+        if (pathList == null || urls == null) {
+            return;
+        }
+        int i = 0;
+        for (Iterator paths = pathList.getPathsIterator(); paths.hasNext() && i < urls.length; i++) {
+            File path = (File) paths.next();
+            SVNRevision rN = pathList.getPegRevision(path);
+            SVNURL url = urls[i];
+            try {
+                doDiffStatus(path, rN, url, rM, depth, useAncestry, handler);
+            } catch (SVNException svne) {
+                dispatchEvent(new SVNEvent(svne.getErrorMessage()));                
+                continue;
+            }
+        }
+    }
+    
     public void doDiffStatus(File path1, SVNRevision rN, SVNURL url2, SVNRevision rM, SVNDepth depth, boolean useAncestry,
             ISVNDiffStatusHandler handler) throws SVNException {
         if (handler == null) {
@@ -638,6 +754,25 @@ public class SVNDiffClient extends SVNBasicClient {
     public void doDiffStatus(SVNURL url1, SVNRevision rN, File path2, SVNRevision rM, boolean recursive, boolean useAncestry,
             ISVNDiffStatusHandler handler) throws SVNException {
         doDiffStatus(url1, rN, path2, rM, SVNDepth.fromRecurse(recursive), useAncestry, handler);
+    }
+    
+    public void doDiffStatus(SVNURL[] urls, SVNRevision rN, ISVNPathList pathList, SVNDepth depth, boolean useAncestry,
+            ISVNDiffStatusHandler handler) throws SVNException {
+        if (pathList == null || urls == null) {
+            return;
+        }
+        int i = 0;
+        for (Iterator paths = pathList.getPathsIterator(); paths.hasNext() && i < urls.length; i++) {
+            File path = (File) paths.next();
+            SVNRevision rM = pathList.getPegRevision(path);
+            SVNURL url = urls[i];
+            try {
+                doDiffStatus(url, rN, path, rM, depth, useAncestry, handler);
+            } catch (SVNException svne) {
+                dispatchEvent(new SVNEvent(svne.getErrorMessage()));
+                continue;
+            }
+        }
     }
     
     public void doDiffStatus(SVNURL url1, SVNRevision rN, File path2, SVNRevision rM, SVNDepth depth, boolean useAncestry,
