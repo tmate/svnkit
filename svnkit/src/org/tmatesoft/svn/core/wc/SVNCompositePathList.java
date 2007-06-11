@@ -14,6 +14,7 @@ package org.tmatesoft.svn.core.wc;
 import java.io.File;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.Map;
 
@@ -24,11 +25,12 @@ import org.tmatesoft.svn.core.SVNException;
  * @version 1.1.2
  * @author  TMate Software Ltd.
  */
-public class SVNCompositePathList implements ISVNPathList {
+public class SVNCompositePathList implements ISVNPathList, Iterator {
     private File[] myPaths;
     private Map myPathsToPegRevisions;
     private SVNRevision myPegRevision;
-    
+    private Iterator myPathsIterator;
+
     public static SVNCompositePathList create(SVNPathList pathList, SVNChangeList changeList, boolean noDuplicates) throws SVNException {
         if (pathList == null && changeList == null) {
             return null;
@@ -88,6 +90,36 @@ public class SVNCompositePathList implements ISVNPathList {
 
     public SVNRevision getPegRevision() {
         return myPegRevision;
+    }
+
+    public Iterator getPathsIterator() throws SVNException {
+        if (myPathsIterator != null) {
+            return myPathsIterator;
+        }
+        myPathsIterator = myPathsToPegRevisions.keySet().iterator();
+        return this;
+    }
+
+    public boolean hasNext() {
+        if (myPathsIterator != null) {
+            boolean hasNext = myPathsIterator.hasNext();
+            if (!hasNext) {
+                myPathsIterator = null;
+            }
+            return hasNext;
+        }
+        return false;
+    }
+
+    public Object next() {
+        if (myPathsIterator != null) {
+            return myPathsIterator.next();
+        }
+        return null;
+    }
+
+    public void remove() {
+        //do nothing
     }
     
 }

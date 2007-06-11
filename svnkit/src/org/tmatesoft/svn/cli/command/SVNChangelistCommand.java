@@ -36,6 +36,7 @@ public class SVNChangelistCommand extends SVNCommand {
     public void run(PrintStream out, PrintStream err) throws SVNException {
         String changelist = (String) getCommandLine().getArgumentValue(SVNArgument.CHANGELIST); 
         Collection changelistTargets = null;
+        getClientManager().setEventHandler(new SVNCommandEventProcessor(out, err, false));
         SVNChangelistClient client = getClientManager().getChangelistClient();
 
         if (changelist != null) {

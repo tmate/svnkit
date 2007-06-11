@@ -21,6 +21,7 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.Map;
 import java.util.TreeMap;
 
@@ -120,15 +121,15 @@ public class SVNLogCommand extends SVNCommand implements ISVNLogEntryHandler {
             }
             String url = getCommandLine().getURL(0);
             SVNRevision pegRevision = getCommandLine().getPegRevision(0);
-            Collection targets = new ArrayList();
+            Collection targets = new LinkedList();
             for(int i = 0; i < getCommandLine().getPathCount(); i++) {
                 targets.add(getCommandLine().getPathAt(i));
             }
             if (changelist != null) {
                 File[] paths = changelist.getPaths();
-                String thisPath = new File(".").getAbsolutePath();
+                String thisPath = new File(".").getAbsolutePath().replace(File.separatorChar, '/');
                 for (int i = 0; i < changelist.getPathsCount(); i++) {
-                    String path = paths[i].getAbsolutePath();
+                    String path = paths[i].getAbsolutePath().replace(File.separatorChar, '/');
                     String relativePath = path.substring(thisPath.length());
                     relativePath = relativePath.startsWith("/") ? relativePath.substring(1) : relativePath;
                     targets.add(relativePath);
@@ -141,7 +142,7 @@ public class SVNLogCommand extends SVNCommand implements ISVNLogEntryHandler {
                 SVNErrorMessage error = SVNErrorMessage.create(SVNErrorCode.UNSUPPORTED_FEATURE, "When specifying working copy paths, only one target may be given");
                 SVNErrorManager.error(error);
             }
-            Collection targets = new ArrayList();
+            Collection targets = new ArrayList(getCommandLine().getPathCount());
             SVNRevision pegRevision = null;
             for(int i = 0; i < getCommandLine().getPathCount(); i++) {
                 targets.add(new File(getCommandLine().getPathAt(i)).getAbsoluteFile());

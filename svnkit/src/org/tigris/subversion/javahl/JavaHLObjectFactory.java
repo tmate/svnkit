@@ -338,7 +338,7 @@ public class JavaHLObjectFactory {
             }
             cp = (ChangePath[]) clientChangePaths.toArray(new ChangePath[clientChangePaths.size()]);
         }
-        handler.singleMessage(cp, logEntry.getRevision(), logEntry.getAuthor(), logEntry.getDate().getTime() * 1000, logEntry.getMessage());
+        handler.singleMessage(cp, logEntry.getRevision(), logEntry.getAuthor(), logEntry.getDate().getTime() * 1000, logEntry.getMessage(), 0);//TODO: FIXME
     }
 
     public static CommitItem[] getCommitItems(SVNCommitItem[] commitables) {

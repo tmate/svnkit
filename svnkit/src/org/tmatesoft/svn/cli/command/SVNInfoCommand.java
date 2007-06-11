@@ -19,6 +19,7 @@ import java.io.PrintStream;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.Locale;
 
@@ -35,6 +36,7 @@ import org.tmatesoft.svn.core.internal.util.SVNFormatUtil;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.wc.ISVNInfoHandler;
+import org.tmatesoft.svn.core.wc.ISVNPathList;
 import org.tmatesoft.svn.core.wc.SVNChangeList;
 import org.tmatesoft.svn.core.wc.SVNCompositePathList;
 import org.tmatesoft.svn.core.wc.SVNInfo;
@@ -85,6 +87,8 @@ public class SVNInfoCommand extends SVNCommand implements ISVNInfoHandler {
             depth = SVNDepth.DEPTH_IMMEDIATES;
         }
         
+        boolean isRecursive = SVNDepth.recurseFromDepth(depth);
+        
         ISVNInfoHandler infoHandler = getCommandLine().hasArgument(SVNArgument.XML) ? handler : (ISVNInfoHandler) this;
         
         String changelistName = (String) getCommandLine().getArgumentValue(SVNArgument.CHANGELIST); 
@@ -109,33 +113,16 @@ public class SVNInfoCommand extends SVNCommand implements ISVNInfoHandler {
         
         SVNPathList pathList = SVNPathList.create(paths, (SVNRevision[]) pegRevisions.toArray(new SVNRevision[pegRevisions.size()]));
         SVNCompositePathList combinedPathList = SVNCompositePathList.create(pathList, changelist, false); 
-        
-        if (combinedPathList != null) {
-            File[] combinedPaths = combinedPathList.getPaths();
-            for (int i = 0; i < combinedPaths.length; i++) {
-                myBaseFile = combinedPaths[i];
-                SVNRevision pegRev = combinedPathList.getPegRevision(myBaseFile);
-                handler.setTargetPath(myBaseFile);
-                try {
-                    wcClient.doInfo(myBaseFile, pegRev, revision, SVNDepth.recurseFromDepth(depth), infoHandler);
-                } catch (SVNException e) {
-                    if (e.getErrorMessage().getErrorCode() == SVNErrorCode.UNVERSIONED_RESOURCE) {
-                        print(myBaseFile + ":  (Not a versioned resource)", myOut);
-                        print("", myOut);
-                        continue;
-                    }
-                    throw e;
-                }
-            }            
-        }
-            
+        PathListWrapper wrappedPathList = new PathListWrapper(combinedPathList, handler);
+        wcClient.doInfo(wrappedPathList, revision, isRecursive, handler);
+
         myBaseFile = null;
         for (int i = 0; i < getCommandLine().getURLCount(); i++) {
             String url = getCommandLine().getURL(i);
             SVNURL svnURL = SVNURL.parseURIEncoded(url);
             SVNRevision peg = getCommandLine().getPegRevision(i);
             try {
-                wcClient.doInfo(svnURL, peg, revision, SVNDepth.recurseFromDepth(depth), infoHandler);
+                wcClient.doInfo(svnURL, peg, revision, isRecursive, infoHandler);
             } catch (SVNException e) {
                 if (e.getErrorMessage().getErrorCode() == SVNErrorCode.RA_ILLEGAL_URL) {
                     print(svnURL + ":  (Not a valid URL)", myOut);
@@ -284,5 +271,50 @@ public class SVNInfoCommand extends SVNCommand implements ISVNInfoHandler {
 
     private static String formatDate(Date date) {
         return DATE_FORMAT.format(date);
+    }
+    
+    private class PathListWrapper implements ISVNPathList, Iterator {
+        private SVNCompositePathList myRealPathList;
+        private SVNXMLInfoHandler myXMLHandler;
+
+        public PathListWrapper(SVNCompositePathList pathList, SVNXMLInfoHandler handler) {
+            myRealPathList = pathList;
+            myXMLHandler = handler;
+        }
+        
+        public File[] getPaths() throws SVNException {
+            return myRealPathList.getPaths();
+        }
+
+        public int getPathsCount() throws SVNException {
+            return myRealPathList.getPathsCount();
+        }
+
+        public Iterator getPathsIterator() throws SVNException {
+            return myRealPathList.getPathsIterator();
+        }
+
+        public SVNRevision getPegRevision(File path) {
+            return myRealPathList.getPegRevision(path);
+        }
+
+        public SVNRevision getPegRevision() {
+            return myRealPathList.getPegRevision();
+        }
+
+        public boolean hasNext() {
+            return myRealPathList.hasNext();
+        }
+
+        public Object next() {
+            myBaseFile = (File) myRealPathList.next();
+            myXMLHandler.setTargetPath(myBaseFile);
+            return myBaseFile;
+        }
+
+        public void remove() {
+            myRealPathList.remove();
+        }
+        
     }
 }

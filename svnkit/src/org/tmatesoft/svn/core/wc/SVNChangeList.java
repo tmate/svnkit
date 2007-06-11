@@ -12,7 +12,9 @@
 package org.tmatesoft.svn.core.wc;
 
 import java.io.File;
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.Iterator;
 
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.auth.ISVNAuthenticationManager;
@@ -22,7 +24,7 @@ import org.tmatesoft.svn.core.auth.ISVNAuthenticationManager;
  * @version 1.1.2
  * @author  TMate Software Ltd.
  */
-public class SVNChangeList implements ISVNPathList {
+public class SVNChangeList implements ISVNPathList, Iterator {
     private String myChangelistName;
     private File myRootPath;
     private File[] myPaths;
@@ -31,6 +33,7 @@ public class SVNChangeList implements ISVNPathList {
     private ISVNRepositoryPool myRepositoryPool;
     private ISVNAuthenticationManager myAuthManager;    
     private SVNChangelistClient myChangelistClient;
+    private Iterator myPathsIterator;
     
     public static SVNChangeList create(String changelistName, File wcPath) {
         SVNChangeList list = new SVNChangeList();
@@ -57,6 +60,37 @@ public class SVNChangeList implements ISVNPathList {
             
         }
         return myPaths;
+    }
+
+    public Iterator getPathsIterator() throws SVNException {
+        if (myPathsIterator != null) {
+            return myPathsIterator;
+        }
+        Collection paths = Arrays.asList(getPaths());
+        myPathsIterator = paths.iterator();
+        return this;
+    }
+
+    public boolean hasNext() {
+        if (myPathsIterator != null) {
+            boolean hasNext = myPathsIterator.hasNext();
+            if (!hasNext) {
+                myPathsIterator = null;
+            }
+            return hasNext;
+        }
+        return false;
+    }
+
+    public Object next() {
+        if (myPathsIterator != null) {
+            return myPathsIterator.next();
+        }
+        return null;
+    }
+
+    public void remove() {
+        //do nothing
     }
 
     public int getPathsCount() throws SVNException {

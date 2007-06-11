@@ -515,10 +515,9 @@ public class SVNWCClient extends SVNBasicClient {
         if (pathList == null) {
             return;
         }
-        File[] paths = pathList.getPaths();
-        for (int i = 0; i < paths.length; i++) {
+        for (Iterator paths = pathList.getPathsIterator(); paths.hasNext();) {
             checkCancelled();
-            File path = paths[i];
+            File path = (File) paths.next();
             try {
                 doSetProperty(path, propName, propValue, force, recursive, handler);
             } catch (SVNException svne) {
@@ -669,6 +668,7 @@ public class SVNWCClient extends SVNBasicClient {
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.CLIENT_PROPERTY_NAME, "''{0}'' is a wcprop , thus not accessible to clients", propName);
             SVNErrorManager.error(err);
         }
+
         SVNRepository repos = createRepository(url, null, SVNRevision.UNDEFINED, revision);
         long revNumber = getRevisionNumber(revision, repos, null);
         repos.setRevisionPropertyValue(revNumber, propName, propValue);
@@ -913,6 +913,26 @@ public class SVNWCClient extends SVNBasicClient {
             throw svne;
         } finally {
             wcAccess.close();
+        }
+    }
+    
+    public void doGetProperty(ISVNPathList pathList, String propName, SVNRevision revision, SVNDepth depth, ISVNPropertyHandler handler) throws SVNException {
+        if (pathList == null) {
+            return;
+        }
+
+        for (Iterator paths = pathList.getPathsIterator(); paths.hasNext();) {
+            checkCancelled();
+            File path = (File) paths.next();
+            try {
+                doGetProperty(path, propName, pathList.getPegRevision(path), revision, depth, handler);
+            } catch (SVNException svne) {
+                if (svne.getErrorMessage().isWarning()) {
+                    dispatchEvent(new SVNEvent(svne.getErrorMessage()));
+                } else {
+                    throw svne;
+                }
+            }
         }
     }
     
@@ -1366,6 +1386,17 @@ public class SVNWCClient extends SVNBasicClient {
         dispatchEvent(event);
     }
     
+    public void doRevert(ISVNPathList pathList, boolean recursive) throws SVNException {
+        if (pathList == null) {
+            return;
+        }
+        for (Iterator paths = pathList.getPathsIterator(); paths.hasNext();) {
+            checkCancelled();
+            File path = (File) paths.next();
+            doRevert(path, recursive);
+        }
+    }
+    
     /**
      * Reverts all local changes made to a Working Copy item(s) thus
      * bringing it to a 'pristine' state.
@@ -1405,8 +1436,9 @@ public class SVNWCClient extends SVNBasicClient {
             if (code == SVNErrorCode.ENTRY_NOT_FOUND || code == SVNErrorCode.UNVERSIONED_RESOURCE) {
                 SVNEvent event = SVNEventFactory.createSkipEvent(path.getParentFile(), path, SVNEventAction.SKIP, SVNEventAction.REVERT, null);
                 dispatchEvent(event);
-            }            
-            throw e;
+            } else {            
+                throw e;
+            }
         } finally {
             wcAccess.close();
         }
@@ -1881,6 +1913,14 @@ public class SVNWCClient extends SVNBasicClient {
         }
     }
 
+    public void doUnlock(ISVNPathList pathList, boolean breakLock) throws SVNException {
+        if (pathList == null) {
+            return;
+        }
+        File[] paths = pathList.getPaths();
+        doUnlock(paths, breakLock);
+    }
+
     /**
      * Unlocks file items in a repository.
      * 
@@ -2106,9 +2146,8 @@ public class SVNWCClient extends SVNBasicClient {
             return;
         }
         
-        File[] paths = pathList.getPaths();
-        for (int i = 0; i < paths.length; i++) {
-            File path = paths[i];
+        for (Iterator paths = pathList.getPathsIterator(); paths.hasNext();) {
+            File path = (File) paths.next();
             SVNRevision pegRevision = pathList.getPegRevision(path);
             try {
                 doInfo(path, pegRevision, revision, recursive, handler);
