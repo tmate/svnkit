@@ -30,6 +30,7 @@ public class SVNCompositePathList implements ISVNPathList, Iterator {
     private Map myPathsToPegRevisions;
     private SVNRevision myPegRevision;
     private Iterator myPathsIterator;
+    private int myIterateIndex; 
 
     public static SVNCompositePathList create(SVNPathList pathList, SVNChangeList changeList, boolean noDuplicates) throws SVNException {
         if (pathList == null && changeList == null) {
@@ -96,13 +97,15 @@ public class SVNCompositePathList implements ISVNPathList, Iterator {
         if (myPathsIterator != null) {
             return myPathsIterator;
         }
-        myPathsIterator = myPathsToPegRevisions.keySet().iterator();
-        return this;
+        getPaths();
+        myIterateIndex = -1;
+        myPathsIterator = this;
+        return myPathsIterator;
     }
 
     public boolean hasNext() {
         if (myPathsIterator != null) {
-            boolean hasNext = myPathsIterator.hasNext();
+            boolean hasNext = (myIterateIndex + 1) < myPaths.length;  
             if (!hasNext) {
                 myPathsIterator = null;
             }
@@ -112,8 +115,8 @@ public class SVNCompositePathList implements ISVNPathList, Iterator {
     }
 
     public Object next() {
-        if (myPathsIterator != null) {
-            return myPathsIterator.next();
+        if (myPathsIterator != null && (myIterateIndex + 1) < myPaths.length) {
+            return myPaths[++myIterateIndex];
         }
         return null;
     }

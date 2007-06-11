@@ -68,7 +68,8 @@ public class SVNUpdateCommand extends SVNCommand implements ISVNEventHandler {
         for (int i = 0; i < getCommandLine().getPathCount(); i++) {
             targets.add(new File(getCommandLine().getPathAt(i)).getAbsoluteFile());
         }
-        if (targets.size() == 0 && (changelist == null || changelist.getPathsCount() == 0)) {
+        if (targets.size() == 0 && (changelist == null || changelist.getPathsCount() == 0) &&
+                !getCommandLine().hasURLs()) {
             targets.add(new File(".").getAbsoluteFile());
         }
         File[] paths = (File[]) targets.toArray(new File[targets.size()]);

@@ -12,7 +12,6 @@
 package org.tmatesoft.svn.core.wc;
 
 import java.io.File;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Iterator;
 
@@ -34,6 +33,7 @@ public class SVNChangeList implements ISVNPathList, Iterator {
     private ISVNAuthenticationManager myAuthManager;    
     private SVNChangelistClient myChangelistClient;
     private Iterator myPathsIterator;
+    private int myIterateIndex; 
     
     public static SVNChangeList create(String changelistName, File wcPath) {
         SVNChangeList list = new SVNChangeList();
@@ -57,7 +57,6 @@ public class SVNChangeList implements ISVNPathList, Iterator {
             if (changelistTargets != null) {
                 myPaths = (File[]) changelistTargets.toArray(new File[changelistTargets.size()]);
             }
-            
         }
         return myPaths;
     }
@@ -66,14 +65,15 @@ public class SVNChangeList implements ISVNPathList, Iterator {
         if (myPathsIterator != null) {
             return myPathsIterator;
         }
-        Collection paths = Arrays.asList(getPaths());
-        myPathsIterator = paths.iterator();
-        return this;
+        getPaths();
+        myIterateIndex = -1;
+        myPathsIterator = this;
+        return myPathsIterator;
     }
 
     public boolean hasNext() {
         if (myPathsIterator != null) {
-            boolean hasNext = myPathsIterator.hasNext();
+            boolean hasNext = (myIterateIndex + 1) < myPaths.length;  
             if (!hasNext) {
                 myPathsIterator = null;
             }
@@ -83,8 +83,8 @@ public class SVNChangeList implements ISVNPathList, Iterator {
     }
 
     public Object next() {
-        if (myPathsIterator != null) {
-            return myPathsIterator.next();
+        if (myPathsIterator != null && (myIterateIndex + 1) < myPaths.length) {
+            return myPaths[++myIterateIndex];
         }
         return null;
     }
