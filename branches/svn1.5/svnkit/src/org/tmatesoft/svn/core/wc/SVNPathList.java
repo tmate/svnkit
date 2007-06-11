@@ -12,8 +12,6 @@
 package org.tmatesoft.svn.core.wc;
 
 import java.io.File;
-import java.util.Arrays;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -30,6 +28,7 @@ public class SVNPathList implements ISVNPathList, Iterator {
     private SVNRevision myPegRevision;
     private Map myPathsToPegRevisions;
     private Iterator myPathsIterator;
+    private int myIterateIndex; 
 
     public static SVNPathList create(File[] paths, SVNRevision pegRevision) {
         if (paths == null || paths.length == 0) {
@@ -97,14 +96,15 @@ public class SVNPathList implements ISVNPathList, Iterator {
         if (myPathsIterator != null) {
             return myPathsIterator;
         }
-        Collection paths = Arrays.asList(getPaths());
-        myPathsIterator = paths.iterator();
-        return this;
+        getPaths();
+        myIterateIndex = -1;
+        myPathsIterator = this;
+        return myPathsIterator;
     }
 
     public boolean hasNext() {
         if (myPathsIterator != null) {
-            boolean hasNext = myPathsIterator.hasNext();
+            boolean hasNext = (myIterateIndex + 1) < myPaths.length;  
             if (!hasNext) {
                 myPathsIterator = null;
             }
@@ -114,8 +114,8 @@ public class SVNPathList implements ISVNPathList, Iterator {
     }
 
     public Object next() {
-        if (myPathsIterator != null) {
-            return myPathsIterator.next();
+        if (myPathsIterator != null && (myIterateIndex + 1) < myPaths.length) {
+            return myPaths[++myIterateIndex];
         }
         return null;
     }

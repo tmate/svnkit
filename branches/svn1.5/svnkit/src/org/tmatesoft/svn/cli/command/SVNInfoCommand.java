@@ -104,17 +104,25 @@ public class SVNInfoCommand extends SVNCommand implements ISVNInfoHandler {
             }
         }
 
-        File[] paths = getCommandLine().getPathCount() > 0 ? new File[getCommandLine().getPathCount()] : null;
+        LinkedList paths = new LinkedList();
         LinkedList pegRevisions = new LinkedList();
         for (int i = 0; i < getCommandLine().getPathCount(); i++) {
-            paths[i] = new File(getCommandLine().getPathAt(i));
+            paths.add(new File(getCommandLine().getPathAt(i)).getAbsoluteFile());
             pegRevisions.add(getCommandLine().getPathPegRevision(i));
         }
+        if (paths.isEmpty() && (changelist == null || changelist.getPathsCount() == 0) && 
+                !getCommandLine().hasURLs()) {
+            paths.add(new File(".").getAbsoluteFile());
+            pegRevisions.add(SVNRevision.UNDEFINED);
+        }
         
-        SVNPathList pathList = SVNPathList.create(paths, (SVNRevision[]) pegRevisions.toArray(new SVNRevision[pegRevisions.size()]));
+        File[] pathsArray = (File[]) paths.toArray(new File[paths.size()]); 
+        SVNPathList pathList = SVNPathList.create(pathsArray, (SVNRevision[]) pegRevisions.toArray(new SVNRevision[pegRevisions.size()]));
         SVNCompositePathList combinedPathList = SVNCompositePathList.create(pathList, changelist, false); 
-        PathListWrapper wrappedPathList = new PathListWrapper(combinedPathList, handler);
-        wcClient.doInfo(wrappedPathList, revision, isRecursive, handler);
+        if (combinedPathList != null) {
+            PathListWrapper wrappedPathList = new PathListWrapper(combinedPathList, handler);
+            wcClient.doInfo(wrappedPathList, revision, isRecursive, infoHandler);
+        }
 
         myBaseFile = null;
         for (int i = 0; i < getCommandLine().getURLCount(); i++) {

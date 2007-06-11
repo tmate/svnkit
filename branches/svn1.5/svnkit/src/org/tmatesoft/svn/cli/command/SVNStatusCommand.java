@@ -114,7 +114,8 @@ public class SVNStatusCommand extends SVNCommand implements ISVNStatusHandler, I
         for (int i = 0; i < paths.length; i++) {
             targets.add(new File(paths[i]));
         }
-        if (targets.size() == 0 && (changelist == null || changelist.getPathsCount() == 0)) {
+        if (targets.size() == 0 && (changelist == null || changelist.getPathsCount() == 0) && 
+                !getCommandLine().hasURLs()) {
             targets.add(new File(".").getAbsoluteFile());
         }
         File[] files = (File[]) targets.toArray(new File[targets.size()]);

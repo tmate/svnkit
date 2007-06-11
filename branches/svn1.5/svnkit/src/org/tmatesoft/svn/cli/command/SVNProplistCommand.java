@@ -74,7 +74,8 @@ public class SVNProplistCommand extends SVNCommand implements ISVNPropertyHandle
         for (int i = 0; i < getCommandLine().getPathCount(); i++) {
             targets.put(new File(getCommandLine().getPathAt(i)).getAbsoluteFile(), getCommandLine().getPathPegRevision(i));
         }
-        if (targets.size() == 0 && (changelist == null || changelist.getPathsCount() == 0)) {
+        if (targets.size() == 0 && (changelist == null || changelist.getPathsCount() == 0) && 
+                !getCommandLine().hasURLs()) {
             targets.put(new File(".").getAbsoluteFile(), SVNRevision.UNDEFINED);
         }
         File[] paths = (File[]) targets.keySet().toArray(new File[targets.size()]);
