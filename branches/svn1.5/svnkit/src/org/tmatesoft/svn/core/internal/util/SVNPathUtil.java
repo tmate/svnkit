@@ -477,8 +477,19 @@ public class SVNPathUtil {
         }
         
         if (ancestorPath.startsWith(parentPath)) {
-            return parentPath.length() == ancestorPath.length() || parentPath.endsWith("/") || ancestorPath.charAt(parentPath.length()) == '/';
+            if (parentPath.length() != ancestorPath.length() && !parentPath.endsWith("/") &&
+                ancestorPath.charAt(parentPath.length()) != '/') {
+                if (parentPath.startsWith("file://") && ancestorPath.startsWith("file://")) {
+                    //maybe encoded back slashes (UNC path)?
+                    String encodedSlash = SVNEncodingUtil.uriEncode("\\");
+                    return parentPath.endsWith(encodedSlash) || 
+                           ancestorPath.substring(parentPath.length()).startsWith(encodedSlash);
+                }
+                return false;
+            }
+            return true; 
         }
+        
         return false;
     }
 
