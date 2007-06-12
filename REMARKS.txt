@@ -22,7 +22,7 @@
         
        are all moved to [SVNAdminArea\SVNWCAccess].getVersionedEntry() methods +
 8) validation of EXTERNALS properties in SVNPropertiesManager.setProperty()
-9) changelists implementation (!)
+9) changelists implementation ((+/-))
 10) commit uses SVNTranslatorInputStream for diff windows (inconsistent eols cause commit to abort) ((+))
 11) commit with --with-revprop switch ((+/-))
 12) SVNPropeditCommand ((+))
