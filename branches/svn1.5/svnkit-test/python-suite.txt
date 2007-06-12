@@ -14,13 +14,13 @@ history ALL
 import ALL
 lock ALL
 log ALL
-merge ALL
+merge ALL -4
 prop ALL
 revert ALL
 schedule ALL
 special ALL
 stat ALL
-svnadmin ALL
+svnadmin ALL -7 -8
 svnlook ALL
 svnsync ALL
 svnversion ALL

@@ -11,6 +11,8 @@
  */
 package org.tmatesoft.svn.core.internal.io.dav.http;
 
+import java.io.UnsupportedEncodingException;
+
 import org.tmatesoft.svn.core.auth.SVNPasswordAuthentication;
 import org.tmatesoft.svn.core.internal.util.SVNBase64;
 
@@ -20,15 +22,20 @@ import org.tmatesoft.svn.core.internal.util.SVNBase64;
  */
 class HTTPBasicAuthentication extends HTTPAuthentication {
 
-    public HTTPBasicAuthentication (SVNPasswordAuthentication credentials) {
+    private String myCharset;
+
+    public HTTPBasicAuthentication (SVNPasswordAuthentication credentials, String charset) {
         super(credentials);
+        myCharset = charset;
     }
 
-    protected HTTPBasicAuthentication (String name, String password) {
+    protected HTTPBasicAuthentication (String name, String password, String charset) {
         super(name, password);
+        myCharset = charset;
     }
 
-    protected HTTPBasicAuthentication () {
+    protected HTTPBasicAuthentication (String charset) {
+        myCharset = charset;
     }
 
     public String authenticate() {
@@ -38,7 +45,11 @@ class HTTPBasicAuthentication extends HTTPAuthentication {
         
         StringBuffer result = new StringBuffer();
         String authStr = getUserName() + ":" + getPassword();
-        authStr = SVNBase64.byteArrayToBase64(authStr.getBytes());
+        try {
+            authStr = SVNBase64.byteArrayToBase64(authStr.getBytes(myCharset));
+        } catch (UnsupportedEncodingException e) {
+            authStr = SVNBase64.byteArrayToBase64(authStr.getBytes());
+        }
         result.append("Basic ");
         result.append(authStr);
         return result.toString();

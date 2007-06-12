@@ -51,8 +51,7 @@ public class SVNTranslator {
 
     public static final byte[] CR = new byte[] { '\r' };
 
-    public static final byte[] NATIVE = System.getProperty("line.separator")
-            .getBytes();
+    public static final byte[] NATIVE = System.getProperty("line.separator").getBytes();
 
     private static final String NATIVE_STYLE = "native";
     private static final String CRLF_STYLE = "CRLF";

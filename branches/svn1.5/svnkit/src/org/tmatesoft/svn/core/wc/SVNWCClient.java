@@ -1120,11 +1120,11 @@ public class SVNWCClient extends SVNBasicClient {
         path = new File(SVNPathUtil.validateFilePath(path.getAbsolutePath())).getAbsoluteFile();
         try {
             if (!force && deleteFiles) {
-                SVNWCManager.canDelete(path, !deleteFiles, getOptions());
+                SVNWCManager.canDelete(path, getOptions(), this);
             }
             SVNAdminArea root = wcAccess.open(path.getParentFile(), true, 0); 
             if (!dryRun) {
-                SVNWCManager.delete(wcAccess, root, path, deleteFiles);
+                SVNWCManager.delete(wcAccess, root, path, deleteFiles, true);
             }
         } finally {
             wcAccess.close();
@@ -1401,7 +1401,7 @@ public class SVNWCClient extends SVNBasicClient {
      * Reverts all local changes made to a Working Copy item(s) thus
      * bringing it to a 'pristine' state.
      * 
-     * @param  path            a WC path to perform a revert on
+     * @param  paths           a WC paths to perform a revert on
      * @param  recursive       <span class="javakeyword">true</span> to
      *                         descend recursively (relevant for directories)
      * @throws SVNException    if one of the following is true:
@@ -1410,41 +1410,76 @@ public class SVNWCClient extends SVNBasicClient {
      *                         <li>when trying to revert an addition of a directory
      *                         from within the directory itself
      *                         </ul>
+     * @see #doRevert(File[], boolean)
      */
     /* TODO(sd): "I don't see any reason to change this recurse parameter
      * to a depth, but making a note to re-check this logic later."
      */
     public void doRevert(File path, boolean recursive) throws SVNException {
-        path = new File(SVNPathUtil.validateFilePath(path.getAbsolutePath()));
-        SVNWCAccess wcAccess = createWCAccess();
+        doRevert(new File[] {path}, recursive);
+    }
+
+    /**
+     * Reverts all local changes made to a Working Copy item(s) thus
+     * bringing it to a 'pristine' state.
+     * 
+     * @param  paths           a WC paths to perform a revert on
+     * @param  recursive       <span class="javakeyword">true</span> to
+     *                         descend recursively (relevant for directories)
+     * @throws SVNException    if one of the following is true:
+     *                         <ul>
+     *                         <li><code>path</code> is not under version control
+     *                         <li>when trying to revert an addition of a directory
+     *                         from within the directory itself
+     *                         </ul>
+     *                         
+     *                         Exception will not be thrown if there are multiple paths passed. 
+     *                         Instead caller should process events received by <code>ISVNEventHandler</code>
+     *                         instance to get information on whether certain path was reverted or not.  
+     */
+    public void doRevert(File[] paths, boolean recursive) throws SVNException {
+        boolean reverted = false;
         try {
-            SVNAdminAreaInfo info = wcAccess.openAnchor(path, true, recursive ? SVNWCAccess.INFINITE_DEPTH : 0);
-            SVNEntry entry = wcAccess.getEntry(path, false);
-            if (entry != null && entry.isDirectory() && entry.isScheduledForAddition()) {
-                if (!recursive) {
-                    getDebugLog().info("Forcing revert on path '" + path + "' to recurse");
-                    recursive = true;
+            for (int i = 0; i < paths.length; i++) {
+                File path = paths[i];
+                path = new File(SVNPathUtil.validateFilePath(path.getAbsolutePath()));
+                SVNWCAccess wcAccess = createWCAccess();
+                try {
+                    SVNAdminAreaInfo info = wcAccess.openAnchor(path, true, recursive ? SVNWCAccess.INFINITE_DEPTH : 0);
+                    SVNEntry entry = wcAccess.getEntry(path, false);
+                    if (entry != null && entry.isDirectory() && entry.isScheduledForAddition()) {
+                        if (!recursive) {
+                            getDebugLog().info("Forcing revert on path '" + path + "' to recurse");
+                            recursive = true;
+                            wcAccess.close();
+                            info = wcAccess.openAnchor(path, true, SVNWCAccess.INFINITE_DEPTH);
+                        }
+                    }
+                    
+                    boolean useCommitTimes = getOptions().isUseCommitTimes();
+                    reverted |= doRevert(path, info.getAnchor(), recursive, useCommitTimes);            
+                } catch (SVNException e) {
+                    reverted |= true;
+                    SVNErrorCode code = e.getErrorMessage().getErrorCode();
+                    if (code == SVNErrorCode.ENTRY_NOT_FOUND || code == SVNErrorCode.UNVERSIONED_RESOURCE) {
+                        SVNEvent event = SVNEventFactory.createSkipEvent(path.getParentFile(), path, SVNEventAction.SKIP, SVNEventAction.REVERT, null);
+                        dispatchEvent(event);
+                    }
+                    if (paths.length == 1) { 
+                        throw e;
+                    }
+                } finally {
                     wcAccess.close();
-                    info = wcAccess.openAnchor(path, true, SVNWCAccess.INFINITE_DEPTH);
                 }
             }
-            
-            boolean useCommitTimes = getOptions().isUseCommitTimes();
-            doRevert(path, info.getAnchor(), recursive, useCommitTimes);            
-        } catch (SVNException e) {
-            SVNErrorCode code = e.getErrorMessage().getErrorCode();
-            if (code == SVNErrorCode.ENTRY_NOT_FOUND || code == SVNErrorCode.UNVERSIONED_RESOURCE) {
-                SVNEvent event = SVNEventFactory.createSkipEvent(path.getParentFile(), path, SVNEventAction.SKIP, SVNEventAction.REVERT, null);
-                dispatchEvent(event);
-            } else {            
-                throw e;
-            }
         } finally {
-            wcAccess.close();
+            if (reverted) {
+                sleepForTimeStamp();
+            }
         }
     }
     
-    private void doRevert(File path, SVNAdminArea parent, boolean recursive, boolean useCommitTimes) throws SVNException {
+    private boolean doRevert(File path, SVNAdminArea parent, boolean recursive, boolean useCommitTimes) throws SVNException {
         checkCancelled();
         SVNAdminArea dir = parent.getWCAccess().probeRetrieve(path);
         SVNEntry entry = null;
@@ -1459,7 +1494,7 @@ public class SVNWCClient extends SVNBasicClient {
             if (fileType != SVNFileType.DIRECTORY && !entry.isScheduledForAddition()) {
                 SVNEvent event = SVNEventFactory.createNotRevertedEvent(dir, entry);
                 dispatchEvent(event);
-                return;
+                return false;
             }
         }
         if (entry.getKind() != SVNNodeKind.DIR && entry.getKind() != SVNNodeKind.FILE) {
@@ -1501,9 +1536,18 @@ public class SVNWCClient extends SVNBasicClient {
             if (entry.getKind() == SVNNodeKind.FILE) {
                 reverted = revert(parent, entry.getName(), entry, useCommitTimes);
             } else if (entry.getKind() == SVNNodeKind.DIR) {
-                reverted = revert(dir, dir.getThisDirName(), entry, useCommitTimes);
+                boolean notScheduled = entry.getSchedule() == null;
+                reverted = revert(dir, dir.getThisDirName(), entry, useCommitTimes);                
                 if (entry.isScheduledForReplacement()) {
                     recursive = true;
+                }
+                // check parent entry for schedule.
+                if (parent != dir) {
+                    SVNEntry entryInParent = parent.getEntry(path.getName(), false);
+                    if (entryInParent.getSchedule() != null && notScheduled) {
+                        entryInParent.setSchedule(null);
+                        parent.saveEntries(false);
+                    }
                 }
             }
         }
@@ -1518,9 +1562,10 @@ public class SVNWCClient extends SVNBasicClient {
                     continue;
                 }
                 File childPath = new File(path, childEntry.getName());
-                doRevert(childPath, dir, true, useCommitTimes);
+                reverted |= doRevert(childPath, dir, true, useCommitTimes);
             }
         }
+        return reverted;
     }
     
     private boolean revert(SVNAdminArea dir, String name, SVNEntry entry, boolean useCommitTime) throws SVNException {
@@ -1698,6 +1743,7 @@ public class SVNWCClient extends SVNBasicClient {
      * to a depth, but making a note to re-check this logic later."
      */
     public void doResolve(File path, boolean recursive) throws SVNException {
+        path = path.getAbsoluteFile();
         SVNWCAccess wcAccess = createWCAccess();
         try {
             wcAccess.probeOpen(path, true, recursive ? SVNWCAccess.INFINITE_DEPTH : 0);
@@ -1722,7 +1768,7 @@ public class SVNWCClient extends SVNBasicClient {
         }
         SVNAdminArea dir = wcAccess.retrieve(dirPath);
         if (dir.markResolved(entry.getName(), true, true)) {
-            SVNEvent event = SVNEventFactory.createRestoredEvent(null, dir, entry);
+            SVNEvent event = SVNEventFactory.createResolvedEvent(null, dir, entry);
             dispatchEvent(event);
         }
     }
@@ -1735,7 +1781,7 @@ public class SVNWCClient extends SVNBasicClient {
             SVNAdminArea dir = access.retrieve(path);
             for (Iterator ents = dir.entries(false); ents.hasNext();) {
                 SVNEntry childEntry = (SVNEntry) ents.next();
-                if ("".equals(childEntry.getName())) {
+                if (dir.getThisDirName().equals(childEntry.getName())) {
                     continue;
                 }
                 resolveAll(access, dir.getFile(childEntry.getName()));

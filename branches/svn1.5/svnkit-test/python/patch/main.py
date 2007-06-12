@@ -117,19 +117,20 @@ except ImportError:
 
 # The locations of the svn, svnadmin and svnlook binaries, relative to
 # the only scripts that import this file right now (they live in ../).
-# Use --bin to override these defaults.
-#svn_binary = os.path.abspath('../../svn/svn' + _exe)
-#svnadmin_binary = os.path.abspath('../../svnadmin/svnadmin' + _exe)
-#svnlook_binary = os.path.abspath('../../svnlook/svnlook' + _exe)
-#svnsync_binary = os.path.abspath('../../svnsync/svnsync' + _exe)
-#svnversion_binary = os.path.abspath('../../svnversion/svnversion' + _exe)
-
+#svn_binary = os.path.abspath('../../../clients/cmdline/svn' + _exe)
+#svn_binary = 'svn' + _exe
 svn_binary = os.path.abspath('%ant.dir%/build/lib/jsvn' + _bat)
+#svnadmin_binary = 'svnadmin' + _exe
 svnadmin_binary = os.path.abspath('%ant.dir%/build/lib/jsvnadmin' + _bat)
+#svnlook_binary = 'svnlook' + _exe
 svnlook_binary = os.path.abspath('%ant.dir%/build/lib/jsvnlook' + _bat)
+#svnsync_binary = 'svnsync' + _exe
 svnsync_binary = os.path.abspath('%ant.dir%/build/lib/jsvnsync' + _bat)
+#svnversion_binary = 'svnversion' + _exe
 svnversion_binary = os.path.abspath('%ant.dir%/build/lib/jsvnversion' + _bat)
 
+#svn_binary = os.path.abspath('I:/Workspace/svn_trunk/subversion/svn/svn' + _exe)
+#svnadmin_binary = os.path.abspath('I:/Workspace/svn_trunk/subversion/svnadmin/svnadmin' + _exe)
 
 
 # The location of our mock svneditor script.
@@ -147,7 +148,7 @@ wc_author2 = 'jconstant' # use the same password as wc_author
 verbose_mode = False
 
 # Global variable indicating if we want test data cleaned up after success
-cleanup_mode = True
+cleanup_mode = False
 
 # Global variable indicating if svnserve should use Cyrus SASL
 enable_sasl = False
