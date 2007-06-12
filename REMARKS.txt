@@ -1,4 +1,4 @@
-1) sparse dirs (!)
+1) sparse dirs ((+/-))
 2) new list functionality ((+))
      - uses repository.info() +
      - dispatches SVNDirEntry for the target directory +
@@ -27,7 +27,7 @@
 11) commit with --with-revprop switch ((+/-))
 12) SVNPropeditCommand ((+))
 13) SVNWCClient.doSetProperty(SVNURL url, ...) ((+))
-14) replacement with history performed by SVNKit fails: ((+/-))      
+14) replacement with history performed by SVNKit fails: ((+))      
  - say, we've got a versioned file without props at all
  - we create a file with the same name in the same repository 
    in a different location and with some props attached to it
@@ -50,12 +50,16 @@
               at org.tmatesoft.svn.cli.command.SVNCopyCommand.run(SVNCopyCommand.java:50)
               at org.tmatesoft.svn.cli.SVN.main(SVN.java:149)
     As it's been discovered the problem is in relative File representations with file names only
-    This exact problem (with copying) is resolved but the common problem with relative file names 
-    keeps unresolved... !!ISSUE!!
 15) revert of replacement (that added new .base props) leaves .base props of ((+))
 the reverted file if there were no .revert-base prop file
 Remarks: need to change copy (add empty .revert-base prop file) ((+))
-16) copying multiple sources to repository ((+))
-   * TEST: move url1 url1  +
-17) JavaHL implementation   
-18) cancellation during jsvn* clients' execution (shutdown hook for Runtime?)
+16) JavaHL implementation   
+17) cancellation during jsvn* clients' execution (shutdown hook for Runtime?)
+18) SVNRepository.getDir() with selected SVNDirEntry fields ((+))
+19) --parents switch for MkDir(SVNURL), SVNCopyClient.copy() ((+))
+20) bugfix in switch: switching to non-existent dir in repos should result 
+    to failing but not deleting local directory
+21) SVNDiffClient.doDiffStatus() with pegRevision ((+))
+22) UTF-8 encoding for log messages
+23) add support for --xml switch to 'jsvn prop[get/list]'
+24) support for UNC paths in file protocol (must be tested in various operations) ((+))
