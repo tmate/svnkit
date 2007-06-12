@@ -101,7 +101,7 @@ abstract class HTTPAuthentication {
         myPassword = password;
     }
     
-    public static HTTPAuthentication parseAuthParameters(Collection authHeaderValues, HTTPAuthentication prevResponse) throws SVNException {
+    public static HTTPAuthentication parseAuthParameters(Collection authHeaderValues, HTTPAuthentication prevResponse, String charset) throws SVNException {
         if (authHeaderValues == null) {
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.UNSUPPORTED_FEATURE, "Missing HTTP authorization method"); 
             SVNErrorManager.error(err);
@@ -128,7 +128,7 @@ abstract class HTTPAuthentication {
         
             source = source.substring(index).trim();
             if ("Basic".equalsIgnoreCase(method)) {
-                auth = new HTTPBasicAuthentication();
+                auth = new HTTPBasicAuthentication(charset);
                 
                 if (source.indexOf("realm=") >= 0) {
                     source = source.substring(source.indexOf("realm=") + "realm=".length());
@@ -185,7 +185,7 @@ abstract class HTTPAuthentication {
             } else if ("NTLM".equalsIgnoreCase(method)) {
                 HTTPNTLMAuthentication ntlmAuth = null;
                 if (source.length() == 0) {
-                    ntlmAuth = new HTTPNTLMAuthentication();
+                    ntlmAuth = new HTTPNTLMAuthentication(charset);
                     ntlmAuth.setType1State();
                 } else {
                     ntlmAuth = (HTTPNTLMAuthentication)prevResponse;

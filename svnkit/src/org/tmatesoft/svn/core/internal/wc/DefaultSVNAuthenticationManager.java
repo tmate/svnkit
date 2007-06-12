@@ -53,6 +53,7 @@ public class DefaultSVNAuthenticationManager implements ISVNAuthenticationManage
     private int myLastProviderIndex;
     private SVNCompositeConfigFile myConfigFile;
     private boolean myIsAuthenticationForced;
+    private SVNAuthentication myLastLoadedAuth;
 
     public DefaultSVNAuthenticationManager(File configDirectory, boolean storeAuth, String userName, String password) {
         this(configDirectory, storeAuth, userName, password, null, null);
@@ -72,7 +73,7 @@ public class DefaultSVNAuthenticationManager implements ISVNAuthenticationManage
         myProviders[1] = createRuntimeAuthenticationProvider();
         myProviders[2] = createCacheAuthenticationProvider(new File(myConfigDirectory, "auth"));
     }
-
+    
     public void setAuthenticationProvider(ISVNAuthenticationProvider provider) {
         // add provider to list
         myProviders[3] = provider; 
@@ -140,6 +141,7 @@ public class DefaultSVNAuthenticationManager implements ISVNAuthenticationManage
         myPreviousAuthentication = null;
         myPreviousErrorMessage = null;
         myLastProviderIndex = 0;
+        myLastLoadedAuth = null;
         // iterate over providers and ask for auth till it is found.
         for (int i = 0; i < myProviders.length; i++) {
             if (myProviders[i] == null) {
@@ -147,6 +149,9 @@ public class DefaultSVNAuthenticationManager implements ISVNAuthenticationManage
             }
             SVNAuthentication auth = myProviders[i].requestClientAuthentication(kind, url, realm, null, null, myIsStoreAuth);
             if (auth != null) {
+                if (i == 2) {
+                    myLastLoadedAuth = auth;
+                }
                 myPreviousAuthentication = auth;
                 myLastProviderIndex = i;
                 return auth;
@@ -171,8 +176,14 @@ public class DefaultSVNAuthenticationManager implements ISVNAuthenticationManage
             if (myProviders[i] == null) {
                 continue;
             }
+            if ((i == 1 || i == 2) && hasExplicitCredentials(kind)) {
+                continue;
+            }
             SVNAuthentication auth = myProviders[i].requestClientAuthentication(kind, url, realm, myPreviousErrorMessage, myPreviousAuthentication, myIsStoreAuth);
             if (auth != null) {
+                if (i == 2) {
+                    myLastLoadedAuth = auth;
+                }
                 myPreviousAuthentication = auth;
                 myLastProviderIndex = i;
                 return auth;
@@ -189,12 +200,27 @@ public class DefaultSVNAuthenticationManager implements ISVNAuthenticationManage
         if (!accepted) {
             myPreviousErrorMessage = errorMessage;
             myPreviousAuthentication = authentication;
+            myLastLoadedAuth = null;
             return;
         }
         if (myIsStoreAuth && authentication.isStorageAllowed() && myProviders[2] instanceof IPersistentAuthenticationProvider) {
-            ((IPersistentAuthenticationProvider) myProviders[2]).saveAuthentication(authentication, kind, realm);
+            // compare this authentication with last loaded from provider[2].
+            if (myLastLoadedAuth == null || myLastLoadedAuth != authentication) {
+                ((IPersistentAuthenticationProvider) myProviders[2]).saveAuthentication(authentication, kind, realm);
+            }
         }
-        ((CacheAuthenticationProvider) myProviders[1]).saveAuthentication(authentication, realm);
+        myLastLoadedAuth = null;
+        if (!hasExplicitCredentials(kind)) {
+            // do not cache explicit credentials in runtime cache?
+            ((CacheAuthenticationProvider) myProviders[1]).saveAuthentication(authentication, realm);
+        }
+    }
+    
+    private boolean hasExplicitCredentials(String kind) {
+        if (ISVNAuthenticationManager.PASSWORD.equals(kind) || ISVNAuthenticationManager.USERNAME.equals(kind) || ISVNAuthenticationManager.SSH.equals(kind)) {
+            return myProviders[0] instanceof DumbAuthenticationProvider && ((DumbAuthenticationProvider) myProviders[0]).myUserName != null;
+        }
+        return false;
     }
     
     protected SVNCompositeConfigFile getServersFile() {
@@ -497,6 +523,7 @@ public class DefaultSVNAuthenticationManager implements ISVNAuthenticationManage
             values.put("username", auth.getUserName());
             String cipherType = SVNPasswordCipher.getDefaultCipherType();
             SVNPasswordCipher cipher = SVNPasswordCipher.getInstance(cipherType);
+
             if (cipherType != null) {
                 values.put("passtype", cipherType);
             } 

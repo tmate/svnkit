@@ -120,11 +120,11 @@ public class SVNDiffCommand extends SVNCommand implements ISVNDiffStatusHandler 
             SVNRevision rN = SVNRevision.UNDEFINED;
             SVNRevision rM = SVNRevision.UNDEFINED;
             String revStr = (String) getCommandLine().getArgumentValue(SVNArgument.REVISION);
-            if (revStr != null && revStr.indexOf(':') > 0) {
-                rN = SVNRevision.parse(revStr.substring(0, revStr.indexOf(':')));
-                rM = SVNRevision.parse(revStr.substring(revStr.indexOf(':') + 1));
-            } else if (revStr != null) {
-                rN = SVNRevision.parse(revStr);
+
+            if (revStr != null) {
+                SVNRevision[] revRange = getStartEndRevisions();
+                rN = revRange[0];
+                rM = revRange[1];
             } else if (revStr == null && getCommandLine().hasArgument(SVNArgument.CHANGE)) {
                 long changeRev = Long.parseLong((String) getCommandLine().getArgumentValue(SVNArgument.CHANGE));
                 if (changeRev >= 0) {
@@ -135,6 +135,7 @@ public class SVNDiffCommand extends SVNCommand implements ISVNDiffStatusHandler 
                     rM = SVNRevision.create((-changeRev) - 1);
                 }
             }
+            
             if (getCommandLine().hasArgument(SVNArgument.OLD)) {
                 // diff [-rN[:M]] --old=url[@r] [--new=url[@r]] [path...] (case2)
                 String oldPath = (String) getCommandLine().getArgumentValue(SVNArgument.OLD);
@@ -241,7 +242,9 @@ public class SVNDiffCommand extends SVNCommand implements ISVNDiffStatusHandler 
                 SVNRevision r2 = rM;
                 r1 = r1 == SVNRevision.UNDEFINED ? SVNRevision.BASE : r1;
                 r2 = r2 == SVNRevision.UNDEFINED ? SVNRevision.WORKING : r2;
-                boolean peggedDiff = r1 != SVNRevision.WORKING && r1 != SVNRevision.BASE && r1 != SVNRevision.PREVIOUS;
+                boolean peggedDiff = 
+                    (r1 != SVNRevision.WORKING && r1 != SVNRevision.BASE && r1 != SVNRevision.PREVIOUS) ||
+                    (r2 != SVNRevision.WORKING && r2 != SVNRevision.BASE && r2 != SVNRevision.PREVIOUS);
                 peggedDiff &= !summarize;
                 
                 Collection paths = new LinkedList();

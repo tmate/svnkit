@@ -23,7 +23,7 @@ import java.util.Properties;
  */
 public class Version {
 
-    private static String PROPERTIES_PATH = "svnkit.build.properties";
+    private static String PROPERTIES_PATH = "/svnkit.build.properties";
 
     private static final String VERSION_STRING_PROPERTY = "svnkit.version.string";
     private static final String VERSION_MAJOR_PROPERTY = "svnkit.version.major";
@@ -36,13 +36,28 @@ public class Version {
     private static final String VERSION_MINOR_DEFAULT = "0";
     private static final String VERSION_MICRO_DEFAULT = "0";
     private static final String VERSION_REVISION_DEFAULT = "SNAPSHOT";
+    private static String ourUserAgent;
 
     private static Properties ourProperties;
+    
+    static {
+        ourUserAgent = System.getProperty("svnkit.http.userAgent");
+    }
 
     public static String getVersionString() {
         loadProperties();
-        return ourProperties.getProperty(VERSION_STRING_PROPERTY,
-                VERSION_STRING_DEFAULT);
+        return ourProperties.getProperty(VERSION_STRING_PROPERTY, VERSION_STRING_DEFAULT);
+    }
+    
+    public static void setUserAgent(String userAgent) {
+        ourUserAgent = userAgent;
+    }
+
+    public static String getUserAgent() {
+        if (ourUserAgent != null) {
+            return ourUserAgent;
+        }
+        return getVersionString();
     }
 
     public static int getMajorVersion() {
@@ -93,8 +108,7 @@ public class Version {
         if (ourProperties != null) {
             return;
         }
-        InputStream is = Version.class.getClassLoader().getResourceAsStream(
-                PROPERTIES_PATH);
+        InputStream is = Version.class.getResourceAsStream(PROPERTIES_PATH);
         ourProperties = new Properties();
         if (is == null) {
             return;

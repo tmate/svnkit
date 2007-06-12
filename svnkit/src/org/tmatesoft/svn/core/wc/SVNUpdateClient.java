@@ -1030,15 +1030,18 @@ public class SVNUpdateClient extends SVNBasicClient {
                     if (error != null && error.getErrorMessage().getErrorCode() != SVNErrorCode.WC_LEFT_LOCAL_MOD) {
                         throw error;
                     }
-                } else if (external.isModified()) {
-                    deleteExternal(external);
-                    external.getFile().mkdirs();
-                    dispatchEvent(SVNEventFactory.createUpdateExternalEvent(info, ""));
-                    doCheckout(external.getNewURL(), external.getFile(), revision, revision, SVNDepth.DEPTH_INFINITY, false);
+
                 } else {
                     if (!external.getFile().isDirectory()) {
-                        external.getFile().mkdirs();
-                        doCheckout(external.getNewURL(), external.getFile(), revision, revision, SVNDepth.DEPTH_INFINITY, false);
+                        boolean created = external.getFile().mkdirs();
+                        try {
+                            doCheckout(external.getNewURL(), external.getFile(), revision, revision, true);
+                        } catch (SVNException e) {
+                            if (created && e.getErrorMessage().getErrorCode() == SVNErrorCode.RA_ILLEGAL_URL) {
+                                SVNFileUtil.deleteAll(external.getFile(), true);
+                            }
+                            throw e;
+                        }
                     } else {
                         SVNWCAccess wcAccess = createWCAccess();
                         SVNAdminArea area = wcAccess.open(external.getFile(), true, 0);
@@ -1145,19 +1148,23 @@ public class SVNUpdateClient extends SVNBasicClient {
             }
         }
         SVNRepository repos = createRepository(targetURL, false);
-        SVNURL actualRoot = repos.getRepositoryRoot(true);
-        if (isRoot && !targetURL.equals(actualRoot)) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.CLIENT_INVALID_RELOCATION, "''{0}'' is not the root of the repository", targetURL);
-            SVNErrorManager.error(err);
+        try {
+            SVNURL actualRoot = repos.getRepositoryRoot(true);
+            if (isRoot && !targetURL.equals(actualRoot)) {
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.CLIENT_INVALID_RELOCATION, "''{0}'' is not the root of the repository", targetURL);
+                SVNErrorManager.error(err);
+            }
+    
+            String actualUUID = repos.getRepositoryUUID(true);
+            if (expectedUUID != null && !expectedUUID.equals(actualUUID)) {
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.CLIENT_INVALID_RELOCATION, "The repository at ''{0}'' has uuid ''{1}'', but the WC has ''{2}''",
+                        new Object[] {targetURL, expectedUUID, actualUUID});
+                SVNErrorManager.error(err);
+            }
+            validatedURLs.put(targetURL, actualUUID);
+        } finally {
+            repos.closeSession();
         }
-
-        String actualUUID = repos.getRepositoryUUID(true);
-        if (expectedUUID != null && !expectedUUID.equals(actualUUID)) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.CLIENT_INVALID_RELOCATION, "The repository at ''{0}'' has uuid ''{1}'', but the WC has ''{2}''",
-                    new Object[] {targetURL, expectedUUID, actualUUID});
-            SVNErrorManager.error(err);
-        }
-        validatedURLs.put(targetURL, actualUUID);
         return validatedURLs;
     }
     

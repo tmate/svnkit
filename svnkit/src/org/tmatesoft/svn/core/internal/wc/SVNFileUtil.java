@@ -100,16 +100,13 @@ public class SVNFileUtil {
         String prefix = "svnkit.program.";
 
         Properties props = new Properties();
-        InputStream is = SVNFileUtil.class.getClassLoader().getResourceAsStream("svnkit.runtime.properties");
+        InputStream is = SVNFileUtil.class.getResourceAsStream("/svnkit.runtime.properties");
         if (is != null) {
             try {
                 props.load(is);
             } catch (IOException e) {
             } finally {
-                try {
-                    is.close();
-                } catch (IOException e) {
-                }
+                SVNFileUtil.closeFile(is);
             }
         }
 

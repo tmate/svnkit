@@ -697,7 +697,11 @@ public class SVNCopyClient extends SVNBasicClient {
             uuid = entry.getUUID();
         } else if (entry.getURL() != null) {
             SVNRepository repos = createRepository(entry.getSVNURL(), false);
-            uuid = repos.getRepositoryUUID(true);
+            try {
+                uuid = repos.getRepositoryUUID(true);
+            } finally {
+                repos.closeSession();
+            }
         } else {
             if (wcAccess.isWCRoot(path)) {
                 SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_MISSING_URL, "''{0}'' has no URL", path);
@@ -830,15 +834,6 @@ public class SVNCopyClient extends SVNBasicClient {
                         adminArea = wcAccess.open(dstParent, true, 0);
                     }
                 }
-                
-//                if (!force) {
-//                    try {
-//                        SVNWCManager.canDelete(srcPath, false, getOptions());
-//                    } catch (SVNException svne) {
-//                        SVNErrorMessage err = svne.getErrorMessage().wrap("Move will not be attempted unless forced");
-//                       SVNErrorManager.error(err, svne);
-//                  }
-//                }
             } else {
                 adminArea = wcAccess.open(dstParent, true, 0);
             }
@@ -877,7 +872,7 @@ public class SVNCopyClient extends SVNBasicClient {
                 copyAccess.close();
             }
             if (isMove) {
-                SVNWCManager.delete(srcParentArea.getWCAccess(), srcParentArea, srcPath, true);
+                SVNWCManager.delete(srcParentArea.getWCAccess(), srcParentArea, srcPath, true, false);
             }
         } finally {
             wcAccess.close();
