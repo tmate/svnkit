@@ -145,10 +145,10 @@ wc_passwd = 'rayjandom'
 wc_author2 = 'jconstant' # use the same password as wc_author
 
 # Global variable indicating if we want verbose output.
-verbose_mode = False
+verbose_mode = 1
 
 # Global variable indicating if we want test data cleaned up after success
-cleanup_mode = False
+cleanup_mode = 1
 
 # Global variable indicating if svnserve should use Cyrus SASL
 enable_sasl = False
