@@ -381,18 +381,18 @@ public class FSFile {
         String path = readStringFromReportFile();
         String linkPath = read() == '+' ? readStringFromReportFile() : null;
         long revision = readRevisionFromReportFile();
-        SVNDepth depth = SVNDepth.DEPTH_INFINITY;
+        SVNDepth depth = SVNDepth.INFINITY;
         if (read() == '+') {
             int id = readNumberFromReportFile();
             switch(id) {
                 case 0:
-                    depth = SVNDepth.DEPTH_EMPTY;
+                    depth = SVNDepth.EMPTY;
                     break;
                 case 1:
-                    depth = SVNDepth.DEPTH_FILES;
+                    depth = SVNDepth.FILES;
                     break;
                 case 2:
-                    depth = SVNDepth.DEPTH_IMMEDIATES;
+                    depth = SVNDepth.IMMEDIATES;
                     break;
                 default: {
                     SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.REPOS_BAD_REVISION_REPORT, "Invalid depth ({0,number,integer}) for path ''{1}''", new Object[]{new Integer(id), path});

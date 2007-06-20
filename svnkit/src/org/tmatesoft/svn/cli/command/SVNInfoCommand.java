@@ -75,7 +75,7 @@ public class SVNInfoCommand extends SVNCommand implements ISVNInfoHandler {
             handler.startDocument();
         }
 
-        SVNDepth depth = SVNDepth.DEPTH_UNKNOWN;
+        SVNDepth depth = SVNDepth.UNKNOWN;
         if (getCommandLine().hasArgument(SVNArgument.RECURSIVE)) {
             depth = SVNDepth.fromRecurse(true);
         }
@@ -83,8 +83,8 @@ public class SVNInfoCommand extends SVNCommand implements ISVNInfoHandler {
         if (depthStr != null) {
             depth = SVNDepth.fromString(depthStr);
         }
-        if (depth == SVNDepth.DEPTH_UNKNOWN) {
-            depth = SVNDepth.DEPTH_IMMEDIATES;
+        if (depth == SVNDepth.UNKNOWN) {
+            depth = SVNDepth.IMMEDIATES;
         }
         
         boolean isRecursive = SVNDepth.recurseFromDepth(depth);
@@ -212,7 +212,7 @@ public class SVNInfoCommand extends SVNCommand implements ISVNInfoHandler {
                 print("Schedule: " + info.getSchedule(), myOut);
             }
             if (info.getDepth() != null) {
-                if (info.getDepth() != SVNDepth.DEPTH_UNKNOWN && info.getDepth() != SVNDepth.DEPTH_INFINITY) {
+                if (info.getDepth() != SVNDepth.UNKNOWN && info.getDepth() != SVNDepth.INFINITY) {
                     print("Depth: " + info.getDepth(), myOut);
                 }
             }

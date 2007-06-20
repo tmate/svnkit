@@ -71,7 +71,7 @@ public class DAVEditorHandler extends BasicDAVDeltaHandler {
             buffer.append(SVNEncodingUtil.xmlEncodeCDATA(dstPath));
             buffer.append("</S:dst-path>\n");
         }
-        if (depth == SVNDepth.DEPTH_FILES || depth == SVNDepth.DEPTH_EMPTY) {
+        if (depth == SVNDepth.FILES || depth == SVNDepth.EMPTY) {
             buffer.append("<S:recursive>no</S:recursive>\n");
         }
         
@@ -91,7 +91,7 @@ public class DAVEditorHandler extends BasicDAVDeltaHandler {
         final StringBuffer report = buffer;
         reporterBaton.report(new ISVNReporter() {
             public void setPath(String path, String lockToken, long revision, boolean startEmpty) throws SVNException {
-                setPath(path, lockToken, revision, SVNDepth.DEPTH_INFINITY, startEmpty);
+                setPath(path, lockToken, revision, SVNDepth.INFINITY, startEmpty);
             }
 
             public void deletePath(String path) {
@@ -101,7 +101,7 @@ public class DAVEditorHandler extends BasicDAVDeltaHandler {
             }
 
             public void linkPath(SVNURL url, String path, String lockToken, long revision, boolean startEmpty) throws SVNException {
-                linkPath(url, path, lockToken, revision, SVNDepth.DEPTH_INFINITY, startEmpty);
+                linkPath(url, path, lockToken, revision, SVNDepth.INFINITY, startEmpty);
             }
 
             public void finishReport() {

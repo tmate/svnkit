@@ -141,7 +141,7 @@ public class SVNRemoteStatusEditor extends SVNStatusEditor implements ISVNEditor
                 tweakStatusHash(parent, myDirectoryInfo, myDirectoryInfo.myPath, contentsStatus, propertiesStatus, null);
             }
         }
-        if (parent != null && myDirectoryInfo.myDepth != SVNDepth.DEPTH_EXCLUDE) {
+        if (parent != null && myDirectoryInfo.myDepth != SVNDepth.EXCLUDE) {
             boolean wasDeleted = false;
             SVNStatus dirStatus = (SVNStatus) parent.myChildrenStatuses.get(myDirectoryInfo.myPath);
             if (dirStatus != null && 
@@ -159,7 +159,7 @@ public class SVNRemoteStatusEditor extends SVNStatusEditor implements ISVNEditor
                 File targetPath = getAnchor().getFile(getAdminAreaInfo().getTargetName());
                 SVNStatus tgtStatus = (SVNStatus) myDirectoryInfo.myChildrenStatuses.get(targetPath);
                 if (tgtStatus != null) {
-                    if (getDepth() != SVNDepth.DEPTH_EXCLUDE && tgtStatus.getKind() == SVNNodeKind.DIR) {
+                    if (getDepth() != SVNDepth.EXCLUDE && tgtStatus.getKind() == SVNNodeKind.DIR) {
                         SVNAdminArea dir = getWCAccess().retrieve(targetPath);
                         getDirStatus(null, dir, null, getDepth(), isReportAll(), isNoIgnore(), null, true, getDefaultHandler());
                     }
@@ -266,8 +266,8 @@ public class SVNRemoteStatusEditor extends SVNStatusEditor implements ISVNEditor
             if (getWCAccess().isMissing(path)) {
                 status.setContentsStatus(SVNStatusType.STATUS_MISSING);
             } else if (status.getEntry() != null && status.getKind() == SVNNodeKind.DIR && 
-                    (depth == SVNDepth.DEPTH_UNKNOWN || depth == SVNDepth.DEPTH_IMMEDIATES || 
-                     depth == SVNDepth.DEPTH_INFINITY)) {
+                    (depth == SVNDepth.UNKNOWN || depth == SVNDepth.IMMEDIATES || 
+                     depth == SVNDepth.INFINITY)) {
                 SVNAdminArea dir = getWCAccess().retrieve(path);
                 getDirStatus(dirEntry, dir, null, depth, isReportAll(), isNoIgnore(), null, true, handler);
             }
@@ -393,14 +393,14 @@ public class SVNRemoteStatusEditor extends SVNStatusEditor implements ISVNEditor
             myRemoteKind = SVNNodeKind.DIR;
 
             if (myParent != null) {
-                if (myParent.myDepth == SVNDepth.DEPTH_IMMEDIATES) {
-                    myDepth = SVNDepth.DEPTH_EMPTY;
-                } else if (myParent.myDepth == SVNDepth.DEPTH_FILES || myParent.myDepth == SVNDepth.DEPTH_EMPTY) {
-                    myDepth = SVNDepth.DEPTH_EXCLUDE;
-                } else if (myParent.myDepth == SVNDepth.DEPTH_UNKNOWN) {
-                    myDepth = SVNDepth.DEPTH_UNKNOWN;
+                if (myParent.myDepth == SVNDepth.IMMEDIATES) {
+                    myDepth = SVNDepth.EMPTY;
+                } else if (myParent.myDepth == SVNDepth.FILES || myParent.myDepth == SVNDepth.EMPTY) {
+                    myDepth = SVNDepth.EXCLUDE;
+                } else if (myParent.myDepth == SVNDepth.UNKNOWN) {
+                    myDepth = SVNDepth.UNKNOWN;
                 } else {
-                    myDepth = SVNDepth.DEPTH_INFINITY;
+                    myDepth = SVNDepth.INFINITY;
                 }
             } else {
                 myDepth = getDepth();
@@ -420,15 +420,15 @@ public class SVNRemoteStatusEditor extends SVNStatusEditor implements ISVNEditor
                         textStatus != SVNStatusType.STATUS_EXTERNAL &&
                         textStatus != SVNStatusType.STATUS_IGNORED &&
                         parentStatus.getKind() == SVNNodeKind.DIR && 
-                        (myDepth == SVNDepth.DEPTH_UNKNOWN || 
-                         myDepth == SVNDepth.DEPTH_FILES || 
-                         myDepth == SVNDepth.DEPTH_IMMEDIATES || 
-                         myDepth == SVNDepth.DEPTH_INFINITY)) {
+                        (myDepth == SVNDepth.UNKNOWN || 
+                         myDepth == SVNDepth.FILES || 
+                         myDepth == SVNDepth.IMMEDIATES || 
+                         myDepth == SVNDepth.INFINITY)) {
                     SVNAdminArea dir = getWCAccess().retrieve(myPath);
-                    getDirStatus(null, dir, null, SVNDepth.DEPTH_IMMEDIATES, true, true, null, true, this);
+                    getDirStatus(null, dir, null, SVNDepth.IMMEDIATES, true, true, null, true, this);
                     SVNStatus thisDirStatus = (SVNStatus)myChildrenStatuses.get(myPath);
                     if (thisDirStatus != null && thisDirStatus.getEntry() != null && (
-                            myDepth == SVNDepth.DEPTH_UNKNOWN || 
+                            myDepth == SVNDepth.UNKNOWN || 
                             myDepth.compareTo(parentStatus.getEntry().getDepth()) > 0)) {
                         myDepth = thisDirStatus.getEntry().getDepth();
                     }

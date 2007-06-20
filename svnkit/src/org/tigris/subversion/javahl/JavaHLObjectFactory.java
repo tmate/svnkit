@@ -215,17 +215,17 @@ public class JavaHLObjectFactory {
     public static SVNDepth getSVNDepth(int depth) {
         switch (depth) {
             case Depth.empty:
-                return SVNDepth.DEPTH_EMPTY;
+                return SVNDepth.EMPTY;
             case Depth.exclude:
-                return SVNDepth.DEPTH_EXCLUDE;
+                return SVNDepth.EXCLUDE;
             case Depth.files:
-                return SVNDepth.DEPTH_FILES;
+                return SVNDepth.FILES;
             case Depth.immediates:
-                return SVNDepth.DEPTH_IMMEDIATES;
+                return SVNDepth.IMMEDIATES;
             case Depth.infinity:
-                return SVNDepth.DEPTH_INFINITY;
+                return SVNDepth.INFINITY;
             default:
-                return SVNDepth.DEPTH_UNKNOWN;
+                return SVNDepth.UNKNOWN;
         }
     }
     

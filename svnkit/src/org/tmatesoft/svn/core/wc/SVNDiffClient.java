@@ -1024,7 +1024,7 @@ public class SVNDiffClient extends SVNBasicClient {
             ISVNReporterBaton reporter = new ISVNReporterBaton() {
                 public void report(ISVNReporter reporter) throws SVNException {
                     //TODO(sd): dynamic depth here
-                    reporter.setPath("", null, rev1, SVNDepth.DEPTH_INFINITY, false);
+                    reporter.setPath("", null, rev1, SVNDepth.INFINITY, false);
                     reporter.finishReport();
                 }
             };
@@ -1097,7 +1097,7 @@ public class SVNDiffClient extends SVNBasicClient {
             ISVNReporterBaton reporter = new ISVNReporterBaton() {
                 public void report(ISVNReporter reporter) throws SVNException {
                     //TODO(sd): dynamic depth here
-                    reporter.setPath("", null, rev1, SVNDepth.DEPTH_INFINITY, false);
+                    reporter.setPath("", null, rev1, SVNDepth.INFINITY, false);
                     reporter.finishReport();
                 }
             };
@@ -1190,7 +1190,7 @@ public class SVNDiffClient extends SVNBasicClient {
             dstPath = new File(SVNPathUtil.validateFilePath(dstPath.getAbsolutePath()));
             SVNAdminAreaInfo info = wcAccess.openAnchor(dstPath, !dryRun, SVNDepth.recurseFromDepth(depth) ? SVNWCAccess.INFINITE_DEPTH : 0);
             SVNEntry targetEntry = wcAccess.getVersionedEntry(dstPath, false);
-            if (depth == null || depth == SVNDepth.DEPTH_UNKNOWN) {
+            if (depth == null || depth == SVNDepth.UNKNOWN) {
                 depth = targetEntry.getDepth();
             }
             if (targetEntry.isFile()) {
@@ -1267,7 +1267,7 @@ public class SVNDiffClient extends SVNBasicClient {
             dstPath = new File(SVNPathUtil.validateFilePath(dstPath.getAbsolutePath()));
             SVNAdminAreaInfo info = wcAccess.openAnchor(dstPath, !dryRun, SVNDepth.recurseFromDepth(depth) ? SVNWCAccess.INFINITE_DEPTH : 0);
             SVNEntry targetEntry = wcAccess.getVersionedEntry(dstPath, false);
-            if (depth == null || depth == SVNDepth.DEPTH_UNKNOWN) {
+            if (depth == null || depth == SVNDepth.UNKNOWN) {
                 depth = targetEntry.getDepth();
             }
 
@@ -1344,7 +1344,7 @@ public class SVNDiffClient extends SVNBasicClient {
             dstPath = new File(SVNPathUtil.validateFilePath(dstPath.getAbsolutePath()));
             SVNAdminAreaInfo info = wcAccess.openAnchor(dstPath, !dryRun, SVNDepth.recurseFromDepth(depth) ? SVNWCAccess.INFINITE_DEPTH : 0);
             SVNEntry targetEntry = wcAccess.getVersionedEntry(dstPath, false);
-            if (depth == null || depth == SVNDepth.DEPTH_UNKNOWN) {
+            if (depth == null || depth == SVNDepth.UNKNOWN) {
                 depth = targetEntry.getDepth();
             }
             if (targetEntry.isFile()) {
@@ -1416,7 +1416,7 @@ public class SVNDiffClient extends SVNBasicClient {
             dstPath = new File(SVNPathUtil.validateFilePath(dstPath.getAbsolutePath())).getAbsoluteFile();
             SVNAdminAreaInfo info = wcAccess.openAnchor(dstPath, !dryRun, SVNDepth.recurseFromDepth(depth) ? SVNWCAccess.INFINITE_DEPTH : 0);
             SVNEntry targetEntry = wcAccess.getVersionedEntry(dstPath, false);
-            if (depth == null || depth == SVNDepth.DEPTH_UNKNOWN) {
+            if (depth == null || depth == SVNDepth.UNKNOWN) {
                 depth = targetEntry.getDepth();
             }
             if (targetEntry.isFile()) {
@@ -1488,7 +1488,7 @@ public class SVNDiffClient extends SVNBasicClient {
         try {
             SVNAdminAreaInfo info = wcAccess.openAnchor(dstPath, !dryRun, SVNDepth.recurseFromDepth(depth) ? SVNWCAccess.INFINITE_DEPTH : 0);
             SVNEntry targetEntry = wcAccess.getVersionedEntry(dstPath, false);
-            if (depth == null || depth == SVNDepth.DEPTH_UNKNOWN) {
+            if (depth == null || depth == SVNDepth.UNKNOWN) {
                 depth = targetEntry.getDepth();
             }
             if (targetEntry.isFile()) {
@@ -1572,7 +1572,7 @@ public class SVNDiffClient extends SVNBasicClient {
             path1 = new File(SVNPathUtil.validateFilePath(path1.getAbsolutePath())).getAbsoluteFile();
             SVNAdminAreaInfo info = wcAccess.openAnchor(dstPath.getAbsoluteFile(), !dryRun, SVNDepth.recurseFromDepth(depth) ? SVNWCAccess.INFINITE_DEPTH : 0);
             SVNEntry targetEntry = wcAccess.getVersionedEntry(dstPath, false);
-            if (depth == null || depth == SVNDepth.DEPTH_UNKNOWN) {
+            if (depth == null || depth == SVNDepth.UNKNOWN) {
                 depth = targetEntry.getDepth();
             }
             if (targetEntry.isFile()) {

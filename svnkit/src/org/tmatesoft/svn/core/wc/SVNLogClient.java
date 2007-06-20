@@ -600,7 +600,7 @@ public class SVNLogClient extends SVNBasicClient {
      * @see                   #doList(SVNURL, SVNRevision, SVNRevision, boolean, ISVNDirEntryHandler)  
      */
     public void doList(File path, SVNRevision pegRevision, SVNRevision revision, boolean fetchLocks, boolean recursive, ISVNDirEntryHandler handler) throws SVNException {
-        doList(path, pegRevision, revision, fetchLocks, recursive ? SVNDepth.DEPTH_INFINITY : SVNDepth.DEPTH_IMMEDIATES, SVNDirEntry.DIRENT_ALL, handler);
+        doList(path, pegRevision, revision, fetchLocks, recursive ? SVNDepth.INFINITY : SVNDepth.IMMEDIATES, SVNDirEntry.DIRENT_ALL, handler);
     }
     
     public void doList(File path, SVNRevision pegRevision, SVNRevision revision, boolean fetchLocks, SVNDepth depth, int entryFields, ISVNDirEntryHandler handler) throws SVNException {
@@ -662,7 +662,7 @@ public class SVNLogClient extends SVNBasicClient {
      * @see                   #doList(File, SVNRevision, SVNRevision, boolean, ISVNDirEntryHandler)   
      */
     public void doList(SVNURL url, SVNRevision pegRevision, SVNRevision revision, boolean fetchLocks, boolean recursive, ISVNDirEntryHandler handler) throws SVNException {
-        doList(url, pegRevision, revision, fetchLocks, recursive ? SVNDepth.DEPTH_INFINITY : SVNDepth.DEPTH_IMMEDIATES, SVNDirEntry.DIRENT_ALL, handler);
+        doList(url, pegRevision, revision, fetchLocks, recursive ? SVNDepth.INFINITY : SVNDepth.IMMEDIATES, SVNDirEntry.DIRENT_ALL, handler);
     }
     
     public void doList(SVNURL url, SVNRevision pegRevision, SVNRevision revision, boolean fetchLocks, SVNDepth depth, int entryFields, ISVNDirEntryHandler handler) throws SVNException {
@@ -784,15 +784,15 @@ public class SVNLogClient extends SVNBasicClient {
         };
 
         nestedHandler.handleDirEntry(entry);
-        if (entry.getKind() == SVNNodeKind.DIR && (depth == SVNDepth.DEPTH_FILES || 
-                depth == SVNDepth.DEPTH_IMMEDIATES ||
-                depth == SVNDepth.DEPTH_INFINITY)) {
+        if (entry.getKind() == SVNNodeKind.DIR && (depth == SVNDepth.FILES || 
+                depth == SVNDepth.IMMEDIATES ||
+                depth == SVNDepth.INFINITY)) {
             list(repos, "", rev, depth, entryFields, nestedHandler);
         }
     }
 
     private static void list(SVNRepository repository, String path, long rev, SVNDepth depth, int entryFields, ISVNDirEntryHandler handler) throws SVNException {
-        if (depth == SVNDepth.DEPTH_EMPTY) {
+        if (depth == SVNDepth.EMPTY) {
             return;
         }
         Collection entries = new TreeSet();
@@ -802,11 +802,11 @@ public class SVNLogClient extends SVNBasicClient {
             SVNDirEntry entry = (SVNDirEntry) iterator.next();
             String childPath = SVNPathUtil.append(path, entry.getName());
             entry.setRelativePath(childPath);
-            if (entry.getKind() == SVNNodeKind.FILE || depth == SVNDepth.DEPTH_IMMEDIATES ||
-                depth == SVNDepth.DEPTH_INFINITY) {
+            if (entry.getKind() == SVNNodeKind.FILE || depth == SVNDepth.IMMEDIATES ||
+                depth == SVNDepth.INFINITY) {
                 handler.handleDirEntry(entry);
             }
-            if (entry.getKind() == SVNNodeKind.DIR && entry.getDate() != null && depth == SVNDepth.DEPTH_INFINITY) {
+            if (entry.getKind() == SVNNodeKind.DIR && entry.getDate() != null && depth == SVNDepth.INFINITY) {
                 list(repository, childPath, rev, depth, entryFields, handler);
             }
         }

@@ -42,6 +42,8 @@ import org.tmatesoft.svn.core.internal.wc.SVNFileType;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNProperties;
 import org.tmatesoft.svn.core.io.ISVNLockHandler;
+import org.tmatesoft.svn.core.io.SVNLocationEntry;
+import org.tmatesoft.svn.core.io.SVNRepository;
 
 /**
  * @version 1.1.1
@@ -875,6 +877,88 @@ public class FSFS {
         return metaProps;
     }
 
+    public long getDeletedRevision(String path, long startRev, long endRev) throws SVNException {
+        if (FSRepository.isInvalidRevision(startRev)) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_NO_SUCH_REVISION, "Invalid start revision {0,number,integer}", new Long(startRev));
+            SVNErrorManager.error(err);
+        }
+        if (FSRepository.isInvalidRevision(endRev)) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_NO_SUCH_REVISION, "Invalid end revision {0,number,integer}", new Long(endRev));
+            SVNErrorManager.error(err);
+        }
+        if (startRev > endRev) {
+            long tmpRev = endRev;
+            endRev = startRev;
+            startRev = tmpRev;
+        }
+        
+        FSRevisionRoot startRoot = createRevisionRoot(startRev);
+        FSRevisionNode startNode = null;
+        try {
+            startNode = startRoot.getRevisionNode(path);
+        } catch (SVNException svne) {
+            if (svne.getErrorMessage().getErrorCode() == SVNErrorCode.FS_NOT_FOUND) {
+                return SVNRepository.INVALID_REVISION;
+            }
+            throw svne;
+        }
+        FSID startNodeId = startNode.getId();
+
+        FSRevisionRoot endRoot = createRevisionRoot(endRev);
+        FSRevisionNode endNode = null;
+        try {
+            endNode = endRoot.getRevisionNode(path);
+        } catch (SVNException svne) {
+            if (svne.getErrorMessage().getErrorCode() != SVNErrorCode.FS_NOT_FOUND) {
+                throw svne;
+            }
+        }
+        
+        if (endNode != null) {
+            FSID endNodeId = endNode.getId();
+            if (startNodeId.compareTo(endNodeId) != -1) {
+                FSClosestCopy closestCopy = getClosestCopy(endRoot, path);
+                if (closestCopy == null || closestCopy.getRevisionRoot() == null ||
+                        closestCopy.getRevisionRoot().getRevision() <= startRev) {
+                    return SVNRepository.INVALID_REVISION;
+                }
+            }
+        }
+        
+        long midRev = (startRev + endRev)/2;
+        while (true) {
+            FSRevisionRoot root = createRevisionRoot(midRev);
+            FSRevisionNode node = null;
+            try {
+                node = root.getRevisionNode(path);
+            } catch (SVNException svne) {
+                if (svne.getErrorMessage().getErrorCode() == SVNErrorCode.FS_NOT_FOUND) {
+                    endRev = midRev;
+                    midRev = (startRev + endRev)/2;
+                } else {
+                    throw svne;
+                }
+            }
+            
+            if (node != null) {
+                FSID currentNodeId = node.getId();
+                int nodeRelationship = startNodeId.compareTo(currentNodeId);
+                FSClosestCopy closestCopy = getClosestCopy(root, path);
+                if (nodeRelationship == -1 || (closestCopy != null && 
+                    closestCopy.getRevisionRoot() != null && 
+                    closestCopy.getRevisionRoot().getRevision() > startRev)) {
+                    endRev = midRev;
+                    midRev = (startRev + endRev)/2;
+                } else if (endRev - midRev == 1) {
+                    return endRev;
+                } else {
+                    startRev = midRev;
+                    midRev = (startRev + endRev)/2; 
+                }
+            }
+        }
+    }
+    
     public static File findRepositoryRoot(File path) {
         if (path == null) {
             path = new File("");
@@ -918,6 +1002,32 @@ public class FSFS {
             path = path.substring(0, path.length() - 1);
         }
         return path;
+    }
+
+    public FSClosestCopy getClosestCopy(FSRevisionRoot root, String path) throws SVNException {
+        FSParentPath parentPath = root.openPath(path, true, true);
+        SVNLocationEntry copyDstEntry = FSNodeHistory.findYoungestCopyroot(myRepositoryRoot, parentPath);
+        if (copyDstEntry == null || copyDstEntry.getRevision() == 0) {
+            return null;
+        }
+
+        FSRevisionRoot copyDstRoot = createRevisionRoot(copyDstEntry.getRevision());
+        if (copyDstRoot.checkNodeKind(path) == SVNNodeKind.NONE) {
+            return null;
+        }
+        FSParentPath copyDstParentPath = copyDstRoot.openPath(path, true, true);
+        FSRevisionNode copyDstNode = copyDstParentPath.getRevNode();
+        if (!copyDstNode.getId().isRelated(parentPath.getRevNode().getId())) {
+            return null;
+        }
+
+        long createdRev = copyDstNode.getId().getRevision();
+        if (createdRev == copyDstEntry.getRevision()) {
+            if (copyDstNode.getPredecessorId() == null) {
+                return null;
+            }
+        }
+        return new FSClosestCopy(copyDstRoot, copyDstEntry.getPath());
     }
 
     protected FSFile getTransactionRevisionPrototypeFile(String txnID) {

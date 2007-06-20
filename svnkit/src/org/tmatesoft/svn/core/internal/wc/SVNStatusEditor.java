@@ -106,14 +106,14 @@ public class SVNStatusEditor {
                     SVNEntry entry = myWCAccess.getEntry(path, false);
                     if (entry == null) {
                         getDirStatus(null, myAdminInfo.getAnchor(), myAdminInfo.getTargetName(), 
-                                SVNDepth.DEPTH_EMPTY, myIsReportAll, true, null, true, myStatusHandler);
+                                SVNDepth.EMPTY, myIsReportAll, true, null, true, myStatusHandler);
                     } else {
                         SVNAdminArea target = myWCAccess.retrieve(path);
                         getDirStatus(null, target, null, 
                                 myDepth, myIsReportAll, myIsNoIgnore, null, false, myStatusHandler);
                     }
                 } else {
-                    getDirStatus(null, myAdminInfo.getAnchor(), myAdminInfo.getTargetName(), SVNDepth.DEPTH_EMPTY, myIsReportAll, true, null, true, myStatusHandler);
+                    getDirStatus(null, myAdminInfo.getAnchor(), myAdminInfo.getTargetName(), SVNDepth.EMPTY, myIsReportAll, true, null, true, myStatusHandler);
                 }
             } else {
                 getDirStatus(null, myAdminInfo.getAnchor(), null, 
@@ -182,7 +182,7 @@ public class SVNStatusEditor {
             }
         }
 
-        if (depth == SVNDepth.DEPTH_EMPTY) {
+        if (depth == SVNDepth.EMPTY) {
             return;
         }
         // iterate over files.
@@ -203,7 +203,7 @@ public class SVNStatusEditor {
             if (dir.getThisDirName().equals(entry.getName())) {
                 continue;
             }
-            if (depth == SVNDepth.DEPTH_FILES && entry.isDirectory()) {
+            if (depth == SVNDepth.FILES && entry.isDirectory()) {
                 continue;
             }
             File file = (File) childrenFiles.get(entry.getName());
@@ -211,7 +211,7 @@ public class SVNStatusEditor {
             boolean special = fileType == SVNFileType.SYMLINK;
             SVNNodeKind fileKind = SVNFileType.getNodeKind(fileType);
             handleDirEntry(dir, entry.getName(), dirEntry, entry, 
-                    fileKind, special, depth == SVNDepth.DEPTH_INFINITY ? depth : SVNDepth.DEPTH_EMPTY, 
+                    fileKind, special, depth == SVNDepth.INFINITY ? depth : SVNDepth.EMPTY, 
                             getAll, noIgnore, handler);
         }
     }
@@ -279,8 +279,8 @@ public class SVNStatusEditor {
             if (entry.getKind() == fileKind) {
                 fullEntry = myWCAccess.getVersionedEntry(path, false);
             }
-            if (fullEntry != entry && (depth == SVNDepth.DEPTH_UNKNOWN || depth == SVNDepth.DEPTH_IMMEDIATES
-                    || depth == SVNDepth.DEPTH_INFINITY)) {
+            if (fullEntry != entry && (depth == SVNDepth.UNKNOWN || depth == SVNDepth.IMMEDIATES
+                    || depth == SVNDepth.INFINITY)) {
                 SVNAdminArea childDir = myWCAccess.retrieve(path);
                 getDirStatus(dirEntry, childDir, null, depth, getAll, noIgnore, null, false, handler);
             } else if (fullEntry != entry) {

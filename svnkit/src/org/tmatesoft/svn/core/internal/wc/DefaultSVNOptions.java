@@ -56,6 +56,7 @@ public class DefaultSVNOptions implements ISVNOptions, ISVNMergerFactory {
     private static final String KEYWORD_TIMEZONE = "keyword_timezone";
     private static final String KEYWORD_LOCALE = "keyword_locale";
     private static final String EDITOR_CMD = "editor-cmd";
+    private static final String PRESERVED_CONFLICT_FILE_EXTENSIONS = "preserved-conflict-file-exts";
     
     private static final String DEFAULT_IGNORES = "*.o *.lo *.la #*# .*.rej *.rej .*~ *~ .#* .DS_Store";    
     private static final String YES = "yes";
@@ -440,5 +441,21 @@ public class DefaultSVNOptions implements ISVNOptions, ISVNMergerFactory {
             return null;
         }
         return new Locale(str.substring(0, 2), str.substring(3, 5), str.substring(6));
+    }
+
+    public String[] getPreservedConflictFileExtensions() {
+        String value = getConfigFile().getPropertyValue(MISCELLANY_GROUP, PRESERVED_CONFLICT_FILE_EXTENSIONS);
+        if (value == null) {
+            value = "";
+        }
+        Collection tokensList = new ArrayList();
+        for (StringTokenizer tokens = new StringTokenizer(value, " \t"); tokens.hasMoreTokens();) {
+            String token = tokens.nextToken();
+            if ("".equals(token)) {
+                continue;
+            }
+            tokensList.add(token);
+        }
+        return (String[]) tokensList.toArray(new String[tokensList.size()]);
     }
 }

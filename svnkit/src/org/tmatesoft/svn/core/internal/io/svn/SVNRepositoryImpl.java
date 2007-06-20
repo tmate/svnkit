@@ -965,7 +965,7 @@ public class SVNRepositoryImpl extends SVNRepository implements ISVNReporter {
      */
 
     public void setPath(String path, String lockToken, long revision,  boolean startEmpty) throws SVNException {
-        setPath(path, lockToken, revision, SVNDepth.DEPTH_INFINITY, startEmpty);
+        setPath(path, lockToken, revision, SVNDepth.INFINITY, startEmpty);
     }
 
     public void deletePath(String path) throws SVNException {
@@ -975,7 +975,7 @@ public class SVNRepositoryImpl extends SVNRepository implements ISVNReporter {
     public void linkPath(SVNURL url, String path,
             String lockToken, long revison, boolean startEmpty)
             throws SVNException {
-        linkPath(url, path, lockToken, revison, SVNDepth.DEPTH_INFINITY, startEmpty);
+        linkPath(url, path, lockToken, revison, SVNDepth.INFINITY, startEmpty);
     }
 
     public void finishReport() throws SVNException {

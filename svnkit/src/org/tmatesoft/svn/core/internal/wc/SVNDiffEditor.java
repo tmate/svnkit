@@ -129,7 +129,7 @@ public class SVNDiffEditor implements ISVNEditor {
             }
             if (entry.isFile()) {
                 reportAddedFile(info, SVNPathUtil.append(info.myPath, entry.getName()), entry);
-            } else if (entry.isDirectory() && myDepth == SVNDepth.DEPTH_INFINITY) {
+            } else if (entry.isDirectory() && myDepth == SVNDepth.INFINITY) {
                 SVNDirectoryInfo childInfo = createDirInfo(info, SVNPathUtil.append(info.myPath, entry.getName()), false);
                 reportAddedDir(childInfo);
             }
@@ -450,7 +450,7 @@ public class SVNDiffEditor implements ISVNEditor {
             if (entry.isFile()) {
                 reportModifiedFile(info, entry);
             } else if (entry.isDirectory()) {
-                if (anchor || myDepth == SVNDepth.DEPTH_INFINITY) {
+                if (anchor || myDepth == SVNDepth.INFINITY) {
                     SVNDirectoryInfo childInfo = createDirInfo(info, SVNPathUtil.append(info.myPath, entry.getName()), false);
                     localDirectoryDiff(childInfo);
                 }

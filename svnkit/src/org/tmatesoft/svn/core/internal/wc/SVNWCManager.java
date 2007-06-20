@@ -137,10 +137,10 @@ public class SVNWCManager {
                 SVNEntry pEntry = wcAccess.getEntry(path.getParentFile(), false);
                 SVNURL newURL = pEntry.getSVNURL().appendPath(name, false);
                 SVNURL rootURL = pEntry.getRepositoryRootURL();
-                ensureAdminAreaExists(path, newURL.toString(), rootURL != null ? rootURL.toString() : null, pEntry.getUUID(), 0, SVNDepth.DEPTH_INFINITY);
+                ensureAdminAreaExists(path, newURL.toString(), rootURL != null ? rootURL.toString() : null, pEntry.getUUID(), 0, SVNDepth.INFINITY);
             } else {
                 SVNURL rootURL = parentEntry.getRepositoryRootURL();
-                ensureAdminAreaExists(path, copyFromURL.toString(), rootURL != null ? rootURL.toString() : null, parentEntry.getUUID(), copyFromRev, SVNDepth.DEPTH_INFINITY);
+                ensureAdminAreaExists(path, copyFromURL.toString(), rootURL != null ? rootURL.toString() : null, parentEntry.getUUID(), copyFromRev, SVNDepth.INFINITY);
             }
             if (entry == null || entry.isDeleted()) {
                 dir = wcAccess.open(path, true, copyFromURL != null ? SVNWCAccess.INFINITE_DEPTH : 0);
@@ -150,7 +150,7 @@ public class SVNWCManager {
             dir.modifyEntry(dir.getThisDirName(), command, true, true);
             if (copyFromURL != null) {
                 SVNURL newURL = parentEntry.getSVNURL().appendPath(name, false);
-                updateCleanup(path, wcAccess, newURL.toString(), parentEntry.getRepositoryRoot(), -1, false, null, SVNDepth.DEPTH_INFINITY);
+                updateCleanup(path, wcAccess, newURL.toString(), parentEntry.getRepositoryRoot(), -1, false, null, SVNDepth.INFINITY);
                 markTree(dir, null, true, false, COPIED);
                 SVNPropertiesManager.deleteWCProperties(dir, null, true);
             }
@@ -316,7 +316,10 @@ public class SVNWCManager {
         if (!excludePaths.contains(dir.getRoot())) {
             write = dir.tweakEntry(dir.getThisDirName(), baseURL, rootURL, newRevision, false);
         }
-        if (depth == SVNDepth.DEPTH_FILES || depth == SVNDepth.DEPTH_IMMEDIATES || depth == SVNDepth.DEPTH_INFINITY) {
+        if (depth == SVNDepth.UNKNOWN) {
+            depth = SVNDepth.INFINITY;
+        }
+        if (depth.compareTo(SVNDepth.EMPTY) > 0) {
             for(Iterator entries = dir.entries(true); entries.hasNext();) {
                 SVNEntry entry = (SVNEntry) entries.next();
                 if (dir.getThisDirName().equals(entry.getName())) {
@@ -335,7 +338,11 @@ public class SVNWCManager {
                     if (!isExcluded) {
                         write |= dir.tweakEntry(entry.getName(), childURL, rootURL, newRevision, true);
                     }
-                } else if (entry.isDirectory() && depth == SVNDepth.DEPTH_INFINITY) {
+                } else if (entry.isDirectory() && (depth == SVNDepth.INFINITY || 
+                                                   depth == SVNDepth.IMMEDIATES)) {
+                    SVNDepth depthBelowHere = depth == SVNDepth.IMMEDIATES ? SVNDepth.EMPTY : 
+                                                                             depth;
+
                     File path = dir.getFile(entry.getName());
                     if (removeMissingDirs && dir.getWCAccess().isMissing(path)) {
                         if (!entry.isScheduledForAddition() && !isExcluded) {
@@ -344,7 +351,7 @@ public class SVNWCManager {
                         }
                     } else {
                         SVNAdminArea childDir = dir.getWCAccess().retrieve(path);
-                        tweakEntries(childDir, childURL, rootURL, newRevision, removeMissingDirs, excludePaths, depth);
+                        tweakEntries(childDir, childURL, rootURL, newRevision, removeMissingDirs, excludePaths, depthBelowHere);
                     }
                 } 
             }
@@ -403,7 +410,7 @@ public class SVNWCManager {
                 }
             });
         }
-        statusClient.doStatus(path, SVNRevision.UNDEFINED, SVNDepth.DEPTH_INFINITY, false, false, false, false, new ISVNStatusHandler() {
+        statusClient.doStatus(path, SVNRevision.UNDEFINED, SVNDepth.INFINITY, false, false, false, false, new ISVNStatusHandler() {
             public void handleStatus(SVNStatus status) throws SVNException {
                 if (status.getContentsStatus() == SVNStatusType.STATUS_OBSTRUCTED) {
                     SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.NODE_UNEXPECTED_KIND, "''{0}'' is in the way of the resource actually under version control", status.getFile());

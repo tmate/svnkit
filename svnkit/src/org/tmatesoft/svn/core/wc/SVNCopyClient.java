@@ -549,7 +549,7 @@ public class SVNCopyClient extends SVNBasicClient {
                 SVNUpdateClient updateClient = new SVNUpdateClient(getRepositoryPool(), getOptions());
                 updateClient.setEventHandler(getEventDispatcher());
     
-                revision = updateClient.doCheckout(srcURL, dstPath, srcRevision, srcRevision, SVNDepth.DEPTH_INFINITY, false);
+                revision = updateClient.doCheckout(srcURL, dstPath, srcRevision, srcRevision, SVNDepth.INFINITY, false);
                 
                 if (srcRevision == SVNRevision.HEAD && sameRepositories) {
                     SVNAdminArea dstArea = dstAccess.open(dstPath, true, SVNWCAccess.INFINITE_DEPTH);

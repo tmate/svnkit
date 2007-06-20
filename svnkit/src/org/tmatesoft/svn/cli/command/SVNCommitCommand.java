@@ -38,7 +38,7 @@ public class SVNCommitCommand extends SVNCommand {
     
     public void run(final PrintStream out, PrintStream err) throws SVNException {
         checkEditorCommand();
-        SVNDepth depth = SVNDepth.DEPTH_UNKNOWN;
+        SVNDepth depth = SVNDepth.UNKNOWN;
         if (getCommandLine().hasArgument(SVNArgument.NON_RECURSIVE)) {
             depth = SVNDepth.fromRecurse(false);
         }
@@ -46,8 +46,8 @@ public class SVNCommitCommand extends SVNCommand {
         if (depthStr != null) {
             depth = SVNDepth.fromString(depthStr);
         }
-        if (depth == SVNDepth.DEPTH_UNKNOWN) {
-            depth = SVNDepth.DEPTH_INFINITY;
+        if (depth == SVNDepth.UNKNOWN) {
+            depth = SVNDepth.INFINITY;
         }
         
         boolean keepLocks = getCommandLine().hasArgument(SVNArgument.NO_UNLOCK);

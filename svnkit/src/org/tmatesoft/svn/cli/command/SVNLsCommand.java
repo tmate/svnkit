@@ -56,7 +56,7 @@ public class SVNLsCommand extends SVNCommand implements ISVNDirEntryHandler {
     }
 
     public void run(PrintStream out, PrintStream err) throws SVNException {
-        SVNDepth depth = SVNDepth.DEPTH_UNKNOWN;
+        SVNDepth depth = SVNDepth.UNKNOWN;
         if (getCommandLine().hasArgument(SVNArgument.RECURSIVE)) {
             depth = SVNDepth.fromRecurse(true);
         }
@@ -64,8 +64,8 @@ public class SVNLsCommand extends SVNCommand implements ISVNDirEntryHandler {
         if (depthStr != null) {
             depth = SVNDepth.fromString(depthStr);
         }
-        if (depth == SVNDepth.DEPTH_UNKNOWN) {
-            depth = SVNDepth.DEPTH_IMMEDIATES;
+        if (depth == SVNDepth.UNKNOWN) {
+            depth = SVNDepth.IMMEDIATES;
         }
         
         myIsVerbose = getCommandLine().hasArgument(SVNArgument.VERBOSE);

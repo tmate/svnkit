@@ -396,5 +396,7 @@ public interface ISVNOptions extends ISVNTunnelProvider {
 
     public DateFormat getKeywordDateFormat();
     
+    public String[] getPreservedConflictFileExtensions();
+    
     public String getEditor();
 }

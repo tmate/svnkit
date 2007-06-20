@@ -129,7 +129,7 @@ public class SVNInfo {
         }
         return new SVNInfo(path, url, revision, dirEntry.getKind(), uuid,
                 reposRootURL, dirEntry.getRevision(), dirEntry.getDate(),
-                dirEntry.getAuthor(), lock, SVNDepth.DEPTH_UNKNOWN);
+                dirEntry.getAuthor(), lock, SVNDepth.UNKNOWN);
     }
 
     static SVNInfo createInfo(File file, SVNErrorMessage error) {
