@@ -35,7 +35,7 @@ public class SVNSwitchCommand extends SVNCommand {
     }
 
     public void run(final PrintStream out, final PrintStream err) throws SVNException {
-        SVNDepth depth = SVNDepth.DEPTH_UNKNOWN;
+        SVNDepth depth = SVNDepth.UNKNOWN;
         if (getCommandLine().hasArgument(SVNArgument.NON_RECURSIVE)) {
             depth = SVNDepth.fromRecurse(false);
         }
@@ -47,8 +47,8 @@ public class SVNSwitchCommand extends SVNCommand {
          * on this command.  It took -N but not -R.  Why was -N
          * useful?  Does it make sense in a depthy universe?" 
          */
-        if (depth == SVNDepth.DEPTH_UNKNOWN) {
-            depth = SVNDepth.DEPTH_INFINITY;
+        if (depth == SVNDepth.UNKNOWN) {
+            depth = SVNDepth.INFINITY;
         }
         String url = getCommandLine().getURL(0);
         String absolutePath = getCommandLine().getPathAt(0);

@@ -128,9 +128,9 @@ public class SVNStatusCommand extends SVNCommand implements ISVNStatusHandler, I
 
         boolean showUpdates = getCommandLine().hasArgument(SVNArgument.SHOW_UPDATES);
 
-        SVNDepth depth = SVNDepth.DEPTH_UNKNOWN;
+        SVNDepth depth = SVNDepth.UNKNOWN;
         if (getCommandLine().hasArgument(SVNArgument.NON_RECURSIVE)) {
-            depth = SVNDepth.DEPTH_IMMEDIATES;
+            depth = SVNDepth.IMMEDIATES;
         }
         String depthStr = (String) getCommandLine().getArgumentValue(SVNArgument.DEPTH);
         if (depthStr != null) {

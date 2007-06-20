@@ -38,7 +38,7 @@ public class SVNMergeCommand extends SVNCommand {
     }
 
 	public void run(final PrintStream out, PrintStream err) throws SVNException {
-        SVNDepth depth = SVNDepth.DEPTH_UNKNOWN;
+        SVNDepth depth = SVNDepth.UNKNOWN;
         if (getCommandLine().hasArgument(SVNArgument.NON_RECURSIVE)) {
             depth = SVNDepth.fromRecurse(false);
         }

@@ -821,7 +821,7 @@ public class SVNWCClient extends SVNBasicClient {
      * situation where depth support would be useful here?"
      */
     public void doGetProperty(File path, String propName, SVNRevision pegRevision, SVNRevision revision, boolean recursive, ISVNPropertyHandler handler) throws SVNException {
-        doGetProperty(path, propName, pegRevision, revision, recursive ? SVNDepth.DEPTH_INFINITY : SVNDepth.DEPTH_EMPTY, handler);
+        doGetProperty(path, propName, pegRevision, revision, recursive ? SVNDepth.INFINITY : SVNDepth.EMPTY, handler);
     }
     
     public void doGetProperty(File path, String propName, SVNRevision pegRevision, SVNRevision revision, SVNDepth depth, ISVNPropertyHandler handler) throws SVNException {
@@ -830,8 +830,8 @@ public class SVNWCClient extends SVNBasicClient {
             SVNErrorManager.error(err);
         }
 
-        if (depth == null || depth == SVNDepth.DEPTH_UNKNOWN) {
-            depth = SVNDepth.DEPTH_EMPTY;
+        if (depth == null || depth == SVNDepth.UNKNOWN) {
+            depth = SVNDepth.EMPTY;
         }
         
         if (revision == null || !revision.isValid()) {
@@ -841,9 +841,9 @@ public class SVNWCClient extends SVNBasicClient {
 
         try {
             int admDepth = SVNWCAccess.INFINITE_DEPTH;
-            if (depth == SVNDepth.DEPTH_EMPTY || depth == SVNDepth.DEPTH_FILES) {
+            if (depth == SVNDepth.EMPTY || depth == SVNDepth.FILES) {
                 admDepth = 0;
-            } else if (depth == SVNDepth.DEPTH_IMMEDIATES) {
+            } else if (depth == SVNDepth.IMMEDIATES) {
                 admDepth = 1; 
             }
             SVNAdminArea area = wcAccess.probeOpen(path, false, admDepth);
@@ -856,7 +856,7 @@ public class SVNWCClient extends SVNBasicClient {
                 doGetRemoteProperty(url, "", repository, propName, revision, depth, handler);
             } else {
                 boolean base = revision == SVNRevision.BASE || revision == SVNRevision.COMMITTED;
-                if (entry.getKind() == SVNNodeKind.DIR && depth == SVNDepth.DEPTH_INFINITY) {
+                if (entry.getKind() == SVNNodeKind.DIR && depth == SVNDepth.INFINITY) {
                     // area is path itself.
                     doGetLocalProperty(area, propName, base, handler);
                 } else {
@@ -876,13 +876,13 @@ public class SVNWCClient extends SVNBasicClient {
                         }
                     }
                     
-                    if (SVNDepth.DEPTH_EMPTY.compareTo(depth) < 0 && entry.getKind() == SVNNodeKind.DIR) {
+                    if (SVNDepth.EMPTY.compareTo(depth) < 0 && entry.getKind() == SVNNodeKind.DIR) {
                         for (Iterator entries = area.entries(false); entries.hasNext();) {
                             SVNEntry childEntry = (SVNEntry) entries.next();
                             if (area.getThisDirName().equals(childEntry.getName())) {
                                 continue;
                             }
-                            if (childEntry.isFile() || depth == SVNDepth.DEPTH_IMMEDIATES) {
+                            if (childEntry.isFile() || depth == SVNDepth.IMMEDIATES) {
                                 if ((base && childEntry.isScheduledForAddition()) || (!base && childEntry.isScheduledForDeletion())) {
                                     return;
                                 }
@@ -965,7 +965,7 @@ public class SVNWCClient extends SVNBasicClient {
      * situation where depth support would be useful here?"
      */
     public void doGetProperty(SVNURL url, String propName, SVNRevision pegRevision, SVNRevision revision, boolean recursive, ISVNPropertyHandler handler) throws SVNException {
-        doGetProperty(url, propName, pegRevision, revision, recursive ? SVNDepth.DEPTH_INFINITY : SVNDepth.DEPTH_EMPTY, handler);
+        doGetProperty(url, propName, pegRevision, revision, recursive ? SVNDepth.INFINITY : SVNDepth.EMPTY, handler);
     }
 
     public void doGetProperty(SVNURL url, String propName, SVNRevision pegRevision, SVNRevision revision, SVNDepth depth, ISVNPropertyHandler handler) throws SVNException {
@@ -2546,7 +2546,7 @@ public class SVNWCClient extends SVNBasicClient {
         Map props = new HashMap();
         if (kind == SVNNodeKind.DIR) {
             Collection children = repos.getDir(path, revNumber, props,
-                    SVNDepth.DEPTH_EMPTY.compareTo(depth) < 0 ? new ArrayList() : null);
+                    SVNDepth.EMPTY.compareTo(depth) < 0 ? new ArrayList() : null);
             if (propName != null) {
                 String value = (String) props.get(propName);
                 if (value != null) {
@@ -2563,16 +2563,16 @@ public class SVNWCClient extends SVNBasicClient {
                     handler.handleProperty(url, new SVNPropertyData(name, value));
                 }
             }
-            if (SVNDepth.DEPTH_EMPTY.compareTo(depth) < 0) {
+            if (SVNDepth.EMPTY.compareTo(depth) < 0) {
                 checkCancelled();
                 for (Iterator entries = children.iterator(); entries.hasNext();) {
                     SVNDirEntry child = (SVNDirEntry) entries.next();
                     SVNURL childURL = url.appendPath(child.getName(), false);
                     String childPath = "".equals(path) ? child.getName() : SVNPathUtil.append(path, child.getName());
-                    if (child.getKind() == SVNNodeKind.FILE || SVNDepth.DEPTH_FILES.compareTo(depth) < 0) {
+                    if (child.getKind() == SVNNodeKind.FILE || SVNDepth.FILES.compareTo(depth) < 0) {
                         SVNDepth depthBelowHere = depth;
-                        if (depth == SVNDepth.DEPTH_IMMEDIATES) {
-                            depthBelowHere = SVNDepth.DEPTH_EMPTY;
+                        if (depth == SVNDepth.IMMEDIATES) {
+                            depthBelowHere = SVNDepth.EMPTY;
                         }
                         doGetRemoteProperty(childURL, childPath, repos, propName, rev, depthBelowHere, handler);
                     }

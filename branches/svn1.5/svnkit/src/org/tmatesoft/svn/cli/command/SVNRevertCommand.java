@@ -58,7 +58,7 @@ public class SVNRevertCommand extends SVNCommand {
             }
         }
 
-        SVNDepth depth = SVNDepth.DEPTH_UNKNOWN;
+        SVNDepth depth = SVNDepth.UNKNOWN;
         if (getCommandLine().hasArgument(SVNArgument.RECURSIVE)) {
             depth = SVNDepth.fromRecurse(true);
         }
@@ -66,7 +66,7 @@ public class SVNRevertCommand extends SVNCommand {
         if (depthStr != null) {
             depth = SVNDepth.fromString(depthStr);
         }
-        if (depth == SVNDepth.DEPTH_UNKNOWN) {
+        if (depth == SVNDepth.UNKNOWN) {
             depth = SVNDepth.fromRecurse(false);
         }
         

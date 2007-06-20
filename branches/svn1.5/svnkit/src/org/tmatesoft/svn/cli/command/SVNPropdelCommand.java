@@ -81,7 +81,7 @@ public class SVNPropdelCommand extends SVNCommand implements ISVNEventHandler {
         SVNPathList pathList = SVNPathList.create(paths, SVNRevision.UNDEFINED);
         SVNCompositePathList combinedPathList = SVNCompositePathList.create(pathList, changelist, false);
         
-        SVNDepth depth = SVNDepth.DEPTH_UNKNOWN;
+        SVNDepth depth = SVNDepth.UNKNOWN;
         if (getCommandLine().hasArgument(SVNArgument.RECURSIVE)) {
             depth = SVNDepth.fromRecurse(true);
         }
@@ -89,8 +89,8 @@ public class SVNPropdelCommand extends SVNCommand implements ISVNEventHandler {
         if (depthStr != null) {
             depth = SVNDepth.fromString(depthStr);
         }
-        if (depth == SVNDepth.DEPTH_UNKNOWN) {
-            depth = SVNDepth.DEPTH_EMPTY;
+        if (depth == SVNDepth.UNKNOWN) {
+            depth = SVNDepth.EMPTY;
         }
         
         myIsRecursive = SVNDepth.recurseFromDepth(depth);

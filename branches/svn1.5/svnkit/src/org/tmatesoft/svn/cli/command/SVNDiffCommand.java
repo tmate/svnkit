@@ -65,7 +65,7 @@ public class SVNDiffCommand extends SVNCommand implements ISVNDiffStatusHandler 
             }
         }
         
-        SVNDepth depth = SVNDepth.DEPTH_UNKNOWN;
+        SVNDepth depth = SVNDepth.UNKNOWN;
         if (getCommandLine().hasArgument(SVNArgument.NON_RECURSIVE)) {
             depth = SVNDepth.fromRecurse(false);
         }
@@ -73,8 +73,8 @@ public class SVNDiffCommand extends SVNCommand implements ISVNDiffStatusHandler 
         if (depthStr != null) {
             depth = SVNDepth.fromString(depthStr);
         }
-        if (depth == SVNDepth.DEPTH_UNKNOWN) {
-            depth = SVNDepth.DEPTH_INFINITY;
+        if (depth == SVNDepth.UNKNOWN) {
+            depth = SVNDepth.INFINITY;
         }
         
         myOut = out;

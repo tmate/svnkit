@@ -702,7 +702,7 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
             FSRevisionRoot root = null;
             while (count < revisions.length) {
                 root = myFSFS.createRevisionRoot(revision);
-                FSClosestCopy tempClCopy = closestCopy(root, path);
+                FSClosestCopy tempClCopy = myFSFS.getClosestCopy(root, path);
                 if (tempClCopy == null) {
                     break;
                 }
@@ -998,35 +998,6 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
         return SVNRepository.isValidRevision(revision);
     }
 
-    private FSClosestCopy closestCopy(FSRevisionRoot root, String path) throws SVNException {
-        FSParentPath parentPath = root.openPath(path, true, true);
-
-        SVNLocationEntry copyDstEntry = FSNodeHistory.findYoungestCopyroot(myReposRootDir, parentPath);
-        
-        if (copyDstEntry == null || copyDstEntry.getRevision() == 0) {
-            return null;
-        }
-
-        FSRevisionRoot copyDstRoot = myFSFS.createRevisionRoot(copyDstEntry.getRevision());
-        if (copyDstRoot.checkNodeKind(path) == SVNNodeKind.NONE) {
-            return null;
-        }
-        FSParentPath copyDstParentPath = copyDstRoot.openPath(path, true, true);
-        FSRevisionNode copyDstNode = copyDstParentPath.getRevNode();
-        if (!copyDstNode.getId().isRelated(parentPath.getRevNode().getId())) {
-            return null;
-        }
-
-        long createdRev = copyDstNode.getId().getRevision();
-        if (createdRev == copyDstEntry.getRevision()) {
-            if (copyDstNode.getPredecessorId() == null) {
-                return null;
-            }
-        }
-
-        return new FSClosestCopy(copyDstRoot, copyDstEntry.getPath());
-    }
-
     private String getUserName() throws SVNException {
         if (getLocation().getUserInfo() != null && getLocation().getUserInfo().trim().length() > 0) {
             return getLocation().getUserInfo();
@@ -1066,15 +1037,15 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
     }
 
     public void setPath(String path, String lockToken, long revision, boolean startEmpty) throws SVNException {
-        setPath(path, lockToken, revision, SVNDepth.DEPTH_INFINITY, startEmpty);
+        setPath(path, lockToken, revision, SVNDepth.INFINITY, startEmpty);
     }
 
     public void deletePath(String path) throws SVNException {
-        myReporterContext.writePathInfoToReportFile(path, null, null, FSRepository.SVN_INVALID_REVNUM, false, SVNDepth.DEPTH_INFINITY);
+        myReporterContext.writePathInfoToReportFile(path, null, null, FSRepository.SVN_INVALID_REVNUM, false, SVNDepth.INFINITY);
     }
 
     public void linkPath(SVNURL url, String path, String lockToken, long revision, boolean startEmpty) throws SVNException {
-        linkPath(url, path, lockToken, revision, SVNDepth.DEPTH_INFINITY, startEmpty);
+        linkPath(url, path, lockToken, revision, SVNDepth.INFINITY, startEmpty);
     }
 
     public void linkPath(SVNURL url, String path, String lockToken, long revision, SVNDepth depth, boolean startEmpty) throws SVNException {

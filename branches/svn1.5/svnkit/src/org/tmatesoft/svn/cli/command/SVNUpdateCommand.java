@@ -76,7 +76,7 @@ public class SVNUpdateCommand extends SVNCommand implements ISVNEventHandler {
         SVNPathList pathList = SVNPathList.create(paths, SVNRevision.UNDEFINED);
         SVNCompositePathList combinedPathList = SVNCompositePathList.create(pathList, changelist, false);
 
-        SVNDepth depth = SVNDepth.DEPTH_UNKNOWN;
+        SVNDepth depth = SVNDepth.UNKNOWN;
         if (getCommandLine().hasArgument(SVNArgument.NON_RECURSIVE)) {
             depth = SVNDepth.fromRecurse(false);
         }

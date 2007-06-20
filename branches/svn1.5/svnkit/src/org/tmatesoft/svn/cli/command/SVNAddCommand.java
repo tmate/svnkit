@@ -29,7 +29,7 @@ import org.tmatesoft.svn.core.wc.SVNWCClient;
 public class SVNAddCommand extends SVNCommand {
 
     public final void run(final PrintStream out, PrintStream err) throws SVNException {
-        SVNDepth depth = SVNDepth.DEPTH_UNKNOWN;
+        SVNDepth depth = SVNDepth.UNKNOWN;
         if (getCommandLine().hasArgument(SVNArgument.NON_RECURSIVE)) {
             depth = SVNDepth.fromRecurse(false);
         }
@@ -37,8 +37,8 @@ public class SVNAddCommand extends SVNCommand {
         if (depthStr != null) {
             depth = SVNDepth.fromString(depthStr);
         }
-        if (depth == SVNDepth.DEPTH_UNKNOWN) {
-            depth = SVNDepth.DEPTH_INFINITY;
+        if (depth == SVNDepth.UNKNOWN) {
+            depth = SVNDepth.INFINITY;
         }
         boolean recursive = SVNDepth.recurseFromDepth(depth);
         boolean force = getCommandLine().hasArgument(SVNArgument.FORCE);

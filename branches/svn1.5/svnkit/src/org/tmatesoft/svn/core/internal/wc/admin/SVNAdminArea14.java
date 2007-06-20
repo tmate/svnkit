@@ -621,7 +621,7 @@ public class SVNAdminArea14 extends SVNAdminArea {
         Map entryAttrs = new HashMap();
         entryAttrs.put(SVNProperty.NAME, name);
         SVNEntry entry = new SVNEntry(entryAttrs, this, name);
-        entry.setDepth(SVNDepth.DEPTH_INFINITY);
+        entry.setDepth(SVNDepth.INFINITY);
         
         line = reader.readLine();
         String kind = parseValue(line);
@@ -932,7 +932,7 @@ public class SVNAdminArea14 extends SVNAdminArea {
         }
         String depthStr = parseValue(line);
         if (depthStr == null) {
-            entryAttrs.put(SVNProperty.DEPTH, SVNDepth.DEPTH_INFINITY.getName());
+            entryAttrs.put(SVNProperty.DEPTH, SVNDepth.INFINITY.getName());
         } else {
             entryAttrs.put(SVNProperty.DEPTH, depthStr);
         }
@@ -1345,7 +1345,7 @@ public class SVNAdminArea14 extends SVNAdminArea {
         }
         
         String depth = (String)entry.get(SVNProperty.DEPTH);
-        if (!isSubDir && SVNDepth.fromString(depth) != SVNDepth.DEPTH_INFINITY) {
+        if (!isSubDir && SVNDepth.fromString(depth) != SVNDepth.INFINITY) {
             writeValue(writer, depth, emptyFields);
             emptyFields = 0;
         } else {

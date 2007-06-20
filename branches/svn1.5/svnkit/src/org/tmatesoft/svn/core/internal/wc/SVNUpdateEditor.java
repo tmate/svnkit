@@ -67,12 +67,13 @@ public class SVNUpdateEditor implements ISVNEditor, ISVNCleanupHandler {
     private SVNWCAccess myWCAccess; 
     private SVNDeltaProcessor myDeltaProcessor;
     private SVNDepth myDepth;
+    private String[] myExtensionPatterns;
     
     public SVNUpdateEditor(SVNAdminAreaInfo info, String switchURL, boolean recursive, boolean leaveConflicts, boolean allowUnversionedObstructions) throws SVNException {
-        this(info, switchURL, leaveConflicts, allowUnversionedObstructions, SVNDepth.fromRecurse(recursive));
+        this(info, switchURL, leaveConflicts, allowUnversionedObstructions, SVNDepth.fromRecurse(recursive), null);
     }
 
-    public SVNUpdateEditor(SVNAdminAreaInfo info, String switchURL, boolean leaveConflicts, boolean allowUnversionedObstructions, SVNDepth depth) throws SVNException {
+    public SVNUpdateEditor(SVNAdminAreaInfo info, String switchURL, boolean leaveConflicts, boolean allowUnversionedObstructions, SVNDepth depth, String[] preservedExtensions) throws SVNException {
         myAdminInfo = info;
         myWCAccess = info.getWCAccess();
         myIsUnversionedObstructionsAllowed = allowUnversionedObstructions;
@@ -82,7 +83,8 @@ public class SVNUpdateEditor implements ISVNEditor, ISVNCleanupHandler {
         myIsLeaveConflicts = leaveConflicts;
         myDepth = depth;
         myDeltaProcessor = new SVNDeltaProcessor();
-
+        myExtensionPatterns = preservedExtensions;
+        
         SVNEntry entry = info.getAnchor().getEntry(info.getAnchor().getThisDirName(), false);
         myTargetURL = entry != null ? entry.getURL() : null;
         myRootURL = entry != null ? entry.getRepositoryRoot() : null;
@@ -279,10 +281,10 @@ public class SVNUpdateEditor implements ISVNEditor, ISVNCleanupHandler {
             adminArea.modifyEntry(adminArea.getThisDirName(), attributes, true, true);
         }
         
-        SVNDepth depth = SVNDepth.DEPTH_INFINITY;
-        if (myDepth == SVNDepth.DEPTH_EMPTY || myDepth == SVNDepth.DEPTH_FILES ||
-                myDepth == SVNDepth.DEPTH_IMMEDIATES) {
-            depth = SVNDepth.DEPTH_EMPTY;
+        SVNDepth depth = SVNDepth.INFINITY;
+        if (myDepth == SVNDepth.EMPTY || myDepth == SVNDepth.FILES ||
+                myDepth == SVNDepth.IMMEDIATES) {
+            depth = SVNDepth.EMPTY;
         }
             
         String rootURL = null;
@@ -659,10 +661,25 @@ public class SVNUpdateEditor implements ISVNEditor, ISVNCleanupHandler {
                     File mergeLeftFile = myCurrentFile.baseFile;
                     boolean usedTmpFile = false;
 
-                    String ext = null;
-                    int dotInd = name.lastIndexOf('.'); 
-                    if (dotInd != -1 && dotInd != 0 && dotInd != name.length() - 1) {
-                        ext = name.substring(dotInd + 1);
+                    String pathExt = null;
+                    if (myExtensionPatterns != null && myExtensionPatterns.length > 0) {
+                        int dotInd = name.lastIndexOf('.'); 
+                        if (dotInd != -1 && dotInd != 0 && dotInd != name.length() - 1) {
+                            pathExt = name.substring(dotInd + 1);
+                        }
+                        if (pathExt != null && !"".equals(pathExt)) {
+                            boolean matches = false;
+                            for (int i = 0; i < myExtensionPatterns.length; i++) {
+                                String extPattern = myExtensionPatterns[i];
+                                matches = DefaultSVNOptions.matches(extPattern, pathExt);    
+                                if (matches) {
+                                    break;
+                                }
+                            }
+                            if (!matches) {
+                                pathExt = null;
+                            }
+                        }
                     }
                     
                     if (myCurrentFile.isAddExisted && !isReplaced) {
@@ -676,9 +693,9 @@ public class SVNUpdateEditor implements ISVNEditor, ISVNCleanupHandler {
                         mergeLeftFilePath = mergeLeftFilePath.substring(1);
                     }
 
-                    String leftLabel = ".r" + fileEntry.getRevision() + (ext != null ? "." + ext : "");
-                    String rightLabel = ".r" + myTargetRevision + (ext != null ? "." + ext : "");
-                    String mineLabel = ".mine" + (ext != null ? "." + ext : "");
+                    String leftLabel = ".r" + fileEntry.getRevision() + (pathExt != null ? "." + pathExt : "");
+                    String rightLabel = ".r" + myTargetRevision + (pathExt != null ? "." + pathExt : "");
+                    String mineLabel = ".mine" + (pathExt != null ? "." + pathExt : "");
                     // do test merge.
                     mergeOutcome = adminArea.mergeText(name, mergeLeftFile, adminArea.getFile(tmpBasePath), mineLabel, leftLabel, rightLabel, modifiedProps, myIsLeaveConflicts, false, null, log);
                     if (mergeOutcome == SVNStatusType.UNCHANGED) {

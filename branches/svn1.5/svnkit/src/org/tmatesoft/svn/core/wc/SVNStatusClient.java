@@ -255,8 +255,8 @@ public class SVNStatusClient extends SVNBasicClient {
                 }
             }
             SVNEntry entry = null;
-            if (depth == null || depth == SVNDepth.DEPTH_UNKNOWN) {
-                depth = SVNDepth.DEPTH_INFINITY;
+            if (depth == null || depth == SVNDepth.UNKNOWN) {
+                depth = SVNDepth.INFINITY;
             }
             Map externals = null;
             if (collectParentExternals) {
@@ -309,7 +309,7 @@ public class SVNStatusClient extends SVNBasicClient {
                 editor.setExternals(externals);
                 editor.closeEdit();
             }         
-            if (!isIgnoreExternals() && depth == SVNDepth.DEPTH_INFINITY) {
+            if (!isIgnoreExternals() && depth == SVNDepth.INFINITY) {
                 externals = editor.getExternals();
                 for (Iterator paths = externals.keySet().iterator(); paths.hasNext();) {
                     String externalPath = (String) paths.next();
@@ -333,7 +333,7 @@ public class SVNStatusClient extends SVNBasicClient {
                          * to unconditionally recurse
                          * here?" 
                          */
-                        doStatus(externalFile, SVNRevision.HEAD, SVNDepth.DEPTH_INFINITY, remote, reportAll, includeIgnored, false, handler);
+                        doStatus(externalFile, SVNRevision.HEAD, SVNDepth.INFINITY, remote, reportAll, includeIgnored, false, handler);
                     } catch (SVNException e) {
                         if (e instanceof SVNCancelException) {
                             throw e;
