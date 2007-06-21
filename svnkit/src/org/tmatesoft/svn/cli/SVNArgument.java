@@ -97,6 +97,7 @@ public abstract class SVNArgument {
     public static final SVNArgument CHANGELIST = createStringArgument(new String[] { "--changelist" });
     public static final SVNArgument KEEP_CHANGELIST = createUnaryArgument(new String[] { "--keep-changelist" });
     public static final SVNArgument REMOVE = createUnaryArgument(new String[] { "--remove" });
+    public static final SVNArgument ACCEPT = createStringArgument(new String[] { "--accept" });
     
     public static SVNArgument findArgument(String name, Set validArguments) {
         for (Iterator arguments = validArguments.iterator(); arguments.hasNext();) {

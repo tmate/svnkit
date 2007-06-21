@@ -19,7 +19,11 @@ import java.io.PrintStream;
 import org.tmatesoft.svn.cli.SVNArgument;
 import org.tmatesoft.svn.cli.SVNCommand;
 import org.tmatesoft.svn.core.SVNDepth;
+import org.tmatesoft.svn.core.SVNErrorCode;
+import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
+import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
+import org.tmatesoft.svn.core.wc.SVNResolveAccept;
 import org.tmatesoft.svn.core.wc.SVNWCClient;
 
 /**
@@ -46,13 +50,22 @@ public class SVNResolvedCommand extends SVNCommand {
         }
         
         final boolean recursive = SVNDepth.recurseFromDepth(depth);
+        SVNResolveAccept accept = SVNResolveAccept.DEFAULT;
+        if (getCommandLine().hasArgument(SVNArgument.ACCEPT)) {
+            String acceptStr = (String) getCommandLine().getArgumentValue(SVNArgument.ACCEPT);
+            accept = SVNResolveAccept.fromString(acceptStr);
+            if (accept == SVNResolveAccept.INVALID) {
+                SVNErrorMessage error = SVNErrorMessage.create(SVNErrorCode.CL_ARG_PARSING_ERROR, "''{0}'' is not a valid accept value; try ''left'', ''right'', or ''working''", acceptStr);
+                SVNErrorManager.error(error);
+            }
+        }
         getClientManager().setEventHandler(new SVNCommandEventProcessor(out, err, false));
         SVNWCClient wcClient  = getClientManager().getWCClient();
         boolean error = false;
         for (int i = 0; i < getCommandLine().getPathCount(); i++) {
             final String absolutePath = getCommandLine().getPathAt(i);
             try {
-                wcClient.doResolve(new File(absolutePath), recursive);
+                wcClient.doResolve(new File(absolutePath), recursive, accept);
             } catch (SVNException e) {
                 err.println(e.getMessage());
                 error = true;

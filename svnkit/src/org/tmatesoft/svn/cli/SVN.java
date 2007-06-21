@@ -85,6 +85,7 @@ public class SVN {
         ourArguments.add(SVNArgument.CHANGELIST);
         ourArguments.add(SVNArgument.KEEP_CHANGELIST);
         ourArguments.add(SVNArgument.REMOVE);
+        ourArguments.add(SVNArgument.ACCEPT);
     }
 
     public static void main(String[] args) {

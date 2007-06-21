@@ -47,6 +47,7 @@ import org.tmatesoft.svn.core.wc.ISVNCommitParameters;
 import org.tmatesoft.svn.core.wc.ISVNMerger;
 import org.tmatesoft.svn.core.wc.ISVNMergerFactory;
 import org.tmatesoft.svn.core.wc.SVNDiffOptions;
+import org.tmatesoft.svn.core.wc.SVNResolveAccept;
 import org.tmatesoft.svn.core.wc.SVNRevision;
 import org.tmatesoft.svn.core.wc.SVNStatusType;
 
@@ -347,12 +348,30 @@ public abstract class SVNAdminArea {
         return getAdminFile(ADM_KILLME).isFile();
     }
 
-    public boolean markResolved(String name, boolean text, boolean props) throws SVNException {
-        if (!text && !props) {
-            return false;
-        }
+    public boolean markResolved(String name, boolean text, boolean props, SVNResolveAccept accept) throws SVNException {
         SVNEntry entry = getEntry(name, true);
         if (entry == null) {
+            return false;
+        }
+
+        String autoResolveSource = null;
+        if (accept == SVNResolveAccept.LEFT) {
+            autoResolveSource = entry.getConflictOld(); 
+        } else if (accept == SVNResolveAccept.WORKING) {
+            autoResolveSource = entry.getConflictWorking();
+        } else if (accept == SVNResolveAccept.RIGHT) {
+            autoResolveSource = entry.getConflictNew();
+        } else if (accept == SVNResolveAccept.INVALID) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.INCORRECT_PARAMS, "Invalid 'accept' argument");
+            SVNErrorManager.error(err);
+        }
+        
+        if (autoResolveSource != null) {
+            File autoResolveSourceFile = getFile(autoResolveSource);
+            SVNFileUtil.copyFile(autoResolveSourceFile, getFile(name), false);
+        }
+        
+        if (!text && !props) {
             return false;
         }
         boolean filesDeleted = false;
@@ -413,7 +432,7 @@ public abstract class SVNAdminArea {
             SVNFileUtil.setExecutable(dst, true);
         }
 
-        markResolved(name, true, false);
+        markResolved(name, true, false, SVNResolveAccept.DEFAULT);
 
         long tstamp;
         if (myWCAccess.getOptions().isUseCommitTimes() && !special) {
@@ -878,10 +897,15 @@ public abstract class SVNAdminArea {
         
         if (isFile) {
             File path = getFile(name);
-            boolean textModified = hasTextModifications(name, false);
-            if (reportInstantError && textModified) {
-                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_LEFT_LOCAL_MOD, "File ''{0}'' has local modifications", path);
-                SVNErrorManager.error(err);
+            boolean wcSpecial = getProperties(name).getPropertyValue(SVNProperty.SPECIAL) != null;
+            boolean localSpecial = SVNFileUtil.isWindows ? false : SVNFileType.getType(path) == SVNFileType.SYMLINK;
+            boolean textModified = false;
+            if (wcSpecial || !localSpecial) {
+                textModified = hasTextModifications(name, false);
+                if (reportInstantError && textModified) {
+                    SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_LEFT_LOCAL_MOD, "File ''{0}'' has local modifications", path);
+                    SVNErrorManager.error(err);
+                }
             }
             SVNPropertiesManager.deleteWCProperties(this, name, false);
             deleteEntry(name);
@@ -891,7 +915,7 @@ public abstract class SVNAdminArea {
             SVNFileUtil.deleteFile(getFile(SVNAdminUtil.getPropPath(name, isFile ? SVNNodeKind.FILE : SVNNodeKind.DIR, false)));
             SVNFileUtil.deleteFile(getFile(SVNAdminUtil.getPropBasePath(name, isFile ? SVNNodeKind.FILE : SVNNodeKind.DIR, false)));
             if (deleteWorkingFiles) {
-                if (textModified) {
+                if (textModified || (!wcSpecial && localSpecial)) {
                     SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_LEFT_LOCAL_MOD);
                     SVNErrorManager.error(err);
                 } else if (myCommitParameters == null || myCommitParameters.onFileDeletion(path)) {

@@ -1739,26 +1739,31 @@ public class SVNWCClient extends SVNBasicClient {
      *                         will resolve the entire tree
      * @throws SVNException    if <code>path</code> is not under version control
      */
+    public void doResolve(File path, boolean recursive) throws SVNException {
+        doResolve(path, recursive, SVNResolveAccept.DEFAULT);
+    }
+    
     /* TODO(sd): "I don't see any reason to change this recurse parameter
      * to a depth, but making a note to re-check this logic later."
      */
-    public void doResolve(File path, boolean recursive) throws SVNException {
+    public void doResolve(File path, boolean recursive, SVNResolveAccept accept) throws SVNException {
+        accept = accept == null ? SVNResolveAccept.DEFAULT : accept;
         path = path.getAbsoluteFile();
         SVNWCAccess wcAccess = createWCAccess();
         try {
             wcAccess.probeOpen(path, true, recursive ? SVNWCAccess.INFINITE_DEPTH : 0);
             if (!recursive) {
                 SVNEntry entry = wcAccess.getVersionedEntry(path, false);
-                resolveEntry(wcAccess, path, entry);
+                resolveEntry(wcAccess, path, entry, accept);
             } else {
-                resolveAll(wcAccess, path);
+                resolveAll(wcAccess, path, accept);
             }
         } finally {
             wcAccess.close();
         }
-    }
+    }    
     
-    private void resolveEntry(SVNWCAccess wcAccess, File path, SVNEntry entry) throws SVNException {
+    private void resolveEntry(SVNWCAccess wcAccess, File path, SVNEntry entry, SVNResolveAccept accept) throws SVNException {
         if (entry.getKind() == SVNNodeKind.DIR && !"".equals(entry.getName())) {
             return;
         }
@@ -1767,16 +1772,16 @@ public class SVNWCClient extends SVNBasicClient {
             dirPath = path.getParentFile();
         }
         SVNAdminArea dir = wcAccess.retrieve(dirPath);
-        if (dir.markResolved(entry.getName(), true, true)) {
+        if (dir.markResolved(entry.getName(), true, true, accept)) {
             SVNEvent event = SVNEventFactory.createResolvedEvent(null, dir, entry);
             dispatchEvent(event);
         }
     }
 
-    private void resolveAll(SVNWCAccess access, File path) throws SVNException {
+    private void resolveAll(SVNWCAccess access, File path, SVNResolveAccept accept) throws SVNException {
         checkCancelled();
         SVNEntry entry = access.getEntry(path, false);
-        resolveEntry(access, path, entry);
+        resolveEntry(access, path, entry, accept);
         if (entry.isDirectory()) {
             SVNAdminArea dir = access.retrieve(path);
             for (Iterator ents = dir.entries(false); ents.hasNext();) {
@@ -1784,7 +1789,7 @@ public class SVNWCClient extends SVNBasicClient {
                 if (dir.getThisDirName().equals(childEntry.getName())) {
                     continue;
                 }
-                resolveAll(access, dir.getFile(childEntry.getName()));
+                resolveAll(access, dir.getFile(childEntry.getName()), accept);
             }
         } 
     }
