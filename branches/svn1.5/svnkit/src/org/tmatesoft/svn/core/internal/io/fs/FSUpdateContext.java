@@ -397,7 +397,7 @@ public class FSUpdateContext {
                         continue;
                     }
                     if (tgtEntry.getType() == SVNNodeKind.DIR && 
-                        (wcDepth.compareTo(SVNDepth.IMMEDIATES) < 0 && 
+                        (wcDepth.compareTo(SVNDepth.IMMEDIATES) < 0 || 
                         requestedDepth == SVNDepth.FILES)) {
                         continue;
                     }
