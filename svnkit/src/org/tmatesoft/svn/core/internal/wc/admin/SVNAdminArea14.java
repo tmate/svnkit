@@ -1647,6 +1647,12 @@ public class SVNAdminArea14 extends SVNAdminArea {
             }
         }
 
+        long fileLength = 0;
+        if (!getThisDirName().equals(fileName)) {
+            File workingFile = getFile(fileName);  
+            fileLength = workingFile.length();
+        }
+
         long textTime = 0;
         if (!implicit && !getThisDirName().equals(fileName)) {
             File tmpFile = getBaseFile(fileName, true);
@@ -1654,6 +1660,7 @@ public class SVNAdminArea14 extends SVNAdminArea {
             if (fileType == SVNFileType.FILE || fileType == SVNFileType.SYMLINK) {
                 boolean modified = false;
                 File workingFile = getFile(fileName);  
+                fileLength = workingFile.length();
                 long tmpTimestamp = tmpFile.lastModified();
                 long wkTimestamp = workingFile.lastModified(); 
                 if (tmpTimestamp != wkTimestamp) {
@@ -1786,6 +1793,7 @@ public class SVNAdminArea14 extends SVNAdminArea {
         entryAttrs.put(SVNProperty.COPYFROM_REVISION, null);
         entryAttrs.put(SVNProperty.COPYFROM_URL, null);
         entryAttrs.put(SVNProperty.HAS_PROP_MODS, SVNProperty.toString(false));
+        entryAttrs.put(SVNProperty.WORKING_SIZE, Long.toString(fileLength));
         
         try {
             modifyEntry(fileName, entryAttrs, false, true);
