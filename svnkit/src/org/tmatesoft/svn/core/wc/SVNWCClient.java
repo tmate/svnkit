@@ -1626,11 +1626,8 @@ public class SVNWCClient extends SVNBasicClient {
             dir.saveVersionedProperties(log, false);
             reverted = true;
         } 
+
         Map newEntryProperties = new HashMap();
-        if (entry.isScheduledForReplacement() && entry.isCopied()) {
-            newEntryProperties.put(SVNProperty.shortPropertyName(SVNProperty.COPIED), null);
-            reverted = true;
-        }
         if (entry.getKind() == SVNNodeKind.FILE) {
             if (!reinstallWorkingFile) {
                 SVNFileType fileType = SVNFileType.getType(dir.getFile(name));
@@ -1717,6 +1714,13 @@ public class SVNWCClient extends SVNBasicClient {
                 reverted |= dir.getFile(entry.getPropRejectFile()).exists();
             }
         }
+        if (entry.isScheduledForReplacement()) {
+            newEntryProperties.put(SVNProperty.shortPropertyName(SVNProperty.COPIED), SVNProperty.toString(false));
+            newEntryProperties.put(SVNProperty.shortPropertyName(SVNProperty.COPYFROM_URL), null);
+            newEntryProperties.put(SVNProperty.shortPropertyName(SVNProperty.COPYFROM_REVISION), SVNProperty.toString(SVNRepository.INVALID_REVISION));
+            reverted = true;
+        }
+        
         if (entry.getSchedule() != null) {
             newEntryProperties.put(SVNProperty.shortPropertyName(SVNProperty.SCHEDULE), null);
             reverted = true;
