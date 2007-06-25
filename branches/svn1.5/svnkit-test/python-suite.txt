@@ -9,7 +9,6 @@ depth ALL
 diff ALL
 export ALL
 externals ALL 
-getopt ALL
 history ALL
 import ALL
 lock ALL
