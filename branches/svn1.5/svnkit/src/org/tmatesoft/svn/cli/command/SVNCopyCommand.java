@@ -95,11 +95,8 @@ public class SVNCopyCommand extends SVNCommand {
 
         for (int i = 0; i < getCommandLine().getPathCount() - 1; i++) {
             String absoluteSrcPath = getCommandLine().getPathAt(i);
-            SVNRevision pegRevision = SVNRevision.UNDEFINED;
-            if (absoluteSrcPath.indexOf('@') > 0) {
-                pegRevision = SVNRevision.parse(absoluteSrcPath.substring(absoluteSrcPath.lastIndexOf('@') + 1));
-                absoluteSrcPath = absoluteSrcPath.substring(0, absoluteSrcPath.lastIndexOf('@'));
-            }
+            SVNRevision pegRevision = getCommandLine().getPathPegRevision(i);
+            pegRevision = pegRevision == null ? SVNRevision.UNDEFINED : pegRevision;
             if (matchTabsInPath(absoluteSrcPath, err)) {
                 return;
             }
@@ -129,11 +126,8 @@ public class SVNCopyCommand extends SVNCommand {
         
         for (int i = 0; i < getCommandLine().getURLCount() - 1; i++) {
             String srcURL = getCommandLine().getURL(i);
-            SVNRevision pegRevision = SVNRevision.UNDEFINED;
-            if (srcURL != null && srcURL.indexOf('@') > 0) {
-                pegRevision = SVNRevision.parse(srcURL.substring(srcURL.lastIndexOf('@') + 1));
-                srcURL = srcURL.substring(0, srcURL.lastIndexOf('@'));
-            }
+            SVNRevision pegRevision = getCommandLine().getPegRevision(i);
+            pegRevision = pegRevision == null ? SVNRevision.UNDEFINED : pegRevision;
             SVNRevision srcRevision = SVNRevision.parse((String) getCommandLine().getArgumentValue(SVNArgument.REVISION));
             if (matchTabsInURL(srcURL, err)) {
                 return;
@@ -156,17 +150,14 @@ public class SVNCopyCommand extends SVNCommand {
         }
 
         boolean makeParents = getCommandLine().hasArgument(SVNArgument.PARENTS);
-        getClientManager().setEventHandler(new SVNCommandEventProcessor(out, err, false));
+        getClientManager().setEventHandler(new SVNCommandEventProcessor(out, err, true));
         SVNCopyClient updater = getClientManager().getCopyClient();
         SVNCopySource[] sources = new SVNCopySource[getCommandLine().getURLCount()];
 
         for (int i = 0; i < getCommandLine().getURLCount(); i++) {
             String srcURL = getCommandLine().getURL(i);
-            SVNRevision pegRevision = SVNRevision.UNDEFINED;
-            if (srcURL != null && srcURL.indexOf('@') > 0) {
-                pegRevision = SVNRevision.parse(srcURL.substring(srcURL.lastIndexOf('@') + 1));
-                srcURL = srcURL.substring(0, srcURL.lastIndexOf('@'));
-            }
+            SVNRevision pegRevision = getCommandLine().getPegRevision(i);
+            pegRevision = pegRevision == null ? SVNRevision.UNDEFINED : pegRevision;
             SVNRevision revision = SVNRevision.parse((String) getCommandLine().getArgumentValue(SVNArgument.REVISION));
             sources[i] = new SVNCopySource(pegRevision, revision, SVNURL.parseURIEncoded(srcURL));
         }
@@ -189,11 +180,8 @@ public class SVNCopyCommand extends SVNCommand {
         SVNCopySource[] sources = new SVNCopySource[getCommandLine().getPathCount()];
         for (int i = 0; i < getCommandLine().getPathCount(); i++) {
             String srcPath = getCommandLine().getPathAt(i);
-            SVNRevision pegRevision = SVNRevision.UNDEFINED;
-            if (srcPath.indexOf('@') > 0) {
-                pegRevision = SVNRevision.parse(srcPath.substring(srcPath.lastIndexOf('@') + 1));
-                srcPath = srcPath.substring(0, srcPath.lastIndexOf('@'));
-            }
+            SVNRevision pegRevision = getCommandLine().getPathPegRevision(i);
+            pegRevision = pegRevision == null ? SVNRevision.UNDEFINED : pegRevision;
             if (matchTabsInPath(srcPath, err)) {
                 return;
             }
