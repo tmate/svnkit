@@ -88,19 +88,13 @@ public class FSFile {
         return digest;
     }
     
-    public int readInt() throws SVNException {
+    public int readInt() throws SVNException, NumberFormatException {
         String line = readLine(80);
         if (line == null) {
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.BAD_VERSION_FILE_FORMAT, "First line of ''{0}'' contains non-digit", myFile);
             SVNErrorManager.error(err);
         }
-        try {
-            return Integer.parseInt(line);
-        } catch (NumberFormatException nfe) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.BAD_VERSION_FILE_FORMAT, "First line of ''{0}'' contains non-digit", myFile);
-            SVNErrorManager.error(err);
-        }
-        return -1;
+        return Integer.parseInt(line);
     }
     
     public String readLine(int limit) throws SVNException {
