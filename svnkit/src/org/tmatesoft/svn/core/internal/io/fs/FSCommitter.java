@@ -412,7 +412,7 @@ public class FSCommitter {
                 myFSFS.setTransactionProperty(myTxn.getTxnId(), SVNProperty.TXN_CHECK_LOCKS, null);
             }
         }
-
+        
         File dstRevFile = myFSFS.getNewRevisionFile(newRevision);
         SVNFileUtil.rename(revisionPrototypeFile, dstRevFile);
 
