@@ -1,12 +1,12 @@
 package org.sqlite;
 
+import java.io.File;
+import java.io.PrintWriter;
+import java.sql.SQLException;
+
 import org.ibex.nestedvm.Runtime;
 import org.ibex.nestedvm.UnixRuntime;
 import org.ibex.nestedvm.UnixRuntime.GlobalState;
-
-import java.io.File;
-import java.io.PrintWriter;
-import java.sql.*;
 
 // FEATURE: strdup is wasteful, SQLite interface will take unterminated char*
 
@@ -344,7 +344,7 @@ final class NestedDB extends DB implements Runtime.CallJavaCB
 
     // HELPER FUNCTIONS /////////////////////////////////////////////
 
-    /** safe to reuse parameter arrays as all functions are syncrhonized */
+    /** safe to reuse parameter arrays as all functions are synchronized */
     private final int[]
         p0 = new int[] {},
         p1 = new int[] { 0 },

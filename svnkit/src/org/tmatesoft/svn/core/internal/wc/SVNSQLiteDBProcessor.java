@@ -59,7 +59,6 @@ public class SVNSQLiteDBProcessor implements ISVNDBProcessor {
     private File myDBFile;
     private String myDBPath; 
     private Connection myConnection;
-//    private PreparedStatement myTimeoutStatement;
     private PreparedStatement myUserVersionStatement;
     private PreparedStatement mySinglePathSelectFromMergeInfoChangedStatement;
     private PreparedStatement mySelectMergeInfoStatement;
@@ -166,8 +165,9 @@ public class SVNSQLiteDBProcessor implements ISVNDBProcessor {
         try {
             Statement stmt = connection.createStatement();
             for (int i = 0; i < CREATE_TABLES_COMMANDS.length; i++) {
-                stmt.execute(CREATE_TABLES_COMMANDS[i]);
+                stmt.addBatch(CREATE_TABLES_COMMANDS[i]);
             }
+            stmt.executeBatch();
         } catch (SQLException sqle) {
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_SQLITE_ERROR, sqle.getLocalizedMessage());
             SVNErrorManager.error(err, sqle);
@@ -217,21 +217,7 @@ public class SVNSQLiteDBProcessor implements ISVNDBProcessor {
         }
         return myUserVersionStatement;
     }
-    
-/*    private PreparedStatement createTimeoutStatement() throws SVNException {
-        if (myTimeoutStatement == null) {
-            Connection connection = getConnection();
-            try {
-                myTimeoutStatement = connection.prepareStatement(".timeout 10000");
-            } catch (SQLException sqle) {
-                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_SQLITE_ERROR, sqle.getLocalizedMessage());
-                SVNErrorManager.error(err, sqle);
-            }
-        }
-        return myTimeoutStatement;
-    }
-*/    
-    
+
     private PreparedStatement createSinglePathSelectFromMergeInfoChangedStatement() throws SVNException {
         if (mySinglePathSelectFromMergeInfoChangedStatement == null) {
             Connection connection = getConnection();
