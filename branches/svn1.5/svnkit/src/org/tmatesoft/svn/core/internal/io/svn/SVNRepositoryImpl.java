@@ -33,6 +33,7 @@ import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNLock;
 import org.tmatesoft.svn.core.SVNLogEntry;
 import org.tmatesoft.svn.core.SVNLogEntryPath;
+import org.tmatesoft.svn.core.SVNMergeInfoInheritance;
 import org.tmatesoft.svn.core.SVNNodeKind;
 import org.tmatesoft.svn.core.SVNProperty;
 import org.tmatesoft.svn.core.SVNRevisionProperty;
@@ -1144,6 +1145,10 @@ public class SVNRepositoryImpl extends SVNRepository implements ISVNReporter {
         }
     }
 
+    public Map getMergeInfo(String[] paths, long revision, SVNMergeInfoInheritance inherit) throws SVNException {
+        return null;
+    }
+
     protected ISVNEditor getCommitEditorInternal(Map locks, boolean keepLocks, Map revProps, ISVNWorkspaceMediator mediator) throws SVNException {
         try {
             openConnection();
@@ -1180,4 +1185,5 @@ public class SVNRepositoryImpl extends SVNRepository implements ISVNReporter {
         }
         
     }
+
 }

@@ -280,7 +280,8 @@ public class SVNErrorCode implements Serializable {
     public static final SVNErrorCode FS_NO_SUCH_LOCK = new SVNErrorCode(FS_CATEGORY, 40, "Filesystem has no such lock");
     public static final SVNErrorCode FS_LOCK_EXPIRED = new SVNErrorCode(FS_CATEGORY, 41, "Lock has expired");
     public static final SVNErrorCode FS_OUT_OF_DATE = new SVNErrorCode(FS_CATEGORY, 42, "Item is out of date");
-    public static final SVNErrorCode FS_UNSUPPORTED_FORMAT = new SVNErrorCode(FS_CATEGORY, 43, "Unsupported FS format");
+    public static final SVNErrorCode FS_SQLITE_ERROR = new SVNErrorCode(FS_CATEGORY, 43, "SQLite error");
+    public static final SVNErrorCode FS_UNSUPPORTED_FORMAT = new SVNErrorCode(FS_CATEGORY, 44, "Unsupported FS format");
     
     public static final SVNErrorCode REPOS_LOCKED = new SVNErrorCode(REPOS_CATEGORY, 0, "The repository is locked, perhaps for db recovery");
     public static final SVNErrorCode REPOS_HOOK_FAILURE = new SVNErrorCode(REPOS_CATEGORY, 1, "A repository hook failed");
