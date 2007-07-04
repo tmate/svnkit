@@ -38,6 +38,7 @@ import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.internal.wc.SVNFileListUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNFileType;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
+import org.tmatesoft.svn.core.internal.wc.SVNMergeInfoManager;
 import org.tmatesoft.svn.core.internal.wc.SVNProperties;
 import org.tmatesoft.svn.core.internal.wc.admin.SVNTranslator;
 
@@ -454,6 +455,9 @@ public abstract class SVNRepositoryFactory {
             SVNProperties props = new SVNProperties(rev0File, null);
             String date = SVNTimeUtil.formatDate(new Date(System.currentTimeMillis()), true);
             props.setPropertyValue(SVNRevisionProperty.DATE, date);
+            
+            SVNMergeInfoManager mergeInfoManager = SVNMergeInfoManager.createMergeInfoManager(null);
+            mergeInfoManager.createIndex(new File(path, "db"));
         } finally {
             SVNFileUtil.closeFile(uuidOS);
             SVNFileUtil.closeFile(reposFormatOS);

@@ -29,6 +29,7 @@ import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNLock;
 import org.tmatesoft.svn.core.SVNLogEntry;
+import org.tmatesoft.svn.core.SVNMergeInfoInheritance;
 import org.tmatesoft.svn.core.SVNNodeKind;
 import org.tmatesoft.svn.core.SVNProperty;
 import org.tmatesoft.svn.core.SVNRevisionProperty;
@@ -1724,6 +1725,8 @@ public abstract class SVNRepository {
      * @since				SVN 1.2
      */
     public abstract SVNLock[] getLocks(String path) throws SVNException;
+    
+    public abstract Map getMergeInfo(String[] paths, long revision, SVNMergeInfoInheritance inherit) throws SVNException;
     
     /**
 	 * Locks path(s) at definite revision(s).
