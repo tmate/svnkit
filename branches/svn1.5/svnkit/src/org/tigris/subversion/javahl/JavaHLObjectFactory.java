@@ -459,7 +459,8 @@ public class JavaHLObjectFactory {
                 info.getConflictOldFile() != null ? info.getConflictOldFile().getName() : null,
                 info.getConflictNewFile() != null ? info.getConflictNewFile().getName() : null,
                 info.getConflictWrkFile() != null ? info.getConflictWrkFile().getName() : null,
-                info.getPropConflictFile() != null ? info.getPropConflictFile().getName() : null
+                info.getPropConflictFile() != null ? info.getPropConflictFile().getName() : null,
+                info.getChangelistName(), info.getWorkingSize(), info.getRepositorySize()
                 );
     }
     
