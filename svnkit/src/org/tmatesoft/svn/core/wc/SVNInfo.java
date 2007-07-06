@@ -478,6 +478,16 @@ public class SVNInfo {
         return myChangelistName;
     }
 
+    //TODO:implement
+    public long getWorkingSize() {
+        return 0;
+    }
+
+    //TODO:implement
+    public long getRepositorySize() {
+        return 0;
+    }
+
     public SVNErrorMessage getError() {
         return myError;
     }
