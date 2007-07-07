@@ -26,6 +26,7 @@ import org.tigris.subversion.javahl.BlameCallback;
 import org.tigris.subversion.javahl.ClientException;
 import org.tigris.subversion.javahl.CommitItem;
 import org.tigris.subversion.javahl.CommitMessage;
+import org.tigris.subversion.javahl.ConflictResolverCallback;
 import org.tigris.subversion.javahl.CopySource;
 import org.tigris.subversion.javahl.Depth;
 import org.tigris.subversion.javahl.DiffSummaryReceiver;
@@ -2069,6 +2070,10 @@ public class SVNClientImpl implements SVNClientInterface {
         SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.UNSUPPORTED_FEATURE, 
                 message == null ? "Requested SVNAdmin functionality is not yet implemented" : message);
         JavaHLObjectFactory.throwException(new SVNException(err), this);
+    }
+
+    public void setConflictResolver(ConflictResolverCallback listener) {
+        //TODO: implement
     }
 
 }
