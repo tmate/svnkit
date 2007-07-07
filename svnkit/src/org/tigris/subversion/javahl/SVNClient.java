@@ -553,4 +553,8 @@ public class SVNClient implements SVNClientInterface {
     public void logMessages(String path, Revision pegRevision, Revision revisionStart, Revision revisionEnd, boolean stopOnCopy, boolean discoverPath, boolean includeMergedRevisions, boolean omitLogText, long limit, LogMessageCallback callback) throws ClientException {
         myDelegate.logMessages(path, pegRevision, revisionStart, revisionEnd, stopOnCopy, discoverPath, includeMergedRevisions, omitLogText, limit, callback);
     }
+
+    public void setConflictResolver(ConflictResolverCallback listener) {
+        myDelegate.setConflictResolver(listener);
+    }
 }
