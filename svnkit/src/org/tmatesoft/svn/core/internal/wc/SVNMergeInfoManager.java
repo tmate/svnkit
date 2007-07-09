@@ -243,8 +243,7 @@ public class SVNMergeInfoManager {
             } else {
                 SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.MERGE_INFO_PARSE_ERROR, 
                                                              "Invalid character ''{0}'' found in range list", 
-                                                             mergeInfo.length() > 0 ? 
-                                                                     new Character(mergeInfo.charAt(0)) : "");
+                                                             mergeInfo.length() > 0 ?  mergeInfo.charAt(0) + "" : "");
                 SVNErrorManager.error(err);
             }
         }
@@ -279,8 +278,7 @@ public class SVNMergeInfoManager {
         if (ind == 0) {
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.MERGE_INFO_PARSE_ERROR, 
                                                          "Invalid revision number found parsing ''{0}''", 
-                                                         mergeInfo.length() > 0 ? 
-                                                                 new Character(mergeInfo.charAt(0)) : "");
+                                                         mergeInfo.length() > 0 ? mergeInfo.charAt(0) + "" : "");
             SVNErrorManager.error(err);
         }
         
