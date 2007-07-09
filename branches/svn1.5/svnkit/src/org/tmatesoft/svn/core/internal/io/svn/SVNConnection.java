@@ -41,6 +41,7 @@ class SVNConnection {
     private SVNRepositoryImpl myRepository;
     private boolean myIsSVNDiff1;
     private boolean myIsCommitRevprops;
+    private boolean myIsMergeInfo;
 
     private static final String SUCCESS = "success";
     private static final String FAILURE = "failure";
@@ -49,6 +50,7 @@ class SVNConnection {
     private static final String SVNDIFF1 = "svndiff1";
     private static final String ABSENT_ENTRIES = "absent-entries";
     private static final String COMMIT_REVPROPS = "commit-revprops";
+    private static final String MERGE_INFO = "merge-info";
 
     public SVNConnection(ISVNConnector connector, SVNRepositoryImpl repository) {
         myConnector = connector;
@@ -78,7 +80,11 @@ class SVNConnection {
     public boolean isCommitRevprops() {
         return myIsCommitRevprops;
     }
-    
+
+    public boolean isMergeInfo() {
+        return myIsMergeInfo;
+    }
+
     protected void handshake(SVNRepositoryImpl repository) throws SVNException {
         Object[] items = read("[(*N(*W)(*W))]", null, true);
         List versions = SVNReader.getList(items, 0);
@@ -94,8 +100,9 @@ class SVNConnection {
         }
         myIsSVNDiff1 = SVNReader.hasValue(items, 2, SVNDIFF1);
         myIsCommitRevprops = SVNReader.hasValue(items, 2, COMMIT_REVPROPS);
-        write("(n(www)s)", new Object[] { "2", EDIT_PIPELINE, SVNDIFF1, ABSENT_ENTRIES, 
-                repository.getLocation().toString() });
+        myIsMergeInfo = SVNReader.hasValue(items, 2, MERGE_INFO);
+        write("(n(wwww)s)", new Object[] { "2", EDIT_PIPELINE, SVNDIFF1, ABSENT_ENTRIES, 
+                MERGE_INFO, repository.getLocation().toString() });
     }
 
     private boolean myIsCredentialsReceived = false;

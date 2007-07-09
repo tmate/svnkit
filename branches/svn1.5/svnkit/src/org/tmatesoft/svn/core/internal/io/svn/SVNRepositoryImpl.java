@@ -20,6 +20,7 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 
 import org.tmatesoft.svn.core.ISVNDirEntryHandler;
 import org.tmatesoft.svn.core.ISVNLogEntryHandler;
@@ -1146,7 +1147,28 @@ public class SVNRepositoryImpl extends SVNRepository implements ISVNReporter {
     }
 
     public Map getMergeInfo(String[] paths, long revision, SVNMergeInfoInheritance inherit) throws SVNException {
-        return null;
+        try {
+            openConnection();
+            if (!myConnection.isMergeInfo()) {
+                return new TreeMap();
+            }
+            String[] repositoryPaths = getRepositoryPaths(paths);
+            if (repositoryPaths == null || repositoryPaths.length == 0) {
+                repositoryPaths = new String[]{""};
+            }
+
+            Object[] buffer = new Object[] { "get-merge-info", repositoryPaths, 
+                    getRevisionObject(revision), inherit.toString()};
+            write("(w((*s)(n)w))", buffer);
+            authenticate();
+            read("[((*G))]", buffer, true);
+            Map pathsToMergeInfos = (Map) buffer[0];
+            return pathsToMergeInfos == null ? new TreeMap() : pathsToMergeInfos;
+        } catch (SVNException e) {
+            closeConnection();
+            closeSession();
+            throw e;
+        }
     }
 
     protected ISVNEditor getCommitEditorInternal(Map locks, boolean keepLocks, Map revProps, ISVNWorkspaceMediator mediator) throws SVNException {
@@ -1183,7 +1205,6 @@ public class SVNRepositoryImpl extends SVNRepository implements ISVNReporter {
             closeSession();
             throw e;
         }
-        
     }
 
 }

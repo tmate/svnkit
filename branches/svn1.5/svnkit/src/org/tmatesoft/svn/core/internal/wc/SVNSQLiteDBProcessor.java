@@ -137,8 +137,6 @@ public class SVNSQLiteDBProcessor implements ISVNDBProcessor {
                 long startRev = rows.getLong("mergedrevstart");
                 long endRev = rows.getLong("mergedrevend");
                 if (lastMergedFrom != null && !lastMergedFrom.equals(mergedFrom)) {
-                    //TODO: what if result already contains that path? will we override 
-                    //the previous range..
                     SVNMergeRange[] rangesArray = (SVNMergeRange[]) ranges.toArray(new SVNMergeRange[ranges.size()]);
                     Arrays.sort(rangesArray);
                     result.put(lastMergedFrom, rangesArray);

@@ -389,6 +389,10 @@ public class SVNErrorCode implements Serializable {
     public static final SVNErrorCode PROPERTY_NOT_FOUND = new SVNErrorCode(MISC_CATEGORY, 17, "Property not found");
     public static final SVNErrorCode NO_AUTH_FILE_PATH = new SVNErrorCode(MISC_CATEGORY, 18, "No auth file path available");
     public static final SVNErrorCode VERSION_MISMATCH = new SVNErrorCode(MISC_CATEGORY, 19, "Incompatible library version");
+    /**
+     * @since SVN 1.5
+     */
+    public static final SVNErrorCode MERGE_INFO_PARSE_ERROR = new SVNErrorCode(MISC_CATEGORY, 20, "Merge info parse error");
     
     public static final SVNErrorCode CL_ARG_PARSING_ERROR = new SVNErrorCode(CL_CATEGORY, 0, "Client error in parsing arguments");
     public static final SVNErrorCode CL_INSUFFICIENT_ARGS = new SVNErrorCode(CL_CATEGORY, 1, "Not enough args provided");
