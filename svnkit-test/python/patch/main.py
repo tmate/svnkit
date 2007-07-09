@@ -16,7 +16,7 @@
 ######################################################################
 
 import sys     # for argv[]
-import os      # for popen2()
+import os
 import shutil  # for rmtree()
 import re
 import stat    # for ST_MODE
@@ -58,12 +58,6 @@ from svntest import wc
 #
 #####################################################################
 # Global stuff
-
-### Grandfather in SVNTreeUnequal, which used to live here.  If you're
-# ever feeling saucy, you could go through the testsuite and change
-# main.SVNTreeUnequal to test.SVNTreeUnequal.
-import tree
-SVNTreeUnequal = tree.SVNTreeUnequal
 
 class SVNProcessTerminatedBySignal(Failure):
   "Exception raised if a spawned process segfaulted, aborted, etc."
@@ -115,6 +109,23 @@ try:
 except ImportError:
   platform_with_os_wait = False
 
+# The location of our mock svneditor script.
+svneditor_script = os.path.join(sys.path[0], 'svneditor.py')
+
+# Username and password used by the working copies
+wc_author = 'jrandom'
+wc_passwd = 'rayjandom'
+
+# Username and password used by the working copies for "second user"
+# scenarios
+wc_author2 = 'jconstant' # use the same password as wc_author
+
+######################################################################
+# Global variables set during option parsing.  These should not be used
+# until the variable command_line_parsed has been set to True, as is
+# done in run_tests below.
+command_line_parsed = False
+
 # The locations of the svn, svnadmin and svnlook binaries, relative to
 # the only scripts that import this file right now (they live in ../).
 #svn_binary = os.path.abspath('../../../clients/cmdline/svn' + _exe)
@@ -129,29 +140,22 @@ svnsync_binary = os.path.abspath('%ant.dir%/build/lib/jsvnsync' + _bat)
 #svnversion_binary = 'svnversion' + _exe
 svnversion_binary = os.path.abspath('%ant.dir%/build/lib/jsvnversion' + _bat)
 
-#svn_binary = os.path.abspath('I:/Workspace/svn_trunk/subversion/svn/svn' + _exe)
-#svnadmin_binary = os.path.abspath('I:/Workspace/svn_trunk/subversion/svnadmin/svnadmin' + _exe)
-
-
-# The location of our mock svneditor script.
-svneditor_script = os.path.join(sys.path[0], 'svneditor.py')
-
-# Username and password used by the working copies
-wc_author = 'jrandom'
-wc_passwd = 'rayjandom'
-
-# Username and password used by the working copies for "second user"
-# scenarios
-wc_author2 = 'jconstant' # use the same password as wc_author
-
 # Global variable indicating if we want verbose output.
-verbose_mode = 1
+verbose_mode = True
 
 # Global variable indicating if we want test data cleaned up after success
-cleanup_mode = 1
+cleanup_mode = True
 
 # Global variable indicating if svnserve should use Cyrus SASL
 enable_sasl = False
+
+# Global variable indicating which DAV library, if any, is in use
+# ('neon', 'serf')
+http_library = None
+
+# Global variable indicating what the minor version of the server
+# tested against is (4 for 1.4.x, for example).
+server_minor_version = 5
 
 # Global variable indicating if this is a child process and no cleanup
 # of global directories is needed.
@@ -162,8 +166,15 @@ test_area_url = file_scheme_prefix + os.path.abspath(os.getcwd())
 if windows:
   test_area_url = test_area_url.replace('\\', '/')
 
+# Location to the pristine repository, will be calculated from test_area_url
+# when we know what the user specified for --url.
+pristine_url = None
+
 # Global variable indicating the FS type for repository creations.
 fs_type = None
+
+# End of command-line-set global variables.
+######################################################################
 
 # All temporary repositories and working copies are created underneath
 # this dir, so there's one point at which to mount, e.g., a ramdisk.
@@ -186,10 +197,6 @@ temp_dir = os.path.join(work_dir, 'local_tmp')
 pristine_dir = os.path.join(temp_dir, "repos")
 greek_dump_dir = os.path.join(temp_dir, "greekfiles")
 default_config_dir = os.path.abspath(os.path.join(temp_dir, "config"))
-
-# Location to the pristine repository, will be calculated from test_area_url
-# when we know what the user specified for --url.
-pristine_url = None
 
 #
 # Our pristine greek-tree state.
@@ -270,25 +277,46 @@ def run_command(command, error_expected, binary_mode=0, *varargs):
   return run_command_stdin(command, error_expected, binary_mode,
                            None, *varargs)
 
-# Run any binary, supplying input text, logging the command line
-def spawn_process(command, binary_mode=0,stdin_lines=None, *varargs):
-  args = ''
-  for arg in varargs:                   # build the command string
-    arg = str(arg)
+# A regular expression that matches arguments that are trivially safe
+# to pass on a command line without quoting on any supported operating
+# system:
+_safe_arg_re = re.compile(r'^[A-Za-z\d\.\_\/\-\:\@]+$')
+
+def _quote_arg(arg):
+  """Quote ARG for a command line.
+
+  Simply surround every argument in double-quotes unless it contains
+  only universally harmless characters.
+
+  WARNING: This function cannot handle arbitrary command-line
+  arguments.  It can easily be confused by shell metacharacters.  A
+  perfect job would be difficult and OS-dependent (see, for example,
+  http://msdn.microsoft.com/library/en-us/vccelng/htm/progs_12.asp).
+  In other words, this function is just good enough for what we need
+  here."""
+
+  arg = str(arg)
+  if _safe_arg_re.match(arg):
+    return arg
+  else:
     if os.name != 'nt':
       arg = arg.replace('$', '\$')
-    args = args + ' "' + arg + '"'
+    return '"%s"' % (arg,)
+
+# Run any binary, supplying input text, logging the command line
+def spawn_process(command, binary_mode=0,stdin_lines=None, *varargs):
+  args = ' '.join(map(_quote_arg, varargs))
 
   # Log the command line
   if verbose_mode:
-    print 'CMD:', os.path.basename(command) + args,
+    print 'CMD:', os.path.basename(command) + ' ' + args,
 
   if binary_mode:
     mode = 'b'
   else:
     mode = 't'
 
-  infile, outfile, errfile = os.popen3(command + args, mode)
+  infile, outfile, errfile = os.popen3(command + ' ' + args, mode)
 
   if stdin_lines:
     map(infile.write, stdin_lines)
@@ -344,22 +372,44 @@ def run_command_stdin(command, error_expected, binary_mode=0,
 
   return stdout_lines, stderr_lines
 
-def create_config_dir(cfgdir,
-                      config_contents = '#\n',
-                      server_contents = '#\n'):
+def create_config_dir(cfgdir, config_contents=None, server_contents=None):
   "Create config directories and files"
 
   # config file names
   cfgfile_cfg = os.path.join(cfgdir, 'config')
-  cfgfile_srv = os.path.join(cfgdir, 'server')
+  cfgfile_srv = os.path.join(cfgdir, 'servers')
 
   # create the directory
   if not os.path.isdir(cfgdir):
     os.makedirs(cfgdir)
 
+  # define default config file contents if none provided
+  if config_contents is None:
+    config_contents = """
+#
+[miscellany]
+interactive-conflicts = false
+"""
+
+  # define default server file contents if none provided
+  if server_contents is None:
+    if http_library:
+      server_contents = """
+#
+[global]
+http-library=%s
+""" % (http_library)
+    else:
+      server_contents = "#\n"
+    
   file_write(cfgfile_cfg, config_contents)
   file_write(cfgfile_srv, server_contents)
 
+def _with_config_dir(args):
+  if '--config-dir' in args:
+    return args
+  else:
+    return args + ('--config-dir', default_config_dir)
 
 # For running subversion and returning the output
 def run_svn(error_expected, *varargs):
@@ -367,12 +417,7 @@ def run_svn(error_expected, *varargs):
   If ERROR_EXPECTED is None, any stderr also will be printed.  If
   you're just checking that something does/doesn't come out of
   stdout/stderr, you might want to use actions.run_and_verify_svn()."""
-  if '--config-dir' in varargs:
-    return run_command(svn_binary, error_expected, 0,
-                       *varargs)
-  else:
-    return run_command(svn_binary, error_expected, 0,
-                       *varargs + ('--config-dir', default_config_dir))
+  return run_command(svn_binary, error_expected, 0, *(_with_config_dir(varargs)))
 
 # For running svnadmin.  Ignores the output.
 def run_svnadmin(*varargs):
@@ -386,7 +431,7 @@ def run_svnlook(*varargs):
 
 def run_svnsync(*varargs):
   "Run svnsync with VARARGS, returns stdout, stderr as list of lines."
-  return run_command(svnsync_binary, 1, 0, *varargs)
+  return run_command(svnsync_binary, 1, 0, *(_with_config_dir(varargs)))
 
 def run_svnversion(*varargs):
   "Run svnversion with VARARGS, returns stdout, stderr as list of lines."
@@ -461,6 +506,8 @@ def create_repos(path):
     os.makedirs(path) # this creates all the intermediate dirs, if neccessary
 
   opts = ("--bdb-txn-nosync",)
+  if server_minor_version < 5:
+    opts += ("--pre-1.5-compatible",)
   if fs_type is not None:
     opts += ("--fs-type=" + fs_type,)
   stdout, stderr = run_command(svnadmin_binary, 1, 0, "create", path, *opts)
@@ -593,17 +640,12 @@ def compare_unordered_output(expected, actual):
     except ValueError:
       raise Failure("Expected output does not match actual output")
 
-def skip_test_when_no_authz_available():
-  "skip this test when authz is not available"
-  if test_area_url.startswith('file://'):
-    raise Skip
-
-def write_restrictive_svnserve_conf(repo_dir):
+def write_restrictive_svnserve_conf(repo_dir, anon_access="none"):
   "Create a restrictive authz file ( no anynomous access )."
 
   fp = open(get_svnserve_conf_file_path(repo_dir), 'w')
-  fp.write("[general]\nanon-access = none\nauth-access = write\n"
-           "authz-db = authz\n")
+  fp.write("[general]\nanon-access = %s\nauth-access = write\n"
+           "authz-db = authz\n" % anon_access)
   if enable_sasl == 1:
     fp.write("realm = svntest\n[sasl]\nuse-sasl = true\n");
   else:
@@ -633,22 +675,56 @@ def use_editor(func):
   os.environ['SVN_EDITOR'] = svneditor_script
   os.environ['SVNTEST_EDITOR_FUNC'] = func
 
+
+def merge_notify_line(revstart, revend=None):
+  """Return an expected output line that describes the beginning of a
+  merge operation on revisions REVSTART through REVEND."""
+  if (revend is None):
+    return "--- Merging r%ld:\n" % revstart
+  else:
+    return "--- Merging r%ld through r%ld:\n" % (revstart, revend)
+
+
 ######################################################################
 # Functions which check the test configuration
 # (useful for conditional XFails)
 
+def _check_command_line_parsed():
+  """Raise an exception if the command line has not yet been parsed."""
+  if not command_line_parsed:
+    raise Failure("Condition cannot be tested until command line is parsed")
+
 def is_ra_type_dav():
+  _check_command_line_parsed()
   return test_area_url.startswith('http')
 
 def is_ra_type_svn():
+  _check_command_line_parsed()
   return test_area_url.startswith('svn')
 
+def is_ra_type_file():
+  _check_command_line_parsed()
+  return test_area_url.startswith('file')
+
 def is_fs_type_fsfs():
+  _check_command_line_parsed()
   # This assumes that fsfs is the default fs implementation.
   return (fs_type == 'fsfs' or fs_type is None)
 
 def is_os_windows():
   return (os.name == 'nt')
+
+def is_posix_os():
+  return (os.name == 'posix')
+
+def server_has_mergeinfo():
+  _check_command_line_parsed()
+  return server_minor_version >= 5
+
+def server_has_revprop_commit():
+  _check_command_line_parsed()
+  return server_minor_version >= 5
+
 
 ######################################################################
 # Sandbox handling
@@ -786,8 +862,12 @@ class SpawnTest(threading.Thread):
     
     self.result, self.stdout_lines, self.stderr_lines =\
                                          spawn_process(command, 1, None, *args)
-    sys.stdout.write('.')
+    # don't trust the exitcode, will not be correct on Windows
+    if filter(lambda x: x.startswith('FAIL: ') or x.startswith('XPASS: '), 
+              self.stdout_lines):
+      self.result = 1
     self.tests.append(self)
+    sys.stdout.write('.')
 
 class TestRunner:
   """Encapsulate a single test case (predicate), including logic for
@@ -829,6 +909,7 @@ class TestRunner:
     os.environ['SVNTEST_EDITOR_FUNC'] = ''
     actions.no_sleep_for_timestamps()
 
+    saved_dir = os.getcwd()
     try:
       rc = apply(self.pred.run, (), kw)
       if rc is not None:
@@ -863,6 +944,8 @@ class TestRunner:
       result = 1
       print 'UNEXPECTED EXCEPTION:'
       traceback.print_exc(file=sys.stdout)
+      
+    os.chdir(saved_dir)
     result = self.pred.convert_result(result)
     print self.pred.run_text(result),
     self._print_name()
@@ -961,15 +1044,16 @@ def usage():
   print " test          The number of the test to run (multiple okay), " \
         "or all tests\n"
   print "Options:"
-  print " --list        Print test doc strings instead of running them"
-  print " --fs-type     Subversion file system type (fsfs or bdb)"
-  print " --url         Base url to the repos (e.g. svn://localhost)"
-  print " --verbose     Print binary command-lines"
-  print " --cleanup     Whether to clean up"
-  print " --enable-sasl Whether to enable SASL authentication"
-  print " --parallel    Run the tests in parallel"
-  print " --bin         Use the svn binaries installed in this path"
-  print " --help        This information"
+  print " --list          Print test doc strings instead of running them"
+  print " --fs-type       Subversion file system type (fsfs or bdb)"
+  print " --http-library  DAV library to use (neon or serf)"
+  print " --url           Base url to the repos (e.g. svn://localhost)"
+  print " --verbose       Print binary command-lines"
+  print " --cleanup       Whether to clean up"
+  print " --enable-sasl   Whether to enable SASL authentication"
+  print " --parallel      Run the tests in parallel"
+  print " --bin           Use the svn binaries installed in this path"
+  print " --help          This information"
 
 
 # Main func.  This is the "entry point" that all the test scripts call
@@ -995,6 +1079,9 @@ def run_tests(test_list, serial_only = False):
   global svnlook_binary
   global svnsync_binary
   global svnversion_binary
+  global command_line_parsed
+  global http_library
+  global server_minor_version
   
   testnums = []
   # Should the tests be listed (as opposed to executed)?
@@ -1004,7 +1091,8 @@ def run_tests(test_list, serial_only = False):
   svn_bin = None
   opts, args = my_getopt(sys.argv[1:], 'vhpc',
                          ['url=', 'fs-type=', 'verbose', 'cleanup', 'list',
-                          'enable-sasl', 'help', 'parallel', 'bin='])
+                          'enable-sasl', 'help', 'parallel', 'bin=',
+                          'http-library=', 'server-minor-version='])
 
   for arg in args:
     if arg == "list":
@@ -1052,17 +1140,33 @@ def run_tests(test_list, serial_only = False):
     elif opt == '--bin':
       svn_bin = val
 
+    elif opt == '--http-library':
+      http_library = val
+
+    elif opt == '--server-minor-version':
+      server_minor_version = int(val)
+      if server_minor_version < 4 or server_minor_version > 6:
+        print "ERROR: test harness only supports server minor version 4 or 5"
+        sys.exit(1)
+
   if test_area_url[-1:] == '/': # Normalize url to have no trailing slash
     test_area_url = test_area_url[:-1]
 
-  ######################################################################
-  # Initialization
+  # Calculate pristine_url from test_area_url.
+  pristine_url = test_area_url + '/' + pristine_dir
+  if windows:
+    pristine_url = pristine_url.replace('\\', '/')  
+
   if not svn_bin is None:
     svn_binary = os.path.join(svn_bin, 'svn' + _exe)
     svnadmin_binary = os.path.join(svn_bin, 'svnadmin' + _exe)
     svnlook_binary = os.path.join(svn_bin, 'svnlook' + _exe)
     svnsync_binary = os.path.join(svn_bin, 'svnsync' + _exe)
     svnversion_binary = os.path.join(svn_bin, 'svnversion' + _exe)
+
+  command_line_parsed = True
+
+  ######################################################################
 
   # Cleanup: if a previous run crashed or interrupted the python
   # interpreter, then `temp_dir' was never removed.  This can cause wonkiness.
@@ -1087,14 +1191,12 @@ def run_tests(test_list, serial_only = False):
   if serial_only or len(testnums) < 2:
     parallel = 0
 
-  # Calculate pristine_url from test_area_url.
-  pristine_url = test_area_url + '/' + pristine_dir
-  if windows:
-    pristine_url = pristine_url.replace('\\', '/')  
-
-  # Setup the pristine repository (and working copy)
+  # Setup the pristine repository
   actions.setup_pristine_repository()
 
+  # Build out the default configuration directory
+  create_config_dir(default_config_dir)
+    
   # Run the tests.
   exit_code = _internal_run_tests(test_list, testnums, parallel)
 
