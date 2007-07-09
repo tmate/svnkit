@@ -14,6 +14,7 @@ package org.tmatesoft.svn.core.internal.io.svn;
 
 import java.io.OutputStream;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -1163,11 +1164,12 @@ public class SVNRepositoryImpl extends SVNRepository implements ISVNReporter {
             authenticate();
             read("[((*G))]", buffer, true);
             Map pathsToMergeInfos = (Map) buffer[0];
-            return pathsToMergeInfos == null ? new TreeMap() : pathsToMergeInfos;
+            return pathsToMergeInfos == null ? Collections.EMPTY_MAP : pathsToMergeInfos;
         } catch (SVNException e) {
-            closeConnection();
             closeSession();
             throw e;
+        } finally {
+            closeConnection();
         }
     }
 
