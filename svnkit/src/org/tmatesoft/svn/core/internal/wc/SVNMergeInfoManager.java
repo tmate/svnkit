@@ -27,6 +27,7 @@ import org.tmatesoft.svn.core.SVNMergeInfoInheritance;
 import org.tmatesoft.svn.core.SVNMergeRange;
 import org.tmatesoft.svn.core.internal.io.fs.FSRevisionRoot;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
+import org.tmatesoft.svn.util.SVNDebugLog;
 
 
 /**
@@ -57,6 +58,28 @@ public class SVNMergeInfoManager {
             myDBProcessor.closeDB();
         }
         return mergeInfo == null ? new TreeMap() : mergeInfo;
+    }
+    
+    public Map getMergeInfoForTree(String[] paths, FSRevisionRoot root) throws SVNException {
+        Map pathsToMergeInfos = null; 
+        try {
+            myDBProcessor.openDB(root.getOwner().getDBRoot());
+            pathsToMergeInfos = getMergeInfoImpl(paths, root, SVNMergeInfoInheritance.INHERITED);
+            long revision = root.getRevision();
+            for (int i = 0; i < paths.length; i++) {
+                String path = paths[i];
+                SVNMergeInfo mergeInfo = (SVNMergeInfo) pathsToMergeInfos.get(path); 
+                Map srcsToRanges = mergeInfo != null ? mergeInfo.getMergeSourcesToMergeRanges() : null;
+                srcsToRanges = myDBProcessor.getMergeInfoForChildren(path, revision, srcsToRanges);
+                if (mergeInfo == null) {
+                    mergeInfo = new SVNMergeInfo(path, srcsToRanges);
+                    pathsToMergeInfos.put(path, mergeInfo);
+                }
+            }
+        } finally {
+            myDBProcessor.closeDB();
+        }
+        return pathsToMergeInfos == null ? new TreeMap() : pathsToMergeInfos;
     }
     
     private Map getMergeInfoImpl(String[] paths, FSRevisionRoot root, SVNMergeInfoInheritance inherit) throws SVNException {
@@ -206,7 +229,70 @@ public class SVNMergeInfoManager {
         srcPathsToRanges.put(path, ranges);
         return srcPathsToRanges;
     }
+
+    public static void mergeMergeInfos(Map originalSrcsToRanges, Map changedSrcsToRanges) {
+        String[] paths1 = (String[]) originalSrcsToRanges.keySet().toArray();
+        String[] paths2 = (String[]) changedSrcsToRanges.keySet().toArray();
+        int i = 0;
+        int j = 0;
+        while (i < paths1.length && j < paths2.length) {
+            String path1 = paths1[i];
+            String path2 = paths2[j];
+            int res = path1.compareTo(path2);
+            if (res == 0) {
+                SVNMergeRange[] ranges1 = (SVNMergeRange[]) originalSrcsToRanges.get(path1);
+                SVNMergeRange[] ranges2 = (SVNMergeRange[]) changedSrcsToRanges.get(path2);
+                ranges1 = mergeMergeRanges(ranges1, ranges2);
+                originalSrcsToRanges.put(path1, ranges1);
+                i++;
+                j++;
+            } else if (res < 0) {
+                i++;
+            } else {
+                originalSrcsToRanges.put(path2, changedSrcsToRanges.get(path2));
+                j++;
+            }
+        }
+        
+        for (; j < paths2.length; j++) {
+            String path = paths2[j];
+            originalSrcsToRanges.put(path, changedSrcsToRanges.get(path));
+        }
+    }
     
+    private static SVNMergeRange[] mergeMergeRanges(SVNMergeRange[] ranges1, SVNMergeRange[] ranges2) {
+        int i = 0;
+        int j = 0;
+        SVNMergeRange lastRange = null;
+        Collection resultRanges = new LinkedList();
+        while (i < ranges1.length && j < ranges2.length) {
+            SVNMergeRange range1 = ranges1[i];
+            SVNMergeRange range2 = ranges2[j];
+            int res = range1.compareTo(range2);
+            if (res == 0) {
+                lastRange = combineWithLastRange(lastRange, range1, resultRanges, true);
+                i++;
+                j++;
+            } else if (res < 0) {
+                lastRange = combineWithLastRange(lastRange, range1, resultRanges, true);
+                i++;
+            } else { 
+                lastRange = combineWithLastRange(lastRange, range2, resultRanges, true);
+                j++;
+            }
+        }
+        SVNDebugLog.assertCondition(i >= ranges1.length || j >= ranges2.length, "assertion failure in SVNMergeInfoManager.mergeMergeRanges()");
+        for (; i < ranges1.length; i++) {
+            SVNMergeRange range = ranges1[i];
+            lastRange = combineWithLastRange(lastRange, range, resultRanges, true);
+        }
+        for (; j < ranges2.length; j++) {
+            SVNMergeRange range = ranges2[j];
+            lastRange = combineWithLastRange(lastRange, range, resultRanges, true);
+        }
+        return (SVNMergeRange[]) resultRanges.toArray(new SVNMergeRange[resultRanges.size()]);
+    }
+
     private static SVNMergeRange[] parseRanges(StringBuffer mergeInfo) throws SVNException {
         Collection ranges = new LinkedList();
         while (mergeInfo.length() > 0 && mergeInfo.charAt(0) != '\n' && 
@@ -235,10 +321,10 @@ public class SVNMergeInfoManager {
                 range.setEndRevision(endRev);
             }
             if (mergeInfo.length() == 0 || mergeInfo.charAt(0) == '\n') {
-                lastRange = combineWithLastRange(lastRange, range, ranges);
+                lastRange = combineWithLastRange(lastRange, range, ranges, false);
                 return (SVNMergeRange[]) ranges.toArray(new SVNMergeRange[ranges.size()]);
             } else if (mergeInfo.length() > 0 && mergeInfo.charAt(0) == ',') {
-                lastRange = combineWithLastRange(lastRange, range, ranges);
+                lastRange = combineWithLastRange(lastRange, range, ranges, false);
                 mergeInfo = mergeInfo.deleteCharAt(0);
             } else {
                 SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.MERGE_INFO_PARSE_ERROR, 
@@ -256,7 +342,7 @@ public class SVNMergeInfoManager {
         return (SVNMergeRange[]) ranges.toArray(new SVNMergeRange[ranges.size()]);
     }
     
-    private static SVNMergeRange combineWithLastRange(SVNMergeRange lastRange, SVNMergeRange nextRange, Collection ranges) {
+    private static SVNMergeRange combineWithLastRange(SVNMergeRange lastRange, SVNMergeRange nextRange, Collection ranges, boolean dup) {
         if (lastRange != null && 
             lastRange.getStartRevision() <= nextRange.getEndRevision() + 1 &&
             nextRange.getStartRevision() <= lastRange.getEndRevision() + 1) {
@@ -264,9 +350,11 @@ public class SVNMergeInfoManager {
             lastRange.setEndRevision(Math.max(lastRange.getEndRevision(), nextRange.getEndRevision()));
             return lastRange; 
         }
-
-        ranges.add(nextRange);
-        return nextRange;
+        SVNMergeRange range = dup ? new SVNMergeRange(nextRange.getStartRevision(), 
+                                                      nextRange.getEndRevision()) : 
+                                    nextRange;
+        ranges.add(range);
+        return range;
     }
     
     private static long parseRevision(StringBuffer mergeInfo) throws SVNException {
