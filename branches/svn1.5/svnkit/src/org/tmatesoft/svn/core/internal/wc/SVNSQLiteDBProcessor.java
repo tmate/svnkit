@@ -62,6 +62,7 @@ public class SVNSQLiteDBProcessor implements ISVNDBProcessor {
     private PreparedStatement myUserVersionStatement;
     private PreparedStatement mySinglePathSelectFromMergeInfoChangedStatement;
     private PreparedStatement mySelectMergeInfoStatement;
+    private PreparedStatement myPathLikeSelectFromMergeInfoChangedStatement;
     
     public void openDB(File dbDir) throws SVNException {
         if (myDBDirectory == null || !myDBDirectory.equals(dbDir)) {
@@ -90,6 +91,10 @@ public class SVNSQLiteDBProcessor implements ISVNDBProcessor {
                 if (mySinglePathSelectFromMergeInfoChangedStatement != null) {
                     mySinglePathSelectFromMergeInfoChangedStatement.close();
                     mySinglePathSelectFromMergeInfoChangedStatement = null;
+                }
+                if (myPathLikeSelectFromMergeInfoChangedStatement != null) {
+                    myPathLikeSelectFromMergeInfoChangedStatement.close();
+                    myPathLikeSelectFromMergeInfoChangedStatement = null;
                 }
                 if (mySelectMergeInfoStatement != null) {
                     mySelectMergeInfoStatement.close();
@@ -158,6 +163,28 @@ public class SVNSQLiteDBProcessor implements ISVNDBProcessor {
         return result;
     }
 
+    public Map getMergeInfoForChildren(String parentPath, long revision, Map parentMergeInfo) throws SVNException {
+        parentMergeInfo = parentMergeInfo == null ? new TreeMap() : parentMergeInfo;
+        PreparedStatement statement = createPathLikeSelectFromMergeInfoChangedStatement();
+        try {
+            statement.setString(1, parentPath + "/%");
+            statement.setLong(2, revision);
+            ResultSet result = statement.executeQuery();
+            while (result.next()) {
+                long lastMergedRevision = result.getLong(1);
+                String path = result.getString(2);
+                if (lastMergedRevision > 0) {
+                    Map srcsToRanges = parseMergeInfoFromDB(path, lastMergedRevision);
+                    SVNMergeInfoManager.mergeMergeInfos(parentMergeInfo, srcsToRanges);
+                }
+            }
+        } catch (SQLException sqle) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_SQLITE_ERROR, sqle.getLocalizedMessage());
+            SVNErrorManager.error(err, sqle);
+        }
+        return parentMergeInfo;
+    }
+
     private void createMergeInfoTables() throws SVNException {
         Connection connection = getConnection();
         try {
@@ -214,6 +241,19 @@ public class SVNSQLiteDBProcessor implements ISVNDBProcessor {
             }
         }
         return myUserVersionStatement;
+    }
+
+    private PreparedStatement createPathLikeSelectFromMergeInfoChangedStatement() throws SVNException {
+        if (myPathLikeSelectFromMergeInfoChangedStatement == null) {
+            Connection connection = getConnection();
+            try {
+                myPathLikeSelectFromMergeInfoChangedStatement = connection.prepareStatement("SELECT MAX(revision), path FROM mergeinfo_changed WHERE path LIKE ? AND revision <= ?;");
+            } catch (SQLException sqle) {
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_SQLITE_ERROR, sqle.getLocalizedMessage());
+                SVNErrorManager.error(err, sqle);
+            }
+        }
+        return myPathLikeSelectFromMergeInfoChangedStatement;
     }
 
     private PreparedStatement createSinglePathSelectFromMergeInfoChangedStatement() throws SVNException {

@@ -38,4 +38,8 @@ public class SVNMergeInfo {
         return myMergeSrcPathsToRanges;
     }
     
+    public void setMergeSourcesToMergeRanges(Map srcsToRanges) {
+        myMergeSrcPathsToRanges = srcsToRanges;
+    }
+    
 }
