@@ -24,6 +24,7 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 
 import org.tmatesoft.svn.core.ISVNDirEntryHandler;
 import org.tmatesoft.svn.core.SVNAuthenticationException;
@@ -33,11 +34,13 @@ import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNLock;
+import org.tmatesoft.svn.core.SVNMergeInfo;
 import org.tmatesoft.svn.core.SVNNodeKind;
 import org.tmatesoft.svn.core.internal.util.SVNTimeUtil;
 import org.tmatesoft.svn.core.internal.wc.IOExceptionWrapper;
 import org.tmatesoft.svn.core.internal.wc.SVNCancellableOutputStream;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
+import org.tmatesoft.svn.core.internal.wc.SVNMergeInfoManager;
 import org.tmatesoft.svn.core.io.ISVNEditor;
 import org.tmatesoft.svn.util.SVNDebugLog;
 
@@ -159,7 +162,7 @@ class SVNReader {
      * Integer 'p' - properties map entry (name => value) 'l' - lock description
      * 
      * 'd' - dir entry (get-dir svn command response) 'f' - stat command
-     * responce 'e' - edit command
+     * responce 'e' - edit command 'g' - get-merge-info command response
      * 
      * '(' and ')' - list brackets '[' and ']' - command response, check for
      * 'failure', equals to '(w?(*e))' where w = success | failure
@@ -168,7 +171,6 @@ class SVNReader {
      * tokens, not for groups.
      * 
      */
-
     public static Object[] parse(InputStream is, String templateStr, Object[] target) throws SVNException {
         if (target != null) {
             for (int i = 0; i < target.length; i++) {
@@ -298,6 +300,8 @@ class SVNReader {
                     result = readDirEntry(is);
                 } else if (ch == 'f') {
                     result = readStatEntry(is);
+                } else if (ch == 'g') {
+                    result = readMergeInfo(is);
                 } else if (ch == 'e') {
                     if (editorBaton == null) {
                         editorBaton = new SVNEditModeReader();
@@ -400,6 +404,8 @@ class SVNReader {
         } else if (target[index] == null) {
             if (result instanceof String[]) {
                 target[index] = new HashMap();
+            } else if(result instanceof SVNMergeInfo) {
+                target[index] = new TreeMap();
             } else if (multiple) {
                 target[index] = new LinkedList();
             } else {
@@ -439,11 +445,15 @@ class SVNReader {
                 }
             }
         }
+        
         if (target[index] instanceof List) {
             ((List) target[index]).add(result);
         } else if (target[index] instanceof Map && result instanceof String[]) {
             String[] property = (String[]) result;
             ((Map) target[index]).put(property[0], property[1]);
+        } else if (target[index] instanceof Map && result instanceof SVNMergeInfo) {
+            SVNMergeInfo info = (SVNMergeInfo) result;
+            ((Map) target[index]).put(info.getPath(), info);
         }
         return target;
     }
@@ -632,6 +642,14 @@ class SVNReader {
         return new SVNDirEntry(null, null, kind, size, hasProps, revision, date, author);
     }
 
+    private static SVNMergeInfo readMergeInfo(InputStream is) throws SVNException {
+        Object[] items = SVNReader.parse(is, "(SS)", new Object[2]);
+        String path = SVNReader.getString(items, 0);
+        String mergeInfoToParse = SVNReader.getString(items, 1);
+        Map srcsToRanges = SVNMergeInfoManager.parseMergeInfo(new StringBuffer(mergeInfoToParse), null);
+        return new SVNMergeInfo(path, srcsToRanges);
+    }
+    
     private static SVNLock readLock(InputStream is) throws SVNException {
         Object[] items = SVNReader.parse(is, "(SSS(?S)S(?S))", new Object[6]);
 

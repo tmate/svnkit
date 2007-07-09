@@ -17,10 +17,17 @@ package org.tmatesoft.svn.core;
  * @author  TMate Software Ltd.
  */
 public class SVNMergeInfoInheritance {
-    public static SVNMergeInfoInheritance EXPLICIT = new SVNMergeInfoInheritance();
-    public static SVNMergeInfoInheritance INHERITED = new SVNMergeInfoInheritance();
-    public static SVNMergeInfoInheritance NEAREST_ANCESTOR = new SVNMergeInfoInheritance();
+    public static SVNMergeInfoInheritance EXPLICIT = new SVNMergeInfoInheritance("explicit");
+    public static SVNMergeInfoInheritance INHERITED = new SVNMergeInfoInheritance("inherited");
+    public static SVNMergeInfoInheritance NEAREST_ANCESTOR = new SVNMergeInfoInheritance("nearest-ancestor");
     
-    private SVNMergeInfoInheritance() {
+    private String myName;
+    
+    private SVNMergeInfoInheritance(String name) {
+        myName = name;
+    }
+    
+    public String toString() {
+        return myName;
     }
 }

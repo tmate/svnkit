@@ -32,6 +32,14 @@ public class SVNMergeRange implements Comparable {
     public long getStartRevision() {
         return myStartRevision;
     }
+    
+    public void setEndRevision(long endRevision) {
+        myEndRevision = endRevision;
+    }
+    
+    public void setStartRevision(long startRevision) {
+        myStartRevision = startRevision;
+    }
 
     public int compareTo(Object o) {
         if (o == this) {
