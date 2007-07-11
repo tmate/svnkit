@@ -40,7 +40,6 @@ import org.tmatesoft.svn.core.internal.util.SVNTimeUtil;
 import org.tmatesoft.svn.core.internal.wc.IOExceptionWrapper;
 import org.tmatesoft.svn.core.internal.wc.SVNCancellableOutputStream;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
-import org.tmatesoft.svn.core.internal.wc.SVNMergeInfoManager;
 import org.tmatesoft.svn.core.io.ISVNEditor;
 import org.tmatesoft.svn.util.SVNDebugLog;
 
@@ -646,8 +645,8 @@ class SVNReader {
         Object[] items = SVNReader.parse(is, "(SS)", new Object[2]);
         String path = SVNReader.getString(items, 0);
         String mergeInfoToParse = SVNReader.getString(items, 1);
-        Map srcsToRanges = SVNMergeInfoManager.parseMergeInfo(new StringBuffer(mergeInfoToParse), null);
-        return new SVNMergeInfo(path, srcsToRanges);
+        Map srcsToRangeLists = SVNMergeInfo.parseMergeInfo(new StringBuffer(mergeInfoToParse), null);
+        return new SVNMergeInfo(path, srcsToRangeLists);
     }
     
     private static SVNLock readLock(InputStream is) throws SVNException {

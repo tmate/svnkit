@@ -73,6 +73,12 @@ public class SVNProperty {
      * An <span class="javastring">"svn:special"</span> SVN special property.
      */
     public static final String SPECIAL = SVN_PREFIX + "special";
+    
+    /**
+     * @since SVN 1.5
+     */
+    public static final String MERGE_INFO = SVN_PREFIX + "mergeinfo";
+
     /**
      * An <span class="javastring">"svn:entry:revision"</span> SVN untweakable metaproperty.
      */

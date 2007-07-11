@@ -28,6 +28,7 @@ import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNMergeRange;
+import org.tmatesoft.svn.core.SVNMergeRangeList;
 import org.tmatesoft.svn.core.wc.SVNRevision;
 
 
@@ -144,7 +145,7 @@ public class SVNSQLiteDBProcessor implements ISVNDBProcessor {
                 if (lastMergedFrom != null && !lastMergedFrom.equals(mergedFrom)) {
                     SVNMergeRange[] rangesArray = (SVNMergeRange[]) ranges.toArray(new SVNMergeRange[ranges.size()]);
                     Arrays.sort(rangesArray);
-                    result.put(lastMergedFrom, rangesArray);
+                    result.put(lastMergedFrom, new SVNMergeRangeList(rangesArray));
                     ranges.clear();
                 }
                 if (SVNRevision.isValidRevisionNumber(startRev) 
@@ -155,7 +156,7 @@ public class SVNSQLiteDBProcessor implements ISVNDBProcessor {
             }
             SVNMergeRange[] rangesArray = (SVNMergeRange[]) ranges.toArray(new SVNMergeRange[ranges.size()]); 
             Arrays.sort(rangesArray);
-            result.put(mergedFrom, rangesArray);
+            result.put(mergedFrom, new SVNMergeRangeList(rangesArray));
         } catch (SQLException sqle) {
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_SQLITE_ERROR, sqle.getLocalizedMessage());
             SVNErrorManager.error(err, sqle);
@@ -174,8 +175,8 @@ public class SVNSQLiteDBProcessor implements ISVNDBProcessor {
                 long lastMergedRevision = result.getLong(1);
                 String path = result.getString(2);
                 if (lastMergedRevision > 0) {
-                    Map srcsToRanges = parseMergeInfoFromDB(path, lastMergedRevision);
-                    SVNMergeInfoManager.mergeMergeInfos(parentMergeInfo, srcsToRanges);
+                    Map srcsToRangeLists = parseMergeInfoFromDB(path, lastMergedRevision);
+                    SVNMergeInfoManager.mergeMergeInfos(parentMergeInfo, srcsToRangeLists);
                 }
             }
         } catch (SQLException sqle) {

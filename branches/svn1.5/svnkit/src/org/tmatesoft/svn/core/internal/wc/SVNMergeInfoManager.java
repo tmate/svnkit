@@ -12,22 +12,18 @@
 package org.tmatesoft.svn.core.internal.wc;
 
 import java.io.File;
-import java.util.Arrays;
-import java.util.Collection;
+import java.util.Collections;
 import java.util.Iterator;
-import java.util.LinkedList;
 import java.util.Map;
 import java.util.TreeMap;
 
-import org.tmatesoft.svn.core.SVNErrorCode;
-import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNMergeInfo;
 import org.tmatesoft.svn.core.SVNMergeInfoInheritance;
 import org.tmatesoft.svn.core.SVNMergeRange;
+import org.tmatesoft.svn.core.SVNMergeRangeList;
 import org.tmatesoft.svn.core.internal.io.fs.FSRevisionRoot;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
-import org.tmatesoft.svn.util.SVNDebugLog;
 
 
 /**
@@ -69,10 +65,10 @@ public class SVNMergeInfoManager {
             for (int i = 0; i < paths.length; i++) {
                 String path = paths[i];
                 SVNMergeInfo mergeInfo = (SVNMergeInfo) pathsToMergeInfos.get(path); 
-                Map srcsToRanges = mergeInfo != null ? mergeInfo.getMergeSourcesToMergeRanges() : null;
-                srcsToRanges = myDBProcessor.getMergeInfoForChildren(path, revision, srcsToRanges);
+                Map srcsToRangeLists = mergeInfo != null ? mergeInfo.getMergeSourcesToMergeLists() : null;
+                srcsToRangeLists = myDBProcessor.getMergeInfoForChildren(path, revision, srcsToRangeLists);
                 if (mergeInfo == null) {
-                    mergeInfo = new SVNMergeInfo(path, srcsToRanges);
+                    mergeInfo = new SVNMergeInfo(path, srcsToRangeLists);
                     pathsToMergeInfos.put(path, mergeInfo);
                 }
             }
@@ -100,13 +96,14 @@ public class SVNMergeInfoManager {
             SVNMergeInfo pathMergeInfo = (SVNMergeInfo) mergeInfoCache.get(path);
             if (pathMergeInfo != null) {
                 result.put(path, pathMergeInfo);
+                return result;
             }
             
             lastMergedRevision = myDBProcessor.getMaxRevisionForPathFromMergeInfoChangedTable(path, revision);
             if (lastMergedRevision > 0) {
-                Map mergeSrcsToMergeRanges = myDBProcessor.parseMergeInfoFromDB(path, lastMergedRevision);
-                if (!mergeSrcsToMergeRanges.isEmpty()) {
-                    SVNMergeInfo mergeInfo = new SVNMergeInfo(path, combineRanges(mergeSrcsToMergeRanges));
+                Map mergeSrcsToMergeRangeLists = myDBProcessor.parseMergeInfoFromDB(path, lastMergedRevision);
+                if (!mergeSrcsToMergeRangeLists.isEmpty()) {
+                    SVNMergeInfo mergeInfo = new SVNMergeInfo(path, combineRanges(mergeSrcsToMergeRangeLists));
                     result.put(path, mergeInfo);
                     mergeInfoCache.put(path, mergeInfo);
                 } else {
@@ -127,47 +124,30 @@ public class SVNMergeInfoManager {
                 mergeInfoCache.remove(path);
             } else {
                 String name = SVNPathUtil.tail(path);
-                Map parentSrcsToRanges = parentInfo.getMergeSourcesToMergeRanges();
-                Map translatedSrcsToRanges = new TreeMap();
-                for (Iterator paths = parentSrcsToRanges.keySet().iterator(); paths.hasNext();) {
+                Map parentSrcsToRangeLists = parentInfo.getMergeSourcesToMergeLists();
+                Map translatedSrcsToRangeLists = new TreeMap();
+                for (Iterator paths = parentSrcsToRangeLists.keySet().iterator(); paths.hasNext();) {
                     String mergeSrcPath = (String) paths.next();
-                    SVNMergeRange[] ranges = (SVNMergeRange[]) parentSrcsToRanges.get(mergeSrcPath);
-                    translatedSrcsToRanges.put(SVNPathUtil.append(mergeSrcPath, name), ranges);
+                    SVNMergeRangeList rangeList = (SVNMergeRangeList) parentSrcsToRangeLists.get(mergeSrcPath);
+                    translatedSrcsToRangeLists.put(SVNPathUtil.append(mergeSrcPath, name), rangeList);
                 }
-                SVNMergeInfo translatedMergeInfo = new SVNMergeInfo(path, combineRanges(translatedSrcsToRanges)); 
+                SVNMergeInfo translatedMergeInfo = new SVNMergeInfo(path, combineRanges(translatedSrcsToRangeLists)); 
                 mergeInfoCache.put(path, translatedMergeInfo);
                 result.put(path, translatedMergeInfo);
             }
-            
         }
         return result;
     }
     
-    private Map combineRanges(Map srcPathsToRanges) {
-        Collection combinedRanges = new LinkedList();
-        String[] paths = (String[]) srcPathsToRanges.keySet().toArray();
+    private Map combineRanges(Map srcPathsToRangeLists) {
+        String[] paths = (String[]) srcPathsToRangeLists.keySet().toArray();
         for (int i = 0; i < paths.length; i++) {
             String path = paths[i];
-            SVNMergeRange[] ranges = (SVNMergeRange[]) srcPathsToRanges.get(path);
-            SVNMergeRange lastRange = null;
-            for (int k = 0; k < ranges.length; k++) {
-                SVNMergeRange nextRange = ranges[k];
-                if (lastRange != null && 
-                    lastRange.getStartRevision() <= nextRange.getEndRevision() + 1 &&
-                    nextRange.getStartRevision() <= lastRange.getEndRevision() + 1) {
-                    lastRange.setStartRevision(Math.min(lastRange.getStartRevision(), nextRange.getStartRevision()));
-                    lastRange.setEndRevision(Math.max(lastRange.getEndRevision(), nextRange.getEndRevision()));
-                    continue; 
-                }
-                lastRange = nextRange;
-                combinedRanges.add(nextRange);
-            }
-            ranges = (SVNMergeRange[]) combinedRanges.toArray(new SVNMergeRange[combinedRanges.size()]);
-            combinedRanges.clear();
-            Arrays.sort(ranges);
-            srcPathsToRanges.put(path, ranges);
+            SVNMergeRangeList rangeList = (SVNMergeRangeList) srcPathsToRangeLists.get(path);
+            rangeList = rangeList.combineRanges();
+            srcPathsToRangeLists.put(path, rangeList);
         }
-        return srcPathsToRanges;
+        return srcPathsToRangeLists;
     }
     
     public static SVNMergeInfoManager createMergeInfoManager(ISVNDBProcessor dbProcessor) {
@@ -177,62 +157,11 @@ public class SVNMergeInfoManager {
         return new SVNMergeInfoManager(dbProcessor);
     }
     
-    /**
-     * Each element of the resultant array is formed like this:
-     * %s:%ld-%ld,.. where the first %s is a merge src path 
-     * and %ld-%ld is startRev-endRev merge range.
-     */
-    public static String[] formatMergeInfo(SVNMergeInfo mergeInfo) {
-        Map srcsToRanges = mergeInfo.getMergeSourcesToMergeRanges();
-        String[] pathRanges = new String[srcsToRanges.size()];
-        int k = 0;
-        for (Iterator paths = srcsToRanges.keySet().iterator(); paths.hasNext();) {
-            String path = (String) paths.next();
-            String output = path + ':';  
-            SVNMergeRange[] ranges = (SVNMergeRange[]) srcsToRanges.get(path);
-            for (int i = 0; i < ranges.length; i++) {
-                SVNMergeRange range = ranges[i];
-                long startRev = range.getStartRevision();
-                long endRev = range.getEndRevision();
-                if (startRev == endRev) {
-                    output += String.valueOf(startRev);
-                } else {
-                    output += startRev + '-' + endRev;
-                }
-                if (i < ranges.length - 1) {
-                    output += ',';
-                }
-            }
-            pathRanges[k++] = output;
-        }
-        return pathRanges;
-    }
-    
-    public static Map parseMergeInfo(StringBuffer mergeInfo, Map srcPathsToRanges) throws SVNException {
-        srcPathsToRanges = srcPathsToRanges == null ? new TreeMap() : srcPathsToRanges;
-        int ind = mergeInfo.indexOf(":");
-        if (ind == -1) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.MERGE_INFO_PARSE_ERROR, "Pathname not terminated by ':'");
-            SVNErrorManager.error(err);
-        }
-        String path = mergeInfo.substring(0, ind);
-        mergeInfo = mergeInfo.delete(0, ind + 1);
-        SVNMergeRange[] ranges = parseRanges(mergeInfo);
-        if (mergeInfo.length() != 0 && mergeInfo.charAt(0) != '\n') {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.MERGE_INFO_PARSE_ERROR, "Could not find end of line in range list line in ''{0}''", mergeInfo);
-            SVNErrorManager.error(err);
-        }
-        if (mergeInfo.length() > 0) {
-            mergeInfo = mergeInfo.deleteCharAt(0);
-        }
-        Arrays.sort(ranges);
-        srcPathsToRanges.put(path, ranges);
-        return srcPathsToRanges;
-    }
-
-    public static void mergeMergeInfos(Map originalSrcsToRanges, Map changedSrcsToRanges) {
-        String[] paths1 = (String[]) originalSrcsToRanges.keySet().toArray();
-        String[] paths2 = (String[]) changedSrcsToRanges.keySet().toArray();
+    public static Map mergeMergeInfos(Map originalSrcsToRangeLists, Map changedSrcsToRangeLists) {
+        originalSrcsToRangeLists = originalSrcsToRangeLists == null ? new TreeMap() : originalSrcsToRangeLists;
+        changedSrcsToRangeLists = changedSrcsToRangeLists == null ? Collections.EMPTY_MAP : changedSrcsToRangeLists;
+        String[] paths1 = (String[]) originalSrcsToRangeLists.keySet().toArray();
+        String[] paths2 = (String[]) changedSrcsToRangeLists.keySet().toArray();
         int i = 0;
         int j = 0;
         while (i < paths1.length && j < paths2.length) {
@@ -240,138 +169,85 @@ public class SVNMergeInfoManager {
             String path2 = paths2[j];
             int res = path1.compareTo(path2);
             if (res == 0) {
-                SVNMergeRange[] ranges1 = (SVNMergeRange[]) originalSrcsToRanges.get(path1);
-                SVNMergeRange[] ranges2 = (SVNMergeRange[]) changedSrcsToRanges.get(path2);
-                ranges1 = mergeMergeRanges(ranges1, ranges2);
-                originalSrcsToRanges.put(path1, ranges1);
+                SVNMergeRangeList rangeList1 = (SVNMergeRangeList) originalSrcsToRangeLists.get(path1);
+                SVNMergeRangeList rangeList2 = (SVNMergeRangeList) changedSrcsToRangeLists.get(path2);
+                rangeList1 = rangeList1.merge(rangeList2);
+                originalSrcsToRangeLists.put(path1, rangeList1);
                 i++;
                 j++;
             } else if (res < 0) {
                 i++;
             } else {
-                originalSrcsToRanges.put(path2, changedSrcsToRanges.get(path2));
+                originalSrcsToRangeLists.put(path2, changedSrcsToRangeLists.get(path2));
                 j++;
             }
         }
         
         for (; j < paths2.length; j++) {
             String path = paths2[j];
-            originalSrcsToRanges.put(path, changedSrcsToRanges.get(path));
+            originalSrcsToRangeLists.put(path, changedSrcsToRangeLists.get(path));
+        }
+        return originalSrcsToRangeLists;
+    }
+    
+    public static String combineMergeInfoProperties(String propValue1, String propValue2) throws SVNException {
+        Map srcsToRanges1 = SVNMergeInfo.parseMergeInfo(new StringBuffer(propValue1), null);
+        Map srcsToRanges2 = SVNMergeInfo.parseMergeInfo(new StringBuffer(propValue2), null);
+        srcsToRanges1 = mergeMergeInfos(srcsToRanges1, srcsToRanges2);
+        return SVNMergeInfo.formatMergeInfoToString(srcsToRanges1);
+    }
+    
+    public static void diffMergeInfoProperties(Map deleted, Map added, String fromPropValue, String toPropValue) throws SVNException {
+        if (fromPropValue.equals(toPropValue)) {
+            return;
+        } 
+        Map from = SVNMergeInfo.parseMergeInfo(new StringBuffer(fromPropValue), null);
+        Map to = SVNMergeInfo.parseMergeInfo(new StringBuffer(toPropValue), null);
+        diffMergeInfo(deleted, added, from, to);
+    }
+    
+    public static void diffMergeInfo(Map deleted, Map added, Map from, Map to) {
+        from = from == null ? Collections.EMPTY_MAP : from;
+        to = to == null ? Collections.EMPTY_MAP : to;
+        if (!from.isEmpty() && to.isEmpty()) {
+            SVNMergeInfo.dupMergeInfo(from, deleted);
+        } else if (from.isEmpty() && !to.isEmpty()) {
+            SVNMergeInfo.dupMergeInfo(to, added);
+        } else if (!from.isEmpty() && !to.isEmpty()) {
+            walkMergeInfoHashForDiff(deleted, added, from, to);
         }
     }
     
-    private static SVNMergeRange[] mergeMergeRanges(SVNMergeRange[] ranges1, SVNMergeRange[] ranges2) {
-        int i = 0;
-        int j = 0;
-        SVNMergeRange lastRange = null;
-        Collection resultRanges = new LinkedList();
-        while (i < ranges1.length && j < ranges2.length) {
-            SVNMergeRange range1 = ranges1[i];
-            SVNMergeRange range2 = ranges2[j];
-            int res = range1.compareTo(range2);
-            if (res == 0) {
-                lastRange = combineWithLastRange(lastRange, range1, resultRanges, true);
-                i++;
-                j++;
-            } else if (res < 0) {
-                lastRange = combineWithLastRange(lastRange, range1, resultRanges, true);
-                i++;
-            } else { 
-                lastRange = combineWithLastRange(lastRange, range2, resultRanges, true);
-                j++;
-            }
-        }
-        SVNDebugLog.assertCondition(i >= ranges1.length || j >= ranges2.length, "assertion failure in SVNMergeInfoManager.mergeMergeRanges()");
-        for (; i < ranges1.length; i++) {
-            SVNMergeRange range = ranges1[i];
-            lastRange = combineWithLastRange(lastRange, range, resultRanges, true);
-        }
-        for (; j < ranges2.length; j++) {
-            SVNMergeRange range = ranges2[j];
-            lastRange = combineWithLastRange(lastRange, range, resultRanges, true);
-        }
-        return (SVNMergeRange[]) resultRanges.toArray(new SVNMergeRange[resultRanges.size()]);
-    }
-
-    private static SVNMergeRange[] parseRanges(StringBuffer mergeInfo) throws SVNException {
-        Collection ranges = new LinkedList();
-        while (mergeInfo.length() > 0 && mergeInfo.charAt(0) != '\n' && 
-                Character.isWhitespace(mergeInfo.charAt(0))) {
-            mergeInfo = mergeInfo.deleteCharAt(0);
-        }
-        if (mergeInfo.length() == 0 || mergeInfo.charAt(0) == '\n') {
-            return null;
-        }
-        
-        SVNMergeRange lastRange = null;
-        while (mergeInfo.length() > 0 && mergeInfo.charAt(0) != '\n') {
-            long startRev = parseRevision(mergeInfo);
-            if (mergeInfo.length() > 0 && mergeInfo.charAt(0) != '\n' && 
-                mergeInfo.charAt(0) != '-' && mergeInfo.charAt(0) != ',') {
-                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.MERGE_INFO_PARSE_ERROR, 
-                                                             "Invalid character ''{0}'' found in revision list", 
-                                                             new Character(mergeInfo.charAt(0)));
-                SVNErrorManager.error(err);
-            }
-            
-            SVNMergeRange range = new SVNMergeRange(startRev, startRev);
-            if (mergeInfo.length() > 0 && mergeInfo.charAt(0) == '-') {
-                mergeInfo = mergeInfo.deleteCharAt(0);
-                long endRev = parseRevision(mergeInfo);
-                range.setEndRevision(endRev);
-            }
-            if (mergeInfo.length() == 0 || mergeInfo.charAt(0) == '\n') {
-                lastRange = combineWithLastRange(lastRange, range, ranges, false);
-                return (SVNMergeRange[]) ranges.toArray(new SVNMergeRange[ranges.size()]);
-            } else if (mergeInfo.length() > 0 && mergeInfo.charAt(0) == ',') {
-                lastRange = combineWithLastRange(lastRange, range, ranges, false);
-                mergeInfo = mergeInfo.deleteCharAt(0);
-            } else {
-                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.MERGE_INFO_PARSE_ERROR, 
-                                                             "Invalid character ''{0}'' found in range list", 
-                                                             mergeInfo.length() > 0 ?  mergeInfo.charAt(0) + "" : "");
-                SVNErrorManager.error(err);
+    private static void walkMergeInfoHashForDiff(Map deleted, Map added, Map from, Map to) {
+        for (Iterator paths = from.keySet().iterator(); paths.hasNext();) {
+            String path = (String) paths.next();
+            SVNMergeRangeList fromRangeList = (SVNMergeRangeList) from.get(path);
+            SVNMergeRangeList toRangeList = (SVNMergeRangeList) to.get(path);
+            if (toRangeList != null) {
+                SVNMergeRangeList deletedRangeList = fromRangeList.diff(toRangeList);
+                SVNMergeRangeList addedRangeList = toRangeList.diff(fromRangeList);
+                if (deleted != null && deletedRangeList.getSize() > 0) {
+                    deleted.put(path, deletedRangeList);
+                }
+                if (added != null && addedRangeList.getSize() > 0) {
+                    added.put(path, addedRangeList);
+                }
+            } else if (deleted != null) {
+                deleted.put(path, fromRangeList.dup());
             }
         }
         
-        if (mergeInfo.length() == 0 || mergeInfo.charAt(0) != '\n' ) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.MERGE_INFO_PARSE_ERROR, "Range list parsing ended before hitting newline");
-            SVNErrorManager.error(err);
+        if (added == null) {
+            return;
         }
         
-        return (SVNMergeRange[]) ranges.toArray(new SVNMergeRange[ranges.size()]);
+        for (Iterator paths = to.keySet().iterator(); paths.hasNext();) {
+            String path = (String) paths.next();
+            SVNMergeRangeList toRangeList = (SVNMergeRangeList) to.get(path);
+            if (!from.containsKey(path)) {
+                added.put(path, toRangeList.dup());
+            }
+        }        
     }
     
-    private static SVNMergeRange combineWithLastRange(SVNMergeRange lastRange, SVNMergeRange nextRange, Collection ranges, boolean dup) {
-        if (lastRange != null && 
-            lastRange.getStartRevision() <= nextRange.getEndRevision() + 1 &&
-            nextRange.getStartRevision() <= lastRange.getEndRevision() + 1) {
-            lastRange.setStartRevision(Math.min(lastRange.getStartRevision(), nextRange.getStartRevision()));
-            lastRange.setEndRevision(Math.max(lastRange.getEndRevision(), nextRange.getEndRevision()));
-            return lastRange; 
-        }
-        SVNMergeRange range = dup ? new SVNMergeRange(nextRange.getStartRevision(), 
-                                                      nextRange.getEndRevision()) : 
-                                    nextRange;
-        ranges.add(range);
-        return range;
-    }
-    
-    private static long parseRevision(StringBuffer mergeInfo) throws SVNException {
-        int ind = 0;
-        while (ind < mergeInfo.length() && Character.isDigit(mergeInfo.charAt(ind))) {
-            ind++;
-        }
-        
-        if (ind == 0) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.MERGE_INFO_PARSE_ERROR, 
-                                                         "Invalid revision number found parsing ''{0}''", 
-                                                         mergeInfo.length() > 0 ? mergeInfo.charAt(0) + "" : "");
-            SVNErrorManager.error(err);
-        }
-        
-        String numberStr = mergeInfo.substring(0, ind);
-        mergeInfo = mergeInfo.delete(0, ind);
-        return Long.parseLong(numberStr);
-    }
 }

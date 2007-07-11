@@ -63,4 +63,29 @@ public class SVNMergeRange implements Comparable {
         return this.compareTo(obj) == 0;
     }
     
+    public SVNMergeRange combine(SVNMergeRange range, boolean dup) {
+        if (canCombine(range)) {
+            myStartRevision = Math.min(myStartRevision, range.getStartRevision());
+            myEndRevision = Math.max(myEndRevision, range.getEndRevision());
+            return this; 
+        }
+        return dup ? new SVNMergeRange(range.getStartRevision(), 
+                                       range.getEndRevision()) : range;
+    }
+    
+    public boolean canCombine(SVNMergeRange range) {
+        return range != null && myStartRevision <= range.getEndRevision() + 1 &&
+               range.getStartRevision() <= myEndRevision + 1;
+    }
+    
+    public boolean contains(SVNMergeRange range) {
+        return range != null && myStartRevision <= range.myStartRevision && 
+               range.myEndRevision <= myEndRevision;
+    }
+    
+    public boolean intersects(SVNMergeRange range) {
+        return range != null && myStartRevision <= range.myEndRevision && 
+               range.myStartRevision <= myEndRevision;
+    }
+    
 }

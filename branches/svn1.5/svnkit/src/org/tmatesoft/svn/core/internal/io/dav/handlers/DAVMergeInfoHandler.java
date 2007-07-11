@@ -18,7 +18,6 @@ import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNMergeInfo;
 import org.tmatesoft.svn.core.SVNMergeInfoInheritance;
 import org.tmatesoft.svn.core.internal.io.dav.DAVElement;
-import org.tmatesoft.svn.core.internal.wc.SVNMergeInfoManager;
 import org.xml.sax.Attributes;
 
 
@@ -82,8 +81,8 @@ public class DAVMergeInfoHandler extends BasicDAVHandler {
             myCurrentInfo = cdata;
         } else if (element == DAVElement.MERGE_INFO_ITEM) {
             if (myPath != null && myCurrentInfo != null) {
-                Map srcPathsToRanges = SVNMergeInfoManager.parseMergeInfo(myCurrentInfo, myPathsToMergeInfos);
-                myPathsToMergeInfos.put(myPath, new SVNMergeInfo(myPath, srcPathsToRanges));
+                Map srcPathsToRangeLists = SVNMergeInfo.parseMergeInfo(myCurrentInfo, myPathsToMergeInfos);
+                myPathsToMergeInfos.put(myPath, new SVNMergeInfo(myPath, srcPathsToRangeLists));
             }
         }
     }
