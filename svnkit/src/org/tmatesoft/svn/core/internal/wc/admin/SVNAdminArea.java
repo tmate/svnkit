@@ -26,12 +26,14 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 
 import org.tmatesoft.svn.core.SVNCommitInfo;
 import org.tmatesoft.svn.core.SVNDepth;
 import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
+import org.tmatesoft.svn.core.SVNMergeInfo;
 import org.tmatesoft.svn.core.SVNNodeKind;
 import org.tmatesoft.svn.core.SVNProperty;
 import org.tmatesoft.svn.core.internal.util.SVNEncodingUtil;
@@ -42,6 +44,7 @@ import org.tmatesoft.svn.core.internal.wc.SVNAdminUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.internal.wc.SVNFileType;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
+import org.tmatesoft.svn.core.internal.wc.SVNMergeInfoManager;
 import org.tmatesoft.svn.core.internal.wc.SVNPropertiesManager;
 import org.tmatesoft.svn.core.wc.ISVNCommitParameters;
 import org.tmatesoft.svn.core.wc.ISVNMerger;
@@ -475,9 +478,15 @@ public abstract class SVNAdminArea {
                     if (workingValue.equals(toValue)) {
                         result = result != SVNStatusType.CONFLICTED && isNormal ? SVNStatusType.MERGED : result;
                     } else {
-                        result = isNormal ? SVNStatusType.CONFLICTED : result;                            
-                        conflicts.add(MessageFormat.format("Trying to add new property ''{0}'' with value ''{1}'',\n" +
-                                "but property already exists with value ''{2}''.", new Object[] { propName, toValue, workingValue }));
+                        if (SVNProperty.MERGE_INFO.equals(propName)) {
+                            toValue = SVNMergeInfoManager.combineMergeInfoProperties(workingValue, toValue);
+                            working.setPropertyValue(propName, toValue);
+                            result = SVNStatusType.MERGED;
+                        } else {
+                            result = isNormal ? SVNStatusType.CONFLICTED : result;                            
+                            conflicts.add(MessageFormat.format("Trying to add new property ''{0}'' with value ''{1}'',\n" +
+                                    "but property already exists with value ''{2}''.", new Object[] { propName, toValue, workingValue }));
+                        }
                     }
                 } else {
                     working.setPropertyValue(propName, toValue);
@@ -485,9 +494,18 @@ public abstract class SVNAdminArea {
             } else {
                 if (workingValue == null) {
                     if (toValue != null) {
-                        result = isNormal ? SVNStatusType.CONFLICTED : result;                            
-                        conflicts.add(MessageFormat.format("Trying to change property ''{0}'' from ''{1}'' to ''{2}'',\n" +
-                                "but the property does not exist.", new Object[] { propName, fromValue, toValue }));
+                        if (SVNProperty.MERGE_INFO.equals(propName)) {
+                            Map addedMergeInfo = new TreeMap();
+                            SVNMergeInfoManager.diffMergeInfoProperties(null, addedMergeInfo, fromValue, toValue);
+                            toValue = SVNMergeInfo.formatMergeInfoToString(addedMergeInfo);
+                            //TODO: ?
+//                            working.setPropertyValue(propName, toValue);
+//                            result = SVNStatusType.MERGED;
+                        } else {
+                            result = isNormal ? SVNStatusType.CONFLICTED : result;                            
+                            conflicts.add(MessageFormat.format("Trying to change property ''{0}'' from ''{1}'' to ''{2}'',\n" +
+                                    "but the property does not exist.", new Object[] { propName, fromValue, toValue }));
+                        }
                     } else {
                         result = result != SVNStatusType.CONFLICTED && isNormal ? SVNStatusType.MERGED : result;
                     }
@@ -495,12 +513,24 @@ public abstract class SVNAdminArea {
                     if (workingValue.equals(fromValue)) {
                         working.setPropertyValue(propName, toValue);
                     } else if (toValue == null && !workingValue.equals(fromValue)) {
-                        result = isNormal ? SVNStatusType.CONFLICTED : result;
-                        conflicts.add(MessageFormat.format("Trying to delete property ''{0}'' but value has been modified from ''{1}'' to ''{2}''.",
-                                 new Object[] { propName, fromValue, workingValue }));
+                        if (SVNProperty.MERGE_INFO.equals(propName)) {
+                            Map addedMergeInfo = new TreeMap();
+                            SVNMergeInfoManager.diffMergeInfoProperties(null, addedMergeInfo, fromValue, workingValue);
+                            toValue = SVNMergeInfo.formatMergeInfoToString(addedMergeInfo);
+                            //TODO: ?
+//                            working.setPropertyValue(propName, toValue);
+//                            result = SVNStatusType.MERGED;
+                        } else {
+                            result = isNormal ? SVNStatusType.CONFLICTED : result;
+                            conflicts.add(MessageFormat.format("Trying to delete property ''{0}'' but value has been modified from ''{1}'' to ''{2}''.",
+                                     new Object[] { propName, fromValue, workingValue }));
+                        }
                     } else if (workingValue.equals(toValue)) {
                         result = result != SVNStatusType.CONFLICTED && isNormal ? SVNStatusType.MERGED : result;
                     } else {
+                        if (SVNProperty.MERGE_INFO.equals(propName)) {
+                        }
+                        
                         result = isNormal ? SVNStatusType.CONFLICTED : result;
 
                         conflicts.add(MessageFormat.format("Trying to change property ''{0}'' from ''{1}'' to ''{2}'',\n" +

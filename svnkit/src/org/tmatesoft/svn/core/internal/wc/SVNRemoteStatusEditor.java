@@ -263,11 +263,11 @@ public class SVNRemoteStatusEditor extends SVNStatusEditor implements ISVNEditor
             File path = (File) paths.next();
             SVNStatus status = (SVNStatus) hash.get(path);
             
-            if (getWCAccess().isMissing(path)) {
-                status.setContentsStatus(SVNStatusType.STATUS_MISSING);
-            } else if (status.getEntry() != null && status.getKind() == SVNNodeKind.DIR && 
-                    (depth == SVNDepth.UNKNOWN || depth == SVNDepth.IMMEDIATES || 
-                     depth == SVNDepth.INFINITY)) {
+            if (status.getContentsStatus() != SVNStatusType.OBSTRUCTED &&
+                status.getContentsStatus() != SVNStatusType.STATUS_MISSING &&
+                status.getEntry() != null && status.getKind() == SVNNodeKind.DIR && 
+                (depth == SVNDepth.UNKNOWN || depth == SVNDepth.IMMEDIATES || 
+                 depth == SVNDepth.INFINITY)) {
                 SVNAdminArea dir = getWCAccess().retrieve(path);
                 getDirStatus(dirEntry, dir, null, depth, isReportAll(), isNoIgnore(), null, true, handler);
             }
