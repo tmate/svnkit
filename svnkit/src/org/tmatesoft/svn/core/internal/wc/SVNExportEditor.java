@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -30,9 +30,11 @@ import org.tmatesoft.svn.core.io.ISVNEditor;
 import org.tmatesoft.svn.core.io.diff.SVNDeltaProcessor;
 import org.tmatesoft.svn.core.io.diff.SVNDiffWindow;
 import org.tmatesoft.svn.core.wc.ISVNEventHandler;
+import org.tmatesoft.svn.core.wc.ISVNOptions;
+
 
 /**
- * @version 1.1.0
+ * @version 1.1.1
  * @author  TMate Software Ltd.
  */
 public class SVNExportEditor implements ISVNEditor {
@@ -48,11 +50,12 @@ public class SVNExportEditor implements ISVNEditor {
     private Map myFileProperties;
     private ISVNEventHandler myEventDispatcher;
     private String myURL;
+    private ISVNOptions myOptions;
     
     private SVNDeltaProcessor myDeltaProcessor;
 
     public SVNExportEditor(ISVNEventHandler eventDispatcher, String url,
-            File dstPath, boolean force, String eolStyle) {
+            File dstPath, boolean force, String eolStyle, ISVNOptions options) {
         myRoot = dstPath;
         myIsForce = force;
         myEOLStyle = eolStyle;
@@ -60,6 +63,7 @@ public class SVNExportEditor implements ISVNEditor {
         myEventDispatcher = eventDispatcher;
         myURL = url;
         myDeltaProcessor = new SVNDeltaProcessor();
+        myOptions = options;
     }
 
     public Map getCollectedExternals() {
@@ -128,7 +132,8 @@ public class SVNExportEditor implements ISVNEditor {
     }
 
     public void applyTextDelta(String commitPath, String baseChecksum) throws SVNException {
-        myCurrentTmpFile = SVNFileUtil.createUniqueFile(myCurrentDirectory, myCurrentFile.getName(), ".tmp");
+        String name = SVNPathUtil.tail(commitPath);
+        myCurrentTmpFile = SVNFileUtil.createUniqueFile(myCurrentDirectory, name, ".tmp");
         myDeltaProcessor.applyTextDelta(null, myCurrentTmpFile, true);
     }
 
@@ -168,7 +173,7 @@ public class SVNExportEditor implements ISVNEditor {
                 url = SVNPathUtil.append(url, SVNEncodingUtil.uriEncode(myCurrentFile.getName()));
                 String author = (String) myFileProperties.get(SVNProperty.LAST_AUTHOR);
                 String revStr = (String) myFileProperties.get(SVNProperty.COMMITTED_REVISION);
-                keywordsMap = SVNTranslator.computeKeywords(keywords, url, author, date, revStr);
+                keywordsMap = SVNTranslator.computeKeywords(keywords, url, author, date, revStr, myOptions);
             }
             byte[] eolBytes = null;
             if (SVNProperty.EOL_STYLE_NATIVE.equals(myFileProperties.get(SVNProperty.EOL_STYLE))) {

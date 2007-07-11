@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -17,15 +17,15 @@ import java.io.InputStream;
 import java.text.ParseException;
 
 /**
- * @version 1.1.0
+ * @version 1.1.1
  * @author  TMate Software Ltd.
  */
 class HTTPParser {
     
-    public static HTTPStatus parseStatus(InputStream is) throws IOException, ParseException {
+    public static HTTPStatus parseStatus(InputStream is, String charset) throws IOException, ParseException {
         String line = null;
         do {
-            line = readLine(is);
+            line = readLine(is, charset);
         } while (line != null && line.length() == 0);
         if (line == null) {
             throw new ParseException("can not read HTTP status line", 0);
@@ -33,7 +33,7 @@ class HTTPParser {
         return HTTPStatus.createHTTPStatus(line);
     }
     
-    public static String readLine(InputStream is) throws IOException {
+    public static String readLine(InputStream is, String charset) throws IOException {
         byte[] bytes = readPlainLine(is);
         if (bytes == null) {
             return null;
@@ -45,7 +45,7 @@ class HTTPParser {
                 length--;
             }
         }
-        return new String(bytes, 0, length);
+        return new String(bytes, 0, length, charset);
     }
     
     public static byte[] readPlainLine(InputStream is) throws IOException {

@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -45,6 +45,7 @@ import org.tmatesoft.svn.core.auth.SVNPasswordAuthentication;
 import org.tmatesoft.svn.core.auth.SVNSSLAuthentication;
 import org.tmatesoft.svn.core.internal.io.dav.handlers.DAVErrorHandler;
 import org.tmatesoft.svn.core.internal.util.SVNSocketFactory;
+import org.tmatesoft.svn.core.internal.wc.SVNCancellableOutputStream;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 import org.tmatesoft.svn.core.io.SVNRepository;
@@ -57,7 +58,7 @@ import org.xml.sax.SAXParseException;
 import org.xml.sax.helpers.DefaultHandler;
 
 /**
- * @version 1.1.0
+ * @version 1.1.1
  * @author  TMate Software Ltd.
  */
 class HTTPConnection implements IHTTPConnection {
@@ -84,16 +85,20 @@ class HTTPConnection implements IHTTPConnection {
     private SVNAuthentication myLastValidAuth;
     private HTTPAuthentication myChallengeCredentials;
     private HTTPAuthentication myProxyAuthentication;
-    private boolean myIsKeepAlive;
     private boolean myIsSpoolResponse;
     private ISVNSSLManager mySSLManager;
+    private String myCharset;
+    private boolean myIsSpoolAll;
+    private File mySpoolDirectory;
 
     
-    public HTTPConnection(SVNRepository repository) throws SVNException {
+    public HTTPConnection(SVNRepository repository, String charset, File spoolDirectory, boolean spoolAll) throws SVNException {
         myRepository = repository;
+        myCharset = charset;
         myHost = repository.getLocation().setPath("", false);
         myIsSecured = "https".equalsIgnoreCase(myHost.getProtocol());
-        myIsKeepAlive = repository.getOptions().keepConnection(repository);
+        myIsSpoolAll = spoolAll;
+        mySpoolDirectory = spoolDirectory;
     }
     
     public SVNURL getHost() {
@@ -112,11 +117,11 @@ class HTTPConnection implements IHTTPConnection {
             if (proxyAuth != null && proxyAuth.getProxyHost() != null) {
                 mySocket = SVNSocketFactory.createPlainSocket(proxyAuth.getProxyHost(), proxyAuth.getProxyPort());
                 if (myProxyAuthentication == null) {
-                    myProxyAuthentication = new HTTPBasicAuthentication(proxyAuth.getProxyUserName(), proxyAuth.getProxyPassword());
+                    myProxyAuthentication = new HTTPBasicAuthentication(proxyAuth.getProxyUserName(), proxyAuth.getProxyPassword(), myCharset);
                 }
                 myIsProxied = true;
                 if (myIsSecured) {
-                    HTTPRequest connectRequest = new HTTPRequest();
+                    HTTPRequest connectRequest = new HTTPRequest(myCharset);
                     connectRequest.setConnection(this);
                     connectRequest.setProxyAuthentication(myProxyAuthentication.authenticate());
                     connectRequest.setForceProxyAuth(true);
@@ -150,16 +155,16 @@ class HTTPConnection implements IHTTPConnection {
     public void readHeader(HTTPRequest request) throws IOException {
         InputStream is = myRepository.getDebugLog().createLogStream(getInputStream());
         try {            
-            HTTPStatus status = HTTPParser.parseStatus(is);
-            HTTPHeader header = HTTPHeader.parseHeader(is);
+            HTTPStatus status = HTTPParser.parseStatus(is, myCharset);
+            HTTPHeader header = HTTPHeader.parseHeader(is, myCharset);
             request.setStatus(status);
             request.setResponseHeader(header);
         } catch (ParseException e) {
             // in case of parse exception:
             // try to read remaining and log it.
-            String line = HTTPParser.readLine(is);
+            String line = HTTPParser.readLine(is, myCharset);
             while(line != null && line.length() > 0) {
-                line = HTTPParser.readLine(is);
+                line = HTTPParser.readLine(is, myCharset);
             }
             throw new IOException(e.getMessage());
         } finally {
@@ -250,16 +255,16 @@ class HTTPConnection implements IHTTPConnection {
         boolean isAuthForced = myRepository.getAuthenticationManager() != null ? myRepository.getAuthenticationManager().isAuthenticationForced() : false;
         if (httpAuth == null && isAuthForced) {
             httpAuth = myRepository.getAuthenticationManager().getFirstAuthentication(ISVNAuthenticationManager.PASSWORD, sslRealm, null);
-            myChallengeCredentials = new HTTPBasicAuthentication((SVNPasswordAuthentication)httpAuth);
+            myChallengeCredentials = new HTTPBasicAuthentication((SVNPasswordAuthentication)httpAuth, myCharset);
             myChallengeCredentials.setChallengeParameter("methodname", method);
             myChallengeCredentials.setChallengeParameter("uri", path);
         } 
         String realm = null;
 
         // 2. create request instance.
-        HTTPRequest request = new HTTPRequest();
+        HTTPRequest request = new HTTPRequest(myCharset);
         request.setConnection(this);
-        request.setKeepAlive(myIsKeepAlive);
+        request.setKeepAlive(true);
         request.setRequestBody(body);
         request.setResponseHandler(handler);
         request.setResponseStream(dst);
@@ -295,11 +300,13 @@ class HTTPConnection implements IHTTPConnection {
                         continue;
                     }
                 }
-                err = SVNErrorMessage.create(SVNErrorCode.RA_DAV_REQUEST_FAILED, ssl.getMessage());
+                err = SVNErrorMessage.create(SVNErrorCode.RA_DAV_REQUEST_FAILED, ssl);
             } catch (IOException e) {
                 myRepository.getDebugLog().info(e);
                 if (e instanceof SocketTimeoutException) {
                     err = SVNErrorMessage.create(SVNErrorCode.RA_DAV_REQUEST_FAILED, "timed out waiting for server");
+                } else if (e instanceof SVNCancellableOutputStream.IOCancelException) {
+                    SVNErrorManager.cancel(e.getMessage());
                 } else {
                     if (sslManager != null && sslManager.isClientCertPromptRequired()) {
                         SVNSSLAuthentication sslAuth = sslManager.getClientAuthentication();
@@ -350,7 +357,7 @@ class HTTPConnection implements IHTTPConnection {
                 }
 
                 try {
-                    myProxyAuthentication = HTTPAuthentication.parseAuthParameters(proxyAuthHeaders, myProxyAuthentication); 
+                    myProxyAuthentication = HTTPAuthentication.parseAuthParameters(proxyAuthHeaders, myProxyAuthentication, myCharset); 
                 } catch (SVNException svne) {
                     myRepository.getDebugLog().info(svne);
                     err = svne.getErrorMessage(); 
@@ -405,7 +412,7 @@ class HTTPConnection implements IHTTPConnection {
                 }
                 
                 try {
-                    myChallengeCredentials = HTTPAuthentication.parseAuthParameters(authHeaderValues, myChallengeCredentials); 
+                    myChallengeCredentials = HTTPAuthentication.parseAuthParameters(authHeaderValues, myChallengeCredentials, myCharset); 
                 } catch (SVNException svne) {
                     err = svne.getErrorMessage(); 
                     break;
@@ -565,25 +572,24 @@ class HTTPConnection implements IHTTPConnection {
     
     public SVNErrorMessage readData(HTTPRequest request, String method, String path, DefaultHandler handler) throws IOException {
         InputStream is = null; 
-        File tmpFile = null; 
+        SpoolFile tmpFile = null; 
         SVNErrorMessage err = null;
-        boolean closeStream = myIsSpoolResponse;
         try {
-            if (myIsSpoolResponse) {
+            if (myIsSpoolResponse || myIsSpoolAll) {
                 OutputStream dst = null;
                 try {
-                    tmpFile = SVNFileUtil.createTempFile(".svnkit", ".spool");
-                    dst = SVNFileUtil.openFileForWriting(tmpFile);
+                    tmpFile = new SpoolFile(mySpoolDirectory);
+                    dst = tmpFile.openForWriting();
+                    dst = new SVNCancellableOutputStream(dst, myRepository.getCanceller());
                     // this will exhaust http stream anyway.
                     err = readData(request, dst);
-                    closeStream |= err != null;
+                    SVNFileUtil.closeFile(dst);
+                    dst = null;
                     if (err != null) {
                         return err;
                     }
                     // this stream always have to be closed.
-                    is = SVNFileUtil.openFileForReading(tmpFile);
-                } catch (SVNException e) {
-                    return e.getErrorMessage();
+                    is = tmpFile.openForReading();
                 } finally {
                     SVNFileUtil.closeFile(dst);
                 }
@@ -592,12 +598,10 @@ class HTTPConnection implements IHTTPConnection {
             }
             // this will not close is stream.
             err = readData(is, method, path, handler);
-            closeStream |= err != null;
         } catch (IOException e) {
-            closeStream = true;
             throw e;
         } finally {
-            if (myIsSpoolResponse) {
+            if (myIsSpoolResponse || myIsSpoolAll) {
                 // always close spooled stream.
                 SVNFileUtil.closeFile(is);
             } else if (err == null && !hasToCloseConnection(request.getResponseHeader())) {
@@ -606,7 +610,7 @@ class HTTPConnection implements IHTTPConnection {
             }
             if (tmpFile != null) {
                 try {
-                    SVNFileUtil.deleteFile(tmpFile);
+                    tmpFile.delete();
                 } catch (SVNException e) {
                     throw new IOException(e.getMessage());
                 }
@@ -752,7 +756,7 @@ class HTTPConnection implements IHTTPConnection {
     
     private InputStream createInputStream(HTTPHeader readHeader, InputStream is) throws IOException {
         if ("chunked".equalsIgnoreCase(readHeader.getFirstHeaderValue(HTTPHeader.TRANSFER_ENCODING_HEADER))) {
-            is = new ChunkedInputStream(is);
+            is = new ChunkedInputStream(is, myCharset);
         } else if (readHeader.getFirstHeaderValue(HTTPHeader.CONTENT_LENGTH_HEADER) != null) {
             is = new FixedSizeInputStream(is, Long.parseLong(readHeader.getFirstHeaderValue(HTTPHeader.CONTENT_LENGTH_HEADER).toString()));
         } else if (!hasToCloseConnection(readHeader)) {

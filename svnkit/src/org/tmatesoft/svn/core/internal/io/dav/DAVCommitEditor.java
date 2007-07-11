@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -41,7 +41,7 @@ import org.tmatesoft.svn.core.io.ISVNWorkspaceMediator;
 import org.tmatesoft.svn.core.io.diff.SVNDiffWindow;
 
 /**
- * @version 1.1.0
+ * @version 1.1.1
  * @author  TMate Software Ltd.
  */
 class DAVCommitEditor implements ISVNEditor {
@@ -127,12 +127,13 @@ class DAVCommitEditor implements ISVNEditor {
 
         DAVResource newDir = new DAVResource(myCommitMediator, myConnection, path, -1, copyPath != null);
         newDir.setWorkingURL(SVNPathUtil.append(wPath, SVNPathUtil.tail(path)));
+        newDir.setAdded(true);
 
         myDirsStack.push(newDir);
         myPathsMap.put(newDir.getURL(), path);
         if (copyPath != null) {
             // convert to full path?
-            copyPath = myRepository.getFullPath(copyPath);
+            copyPath = myRepository.doGetFullPath(copyPath);
             copyPath = SVNEncodingUtil.uriEncode(copyPath);
             DAVBaselineInfo info = DAVUtil.getBaselineInfo(myConnection, myRepository, copyPath, copyRevision, false, false, null);
             copyPath = SVNPathUtil.append(info.baselineBase, info.baselinePath);
@@ -169,7 +170,7 @@ class DAVCommitEditor implements ISVNEditor {
         // do nothing,
         DAVResource parent = myDirsStack.peek() != null ? (DAVResource) myDirsStack.peek() : null;
         DAVResource directory = new DAVResource(myCommitMediator, myConnection, path, revision, parent == null ? false : parent.isCopy());
-        if (parent != null && parent.isCopy()) {
+        if (parent != null && parent.getVersionURL() == null) {
             // part of copied structure -> derive wurl
             directory.setWorkingURL(SVNPathUtil.append(parent.getWorkingURL(), SVNPathUtil.tail(path)));
         } else {
@@ -201,7 +202,13 @@ class DAVCommitEditor implements ISVNEditor {
         path = SVNEncodingUtil.uriEncode(path);
         // checkout parent collection.
         DAVResource parentResource = (DAVResource) myDirsStack.peek();
-        if (parentResource.getWorkingURL() == null) {
+        checkoutResource(parentResource, true);
+        String wPath = parentResource.getWorkingURL();
+        // create child resource.
+        DAVResource newFile = new DAVResource(myCommitMediator, myConnection, path, -1, copyPath != null);
+        newFile.setWorkingURL(SVNPathUtil.append(wPath, SVNPathUtil.tail(path)));
+
+        if (!parentResource.isAdded() && !myPathsMap.containsKey(newFile.getURL())) {
         	String filePath = SVNPathUtil.append(parentResource.getURL(), SVNPathUtil.tail(path));
             SVNErrorMessage err = null;
             try {
@@ -219,17 +226,13 @@ class DAVCommitEditor implements ISVNEditor {
                 SVNErrorManager.error(err);
             } 
         }
-        checkoutResource(parentResource, true);
-        String wPath = parentResource.getWorkingURL();
-        // create child resource.
-        DAVResource newFile = new DAVResource(myCommitMediator, myConnection, path, -1, copyPath != null);
-        newFile.setWorkingURL(SVNPathUtil.append(wPath, SVNPathUtil.tail(path)));
         // put to have working URL to make PUT or PROPPATCH later (in closeFile())
         myPathsMap.put(newFile.getURL(), newFile.getPath());
         myFilesMap.put(originalPath, newFile);
 
+        newFile.setAdded(true);
         if (copyPath != null) {
-            copyPath = myRepository.getFullPath(copyPath);
+            copyPath = myRepository.doGetFullPath(copyPath);
             copyPath = SVNEncodingUtil.uriEncode(copyPath);
             DAVBaselineInfo info = DAVUtil.getBaselineInfo(myConnection, myRepository, copyPath, copyRevision, false, false, null);
             copyPath = SVNPathUtil.append(info.baselineBase, info.baselinePath);
@@ -237,10 +240,7 @@ class DAVCommitEditor implements ISVNEditor {
             // do "COPY" copyPath to parents working url ?
             wPath = myLocation.setPath(newFile.getWorkingURL(), true).toString();
             myConnection.doCopy(copyPath, wPath, 0);
-            newFile.setAdded(false);
-        } else {
-            newFile.setAdded(true);
-        }
+        } 
     }
 
     public void openFile(String path, long revision) throws SVNException {
@@ -248,7 +248,7 @@ class DAVCommitEditor implements ISVNEditor {
         path = SVNEncodingUtil.uriEncode(path);
         DAVResource file = new DAVResource(myCommitMediator, myConnection, path, revision);
         DAVResource parent = (DAVResource) myDirsStack.peek();
-        if (parent.isCopy()) {
+        if (parent.getVersionURL() == null) {
             // part of copied structure -> derive wurl
             file.setWorkingURL(SVNPathUtil.append(parent.getWorkingURL(), SVNPathUtil.tail(path)));
         } else {
@@ -275,7 +275,7 @@ class DAVCommitEditor implements ISVNEditor {
         // save window, create temp file.
         try {
             if (myCurrentDelta == null) {
-                myDeltaFile = SVNFileUtil.createTempFile(".jasvsvn.", ".tmp");
+                myDeltaFile = SVNFileUtil.createTempFile("svnkit", ".tmp");
                 myCurrentDelta = SVNFileUtil.openFileForWriting(myDeltaFile);
             }
             diffWindow.writeTo(myCurrentDelta, myIsFirstWindow);

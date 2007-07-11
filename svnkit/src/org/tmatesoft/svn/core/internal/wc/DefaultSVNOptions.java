@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -12,23 +12,32 @@
 package org.tmatesoft.svn.core.internal.wc;
 
 import java.io.File;
+import java.text.DateFormat;
+import java.text.DateFormatSymbols;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Calendar;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.Locale;
 import java.util.Map;
 import java.util.StringTokenizer;
+import java.util.TimeZone;
 import java.util.regex.Pattern;
 
+import org.tmatesoft.svn.core.SVNURL;
+import org.tmatesoft.svn.core.internal.io.svn.ISVNConnector;
+import org.tmatesoft.svn.core.internal.io.svn.SVNTunnelConnector;
 import org.tmatesoft.svn.core.wc.ISVNMerger;
 import org.tmatesoft.svn.core.wc.ISVNMergerFactory;
 import org.tmatesoft.svn.core.wc.ISVNOptions;
 import org.tmatesoft.svn.core.wc.SVNWCUtil;
 
 /**
- * @version 1.1.0
+ * @version 1.1.1
  * @author  TMate Software Ltd.
  */
 public class DefaultSVNOptions implements ISVNOptions, ISVNMergerFactory {
@@ -43,15 +52,26 @@ public class DefaultSVNOptions implements ISVNOptions, ISVNMergerFactory {
     private static final String GLOBAL_IGNORES = "global-ignores";
     private static final String ENABLE_AUTO_PROPS = "enable-auto-props";
     private static final String STORE_AUTH_CREDS = "store-auth-creds";
+    private static final String KEYWORD_TIMEZONE = "keyword_timezone";
+    private static final String KEYWORD_LOCALE = "keyword_locale";
     
     private static final String DEFAULT_IGNORES = "*.o *.lo *.la #*# .*.rej *.rej .*~ *~ .#* .DS_Store";    
     private static final String YES = "yes";
     private static final String NO = "no";
+    
+    private static final String DEFAULT_LOCALE = Locale.getDefault().toString();
+    private static final String DEFAULT_TIMEZONE = TimeZone.getDefault().getID();
 
     private boolean myIsReadonly;
     private File myConfigDirectory;
-    private SVNConfigFile myConfigFile;
+    private SVNCompositeConfigFile myConfigFile;
     private ISVNMergerFactory myMergerFactory;
+    
+    private String myKeywordLocale = DEFAULT_LOCALE; 
+    private String myKeywordTimezone = DEFAULT_TIMEZONE;
+    private SimpleDateFormat myKeywordDateFormat = new SimpleDateFormat("yyyy-MM-dd' 'HH:mm:ss' 'ZZZZ' ('E', 'dd' 'MMM' 'yyyy')'");
+    
+    
 
     public DefaultSVNOptions() {
         this(null, true);
@@ -64,7 +84,7 @@ public class DefaultSVNOptions implements ISVNOptions, ISVNMergerFactory {
 
     public boolean isUseCommitTimes() {
         String value = getConfigFile().getPropertyValue(MISCELLANY_GROUP, USE_COMMIT_TIMES);
-        return getBooleanValue(value, true);
+        return getBooleanValue(value, false);
     }
 
     public void setUseCommitTimes(boolean useCommitTimes) {
@@ -87,6 +107,10 @@ public class DefaultSVNOptions implements ISVNOptions, ISVNMergerFactory {
     
     public void setAuthStorageEnabled(boolean storeAuth) {
         getConfigFile().setPropertyValue(AUTH_GROUP, STORE_AUTH_CREDS, storeAuth ? YES : NO, !myIsReadonly);
+    }
+
+    public boolean isIgnored(File file) {
+        return file != null && isIgnored(file.getName());
     }
 
     public boolean isIgnored(String name) {
@@ -264,10 +288,12 @@ public class DefaultSVNOptions implements ISVNOptions, ISVNMergerFactory {
         getConfigFile().setPropertyValue(SVNKIT_GROUP, propertyName, propertyValue, !myIsReadonly);
     }
 
-    private SVNConfigFile getConfigFile() {
+    private SVNCompositeConfigFile getConfigFile() {
         if (myConfigFile == null) {
             SVNConfigFile.createDefaultConfiguration(myConfigDirectory);
-            myConfigFile = new SVNConfigFile(new File(myConfigDirectory, "config"));
+            SVNConfigFile userConfig = new SVNConfigFile(new File(myConfigDirectory, "config"));
+            SVNConfigFile systemConfig = new SVNConfigFile(new File(SVNFileUtil.getSystemConfigurationDirectory(), "config"));
+            myConfigFile = new SVNCompositeConfigFile(systemConfig, userConfig);
         }
         return myConfigFile;
     }
@@ -334,11 +360,79 @@ public class DefaultSVNOptions implements ISVNOptions, ISVNMergerFactory {
         return new DefaultSVNMerger(conflictStart, conflictSeparator, conflictEnd);
     }
 
-    public String getTunnelDefinition(String subProtocolName) {
+    public ISVNConnector createTunnelConnector(SVNURL url) {
+	    String subProtocolName = url.getProtocol().substring("svn+".length());
         if (subProtocolName == null) {
             return null;
         }
         Map tunnels = getConfigFile().getProperties("tunnels");
-        return (String) tunnels.get(subProtocolName);
+	    final String tunnel = (String)tunnels.get(subProtocolName);
+	    if (tunnel == null) {
+		    return null;
+	    }
+	    return new SVNTunnelConnector(subProtocolName, tunnel);
+    }
+
+    public DateFormat getKeywordDateFormat() {
+        String localeID = getConfigFile().getPropertyValue(SVNKIT_GROUP, KEYWORD_LOCALE);
+        if (localeID == null) {
+            localeID = DEFAULT_LOCALE;
+        }
+        String tzID = getConfigFile().getPropertyValue(SVNKIT_GROUP, KEYWORD_TIMEZONE);
+        if (tzID == null) {
+            tzID = DEFAULT_TIMEZONE;
+        }
+        if (!myKeywordTimezone.equals(tzID)) {
+            TimeZone tz = TimeZone.getTimeZone(tzID);
+            myKeywordTimezone = tzID;
+            synchronized (myKeywordDateFormat) {
+               myKeywordDateFormat.setTimeZone(tz);
+            }
+        }
+        if (!myKeywordLocale.equals(localeID)) {
+            Locale newLocale = toLocale(localeID);
+            if (newLocale == null) {
+                newLocale = Locale.getDefault();
+            }
+            myKeywordLocale = localeID;
+            synchronized (myKeywordDateFormat) {
+               myKeywordDateFormat.setCalendar(Calendar.getInstance(myKeywordDateFormat.getTimeZone(), newLocale));
+               myKeywordDateFormat.setDateFormatSymbols(new DateFormatSymbols(newLocale));
+            }
+        }
+        return myKeywordDateFormat;
+    }
+    
+    private static Locale toLocale(String str) {
+        if (str == null) {
+            return null;
+        }
+        int len = str.length();
+        if (len != 2 && len != 5 && len < 7) {
+            return null;
+        }
+        char ch0 = str.charAt(0);
+        char ch1 = str.charAt(1);
+        if (ch0 < 'a' || ch0 > 'z' || ch1 < 'a' || ch1 > 'z') {
+            return null;
+        }
+        if (len == 2) {
+            return new Locale(str, "");
+        }
+        if (str.charAt(2) != '_') {
+            return null;
+        }
+        char ch3 = str.charAt(3);
+        char ch4 = str.charAt(4);
+        if (ch3 < 'A' || ch3 > 'Z' || ch4 < 'A' || ch4 > 'Z') {
+            return null;
+        }
+        if (len == 5) {
+            return new Locale(str.substring(0, 2), str.substring(3, 5));
+        }
+        if (str.charAt(5) != '_') {
+            return null;
+        }
+        return new Locale(str.substring(0, 2), str.substring(3, 5), str.substring(6));
     }
 }

@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -19,7 +19,6 @@ import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNLogEntry;
 import org.tmatesoft.svn.core.SVNLogEntryPath;
-import org.tmatesoft.svn.core.internal.util.SVNEncodingUtil;
 import org.tmatesoft.svn.core.internal.util.SVNTimeUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.util.ISVNDebugLog;
@@ -31,7 +30,7 @@ import org.xml.sax.SAXException;
  * This log handler implementation writes xml formatted information 
  * about the log entries it's passed to a specified <b>ContentHandler</b>. 
  * 
- * @version 1.1.0
+ * @version 1.1.1
  * @author  TMate Software Ltd.
  */
 public class SVNXMLLogHandler extends AbstractXMLHandler implements ISVNLogEntryHandler {
@@ -105,16 +104,15 @@ public class SVNXMLLogHandler extends AbstractXMLHandler implements ISVNLogEntry
                 SVNLogEntryPath path = (SVNLogEntryPath) logEntry.getChangedPaths().get(key);
                 addAttribute(ACTION_ATTR, path.getType() + "");
                 if (path.getCopyPath() != null) {
-                    addAttribute(COPYFROM_PATH_ATTR, SVNEncodingUtil.xmlEncodeAttr(path.getCopyPath()));
+                    addAttribute(COPYFROM_PATH_ATTR, path.getCopyPath());
                     addAttribute(COPYFROM_REV_ATTR, path.getCopyRevision() + "");
                 } 
-                addTag(PATH_TAG, SVNEncodingUtil.xmlEncodeAttr(path.getPath()));
+                addTag(PATH_TAG, path.getPath());
             }
             closeTag(PATHS_TAG);
         }
         String message = logEntry.getMessage();
         message = message == null ? "" : message;
-        message = SVNEncodingUtil.xmlEncodeCDATA(message);
         addTag(MSG_TAG, message);
         closeTag(LOGENTRY_TAG);
     }

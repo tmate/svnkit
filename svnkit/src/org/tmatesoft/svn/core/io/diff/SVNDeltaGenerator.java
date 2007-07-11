@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -39,7 +39,7 @@ import org.tmatesoft.svn.core.io.ISVNDeltaConsumer;
  * and the X-Delta algorithm for generating delta as a difference between target and 
  * non-empty source streams.    
  * 
- * @version 1.1.0
+ * @version 1.1.1
  * @author  TMate Software Ltd.
  */
 public class SVNDeltaGenerator {
@@ -186,6 +186,29 @@ public class SVNDeltaGenerator {
             consumer.textDeltaEnd(path);
         }
         return SVNFileUtil.toHexDigest(digest);
+    }
+
+    public void sendDelta(String path, byte[] target, int targetLength, ISVNDeltaConsumer consumer) throws SVNException {
+        sendDelta(path, null, 0, 0, target, targetLength, consumer);
+    }
+
+    public void sendDelta(String path, byte[] source, int sourceLength, long sourceOffset, byte[] target, int targetLength, ISVNDeltaConsumer consumer) throws SVNException {
+        if (targetLength == 0 || target == null) {
+            // send empty window, needed to create empty file. 
+            // only when no windows was sent at all.
+            if (consumer != null) {
+                consumer.textDeltaChunk(path, SVNDiffWindow.EMPTY);
+            }
+            return;
+        } 
+        if (source == null) {
+            source = new byte[0];
+            sourceLength = 0;
+        } else if (sourceLength < 0) {
+            sourceLength = 0;
+        }
+        // generate and send window
+        sendDelta(path, sourceOffset, source == null ? new byte[0] : source, sourceLength, target, targetLength, consumer);
     }
 
     private void sendDelta(String path, long sourceOffset, byte[] source, int sourceLength, byte[] target, int targetLength, ISVNDeltaConsumer consumer) throws SVNException {

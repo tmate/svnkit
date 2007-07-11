@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -70,7 +70,7 @@ import org.tmatesoft.svn.core.io.SVNRepository;
  * </tr>
  * </table>
  * 
- * @version 1.1.0
+ * @version 1.1.1
  * @author  TMate Software Ltd.
  */
 public class SVNDiffClient extends SVNBasicClient {
@@ -105,7 +105,7 @@ public class SVNDiffClient extends SVNBasicClient {
         super(authManager, options);
     }
 
-    protected SVNDiffClient(ISVNRepositoryPool repositoryPool, ISVNOptions options) {
+    public SVNDiffClient(ISVNRepositoryPool repositoryPool, ISVNOptions options) {
         super(repositoryPool, options);
     }
     
@@ -261,7 +261,11 @@ public class SVNDiffClient extends SVNBasicClient {
         path = new File(SVNPathUtil.validateFilePath(path.getAbsolutePath())).getAbsoluteFile();
         getDiffGenerator().init(path.getAbsolutePath(), path.getAbsolutePath());
         if (!(rM == SVNRevision.BASE || rM == SVNRevision.WORKING || rM == SVNRevision.COMMITTED)) {
-            doDiffURLURL(null, path, rN, null, path, rM, pegRevision, recursive, useAncestry, result);
+            if ((rN == SVNRevision.BASE || rN == SVNRevision.WORKING || rN == SVNRevision.COMMITTED)) {
+                doDiffURLWC(path, rM, pegRevision, path, rN, true, recursive, useAncestry, result);
+            } else {
+                doDiffURLURL(null, path, rN, null, path, rM, pegRevision, recursive, useAncestry, result);
+            }
         } else {
             // head, prev,date,number will go here.
             doDiffURLWC(path, rN, pegRevision, path, rM, false, recursive, useAncestry, result);
@@ -682,7 +686,11 @@ public class SVNDiffClient extends SVNBasicClient {
                 SVNRepositoryLocation[] locations = getLocations(null, path1, null, pegRevision, revision1, SVNRevision.UNDEFINED);
                 url1 = locations[0].getURL();
                 String anchorPath2 = SVNPathUtil.append(anchorURL.toString(), target == null ? "" : target);
-                getDiffGenerator().init(url1.toString(), anchorPath2);
+                if (!reverse) {
+                    getDiffGenerator().init(url1.toString(), anchorPath2);
+                } else {
+                    getDiffGenerator().init(anchorPath2, url1.toString());
+                }
             } else {
                 url1 = getURL(path1);
             }
@@ -760,21 +768,27 @@ public class SVNDiffClient extends SVNBasicClient {
         }
         SVNRepository repository1 = createRepository(url1, true);
         SVNRepository repository2 = createRepository(url2, false);
-        
+
         final long rev1 = getRevisionNumber(revision1, repository1, path1);
-        long rev2 = getRevisionNumber(revision2, repository2, path2);
-        
-        SVNNodeKind kind1 = repository1.checkPath("", rev1);
-        SVNNodeKind kind2 = repository2.checkPath("", rev2);
+        long rev2 = -1;
         String target1 = null;
-        if (kind1 == SVNNodeKind.NONE) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_NOT_FOUND, "''{0}'' was not found in the repository at revision {1}",
-                    new Object[] {url1, new Long(rev1)});
-            SVNErrorManager.error(err);
-        } else if (kind2 == SVNNodeKind.NONE) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_NOT_FOUND, "''{0}'' was not found in the repository at revision {1}",
-                    new Object[] {url2, new Long(rev2)});
-            SVNErrorManager.error(err);
+        SVNNodeKind kind1 = null;
+        SVNNodeKind kind2 = null;
+        try {
+            rev2 = getRevisionNumber(revision2, repository2, path2);            
+            kind1 = repository1.checkPath("", rev1);
+            kind2 = repository2.checkPath("", rev2);
+            if (kind1 == SVNNodeKind.NONE) {
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_NOT_FOUND, "''{0}'' was not found in the repository at revision {1}",
+                        new Object[] {url1, new Long(rev1)});
+                SVNErrorManager.error(err);
+            } else if (kind2 == SVNNodeKind.NONE) {
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_NOT_FOUND, "''{0}'' was not found in the repository at revision {1}",
+                        new Object[] {url2, new Long(rev2)});
+                SVNErrorManager.error(err);
+            }
+        } finally {
+            repository2.closeSession();
         }
         if (kind1 == SVNNodeKind.FILE || kind2 == SVNNodeKind.FILE) {
             target1 = SVNPathUtil.tail(url1.getPath());
@@ -801,6 +815,7 @@ public class SVNDiffClient extends SVNBasicClient {
             if (editor != null) {
                 editor.cleanup();
             }
+            repository2.closeSession();
         }
     }
 
@@ -827,27 +842,35 @@ public class SVNDiffClient extends SVNBasicClient {
         SVNRepository repository2 = createRepository(url2, false);
         
         final long rev1 = getRevisionNumber(revision1, repository1, path1);
-        long rev2 = getRevisionNumber(revision2, repository2, path2);
-        
-        SVNNodeKind kind1 = repository1.checkPath("", rev1);
-        SVNNodeKind kind2 = repository2.checkPath("", rev2);
+        long rev2 = -1;
+        SVNNodeKind kind1 = null;
+        SVNNodeKind kind2 = null;
         String target1 = null;
-        if (kind1 == SVNNodeKind.NONE) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_NOT_FOUND, "''{0}'' was not found in the repository at revision {1}",
-                    new Object[] {url1, new Long(rev1)});
-            SVNErrorManager.error(err);
-        } else if (kind2 == SVNNodeKind.NONE) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_NOT_FOUND, "''{0}'' was not found in the repository at revision {1}",
-                    new Object[] {url2, new Long(rev2)});
-            SVNErrorManager.error(err);
-        }
-        if (kind1 == SVNNodeKind.FILE || kind2 == SVNNodeKind.FILE) {
-            target1 = SVNPathUtil.tail(url1.getPath());
-            if (basePath != null) {
-                basePath = basePath.getParentFile();
+
+        try {
+            rev2 = getRevisionNumber(revision2, repository2, path2);
+            
+            kind1 = repository1.checkPath("", rev1);
+            kind2 = repository2.checkPath("", rev2);
+            if (kind1 == SVNNodeKind.NONE) {
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_NOT_FOUND, "''{0}'' was not found in the repository at revision {1}",
+                        new Object[] {url1, new Long(rev1)});
+                SVNErrorManager.error(err);
+            } else if (kind2 == SVNNodeKind.NONE) {
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_NOT_FOUND, "''{0}'' was not found in the repository at revision {1}",
+                        new Object[] {url2, new Long(rev2)});
+                SVNErrorManager.error(err);
             }
-            url1 = SVNURL.parseURIEncoded(SVNPathUtil.removeTail(url1.toString()));
-            repository1 = createRepository(url1, true);
+            if (kind1 == SVNNodeKind.FILE || kind2 == SVNNodeKind.FILE) {
+                target1 = SVNPathUtil.tail(url1.getPath());
+                if (basePath != null) {
+                    basePath = basePath.getParentFile();
+                }
+                url1 = SVNURL.parseURIEncoded(SVNPathUtil.removeTail(url1.toString()));
+                repository1 = createRepository(url1, true);
+            }
+        } finally {
+            repository2.closeSession();
         }
         repository2 = createRepository(url1, false); 
         File tmpFile = getDiffGenerator().createTempDirectory();
@@ -864,6 +887,7 @@ public class SVNDiffClient extends SVNBasicClient {
             if (tmpFile != null) {
                 SVNFileUtil.deleteAll(tmpFile, true, null);
             }
+            repository2.closeSession();
         }
     }
     
@@ -1357,6 +1381,7 @@ public class SVNDiffClient extends SVNBasicClient {
                     }, SVNCancellableEditor.newInstance(editor, this, getDebugLog()));
         } finally {
             editor.cleanup();
+            repository2.closeSession();
         }
         
     }
@@ -1411,9 +1436,8 @@ public class SVNDiffClient extends SVNBasicClient {
     }
     
     private File loadFile(SVNURL url, File path, SVNRevision revision, Map properties, SVNAdminAreaInfo info, long[] revNumber) throws SVNException {
-        String name = info.getTargetName();        
         File tmpDir = info.getAnchor().getRoot();
-        File result = SVNFileUtil.createUniqueFile(tmpDir, name, ".tmp");
+        File result = SVNFileUtil.createUniqueFile(tmpDir, ".merge", ".tmp");
         SVNFileUtil.createEmptyFile(result);
         
         SVNRepository repository = createRepository(url, true);

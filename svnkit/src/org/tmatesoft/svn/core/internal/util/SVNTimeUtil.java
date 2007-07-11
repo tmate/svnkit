@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -23,9 +23,10 @@ import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
+import org.tmatesoft.svn.util.SVNDebugLog;
 
 /**
- * @version 1.1.0
+ * @version 1.1.1
  * @author  TMate Software Ltd.
  */
 public class SVNTimeUtil {
@@ -34,13 +35,19 @@ public class SVNTimeUtil {
             "yyyy-MM-dd'T'HH:mm:ss.SSS'000Z'");
 
     private static final Calendar CALENDAR = Calendar.getInstance(TimeZone.getTimeZone("GMT"));
-    private static final Date NULL = new Date(0);
+    public static final Date NULL = new Date(0);
 
     static {
         ISO8601_FORMAT_OUT.setTimeZone(TimeZone.getTimeZone("GMT"));
     }
 
     public static void formatDate(Date date, StringBuffer buffer) {
+        if (date instanceof SVNDate) {
+            SVNDate extendedDate = (SVNDate) date;
+            buffer.append(extendedDate.format());
+            return;
+        }
+
         synchronized (ISO8601_FORMAT_OUT) {
             ISO8601_FORMAT_OUT.format(date, buffer, new FieldPosition(0));
         }
@@ -56,6 +63,12 @@ public class SVNTimeUtil {
         } else if (!formatZeroDate && date.getTime() == 0) {
             return null;
         }
+        
+        if (date instanceof SVNDate) {
+            SVNDate extendedDate = (SVNDate) date;
+            return extendedDate.format();
+        }
+        
         synchronized (ISO8601_FORMAT_OUT) {
             return ISO8601_FORMAT_OUT.format(date);
         }
@@ -66,20 +79,18 @@ public class SVNTimeUtil {
             return NULL;
         }
         try {
-            return new Date(parseDateAsLong(str));
+            return SVNDate.parseDatestamp(str);
         } catch (Throwable th) {
-            //
+            SVNDebugLog.getDefaultLog().info(th);
         }
         return NULL;        
     }
 
     public static Date parseDateString(String str) throws SVNException {
-        if (str == null) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.BAD_DATE);
-            SVNErrorManager.error(err);
-        }
         try {
-            return new Date(parseDateAsLong(str));
+            return SVNDate.parseDatestamp(str);
+        } catch (SVNException svne) {
+            throw svne;
         } catch (Throwable th) {
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.BAD_DATE);
             SVNErrorManager.error(err, th);

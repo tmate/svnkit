@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -29,8 +29,9 @@ import org.tmatesoft.svn.core.io.ISVNReporter;
 import org.tmatesoft.svn.core.io.ISVNReporterBaton;
 import org.tmatesoft.svn.util.ISVNDebugLog;
 
+
 /**
- * @version 1.1.0
+ * @version 1.1.1
  * @author  TMate Software Ltd.
  */
 public class SVNReporter implements ISVNReporterBaton {
@@ -101,17 +102,19 @@ public class SVNReporter implements ISVNReporterBaton {
                 }
             }
             reporter.finishReport();
+        } catch (SVNException e) {
+            try {
+                reporter.abortReport();
+            } catch (SVNException inner) {
+                myLog.info(inner);
+            }
+            throw e;
         } catch (Throwable th) {
             myLog.info(th);
             try {
                 reporter.abortReport();
             } catch (SVNException e) {
                 myLog.info(e);
-                SVNErrorMessage err = e.getErrorMessage().wrap("Error aborting report");
-                SVNErrorManager.error(err, th);
-            }
-            if (th instanceof SVNException) {
-                throw (SVNException) th;
             }
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.UNKNOWN, "WC report failed: {0}", th.getMessage());
             SVNErrorManager.error(err, th);
@@ -125,6 +128,7 @@ public class SVNReporter implements ISVNReporterBaton {
             externals[i].setOldExternal(externals[i].getNewURL(), externals[i].getNewRevision());
         }
 
+        String parentURL = adminArea.getEntry(adminArea.getThisDirName(), true).getURL();
         for (Iterator e = adminArea.entries(true); e.hasNext();) {
             SVNEntry entry = (SVNEntry) e.next();
             if (adminArea.getThisDirName().equals(entry.getName())) {
@@ -143,7 +147,6 @@ public class SVNReporter implements ISVNReporterBaton {
             File file = adminArea.getFile(entry.getName());
             SVNFileType fileType = SVNFileType.getType(file);
             boolean missing = fileType == SVNFileType.NONE;
-            String parentURL = adminArea.getEntry(adminArea.getThisDirName(), true).getURL();
             String expectedURL = SVNPathUtil.append(parentURL, SVNEncodingUtil.uriEncode(entry.getName()));
 
             if (entry.isFile()) {
@@ -167,6 +170,11 @@ public class SVNReporter implements ISVNReporterBaton {
                 }
             } else if (entry.isDirectory() && recursive) {
                 if (missing) {
+                    if (myIsRestore && entry.isScheduledForDeletion() || entry.isScheduledForReplacement()) {
+                        // remove dir schedule if it is 'scheduled for deletion' but missing.
+                        entry.setSchedule(null);
+                        adminArea.saveEntries(false);
+                    }
                     if (!reportAll) {
                         reporter.deletePath(path);
                     }

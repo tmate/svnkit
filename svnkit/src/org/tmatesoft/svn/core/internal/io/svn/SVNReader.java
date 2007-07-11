@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -26,6 +26,8 @@ import java.util.List;
 import java.util.Map;
 
 import org.tmatesoft.svn.core.ISVNDirEntryHandler;
+import org.tmatesoft.svn.core.SVNAuthenticationException;
+import org.tmatesoft.svn.core.SVNCancelException;
 import org.tmatesoft.svn.core.SVNDirEntry;
 import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
@@ -33,12 +35,13 @@ import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNLock;
 import org.tmatesoft.svn.core.SVNNodeKind;
 import org.tmatesoft.svn.core.internal.util.SVNTimeUtil;
+import org.tmatesoft.svn.core.internal.wc.SVNCancellableOutputStream;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.io.ISVNEditor;
 import org.tmatesoft.svn.util.SVNDebugLog;
 
 /**
- * @version 1.1.0
+ * @version 1.1.1
  * @author  TMate Software Ltd.
  */
 class SVNReader {
@@ -219,6 +222,7 @@ class SVNReader {
                     is.mark(0x100);
                     try {
                         value = readString(is);
+                        is.mark(-1); // drop the last mark
                     } catch (SVNException exception) {
                         try {
                             value = null;
@@ -237,6 +241,7 @@ class SVNReader {
                     is.mark(0x100);
                     try {
                         value = readString(is);
+                        is.mark(-1); // drop the last mark
                     } catch (SVNException exception) {
                         try {
                             value = null;
@@ -266,6 +271,7 @@ class SVNReader {
                                 is.mark(0x100);
                                 SVNErrorMessage err = readError(is);
                                 errorMessages.add(err);
+                                is.mark(-1); // drop the last mark
                             }
                         } catch (SVNException e) {
                             is.reset();
@@ -341,7 +347,7 @@ class SVNReader {
                     targetIndex++;
                 }
             } catch (SVNException e) {
-                if (unconditionalThrow) {
+                if (unconditionalThrow || e instanceof SVNCancelException || e instanceof SVNAuthenticationException) {
                     throw e;
                 }
                 try {
@@ -359,6 +365,7 @@ class SVNReader {
             } catch (IOException ioException) {
                 SVNErrorManager.error(SVNErrorMessage.create(SVNErrorCode.RA_SVN_IO_ERROR, ioException.getMessage()));
             }
+            is.mark(-1); // drop the last mark
         }
         if (target == null) {
             target = new Object[0];
@@ -401,6 +408,7 @@ class SVNReader {
             InputStream in = (InputStream) result;
             OutputStream out = (OutputStream) target[index];
             byte[] buffer = new byte[2048];
+            boolean cancelled = false;
             try {
                 while (true) {
                     int read = in.read(buffer);
@@ -412,10 +420,15 @@ class SVNReader {
                 }
                 out.flush();
             } catch (IOException e) {
+                cancelled = true;
+                if (e instanceof SVNCancellableOutputStream.IOCancelException) {
+                    SVNErrorManager.cancel(e.getMessage());
+                }
                 //
             } finally {
+                // no need to do that if operation was cancelled!
                 try {
-                    while (in.read(buffer) > 0) {
+                    while (!cancelled && in.read(buffer) > 0) {
                     }
                 } catch (IOException e1) {
                     //

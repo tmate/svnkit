@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -30,7 +30,7 @@ import org.tmatesoft.svn.core.io.diff.SVNDeltaGenerator;
 
 
 /**
- * @version 1.1.0
+ * @version 1.1.1
  * @author  TMate Software Ltd.
  */
 public class FSReplayPathHandler implements ISVNCommitPathHandler {
@@ -180,7 +180,7 @@ public class FSReplayPathHandler implements ISVNCommitPathHandler {
                     
                     FSRevisionNode node = myRoot.getRevisionNode(absPath);
                     Map newProps = node.getProperties(myOwner);
-                    Map propDiff = FSRepository.getPropsDiffs(oldProps, newProps);
+                    Map propDiff = FSRepositoryUtil.getPropsDiffs(oldProps, newProps);
                     for (Iterator propNames = propDiff.keySet().iterator(); propNames.hasNext();) {
                         String propName = (String) propNames.next();
                         String propValue = (String) propDiff.get(propName);
@@ -200,7 +200,13 @@ public class FSReplayPathHandler implements ISVNCommitPathHandler {
             }
             
             if (kind == SVNNodeKind.FILE && (change.isTextModified() || (realCopyFromPath != null && copyFromPath == null))) {
-                editor.applyTextDelta(path, null);
+                String checksum = null;
+                if (myCompareRoot != null && srcRoot != null && srcPath != null) {
+                    FSRevisionNode node = srcRoot.getRevisionNode(srcPath);
+                    checksum = node.getFileChecksum();
+                }
+                
+                editor.applyTextDelta(path, checksum);
                 if (myCompareRoot != null) {
                     InputStream sourceStream = null;
                     InputStream targetStream = null;
@@ -221,7 +227,8 @@ public class FSReplayPathHandler implements ISVNCommitPathHandler {
         }
         
         if (closeFile) {
-            editor.closeFile(path, null);
+            FSRevisionNode node = myRoot.getRevisionNode(absPath);
+            editor.closeFile(path, node.getFileChecksum());
             return false;
         }
         return true;
@@ -268,7 +275,8 @@ public class FSReplayPathHandler implements ISVNCommitPathHandler {
                 } finally {
                     SVNFileUtil.closeFile(targetStream);
                 }
-                editor.closeFile(newPath, null);
+                String checksum = srcNode.getFileChecksum();
+                editor.closeFile(newPath, checksum);
             }
             
         }

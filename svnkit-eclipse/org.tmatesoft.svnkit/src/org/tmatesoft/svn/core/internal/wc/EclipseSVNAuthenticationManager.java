@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -30,7 +30,7 @@ import org.tmatesoft.svn.core.auth.SVNSSLAuthentication;
 import org.tmatesoft.svn.core.auth.SVNUserNameAuthentication;
 
 /**
- * @version 1.1.0
+ * @version 1.1.1
  * @author  TMate Software Ltd.
  */
 public class EclipseSVNAuthenticationManager extends DefaultSVNAuthenticationManager {
@@ -53,10 +53,7 @@ public class EclipseSVNAuthenticationManager extends DefaultSVNAuthenticationMan
     }
 
     protected ISVNAuthenticationProvider createDefaultAuthenticationProvider(String userName, String password, File privateKey, String passphrase, boolean allowSave) {
-        return new ISVNAuthenticationProvider() {
-            public SVNAuthentication requestClientAuthentication(String kind, SVNURL url, String realm, SVNErrorMessage errorMessage, SVNAuthentication previousAuth, boolean authMayBeStored) {
-                return null;
-            }
+        return new DumbAuthenticationProvider(userName, password, privateKey, passphrase, allowSave) {
             public int acceptServerAuthentication(SVNURL url, String realm, Object certificate, boolean resultMayBeStored) {
                 return ACCEPTED;
             }
@@ -80,12 +77,13 @@ public class EclipseSVNAuthenticationManager extends DefaultSVNAuthenticationMan
                 if (ISVNAuthenticationManager.PASSWORD.equals(kind)) {
                     return new SVNPasswordAuthentication((String) info.get("username"), (String) info.get("password"), authMayBeStored);
                 } else if (ISVNAuthenticationManager.SSH.equals(kind)) {
-                    int port = url.getPort();
+                    int port = url.hasPort() ? url.getPort() : -1;
                     if (port < 0 && info.get("port") != null) {
                         port = Integer.parseInt((String) info.get("port"));
                     }
                     if (port < 0) {
-                        port = 22;
+                        // will give us default port.
+                        port = url.getPort();
                     }
                     if (info.get("key") != null) {
                         File keyPath = new File((String) info.get("key"));

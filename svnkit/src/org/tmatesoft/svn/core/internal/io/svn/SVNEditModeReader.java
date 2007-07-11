@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -24,7 +24,7 @@ import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.io.ISVNEditor;
 
 /**
- * @version 1.1.0
+ * @version 1.1.1
  * @author  TMate Software Ltd.
  */
 public class SVNEditModeReader {
@@ -49,6 +49,8 @@ public class SVNEditModeReader {
         COMMANDS_MAP.put("close-edit", "()");
         COMMANDS_MAP.put("abort-edit", "()");
         COMMANDS_MAP.put("finish-replay", "()");
+        COMMANDS_MAP.put("absent-dir", "(SS)");
+        COMMANDS_MAP.put("absent-file", "(SS)");
     }
 
     private ISVNEditor myEditor;
@@ -113,6 +115,10 @@ public class SVNEditModeReader {
             myEditor.closeEdit();
         } else if ("abort-edit".equals(commandName)) {
             myEditor.abortEdit();
+        } else if ("absent-dir".equals(commandName)) {
+            myEditor.absentDir((String) items[0]);
+        } else if ("absent-file".equals(commandName)) {
+            myEditor.absentFile((String) items[0]);
         }
         return !last;
     }

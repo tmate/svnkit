@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -45,7 +45,7 @@ import de.regnis.q.sequence.line.diff.QDiffUniGenerator;
  * interface, SVNKit uses this default implementation. To set a custom
  * diff driver use {@link SVNDiffClient#setDiffGenerator(ISVNDiffGenerator) setDiffGenerator()}.
  * 
- * @version 1.1.0
+ * @version 1.1.1
  * @author  TMate Software Ltd.
  */
 public class DefaultSVNDiffGenerator implements ISVNDiffGenerator {
@@ -62,6 +62,8 @@ public class DefaultSVNDiffGenerator implements ISVNDiffGenerator {
     
     private String myEncoding;
     private boolean myIsDiffDeleted;
+    private boolean myIsDiffAdded;
+    private boolean myIsDiffCopied;
     private File myBasePath;
     private boolean myIsDiffUnversioned;
     private SVNDiffOptions myDiffOptions;
@@ -102,6 +104,22 @@ public class DefaultSVNDiffGenerator implements ISVNDiffGenerator {
         return myIsDiffDeleted;
     }
     
+    public void setDiffAdded(boolean isDiffAdded) {
+        myIsDiffAdded = isDiffAdded;
+    }
+
+    public boolean isDiffAdded() {
+        return myIsDiffAdded;
+    }
+
+    public void setDiffCopied(boolean isDiffCopied) {
+        myIsDiffCopied = isDiffCopied;
+    }
+
+    public boolean isDiffCopied() {
+        return myIsDiffCopied;
+    }
+
     /**
      * Gets the diff options that are used by this generator. 
      * Creates a new one if none was used before.
@@ -143,7 +161,7 @@ public class DefaultSVNDiffGenerator implements ISVNDiffGenerator {
         myIsForcedBinaryDiff = forced;
     }
 
-    protected boolean isForcedBinaryDiff() {
+    public boolean isForcedBinaryDiff() {
         return myIsForcedBinaryDiff;
     }
 
@@ -166,7 +184,7 @@ public class DefaultSVNDiffGenerator implements ISVNDiffGenerator {
         diff = new TreeMap(diff);
         try {
             bos.write(EOL);
-            bos.write(("Property changes on: " + path.replace('/', File.separatorChar)).getBytes(getEncoding()));
+            bos.write(("Property changes on: " + (useLocalFileSeparatorChar() ? path.replace('/', File.separatorChar) : path)).getBytes(getEncoding()));
             bos.write(EOL);
             bos.write(PROPERTIES_SEPARATOR);
             bos.write(EOL);
@@ -242,22 +260,15 @@ public class DefaultSVNDiffGenerator implements ISVNDiffGenerator {
         rev2 = rev2 == null ? WC_REVISION_LABEL : rev2;
         ByteArrayOutputStream bos = new ByteArrayOutputStream();
         try {
-            if (file2 == null && !isDiffDeleted()) {
-                bos.write("Index: ".getBytes(getEncoding()));
-                bos.write(path.getBytes(getEncoding()));
-                bos.write(" (deleted)".getBytes(getEncoding()));
-                bos.write(EOL);
-                bos.write(HEADER_SEPARATOR);
-                bos.write(EOL);
+            if (displayHeader(bos, path, file2 == null)) {
                 bos.close();
                 bos.writeTo(result);
                 return;
             }
-            bos.write("Index: ".getBytes(getEncoding()));
-            bos.write(path.getBytes(getEncoding()));
-            bos.write(EOL);
-            bos.write(HEADER_SEPARATOR);
-            bos.write(EOL);
+            if (isHeaderForced(file1, file2)) {
+                bos.writeTo(result);
+                bos.reset();
+            }
         } catch (IOException e) {
             try {
                 bos.close();
@@ -269,33 +280,7 @@ public class DefaultSVNDiffGenerator implements ISVNDiffGenerator {
         }
         if (!isForcedBinaryDiff() && (SVNProperty.isBinaryMimeType(mimeType1) || SVNProperty.isBinaryMimeType(mimeType2))) {
             try {
-                bos.write("Cannot display: file marked as binary type.".getBytes(getEncoding()));
-                bos.write(EOL);
-                if (SVNProperty.isBinaryMimeType(mimeType1)
-                        && !SVNProperty.isBinaryMimeType(mimeType2)) {
-                    bos.write("svn:mime-type = ".getBytes(getEncoding()));
-                    bos.write(mimeType1.getBytes(getEncoding()));
-                    bos.write(EOL);
-                } else if (!SVNProperty.isBinaryMimeType(mimeType1)
-                        && SVNProperty.isBinaryMimeType(mimeType2)) {
-                    bos.write("svn:mime-type = ".getBytes(getEncoding()));
-                    bos.write(mimeType2.getBytes(getEncoding()));
-                    bos.write(EOL);
-                } else if (SVNProperty.isBinaryMimeType(mimeType1)
-                        && SVNProperty.isBinaryMimeType(mimeType2)) {
-                    if (mimeType1.equals(mimeType2)) {
-                        bos.write("svn:mime-type = ".getBytes(getEncoding()));
-                        bos.write(mimeType2.getBytes(getEncoding()));
-                        bos.write(EOL);
-                    } else {
-                        bos.write("svn:mime-type = (".getBytes(getEncoding()));
-                        bos.write(mimeType1.getBytes(getEncoding()));
-                        bos.write(", ".getBytes(getEncoding()));
-                        bos.write(mimeType2.getBytes(getEncoding()));
-                        bos.write(")".getBytes(getEncoding()));
-                        bos.write(EOL);
-                    }
-                }
+                displayBinary(bos, mimeType1, mimeType2);
             } catch (IOException e) {
                 SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, e.getLocalizedMessage());
                 SVNErrorManager.error(err, e);
@@ -318,16 +303,7 @@ public class DefaultSVNDiffGenerator implements ISVNDiffGenerator {
         }
         // put header fields.
         try {
-            bos.write("--- ".getBytes(getEncoding()));
-            bos.write(p1.getBytes(getEncoding()));
-            bos.write("\t".getBytes(getEncoding()));
-            bos.write(rev1.getBytes(getEncoding()));
-            bos.write(EOL);
-            bos.write("+++ ".getBytes(getEncoding()));
-            bos.write(p2.getBytes(getEncoding()));
-            bos.write("\t".getBytes(getEncoding()));
-            bos.write(rev2.getBytes(getEncoding()));
-            bos.write(EOL);
+            displayHeaderFields(bos, p1, rev1, p2, rev2);
         } catch (IOException e) {
             try {
                 bos.close();
@@ -338,10 +314,10 @@ public class DefaultSVNDiffGenerator implements ISVNDiffGenerator {
             SVNErrorManager.error(err, e);
         }
 
-	      String header;
+        String header;
         try {
             bos.close();
-            header = bos.toString();
+            header = bos.toString();            
         } catch (IOException inner) {
             header = "";
         }
@@ -448,5 +424,74 @@ public class DefaultSVNDiffGenerator implements ISVNDiffGenerator {
      */
     public void displayAddedDirectory(String path, String rev1, String rev2) throws SVNException {
         // not implemented.
+    }
+    
+    protected void displayBinary(OutputStream os, String mimeType1, String mimeType2) throws IOException {
+        os.write("Cannot display: file marked as a binary type.".getBytes(getEncoding()));
+        os.write(EOL);
+        if (SVNProperty.isBinaryMimeType(mimeType1)
+                && !SVNProperty.isBinaryMimeType(mimeType2)) {
+            os.write("svn:mime-type = ".getBytes(getEncoding()));
+            os.write(mimeType1.getBytes(getEncoding()));
+            os.write(EOL);
+        } else if (!SVNProperty.isBinaryMimeType(mimeType1)
+                && SVNProperty.isBinaryMimeType(mimeType2)) {
+            os.write("svn:mime-type = ".getBytes(getEncoding()));
+            os.write(mimeType2.getBytes(getEncoding()));
+            os.write(EOL);
+        } else if (SVNProperty.isBinaryMimeType(mimeType1)
+                && SVNProperty.isBinaryMimeType(mimeType2)) {
+            if (mimeType1.equals(mimeType2)) {
+                os.write("svn:mime-type = ".getBytes(getEncoding()));
+                os.write(mimeType2.getBytes(getEncoding()));
+                os.write(EOL);
+            } else {
+                os.write("svn:mime-type = (".getBytes(getEncoding()));
+                os.write(mimeType1.getBytes(getEncoding()));
+                os.write(", ".getBytes(getEncoding()));
+                os.write(mimeType2.getBytes(getEncoding()));
+                os.write(")".getBytes(getEncoding()));
+                os.write(EOL);
+            }
+        }
+    }
+    
+    protected boolean displayHeader(OutputStream os, String path, boolean deleted) throws IOException {
+        if (deleted && !isDiffDeleted()) {
+            os.write("Index: ".getBytes(getEncoding()));
+            os.write(path.getBytes(getEncoding()));
+            os.write(" (deleted)".getBytes(getEncoding()));
+            os.write(EOL);
+            os.write(HEADER_SEPARATOR);
+            os.write(EOL);
+            return true;
+        }
+        os.write("Index: ".getBytes(getEncoding()));
+        os.write(path.getBytes(getEncoding()));
+        os.write(EOL);
+        os.write(HEADER_SEPARATOR);
+        os.write(EOL);
+        return false;
+    }
+    
+    protected void displayHeaderFields(OutputStream os, String path1, String rev1, String path2, String rev2) throws IOException {
+        os.write("--- ".getBytes(getEncoding()));
+        os.write(path1.getBytes(getEncoding()));
+        os.write("\t".getBytes(getEncoding()));
+        os.write(rev1.getBytes(getEncoding()));
+        os.write(EOL);
+        os.write("+++ ".getBytes(getEncoding()));
+        os.write(path2.getBytes(getEncoding()));
+        os.write("\t".getBytes(getEncoding()));
+        os.write(rev2.getBytes(getEncoding()));
+        os.write(EOL);
+    }
+    
+    protected boolean isHeaderForced(File file1, File file2) {
+        return (file1 == null && file2 != null);
+    }
+    
+    protected boolean useLocalFileSeparatorChar() {
+        return true;
     }
 }

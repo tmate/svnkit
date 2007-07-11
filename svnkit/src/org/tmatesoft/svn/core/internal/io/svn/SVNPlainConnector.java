@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -16,6 +16,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.Socket;
+import java.net.UnknownHostException;
 
 import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
@@ -25,10 +26,12 @@ import org.tmatesoft.svn.core.internal.util.SVNSocketFactory;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 
 /**
- * @version 1.1.0
+ * @version 1.1.1
  * @author  TMate Software Ltd.
  */
 public class SVNPlainConnector implements ISVNConnector {
+
+    private static final int DEFAULT_SVN_TIMEOUT = 0;
 
     private Socket mySocket;
     private OutputStream myOutputStream;
@@ -41,6 +44,10 @@ public class SVNPlainConnector implements ISVNConnector {
         SVNURL location = repository.getLocation();
         try {
             mySocket = SVNSocketFactory.createPlainSocket(location.getHost(), location.getPort());
+            mySocket.setSoTimeout(DEFAULT_SVN_TIMEOUT);
+        } catch (UnknownHostException e) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.RA_SVN_IO_ERROR, "Unknown host " + e.getMessage());
+            SVNErrorManager.error(err, e);
         } catch (IOException e) {
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.RA_SVN_IO_ERROR, e.getLocalizedMessage());
             SVNErrorManager.error(err, e);
@@ -77,5 +84,12 @@ public class SVNPlainConnector implements ISVNConnector {
             myOutputStream = new BufferedOutputStream(mySocket.getOutputStream());
         }
         return myOutputStream;
+    }
+
+    public void free() {
+    }
+
+    public boolean occupy() {
+        return true;
     }
 }

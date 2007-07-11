@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -24,7 +24,7 @@ import org.tmatesoft.svn.core.internal.wc.SVNFileType;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 
 /**
- * @version 1.1.0
+ * @version 1.1.1
  * @author  TMate Software Ltd.
  */
 public class FSHooks {
@@ -48,8 +48,24 @@ public class FSHooks {
     private static final String[] winExtensions = {
             ".exe", ".bat", ".cmd"
     };
+    
+    private static Boolean ourIsHooksEnabled;
+    
+    public static void setHooksEnabled(boolean enabled) {
+        ourIsHooksEnabled = enabled ? Boolean.TRUE : Boolean.FALSE;
+    }
+    
+    public static boolean isHooksEnabled() {
+        if (ourIsHooksEnabled == null) {
+            ourIsHooksEnabled = Boolean.valueOf(System.getProperty("svnkit.hooksEnabled", System.getProperty("javasvn.hooksEnabled", "true")));
+        }
+        return ourIsHooksEnabled.booleanValue();
+    }
 
     public static File getHookFile(File reposRootDir, String hookName) throws SVNException {
+        if (!isHooksEnabled()) {
+            return null;
+        }
         File hookFile = null;
         if (SVNFileUtil.isWindows) {
             for (int i = 0; i < winExtensions.length; i++) {
@@ -192,7 +208,7 @@ public class FSHooks {
         runHook(hookFile, hookName, hookProc, null, readErrorStream);
     }
 
-    private static void runChangeRevPropHook(File reposRootDir, String hookName, String propName, String propValue, String author, long revision, String action, boolean isPre) throws SVNException {
+    public static void runChangeRevPropHook(File reposRootDir, String hookName, String propName, String propValue, String author, long revision, String action, boolean isPre) throws SVNException {
         File hookFile = getHookFile(reposRootDir, hookName);
         if (hookFile == null && isPre) {
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.REPOS_DISABLED_FEATURE,
@@ -258,6 +274,10 @@ public class FSHooks {
                     hook, ie.getLocalizedMessage()
             });
             SVNErrorManager.error(err, ie);
+        } finally {
+            errorGobbler.close();
+            inputGobbler.close();
+            hookProcess.destroy();
         }
 
         if (errorGobbler.getError() != null) {
@@ -284,10 +304,16 @@ public class FSHooks {
         InputStream is;
         StringBuffer result;
         IOException error;
+        private boolean myIsClosed;
 
         StreamGobbler(InputStream is) {
             this.is = is;
             result = new StringBuffer();
+        }
+        
+        public void close() {
+            myIsClosed = true;
+            SVNFileUtil.closeFile(is);
         }
 
         public void run() {
@@ -297,9 +323,13 @@ public class FSHooks {
                     result.append((char) (r & 0xFF));
                 }
             } catch (IOException ioe) {
-                error = ioe;
+                if (!myIsClosed) {
+                    error = ioe;
+                }
             } finally {
-                SVNFileUtil.closeFile(is);
+                if (!myIsClosed) {
+                    SVNFileUtil.closeFile(is);
+                }
             }
         }
 

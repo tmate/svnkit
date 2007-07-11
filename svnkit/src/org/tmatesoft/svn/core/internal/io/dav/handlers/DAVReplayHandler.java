@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -25,7 +25,7 @@ import org.xml.sax.Attributes;
 
 
 /**
- * @version 1.1.0
+ * @version 1.1.1
  * @author  TMate Software Ltd.
  */
 public class DAVReplayHandler extends DAVEditorHandler {
@@ -141,7 +141,8 @@ public class DAVReplayHandler extends DAVEditorHandler {
                 SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.RA_DAV_MALFORMED_DATA, "Got close-file element without preceding add-file or open-file");
                 SVNErrorManager.error(err);
             } else {
-                myEditor.closeFile(myPath, null);
+                String checksum = attrs.getValue(CHECKSUM_ATTR);
+                myEditor.closeFile(myPath, checksum);
                 myIsDirectory = true;
             }
         } else if (element == CLOSE_DIRECTORY) {

@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -12,8 +12,6 @@
 
 package org.tmatesoft.svn.core.io;
 
-import java.util.Map;
-
 import org.tmatesoft.svn.core.SVNException;
 
 /**
@@ -21,7 +19,7 @@ import org.tmatesoft.svn.core.SVNException;
  * data storage (mainly instructions and new text data for deltas) as well
  * as for caching and getting some kind of wcprops.
  * 
- * @version 1.1.0
+ * @version 1.1.1
  * @author  TMate Software Ltd.
  * @see		SVNRepository#getCommitEditor(String, Map, boolean, ISVNWorkspaceMediator)
  * @see     <a target="_top" href="http://svnkit.com/kb/examples/">Examples</a>

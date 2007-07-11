@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -23,6 +23,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.PrintStream;
 import java.io.StringReader;
+import java.net.ServerSocket;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
@@ -33,7 +34,7 @@ import java.util.StringTokenizer;
 import org.tmatesoft.svn.util.SVNDebugLog;
 
 /**
- * @version 1.1.0
+ * @version 1.1.1
  * @author  TMate Software Ltd.
  */
 public class PythonTests {
@@ -76,54 +77,68 @@ public class PythonTests {
         }
         String url = "file://" + absTestsRootLocation;
         if (Boolean.TRUE.toString().equals(properties.getProperty("python.file"))) {
+            boolean started = false;
             try {
                 for (int i = 0; i < ourLoggers.length; i++) {
                     ourLoggers[i].startServer("file", url);
                 }
+                started = true;
                 runPythonTests(properties, defaultTestSuite, url);
             } catch (Throwable th) {
                 th.printStackTrace();
             } finally {
-                for (int i = 0; i < ourLoggers.length; i++) {
-                    ourLoggers[i].endServer("file", url);
+                if (started) {
+                    for (int i = 0; i < ourLoggers.length; i++) {
+                        ourLoggers[i].endServer("file", url);
+                    }
                 }
             }
         }
 
         url = "svn://localhost";
         if (Boolean.TRUE.toString().equals(properties.getProperty("python.svn"))) {
+            boolean started = false;
 			try {
-				startSVNServe(properties);
+				int port = startSVNServe(properties);
+                url += ":" + port;
                 for (int i = 0; i < ourLoggers.length; i++) {
                     ourLoggers[i].startServer("svnserve", url);
                 }
+                started = true;
 				runPythonTests(properties, defaultTestSuite, url);
 			} catch (Throwable th) {
 				th.printStackTrace();
 			} finally {
 				stopSVNServe();
-                for (int i = 0; i < ourLoggers.length; i++) {
-                    ourLoggers[i].endServer("svnserve", url);
+                if (started) {
+                    for (int i = 0; i < ourLoggers.length; i++) {
+                        ourLoggers[i].endServer("svnserve", url);
+                    }
                 }
 			}
 		}
 
 		if (Boolean.TRUE.toString().equals(properties.getProperty("python.http"))) {
-			url = "http://localhost:" + properties.getProperty("apache.port", "8082");
 			properties.setProperty("apache.conf", "apache/python.template.conf");
+            boolean started = false;
+            int port = -1;
 			try {
-				startApache(properties);
+				port = startApache(properties);
+                url = "http://localhost:" + port;
 			    for (int i = 0; i < ourLoggers.length; i++) {
                     ourLoggers[i].startServer("apache", url);
                 }
+                started = true;
 				runPythonTests(properties, defaultTestSuite, url);
 			} catch (Throwable th) {
 				th.printStackTrace();
 			} finally {
 				try {
-					stopApache(properties);
-                    for (int i = 0; i < ourLoggers.length; i++) {
-                        ourLoggers[i].endServer("apache", url);
+					stopApache(properties, port);
+                    if (started) {
+                        for (int i = 0; i < ourLoggers.length; i++) {
+                            ourLoggers[i].endServer("apache", url);
+                        }
                     }
                 } catch (Throwable th) {
 					th.printStackTrace();
@@ -369,13 +384,21 @@ public class PythonTests {
         is.close();
         return props;
     }
-    public static void startSVNServe(Properties props) throws Throwable {
-        String port = props.getProperty("svn.port", "3690");
+    
+    public static int startSVNServe(Properties props) throws Throwable {
         String path = getRepositoryRoot(props);
         
+        int portNumber = 3690;
+        try {
+            portNumber = Integer.parseInt(props.getProperty("svn.port", "3690"));
+        } catch (NumberFormatException nfe) {
+        }
+        portNumber = findUnoccupiedPort(portNumber);
+        
         String svnserve = props.getProperty("svnserve.path");
-        String[] command = {svnserve, "-d", "--foreground", "--listen-port", port, "-r", path};
+        String[] command = {svnserve, "-d", "--foreground", "--listen-port", portNumber + "", "-r", path};
         ourSVNServer = execCommand(command, false);
+        return portNumber;
     }
     
     public static void stopSVNServe() {
@@ -384,27 +407,28 @@ public class PythonTests {
         }
     }
 
-    public static void startApache(Properties props) throws Throwable {
-        apache(props, true);
+    public static int startApache(Properties props) throws Throwable {
+        return apache(props, -1, true);
     }
 
-    public static void stopApache(Properties props) throws Throwable {
-        apache(props, false);
+    public static void stopApache(Properties props, int port) throws Throwable {
+        apache(props, port, false);
     }
     
-    private static void apache(Properties props, boolean start) throws Throwable {
+    private static int apache(Properties props, int port, boolean start) throws Throwable {
         String[] command = null;
-        File configFile = File.createTempFile("svn", "test");
+        File configFile = File.createTempFile("jsvn.", ".apache.config.tmp");
         configFile.deleteOnExit();
         String path = configFile.getAbsolutePath().replace(File.separatorChar, '/');
-        generateApacheConfig(configFile, props);
+        port = generateApacheConfig(configFile, props, port);
 
         String apache = props.getProperty("apache.path");
         command = new String[] {apache, "-f", path, "-k", (start ? "start" : "stop")};
         execCommand(command, start);
+        return port;
     }
     
-    private static void generateApacheConfig(File destination, Properties props) throws IOException {
+    private static int generateApacheConfig(File destination, Properties props, int port) throws IOException {
         File template = new File(props.getProperty("apache.conf", "apache/httpd.template.conf"));
         byte[] contents = new byte[(int) template.length()];
         InputStream is = new FileInputStream(template);
@@ -413,13 +437,22 @@ public class PythonTests {
         
         File passwdFile = new File("apache/passwd");
         
+        if (port < 0) {
+            port = 8082;
+            try {
+                port = Integer.parseInt(props.getProperty("apache.port", "8082"));
+            } catch (NumberFormatException nfe) {
+            }
+            port = findUnoccupiedPort(port);
+        }
+        
         String config = new String(contents);
         config = config.replaceAll("%root%", props.getProperty("apache.root"));
-        config = config.replaceAll("%port%", props.getProperty("apache.port"));
+        config = config.replaceAll("%port%", port + "");
         String path = getRepositoryRoot(props);
         config = config.replaceAll("%repository.root%", path);
         config = config.replaceAll("%passwd%", passwdFile.getAbsolutePath().replace(File.separatorChar, '/'));
-        config = config.replaceAll("%home%", System.getProperty("user.home"));
+        config = config.replaceAll("%home%", System.getProperty("user.home").replace(File.separatorChar, '/'));
         
         String pythonTests = new File(props.getProperty("python.tests")).getAbsolutePath().replace(File.separatorChar, '/');
         config = config.replaceAll("%python.tests%", pythonTests);
@@ -427,8 +460,27 @@ public class PythonTests {
         FileOutputStream os = new FileOutputStream(destination);
         os.write(config.getBytes());
         os.close();
+        return port;
     }
     
+    private static int findUnoccupiedPort(int port) {
+        ServerSocket socket = null;
+        try {
+            socket = new ServerSocket();
+            socket.bind(null);
+            return socket.getLocalPort();
+        } catch (IOException e) {
+            return port;
+        } finally {
+            if (socket != null) {
+                try {
+                    socket.close();
+                } catch (IOException e) {
+                }
+            }
+        }
+    }
+
     private static String getRepositoryRoot(Properties props) {
         String path = props.getProperty("repository.root");
         path = path.replaceAll("%home%", System.getProperty("user.home").replace(File.separatorChar, '/'));
@@ -446,7 +498,14 @@ public class PythonTests {
                 if (wait) {
                     int code = process.waitFor();
                     if (code != 0) {
-                        throw new IOException("process '"  +  command[0] + "' exit code is not 0 : " + code);
+                        StringBuffer commandLine = new StringBuffer();
+                        for (int i = 0; i < command.length; i++) {
+                            commandLine.append(command[i]);
+                            if (i + 1 != command.length) {
+                                commandLine.append(' ');
+                            }
+                        }
+                        throw new IOException("process '"  +  commandLine + "' exit code is not 0 : " + code);
                     }
                 }
             } catch (InterruptedException e) {

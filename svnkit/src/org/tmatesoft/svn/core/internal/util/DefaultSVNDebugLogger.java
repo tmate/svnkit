@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -13,6 +13,7 @@ package org.tmatesoft.svn.core.internal.util;
 
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.UnsupportedEncodingException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -20,7 +21,7 @@ import org.tmatesoft.svn.util.SVNDebugLogAdapter;
 
 
 /**
- * @version 1.1.0
+ * @version 1.1.1
  * @author  TMate Software Ltd.
  */
 public class DefaultSVNDebugLogger extends SVNDebugLogAdapter {
@@ -48,8 +49,12 @@ public class DefaultSVNDebugLogger extends SVNDebugLogAdapter {
     }
 
     public void log(String message, byte[] data) {
-        if (getLogger().isLoggable(Level.FINER)) {
-            getLogger().log(Level.FINER, message + "\n" + new String(data));
+        if (getLogger().isLoggable(Level.FINEST)) {
+            try {
+                getLogger().log(Level.FINEST, message + "\n" + new String(data, "UTF-8"));
+            } catch (UnsupportedEncodingException e) {
+                getLogger().log(Level.FINEST, message + "\n" + new String(data));
+            }
         }
     }
 

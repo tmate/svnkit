@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -22,7 +22,7 @@ import org.tmatesoft.svn.core.SVNException;
  * contents difference between files in order to be used in 'diff' operations 
  * performed by <b>SVNDiffClient</b>. 
  * 
- * @version 1.1.0
+ * @version 1.1.1
  * @author  TMate Software Ltd.
  * @see     SVNDiffClient
  * @see     DefaultSVNDiffGenerator
@@ -88,7 +88,8 @@ public interface ISVNDiffGenerator {
      * files.
      *
      * <p>
-     * Like the <i>'--no-diff-deleted'</i> option of the <i>'svn diff'</i> command.
+     * Like the <i>'--no-diff-deleted'</i> option of the <i>'svn diff'</i> 
+     * or <i>'svnlook diff'</i> commands.
      * 
      * @param isDiffDeleted if <span class="javakeyword">true</span> then
      *                      deleted files will be diffed, otherwise not
@@ -103,10 +104,68 @@ public interface ISVNDiffGenerator {
      *         should be diffed (the driver is set to generate differences
      *         for deleted files as well), otherwise 
      *         <span class="javakeyword">false</span>
-     * @see    #isDiffDeleted() 
+     * @see    #setDiffDeleted(boolean) 
      */
     public boolean isDiffDeleted();
     
+    /**
+     * Enables or disables generating differences for added
+     * files. This switch is relevant to  
+     * {@link org.tmatesoft.svn.core.wc.admin.SVNLookClient}'s diff 
+     * operations. 
+     *
+     * <p>
+     * Like the <i>'--no-diff-added'</i> option of the <i>'svnlook diff'</i> command.
+     * 
+     * @param isDiffAdded   if <span class="javakeyword">true</span> then
+     *                      added files will be diffed, otherwise not
+     * @see                 #isDiffAdded()
+     */
+    public void setDiffAdded(boolean isDiffAdded);
+
+    /**
+     * Tells whether added files are enabled to be diffed. 
+     * This switch is relevant to  
+     * {@link org.tmatesoft.svn.core.wc.admin.SVNLookClient}'s diff 
+     * operations. 
+     * 
+     * @return <span class="javakeyword">true</span> if added files
+     *         should be diffed, otherwise 
+     *         <span class="javakeyword">false</span>
+     * @see    #setDiffAdded(boolean)
+     */
+    public boolean isDiffAdded();
+
+    /**
+     * Enables or disables generating differences against copy source 
+     * for copied files. This switch is relevant to  
+     * {@link org.tmatesoft.svn.core.wc.admin.SVNLookClient}'s diff 
+     * operations. 
+     *
+     * <p>
+     * Like the <i>'--diff-copy-from'</i> option of the <i>'svnlook diff'</i> command.
+     * 
+     * @param isDiffCopied   if <span class="javakeyword">true</span> then
+     *                       copied files will be diffed against copy sources, 
+     *                       otherwise they will be treated as newly added files
+     * @see                  #isDiffCopied()
+     */
+    public void setDiffCopied(boolean isDiffCopied);
+
+    /**
+     * Tells whether copied files are enabled to be diffed against their 
+     * copy sources. This switch is relevant to  
+     * {@link org.tmatesoft.svn.core.wc.admin.SVNLookClient}'s diff 
+     * operations. 
+     * 
+     * @return  <span class="javakeyword">true</span> if copied files
+     *          should be diffed against copy sources;  
+     *          <span class="javakeyword">false</span> if copied files 
+     *          should be treated as newly added
+     * @see     #setDiffCopied(boolean) 
+     */
+    public boolean isDiffCopied();
+
     /**
      * Includes or not unversioned files into diff processing. 
      * 
@@ -206,4 +265,7 @@ public interface ISVNDiffGenerator {
      * @since                 1.1
      */
     public void displayAddedDirectory(String path, String rev1, String rev2) throws SVNException;
+
+    public boolean isForcedBinaryDiff();
+
 }

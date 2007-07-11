@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -17,8 +17,9 @@ import java.util.Arrays;
 import java.util.Map;
 
 
+
 /**
- * @version 1.1.0
+ * @version 1.1.1
  * @author  TMate Software Ltd.
  */
 public class SVNSubstitutor {
@@ -71,7 +72,7 @@ public class SVNSubstitutor {
                             myEOLBuffer, myEOLBufferLength, myIsRepair);
                     myEOLBufferLength = 0;
                 } else if (myKeywordBufferLength > 0 && p == '$') {
-                    myKeywordBuffer[myKeywordBufferLength++] = src.get();
+                    myKeywordBuffer[myKeywordBufferLength++] = src.get();                    
                     byte[] keywordName = matchKeyword(myKeywordBuffer, 0, myKeywordBufferLength);
                     if (keywordName == null) {
                         myKeywordBufferLength--;
@@ -173,7 +174,7 @@ public class SVNSubstitutor {
             }
             name = new String(src, offset + 1, len, "ASCII");
         } catch (UnsupportedEncodingException e) {
-            e.printStackTrace();
+            //
         } 
         if (name != null && myKeywords.containsKey(name)) {
             byte[] nameBytes = new byte[len];
@@ -191,11 +192,10 @@ public class SVNSubstitutor {
         try {
             nameStr = new String(name, "ASCII");
         } catch (UnsupportedEncodingException e) {
-            e.printStackTrace();
             return -1;
         }
         byte[] value = (byte[]) myKeywords.get(nameStr);
-        if (value != null) {
+        if (myKeywords.containsKey(nameStr)) {
             if (!myIsExpand) {
                 value = null;
             }

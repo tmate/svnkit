@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -21,19 +21,14 @@ import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNURL;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
+import org.tmatesoft.svn.core.internal.wc.SVNEventFactory;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
+import org.tmatesoft.svn.core.wc.ISVNEventHandler;
+import org.tmatesoft.svn.core.wc.SVNEvent;
 
 
 /**
- * Contains factories for different formats.
- * 
- * Each factory knows:
- * 
- * - whether directory is versioned.
- * - how to create new admin area.
- * - how to upgrade from one area to another (save area in certain format).
- * 
- * @version 1.1.0
+ * @version 1.1.1
  * @author  TMate Software Ltd.
  */
 public abstract class SVNAdminAreaFactory implements Comparable {
@@ -143,7 +138,12 @@ public abstract class SVNAdminAreaFactory implements Comparable {
             Collection enabledFactories = getSelector().getEnabledFactories(area.getRoot(), ourFactories, true);
             if (!enabledFactories.isEmpty()) {
                 SVNAdminAreaFactory newestFactory = (SVNAdminAreaFactory) enabledFactories.iterator().next();
-                area = newestFactory.doUpgrade(area);
+                SVNAdminArea newArea = newestFactory.doUpgrade(area);
+                if (newArea != null && newArea != area && newArea.getWCAccess() != null) {
+                    SVNEvent event = SVNEventFactory.createUpgradeEvent(newArea);
+                    newArea.getWCAccess().handleEvent(event, ISVNEventHandler.UNKNOWN);
+                }
+                area = newArea;
             }
         }
         return area;

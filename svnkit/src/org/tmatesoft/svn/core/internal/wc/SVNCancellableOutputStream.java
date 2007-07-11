@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -15,19 +15,20 @@ import java.io.FilterOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 
+import org.tmatesoft.svn.core.ISVNCanceller;
 import org.tmatesoft.svn.core.SVNCancelException;
-import org.tmatesoft.svn.core.wc.ISVNEventHandler;
+
 
 
 /**
- * @version 1.1.0
+ * @version 1.1.1
  * @author  TMate Software Ltd.
  */
 public class SVNCancellableOutputStream extends FilterOutputStream {
 
-    private ISVNEventHandler myEventHandler;
+    private ISVNCanceller myEventHandler;
 
-    public SVNCancellableOutputStream(OutputStream out, ISVNEventHandler eventHandler) {
+    public SVNCancellableOutputStream(OutputStream out, ISVNCanceller eventHandler) {
         super(out == null ? SVNFileUtil.DUMMY_OUT : out);
         myEventHandler = eventHandler;
     }
@@ -37,12 +38,7 @@ public class SVNCancellableOutputStream extends FilterOutputStream {
             try {
                 myEventHandler.checkCancelled();
             } catch (final SVNCancelException e) {
-                IOException ioe = new IOException("operation cancelled") {
-                    public Throwable getCause() {
-                        return e;
-                    }
-                };
-                throw ioe;
+                throw new IOCancelException(e.getMessage());
             }
         }
         out.write(b, off, len);
@@ -53,14 +49,20 @@ public class SVNCancellableOutputStream extends FilterOutputStream {
             try {
                 myEventHandler.checkCancelled();
             } catch (final SVNCancelException e) {
-                IOException ioe = new IOException("operation cancelled") {
-                    public Throwable getCause() {
-                        return e;
-                    }
-                };
-                throw ioe;
+                throw new IOCancelException(e.getMessage());
             }
         }
         out.write(b);
+    }
+    
+    /**
+     * @version 1.1.1
+     * @author  TMate Software Ltd.
+     */
+    public static class IOCancelException extends IOException {
+
+        public IOCancelException(String message) {
+            super(message);
+        }
     }
 }

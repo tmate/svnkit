@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -21,7 +21,7 @@ import org.xml.sax.SAXException;
 
 
 /**
- * @version 1.1.0
+ * @version 1.1.1
  * @author  TMate Software Ltd.
  */
 public abstract class BasicDAVDeltaHandler extends BasicDAVHandler {
@@ -31,7 +31,6 @@ public abstract class BasicDAVDeltaHandler extends BasicDAVHandler {
     private boolean myIsDeltaProcessing;
     private SVNDeltaReader myDeltaReader;
     private StringBuffer myDeltaOutputStream;
-    private int eolCount;
 
     protected void setDeltaProcessing(boolean processing) throws SVNException {
         myIsDeltaProcessing = processing;
@@ -56,7 +55,6 @@ public abstract class BasicDAVDeltaHandler extends BasicDAVHandler {
             
             for(int i = start; i < start + length; i++) {
                 if (ch[i] == '\r' || ch[i] == '\n') {
-                    eolCount++;
                     myDeltaOutputStream.append(ch, offset, i - offset);
                     offset = i + 1;
                     if (i + 1 < (start + length) && ch[i + 1] == '\n') {

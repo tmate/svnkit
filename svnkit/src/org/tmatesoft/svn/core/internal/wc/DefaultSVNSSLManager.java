@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -42,10 +42,12 @@ import org.tmatesoft.svn.core.auth.ISVNAuthenticationProvider;
 import org.tmatesoft.svn.core.auth.ISVNSSLManager;
 import org.tmatesoft.svn.core.auth.SVNSSLAuthentication;
 import org.tmatesoft.svn.core.internal.util.SVNBase64;
+import org.tmatesoft.svn.util.SVNDebugLog;
+
 
 
 /**
- * @version 1.1.0
+ * @version 1.1.1
  * @author  TMate Software Ltd.
  */
 public class DefaultSVNSSLManager implements ISVNSSLManager {
@@ -280,7 +282,7 @@ public class DefaultSVNSSLManager implements ISVNSSLManager {
                 keyStore.load(is, passphrase);                    
             }
         } catch (Throwable th) {
-            // 
+            SVNDebugLog.getDefaultLog().info(th);
         } finally {
             SVNFileUtil.closeFile(is);
         }
@@ -293,7 +295,7 @@ public class DefaultSVNSSLManager implements ISVNSSLManager {
                     myKeyManagers = kmf.getKeyManagers();
                 }
             } catch (Throwable e) {
-                //
+                SVNDebugLog.getDefaultLog().info(e);
             } 
         }
         return myKeyManagers;

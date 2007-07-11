@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -15,7 +15,7 @@ import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.io.SVNRepository;
 
 /**
- * @version 1.1.0
+ * @version 1.1.1
  * @author  TMate Software Ltd.
  */
 public interface IHTTPConnectionFactory {
@@ -23,7 +23,8 @@ public interface IHTTPConnectionFactory {
     public IHTTPConnectionFactory DEFAULT = new IHTTPConnectionFactory() {
 
         public IHTTPConnection createHTTPConnection(SVNRepository repository) throws SVNException {
-            return new HTTPConnection(repository);
+            String charset = System.getProperty("svnkit.http.encoding", "US-ASCII");
+            return new HTTPConnection(repository, charset, null, false);
         }
         
     };

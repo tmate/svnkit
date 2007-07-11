@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -38,8 +38,9 @@ import org.tmatesoft.svn.core.wc.ISVNOptions;
 import org.tmatesoft.svn.core.wc.SVNEvent;
 
 
+
 /**
- * @version 1.1.0
+ * @version 1.1.1
  * @author  TMate Software Ltd.
  */
 public class SVNWCAccess implements ISVNEventHandler {
@@ -49,6 +50,7 @@ public class SVNWCAccess implements ISVNEventHandler {
     private ISVNEventHandler myEventHandler;
     private ISVNOptions myOptions;
     private Map myAdminAreas;
+    private Map myCleanupHandlers;
 
     private File myAnchor;
 
@@ -74,15 +76,29 @@ public class SVNWCAccess implements ISVNEventHandler {
         }
     }
 
-    public void handleEvent(SVNEvent event) {
+    public void handleEvent(SVNEvent event) throws SVNException {
         handleEvent(event, ISVNEventHandler.UNKNOWN);
     }
+    
+    public void registerCleanupHandler(SVNAdminArea area, ISVNCleanupHandler handler) {
+        if (area == null || handler == null) {
+            return;
+        }
+        if (myCleanupHandlers == null) {
+            myCleanupHandlers = new HashMap();
+        }
+        myCleanupHandlers.put(area, handler);
+    }
 
-    public void handleEvent(SVNEvent event, double progress) {
+    public void handleEvent(SVNEvent event, double progress) throws SVNException {
         if (myEventHandler != null) {
             try {
                 myEventHandler.handleEvent(event, progress);
+            } catch (SVNException e) {
+                throw e;
             } catch (Throwable th) {
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.UNKNOWN, "Error while dispatching event: {0}", th.getMessage());
+                SVNErrorManager.error(err, th);
             }
         }
     }
@@ -163,11 +179,11 @@ public class SVNWCAccess implements ISVNEventHandler {
                 throw svne;
             }
             
-            SVNURL parentURL = parentEntry.getSVNURL();
-            SVNURL targetURL = targetEntry.getSVNURL();
+            SVNURL parentURL = parentEntry != null ? parentEntry.getSVNURL() : null;
+            SVNURL targetURL = targetEntry != null ? targetEntry.getSVNURL() : null;
             String encodedName = SVNEncodingUtil.uriEncode(name);
             if (targetInParent == null || (parentURL != null && targetURL != null && 
-                    (!parentURL.equals(targetURL.removePathTail()) || !encodedName.equals(SVNPathUtil.tail(targetURL.getPath()))))) {
+                    (!parentURL.equals(targetURL.removePathTail()) || !encodedName.equals(SVNPathUtil.tail(targetURL.getURIEncodedPath()))))) {
                 if (myAdminAreas != null) {
                     myAdminAreas.remove(parent);
                 }
@@ -187,12 +203,27 @@ public class SVNWCAccess implements ISVNEventHandler {
         
         if (parentArea != null) {
             if (parentError != null && targetArea != null) {
-                try {
-                    close();
-                } catch (SVNException svne) {
-                    //
+                if (parentError.getErrorMessage().getErrorCode() == SVNErrorCode.WC_LOCKED) {
+                    // try to work without 'anchor'
+                    try {
+                        doClose(parentArea, false);
+                    } catch (SVNException svne) {
+                        try {
+                            close();
+                        } catch (SVNException svne2) {
+                            //
+                        }
+                        throw svne;
+                    }
+                    parentArea = null;
+                } else {
+                    try {
+                        close();
+                    } catch (SVNException svne) {
+                        //
+                    }
+                    throw parentError;
                 }
-                throw parentError;
             }
         }
 
@@ -284,6 +315,7 @@ public class SVNWCAccess implements ISVNEventHandler {
             doClose(myAdminAreas, false);
             myAdminAreas.clear();
         }
+        myCleanupHandlers = null;
     }
     
     public void closeAdminArea(File path) throws SVNException {
@@ -369,6 +401,12 @@ public class SVNWCAccess implements ISVNEventHandler {
         if (adminArea == null) {
             return;
         }
+        if (myCleanupHandlers != null) {
+            ISVNCleanupHandler handler = (ISVNCleanupHandler) myCleanupHandlers.remove(adminArea);
+            if (handler != null) {
+                handler.cleanup(adminArea);
+            }
+        }
         if (!preserveLocks && adminArea.isLocked()) {
             adminArea.unlock();
         }
@@ -401,6 +439,9 @@ public class SVNWCAccess implements ISVNEventHandler {
     
     public boolean isWCRoot(File path) throws SVNException {
         SVNEntry entry = getEntry(path, false);
+        if (path.getParentFile() == null && entry != null) {
+            return true;
+        }
         SVNAdminArea parentArea = getAdminArea(path.getParentFile());
         if (parentArea == null) {
             try {

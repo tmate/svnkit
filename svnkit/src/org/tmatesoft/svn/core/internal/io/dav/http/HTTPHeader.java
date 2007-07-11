@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -21,7 +21,7 @@ import java.util.Map;
 import java.util.TreeMap;
 
 /**
- * @version 1.1.0
+ * @version 1.1.1
  * @author  TMate Software Ltd.
  */
 public class HTTPHeader {
@@ -132,12 +132,12 @@ public class HTTPHeader {
         return myHeaders;
     }
 
-    public static HTTPHeader parseHeader(InputStream is) throws IOException, ParseException {
+    public static HTTPHeader parseHeader(InputStream is, String charset) throws IOException, ParseException {
         HTTPHeader headers = new HTTPHeader();
         String name = null;
         StringBuffer value = null;
         for (; ;) {
-            String line = HTTPParser.readLine(is);
+            String line = HTTPParser.readLine(is, charset);
             if ((line == null) || (line.trim().length() < 1)) {
                 break;
             }

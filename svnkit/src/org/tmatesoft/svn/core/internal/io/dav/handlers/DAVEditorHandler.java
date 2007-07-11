@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -12,6 +12,7 @@
 
 package org.tmatesoft.svn.core.internal.io.dav.handlers;
 
+import java.io.OutputStream;
 import java.io.UnsupportedEncodingException;
 
 import org.tmatesoft.svn.core.SVNErrorCode;
@@ -31,16 +32,17 @@ import org.tmatesoft.svn.core.io.ISVNDeltaConsumer;
 import org.tmatesoft.svn.core.io.ISVNEditor;
 import org.tmatesoft.svn.core.io.ISVNReporter;
 import org.tmatesoft.svn.core.io.ISVNReporterBaton;
+import org.tmatesoft.svn.core.io.diff.SVNDiffWindow;
 import org.xml.sax.Attributes;
 
 
 /**
- * @version 1.1.0
+ * @version 1.1.1
  * @author  TMate Software Ltd.
  */
 public class DAVEditorHandler extends BasicDAVDeltaHandler {
 
-    public static StringBuffer generateEditorRequest(final DAVConnection connection, StringBuffer buffer, final String url, 
+    public static StringBuffer generateEditorRequest(final DAVConnection connection, StringBuffer buffer, String url, 
             long targetRevision, String target, String dstPath, boolean recurse,
             boolean ignoreAncestry, boolean resourceWalk, 
             boolean fetchContents, ISVNReporterBaton reporterBaton) throws SVNException {
@@ -48,6 +50,9 @@ public class DAVEditorHandler extends BasicDAVDeltaHandler {
         buffer.append("<?xml version=\"1.0\" encoding=\"utf-8\"?>\n");
         buffer.append("<S:update-report send-all=\"true\" xmlns:S=\"svn:\">\n");
         buffer.append("<S:src-path>");
+        if (url.endsWith("/")) {
+            url = url.substring(0, url.length() - 1);
+        }
         buffer.append(SVNEncodingUtil.xmlEncodeCDATA(url));
         buffer.append("</S:src-path>\n");
         if (targetRevision >= 0) {
@@ -130,7 +135,6 @@ public class DAVEditorHandler extends BasicDAVDeltaHandler {
             public void finishReport() {
             }
             public void abortReport() throws SVNException {
-                SVNErrorManager.cancel("report aborted");
             }
         });
         buffer.append("</S:update-report>");
@@ -162,14 +166,24 @@ public class DAVEditorHandler extends BasicDAVDeltaHandler {
     protected ISVNEditor myEditor;
     protected String myPath;
     protected String myPropertyName;
-    protected boolean myIsFetchContent;
     protected boolean myIsDirectory;
     private String myChecksum;
     private String myEncoding;
+    private ISVNDeltaConsumer myDeltaConsumer;
 
     public DAVEditorHandler(ISVNEditor editor, boolean fetchContent) {
-        myIsFetchContent = fetchContent; 
         myEditor = editor;
+        myDeltaConsumer = fetchContent ? (ISVNDeltaConsumer) editor : new ISVNDeltaConsumer() {
+            public void applyTextDelta(String path, String baseChecksum) throws SVNException {
+                myEditor.applyTextDelta(path, baseChecksum);
+            }
+            public OutputStream textDeltaChunk(String path, SVNDiffWindow diffWindow) throws SVNException {
+                return null;
+            }
+            public void textDeltaEnd(String path) throws SVNException {
+                myEditor.textDeltaEnd(path);
+            }
+        };
 		init();
 	}
 	
@@ -243,9 +257,7 @@ public class DAVEditorHandler extends BasicDAVDeltaHandler {
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.RA_NOT_IMPLEMENTED, "'update' response format used by the server is not supported; element ''{0}'' was not expected", element.toString());
             SVNErrorManager.error(err);
         } else if (element == TX_DELTA) {
-            if (myIsFetchContent) {
-                setDeltaProcessing(true);
-            }
+            setDeltaProcessing(true);
             myEditor.applyTextDelta(myPath, myChecksum);
         }
 	}
@@ -290,7 +302,7 @@ public class DAVEditorHandler extends BasicDAVDeltaHandler {
             }
             myPropertyName = null;
             myEncoding = null;
-        } else if (element == TX_DELTA && myIsFetchContent) {
+        } else if (element == TX_DELTA) {
             setDeltaProcessing(false);
         }
 	}
@@ -300,7 +312,7 @@ public class DAVEditorHandler extends BasicDAVDeltaHandler {
     }
     
     protected ISVNDeltaConsumer getDeltaConsumer() {
-        return myEditor;
+        return myDeltaConsumer;
     }
     
     private static String computeWCPropertyName(DAVElement element) {

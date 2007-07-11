@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -38,8 +38,9 @@ import org.tmatesoft.svn.core.io.ISVNEditor;
 import org.tmatesoft.svn.core.io.diff.SVNDeltaProcessor;
 import org.tmatesoft.svn.core.io.diff.SVNDiffWindow;
 
+
 /**
- * @version 1.1.0
+ * @version 1.1.1
  * @author  TMate Software Ltd.
  */
 public class SVNDiffEditor implements ISVNEditor {
@@ -460,7 +461,7 @@ public class SVNDiffEditor implements ISVNEditor {
     }
 
     private void diffUnversioned(File root, SVNAdminArea dir, boolean anchor, Set processedFiles) throws SVNException {
-        File[] allFiles = root.listFiles();
+        File[] allFiles = SVNFileListUtil.listFiles(root);
         for (int i = 0; allFiles != null && i < allFiles.length; i++) {
             File file = allFiles[i];
             if (SVNFileUtil.getAdminDirectoryName().equals(file.getName())) {
@@ -522,7 +523,7 @@ public class SVNDiffEditor implements ISVNEditor {
         }
         byte[] eol = SVNTranslator.getEOL(eolStyle);
         File tmpFile = createTempFile();
-        Map keywordsMap = SVNTranslator.computeKeywords(keywords, null, null, null, null);
+        Map keywordsMap = SVNTranslator.computeKeywords(keywords, null, null, null, null, null);
         SVNTranslator.translate(dir.getFile(name), tmpFile, eol, keywordsMap, special, false);
         return tmpFile;
     }

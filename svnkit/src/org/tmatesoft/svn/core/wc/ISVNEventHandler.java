@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -11,7 +11,7 @@
  */
 package org.tmatesoft.svn.core.wc;
 
-import org.tmatesoft.svn.core.SVNCancelException;
+import org.tmatesoft.svn.core.ISVNCanceller;
 import org.tmatesoft.svn.core.SVNException;
 
 /**
@@ -60,13 +60,13 @@ import org.tmatesoft.svn.core.SVNException;
  * are synchronous - that is the caller is blocked till a method 
  * finishes.
  * 
- * @version 1.1.0
+ * @version 1.1.1
  * @author  TMate Software Ltd.
  * @see     SVNEvent
  * @see     <a target="_top" href="http://svnkit.com/kb/examples/">Examples</a>
  *
  */
-public interface ISVNEventHandler {
+public interface ISVNEventHandler extends ISVNCanceller {
     /**
      * Constant that is currently the value of the <code>progress</code>
      * parameter (in {@link #handleEvent(SVNEvent, double) handleEvnt()}) 
@@ -96,12 +96,4 @@ public interface ISVNEventHandler {
      */
     public void handleEvent(SVNEvent event, double progress) throws SVNException;
     
-    /**
-     * Checks if the current operation is cancelled (somehow interrupted)
-     * and should throw an <b>SVNCancelException</b>.
-     * 
-     * @throws SVNCancelException
-     */
-    public void checkCancelled() throws SVNCancelException;
-
 }

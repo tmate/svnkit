@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -29,7 +29,7 @@ import org.tmatesoft.svn.core.auth.SVNPasswordAuthentication;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 
 /**
- * @version 1.1.0
+ * @version 1.1.1
  * @author  TMate Software Ltd.
  */
 abstract class HTTPAuthentication {
@@ -101,7 +101,7 @@ abstract class HTTPAuthentication {
         myPassword = password;
     }
     
-    public static HTTPAuthentication parseAuthParameters(Collection authHeaderValues, HTTPAuthentication prevResponse) throws SVNException {
+    public static HTTPAuthentication parseAuthParameters(Collection authHeaderValues, HTTPAuthentication prevResponse, String charset) throws SVNException {
         if (authHeaderValues == null) {
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.UNSUPPORTED_FEATURE, "Missing HTTP authorization method"); 
             SVNErrorManager.error(err);
@@ -128,7 +128,7 @@ abstract class HTTPAuthentication {
         
             source = source.substring(index).trim();
             if ("Basic".equalsIgnoreCase(method)) {
-                auth = new HTTPBasicAuthentication();
+                auth = new HTTPBasicAuthentication(charset);
                 
                 if (source.indexOf("realm=") >= 0) {
                     source = source.substring(source.indexOf("realm=") + "realm=".length());
@@ -185,7 +185,7 @@ abstract class HTTPAuthentication {
             } else if ("NTLM".equalsIgnoreCase(method)) {
                 HTTPNTLMAuthentication ntlmAuth = null;
                 if (source.length() == 0) {
-                    ntlmAuth = new HTTPNTLMAuthentication();
+                    ntlmAuth = new HTTPNTLMAuthentication(charset);
                     ntlmAuth.setType1State();
                 } else {
                     ntlmAuth = (HTTPNTLMAuthentication)prevResponse;

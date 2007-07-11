@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -26,8 +26,9 @@ import org.tmatesoft.svn.core.wc.SVNEvent;
 import org.tmatesoft.svn.core.wc.SVNEventAction;
 import org.tmatesoft.svn.core.wc.SVNStatusType;
 
+
 /**
- * @version 1.1.0
+ * @version 1.1.1
  * @author  TMate Software Ltd.
  */
 public class SVNEventFactory {
@@ -177,6 +178,12 @@ public class SVNEventFactory {
                 null, null, null, null, null, null);
     }
 
+    public static SVNEvent createResolvedEvent(SVNAdminAreaInfo info, SVNAdminArea adminArea, SVNEntry entry) {
+        return new SVNEvent(info, adminArea, entry.getName(),
+                SVNEventAction.RESOLVED, entry.getKind(), entry.getRevision(),
+                null, null, null, null, null, null);
+    }
+
     public static SVNEvent createRevertedEvent(SVNAdminArea dir, SVNEntry entry) {
         return new SVNEvent(null, dir, entry.getName(),
                 SVNEventAction.REVERT, entry.getKind(), entry.getRevision(),
@@ -194,6 +201,10 @@ public class SVNEventFactory {
         return new SVNEvent(info, adminArea, entry.getName(),
                 SVNEventAction.UPDATE_DELETE, entry.getKind(), entry
                         .getRevision(), null, null, null, null, null, null);
+    }
+
+    public static SVNEvent createUpgradeEvent(SVNAdminArea adminArea) {
+        return new SVNEvent(null, adminArea.getRoot(), SVNEventAction.UPGRADE, SVNNodeKind.DIR, -1, null, null, null, null, null, null);
     }
 
 }

@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -19,7 +19,7 @@ import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.io.SVNRepository;
 
 /**
- * @version 1.1.0
+ * @version 1.1.1
  * @author  TMate Software Ltd.
  */
 public interface ISVNConnectorFactory {
@@ -33,10 +33,10 @@ public interface ISVNConnectorFactory {
             } else if (location.getProtocol().startsWith("svn+")) {
                 String name = location.getProtocol().substring("svn+".length());
                 if (repository.getTunnelProvider() != null) {
-                    String tunnel = repository.getTunnelProvider().getTunnelDefinition(name);
-                    if (tunnel != null) {
-                        return new SVNTunnelConnector(name, tunnel);
-                    }
+                    ISVNConnector connector = repository.getTunnelProvider().createTunnelConnector(location);
+	                  if (connector != null) {
+		                  return connector;
+	                  }
                 }
                 SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.EXTERNAL_PROGRAM, "Cannot find tunnel specification for ''{0}''", name);
                 SVNErrorManager.error(err);

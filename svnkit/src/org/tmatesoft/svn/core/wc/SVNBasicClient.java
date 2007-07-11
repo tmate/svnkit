@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -55,7 +55,7 @@ import org.tmatesoft.svn.util.SVNDebugLog;
  * that allow you to set your {@link ISVNEventHandler event handler}, 
  * obtain run-time configuration options, and others. 
  * 
- * @version 1.1.0
+ * @version 1.1.1
  * @author  TMate Software Ltd.
  */
 public class SVNBasicClient implements ISVNEventHandler {
@@ -69,16 +69,12 @@ public class SVNBasicClient implements ISVNEventHandler {
     private ISVNDebugLog myDebugLog;
 
     protected SVNBasicClient(final ISVNAuthenticationManager authManager, ISVNOptions options) {
-        this(new DefaultSVNRepositoryPool(authManager == null ? SVNWCUtil.createDefaultAuthenticationManager() : authManager, options, 
-                true, DefaultSVNRepositoryPool.RUNTIME_POOL), options);
+        this(new DefaultSVNRepositoryPool(authManager == null ? SVNWCUtil.createDefaultAuthenticationManager() : authManager, options, 0, false), options);
     }
 
     protected SVNBasicClient(ISVNRepositoryPool repositoryPool, ISVNOptions options) {
         myRepositoryPool = repositoryPool;
-        myOptions = options;
-        if (myOptions == null) {
-            myOptions = SVNWCUtil.createDefaultOptions(true);
-        }
+        setOptions(options);
         myPathPrefixesStack = new LinkedList();
     }
     
@@ -89,6 +85,13 @@ public class SVNBasicClient implements ISVNEventHandler {
      */
     public ISVNOptions getOptions() {
         return myOptions;
+    }
+    
+    public void setOptions(ISVNOptions options) {
+        myOptions = options;
+        if (myOptions == null) {
+            myOptions = SVNWCUtil.createDefaultOptions(true);
+        }
     }
     
     /**
@@ -228,6 +231,7 @@ public class SVNBasicClient implements ISVNEventHandler {
             repository = myRepositoryPool.createRepository(url, mayReuse);
         }
         repository.setDebugLog(getDebugLog());
+        repository.setCanceller(getEventDispatcher());
         return repository;
     }
     
@@ -253,7 +257,14 @@ public class SVNBasicClient implements ISVNEventHandler {
                 path = SVNPathUtil.append(path, event.getPath());
                 event.setPath(path);
             }
-            myEventDispatcher.handleEvent(event, progress);
+            try {
+                myEventDispatcher.handleEvent(event, progress);
+            } catch (SVNException e) {
+                throw e;
+            } catch (Throwable th) {
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.UNKNOWN, "Error while dispatching event: {0}", th.getMessage());
+                SVNErrorManager.error(err, th);
+            }
         }
     }
     

@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -11,6 +11,7 @@
  */
 package org.tmatesoft.svn.core.internal.io.fs;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -37,7 +38,7 @@ import org.tmatesoft.svn.core.io.diff.SVNDeltaGenerator;
 import org.tmatesoft.svn.util.SVNDebugLog;
 
 /**
- * @version 1.1.0
+ * @version 1.1.1
  * @author  TMate Software Ltd.
  */
 public class FSUpdateContext {
@@ -299,14 +300,15 @@ public class FSUpdateContext {
     private void diffDirs(long sourceRevision, String sourcePath, String targetPath, String editPath, boolean startEmpty) throws SVNException {
         diffProplists(sourceRevision, startEmpty == true ? null : sourcePath, editPath, targetPath, null, true);
         Map sourceEntries = null;
+        
         if (sourcePath != null && !startEmpty) {
             FSRevisionRoot sourceRoot = getSourceRoot(sourceRevision);
             FSRevisionNode sourceNode = sourceRoot.getRevisionNode(sourcePath);
-            sourceEntries = sourceNode.getDirEntries(myFSFS);
+            sourceEntries = new HashMap(sourceNode.getDirEntries(myFSFS));
         }
         FSRevisionNode targetNode = getTargetRoot().getRevisionNode(targetPath);
 
-        Map targetEntries = targetNode.getDirEntries(myFSFS);
+        Map targetEntries = new HashMap(targetNode.getDirEntries(myFSFS));
 
         while (true) {
             Object[] nextInfo = fetchPathInfo(editPath);
@@ -365,6 +367,7 @@ public class FSUpdateContext {
                 return e1.compareTo(e2);
             }
         });
+
         for (int i = 0; i < tgtEntries.length; i++) {
             FSEntry tgtEntry = tgtEntries[i];
             String entryEditPath = SVNPathUtil.append(editPath, tgtEntry.getName());
@@ -386,7 +389,7 @@ public class FSUpdateContext {
             if (isIgnoreAncestry()) {
                 changed = checkFilesDifferent(sourceRoot, sourcePath, getTargetRoot(), targetPath);
             } else {
-                changed = myRepository.areFileContentsChanged(sourceRoot, sourcePath, getTargetRoot(), targetPath);
+                changed = FSRepositoryUtil.areFileContentsChanged(sourceRoot, sourcePath, getTargetRoot(), targetPath);
             }
             if (!changed) {
                 return;
@@ -419,7 +422,7 @@ public class FSUpdateContext {
     }
 
     private boolean checkFilesDifferent(FSRoot root1, String path1, FSRoot root2, String path2) throws SVNException {
-        boolean changed = myRepository.areFileContentsChanged(root1, path1, root2, path2);
+        boolean changed = FSRepositoryUtil.areFileContentsChanged(root1, path1, root2, path2);
         if (!changed) {
             return false;
         }
@@ -568,7 +571,7 @@ public class FSUpdateContext {
         if (sourcePath != null) {
             FSRevisionRoot sourceRoot = getSourceRoot(sourceRevision);
             FSRevisionNode sourceNode = sourceRoot.getRevisionNode(sourcePath);
-            boolean propsChanged = !myRepository.arePropertiesEqual(sourceNode, targetNode);
+            boolean propsChanged = !FSRepositoryUtil.arePropertiesEqual(sourceNode, targetNode);
             if (!propsChanged) {
                 return;
             }
@@ -578,7 +581,7 @@ public class FSUpdateContext {
         }
 
         Map targetProps = targetNode.getProperties(myFSFS);
-        Map propsDiffs = FSRepository.getPropsDiffs(sourceProps, targetProps);
+        Map propsDiffs = FSRepositoryUtil.getPropsDiffs(sourceProps, targetProps);
         Object[] names = propsDiffs.keySet().toArray();
         for (int i = 0; i < names.length; i++) {
             String propName = (String) names[i];
@@ -640,17 +643,32 @@ public class FSUpdateContext {
         }
     }
 
+    private void writeSingleString(String s, OutputStream out) throws IOException {
+        if (s != null) {
+            byte[] b = s.getBytes("UTF-8");
+            out.write('+');
+            out.write(String.valueOf(b.length).getBytes("UTF-8"));
+            out.write(':');
+            out.write(b);
+        } else {
+            out.write('-');
+        }
+    }
+    
     public void writePathInfoToReportFile(String path, String linkPath, String lockToken, long revision, boolean startEmpty) throws SVNException {
         String anchorRelativePath = SVNPathUtil.append(getReportTarget(), path);
-        String linkPathRep = linkPath != null ? "+" + linkPath.length() + ":" + linkPath : "-";
-        String revisionRep = FSRepository.isValidRevision(revision) ? "+" + revision + ":" : "-";
-        String lockTokenRep = lockToken != null ? "+" + lockToken.length() + ":" + lockToken : "-";
-        String startEmptyRep = startEmpty ? "+" : "-";
-        String fullRepresentation = "+" + anchorRelativePath.length() + ":" + anchorRelativePath + linkPathRep + revisionRep + startEmptyRep + lockTokenRep;
-
+        String revisionRep = FSRepository.isValidRevision(revision) ? "+" + String.valueOf(revision) + ":" : "-";
         try {
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        
+            writeSingleString(anchorRelativePath, baos);
+            writeSingleString(linkPath, baos);
+            baos.write(revisionRep.getBytes("UTF-8"));
+            baos.write(startEmpty ? '+' : '-');
+            writeSingleString(lockToken, baos);
+
             OutputStream reportOS = getReportFileForWriting();
-            reportOS.write(fullRepresentation.getBytes("UTF-8"));
+            reportOS.write(baos.toByteArray());
         } catch (IOException ioe) {
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, ioe.getLocalizedMessage());
             SVNErrorManager.error(err, ioe);

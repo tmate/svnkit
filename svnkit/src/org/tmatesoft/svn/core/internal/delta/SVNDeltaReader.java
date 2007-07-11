@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -31,7 +31,7 @@ import org.tmatesoft.svn.util.SVNDebugLog;
 /**
  * Reads diff windows from stream and feeds them to the ISVNDeltaConsumer instance.
  * 
- * @version 1.1.0
+ * @version 1.1.1
  * @author  TMate Software Ltd.
  */
 public class SVNDeltaReader {
@@ -59,9 +59,11 @@ public class SVNDeltaReader {
         myLastSourceLength = 0;
         myLastSourceOffset = 0;
         myHeaderBytes = 0;
+        myIsWindowSent = false;
+        myVersion = 0;
+
         myBuffer.clear();
         myBuffer.limit(0);
-        myIsWindowSent = false;
     }
     
     public void nextWindow(byte[] data, int offset, int length, String path, ISVNDeltaConsumer consumer) throws SVNException {
@@ -154,11 +156,11 @@ public class SVNDeltaReader {
         int originalPosition = myBuffer.position();
         int uncompressedLength = readOffset();
         // substract offset length from the total length.
-        byte[] uncompressedData = new byte[uncompressedLength];
         if (uncompressedLength == (compressedLength - (myBuffer.position() - originalPosition))) {
-            myBuffer.get(uncompressedData);
-            out.write(uncompressedData);
+            int offset = myBuffer.arrayOffset() + myBuffer.position();
+            out.write(myBuffer.array(), offset, uncompressedLength);
         } else {
+            byte[] uncompressedData = new byte[uncompressedLength];
             byte[] compressed = myBuffer.array();
             int offset = myBuffer.arrayOffset() + myBuffer.position();
             InputStream in = new InflaterInputStream(new ByteArrayInputStream(compressed, offset, compressedLength));

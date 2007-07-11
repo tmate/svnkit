@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -43,8 +43,9 @@ import org.tmatesoft.svn.core.wc.SVNStatus;
 import org.tmatesoft.svn.core.wc.SVNStatusType;
 
 
+
 /**
- * @version 1.1.0
+ * @version 1.1.1
  * @author  TMate Software Ltd.
  */
 public class SVNStatusEditor {
@@ -466,7 +467,17 @@ public class SVNStatusEditor {
     }
     
     private boolean isExternal(String path) {
-        return myExternalsMap.containsKey(path);
+        if (!myExternalsMap.containsKey(path)) {
+            // check if path is external parent.            
+            for (Iterator paths = myExternalsMap.keySet().iterator(); paths.hasNext();) {
+                String externalPath = (String) paths.next();
+                if (externalPath.startsWith(path + "/")) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        return true;
     }
     
     public static Collection getIgnorePatterns(SVNAdminArea dir, Collection globalIgnores) throws SVNException {
@@ -508,7 +519,7 @@ public class SVNStatusEditor {
     }
     
     private static Map getChildrenFiles(File parent) {
-        File[] children = parent.listFiles();
+        File[] children = SVNFileListUtil.listFiles(parent);
         if (children != null) {
             Map map = new HashMap();
             for (int i = 0; i < children.length; i++) {

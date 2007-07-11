@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -34,7 +34,7 @@ import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNProperties;
 
 /**
- * @version 1.1.0
+ * @version 1.1.1
  * @author  TMate Software Ltd.
  */
 public class FSTransactionRoot extends FSRoot {
@@ -270,7 +270,7 @@ public class FSTransactionRoot extends FSRoot {
         }
 
         File propsFile = getTransactionRevNodePropsFile(node.getId());
-        SVNProperties.setProperties(properties, propsFile, SVNFileUtil.createUniqueFile(propsFile.getParentFile(), propsFile.getName(), ".tmp"), SVNProperties.SVN_HASH_TERMINATOR);
+        SVNProperties.setProperties(properties, propsFile, SVNFileUtil.createUniqueFile(propsFile.getParentFile(), ".props", ".tmp"), SVNProperties.SVN_HASH_TERMINATOR);
 
         if (node.getPropsRepresentation() == null || !node.getPropsRepresentation().isTxn()) {
             FSRepresentation mutableRep = new FSRepresentation();
@@ -419,7 +419,7 @@ public class FSTransactionRoot extends FSRoot {
         String newCopyId = FSTransactionRoot.addKeys(startCopyId, txnCopyId);
         String line = newRevision + " " + newNodeId + " " + newCopyId + "\n";
         File currentFile = getOwner().getCurrentFile();
-        File tmpCurrentFile = SVNFileUtil.createUniqueFile(currentFile.getParentFile(), currentFile.getName(), ".tmp");
+        File tmpCurrentFile = SVNFileUtil.createUniqueFile(currentFile.getParentFile(), ".txnfile", ".tmp");
         OutputStream currentOS = null;
 
         try {

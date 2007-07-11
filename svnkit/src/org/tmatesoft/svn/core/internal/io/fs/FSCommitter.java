@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -18,8 +18,10 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Set;
 
 import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
@@ -36,7 +38,7 @@ import org.tmatesoft.svn.core.io.ISVNLockHandler;
 
 
 /**
- * @version 1.1.0
+ * @version 1.1.1
  * @author  TMate Software Ltd.
  */
 public class FSCommitter {
@@ -71,6 +73,36 @@ public class FSCommitter {
         myTxnRoot.deleteEntry(parentPath.getParent().getRevNode(), parentPath.getNameEntry());
         myTxnRoot.removeRevNodeFromCache(parentPath.getAbsPath());
         addChange(path, parentPath.getRevNode().getId(), FSPathChangeKind.FS_PATH_CHANGE_DELETE, false, false, FSRepository.SVN_INVALID_REVNUM, null);
+    }
+
+    public void changeNodeProperty(String path, String propName, String propValue) throws SVNException {
+        if (!SVNProperty.isRegularProperty(propName)) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.REPOS_BAD_ARGS,
+                    "Storage of non-regular property ''{0}'' is disallowed through the repository interface, and could indicate a bug in your client", propName);
+            SVNErrorManager.error(err);
+        }
+
+        FSParentPath parentPath = myTxnRoot.openPath(path, true, true);
+
+        if ((myTxnRoot.getTxnFlags() & FSTransactionRoot.SVN_FS_TXN_CHECK_LOCKS) != 0) {
+            FSCommitter.allowLockedOperation(myFSFS, path, myAuthor, myLockTokens, false, false);
+        }
+
+        makePathMutable(parentPath, path);
+        Map properties = parentPath.getRevNode().getProperties(myFSFS);
+
+        if (properties.isEmpty() && propValue == null) {
+            return;
+        }
+
+        if (propValue == null) {
+            properties.remove(propName);
+        } else {
+            properties.put(propName, propValue);
+        }
+
+        myTxnRoot.setProplist(parentPath.getRevNode(), properties);
+        addChange(path, parentPath.getRevNode().getId(), FSPathChangeKind.FS_PATH_CHANGE_MODIFY, false, true, FSRepository.SVN_INVALID_REVNUM, null);
     }
 
     public void makeCopy(FSRevisionRoot fromRoot, String fromPath, String toPath, boolean preserveHistory) throws SVNException {
@@ -332,7 +364,7 @@ public class FSCommitter {
         String curCopyId = curIds[1];
         String nextNodeId = FSTransactionRoot.generateNextKey(curNodeId);
         myFSFS.writeNextIDs(myTxnRoot.getTxnID(), nextNodeId, curCopyId);
-        return "_" + nextNodeId;
+        return "_" + curNodeId;
     }
 
     private long commit() throws SVNException {
@@ -444,11 +476,12 @@ public class FSCommitter {
         Map sourceEntries = source.getDirEntries(myFSFS);
         Map targetEntries = target.getDirEntries(myFSFS);
         Map ancestorEntries = ancestor.getDirEntries(myFSFS);
+        Set removedEntries = new HashSet();
 
         for (Iterator ancestorEntryNames = ancestorEntries.keySet().iterator(); ancestorEntryNames.hasNext();) {
             String ancestorEntryName = (String) ancestorEntryNames.next();
             FSEntry ancestorEntry = (FSEntry) ancestorEntries.get(ancestorEntryName);
-            FSEntry sourceEntry = (FSEntry) sourceEntries.get(ancestorEntryName);
+            FSEntry sourceEntry = removedEntries.contains(ancestorEntryName) ? null : (FSEntry) sourceEntries.get(ancestorEntryName);
             FSEntry targetEntry = (FSEntry) targetEntries.get(ancestorEntryName);
             if (sourceEntry != null && ancestorEntry.getId().equals(sourceEntry.getId())) {
                 /*
@@ -482,7 +515,7 @@ public class FSCommitter {
                 merge(childTargetPath, targetEntryNode, sourceEntryNode, ancestorEntryNode, txnId);
             }
 
-            sourceEntries.remove(ancestorEntryName);
+            removedEntries.add(ancestorEntryName);
         }
 
         for (Iterator sourceEntryNames = sourceEntries.keySet().iterator(); sourceEntryNames.hasNext();) {

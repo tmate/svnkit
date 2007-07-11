@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -23,7 +23,7 @@ import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 
 
 /**
- * @version 1.1.0
+ * @version 1.1.1
  * @author  TMate Software Ltd.
  */
 public class SVNEncodingUtil {
@@ -117,14 +117,15 @@ public class SVNEncodingUtil {
         // this is string in ASCII-US encoding.
         boolean query = false;
         boolean decoded = false;
-        ByteArrayOutputStream bos = new ByteArrayOutputStream(src.length());
-        for(int i = 0; i < src.length(); i++) {
+        int length = src.length();
+        ByteArrayOutputStream bos = new ByteArrayOutputStream(length);
+        for(int i = 0; i < length; i++) {
             byte ch = (byte) src.charAt(i);
             if (ch == '?') {
                 query = true;
             } else if (ch == '+' && query) {
                 ch = ' ';
-            } else if (ch == '%' && i + 2 < src.length() &&
+            } else if (ch == '%' && i + 2 < length &&
                        isHexDigit(src.charAt(i + 1)) &&
                        isHexDigit(src.charAt(i + 2))) {
                 ch = (byte) (hexValue(src.charAt(i + 1))*0x10 + hexValue(src.charAt(i + 2)));

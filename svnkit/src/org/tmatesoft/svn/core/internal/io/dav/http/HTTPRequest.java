@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -26,7 +26,7 @@ import org.xml.sax.helpers.DefaultHandler;
 
 
 /**
- * @version 1.1.0
+ * @version 1.1.1
  * @author  TMate Software Ltd.
  */
 class HTTPRequest {
@@ -49,12 +49,12 @@ class HTTPRequest {
 
     private byte[] myRequestBody;
     private InputStream myRequestStream;
-
     private boolean myIsProxyAuthForced;
-
     private boolean myIsKeepAlive;
+    private String myCharset;
 
-    public HTTPRequest() {
+    public HTTPRequest(String charset) {
+        myCharset = charset;
     }
     
     public void reset() {
@@ -144,10 +144,9 @@ class HTTPRequest {
             length = ((ByteArrayInputStream) myRequestStream).available();
         } else if (header != null && header.hasHeader(HTTPHeader.CONTENT_LENGTH_HEADER)) {
             length = Long.parseLong(header.getFirstHeaderValue(HTTPHeader.CONTENT_LENGTH_HEADER));
-//            header.removeHeader(HTTPHeader.CONTENT_LENGTH_HEADER);
         }
         StringBuffer headerText = composeHTTPHeader(request, path, header, length, myIsKeepAlive);
-        myConnection.sendData(headerText.toString().getBytes());
+        myConnection.sendData(headerText.toString().getBytes(myCharset));
         if (myRequestBody != null && length > 0) {
             myConnection.sendData(myRequestBody);
         } else if (myRequestStream != null && length > 0) {
@@ -264,11 +263,15 @@ class HTTPRequest {
         sb.append(HTTPRequest.CRLF);
         sb.append("Host: ");
         sb.append(myConnection.getHost().getHost());
-        sb.append(":");
-        sb.append(myConnection.getHost().getPort());
+        // only append if URL has port indeed.
+        int defaultPort = "https".equals(myConnection.getHost().getProtocol()) ? 443 : 80;
+        if (myConnection.getHost().getPort() != defaultPort) {
+            sb.append(":");
+            sb.append(myConnection.getHost().getPort());
+        }
         sb.append(HTTPRequest.CRLF);
         sb.append("User-Agent: ");
-        sb.append(Version.getVersionString());
+        sb.append(Version.getUserAgent());
         sb.append(HTTPRequest.CRLF);
         if (keepAlive) {
             sb.append("Keep-Alive:");

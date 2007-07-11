@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -12,6 +12,7 @@
 package org.tmatesoft.svn.core.wc;
 
 import java.io.File;
+import java.text.DateFormat;
 import java.util.Map;
 
 import org.tmatesoft.svn.core.io.ISVNTunnelProvider;
@@ -71,7 +72,7 @@ import org.tmatesoft.svn.core.io.ISVNTunnelProvider;
  * <p>
  * Read also this <a href="http://svnbook.red-bean.com/nightly/en/svn-book.html#svn.advanced">Subversion book chapter</a> on runtime configuration area.
  * 
- * @version 1.1.0
+ * @version 1.1.1
  * @author  TMate Software Ltd.
  * @see     SVNWCUtil
  * @see     <a target="_top" href="http://svnkit.com/kb/examples/">Examples</a>
@@ -206,8 +207,26 @@ public interface ISVNOptions extends ISVNTunnelProvider {
      * @param  name  a file name
      * @return       <span class="javakeyword">true</span> if the file
      *               is ignored, otherwise <span class="javakeyword">false</span>
+     * @deprecated
      */
     public boolean isIgnored(String name);
+
+    /**
+     * Determines if a file is ignored according to the 
+     * global ignore patterns.
+     * 
+     * <p>
+     * The global ignore patterns describe the names of 
+     * files and directories that SVNKit should ignore during status, add and 
+     * import operations. Similar to the 
+     * <i>'global-ignores'</i> option that can be found in the SVN's <i>config</i> 
+     * file under the <i>[miscellany]</i> section.
+     * 
+     * @param  file  a file
+     * @return       <span class="javakeyword">true</span> if the file
+     *               is ignored, otherwise <span class="javakeyword">false</span>
+     */
+    public boolean isIgnored(File file);
     
     /**
      * Returns all the global ignore patterns.
@@ -374,4 +393,6 @@ public interface ISVNOptions extends ISVNTunnelProvider {
      *                         property is removed
      */
     public void setPropertyValue(String propertyName, String propertyValue);
+
+    public DateFormat getKeywordDateFormat();
 }

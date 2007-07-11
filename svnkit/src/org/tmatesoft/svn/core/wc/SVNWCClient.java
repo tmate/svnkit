@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -43,6 +43,7 @@ import org.tmatesoft.svn.core.internal.wc.SVNCancellableOutputStream;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.internal.wc.SVNEventFactory;
 import org.tmatesoft.svn.core.internal.wc.SVNExternalInfo;
+import org.tmatesoft.svn.core.internal.wc.SVNFileListUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNFileType;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNPropertiesManager;
@@ -135,11 +136,20 @@ import org.tmatesoft.svn.core.io.SVNRepository;
  * </tr>
  * </table>
  * 
- * @version 1.1.0
+ * @version 1.1.1
  * @author  TMate Software Ltd.
  * @see     <a target="_top" href="http://svnkit.com/kb/examples/">Examples</a>
  */
 public class SVNWCClient extends SVNBasicClient {
+    
+    public static ISVNAddParameters DEFAULT_ADD_PARAMETERS = new ISVNAddParameters() {
+        public Action onInconsistentEOLs(File file) {
+            return ISVNAddParameters.REPORT_ERROR;
+        }
+    };
+    
+    private ISVNAddParameters myAddParameters;
+
     /**
      * Constructs and initializes an <b>SVNWCClient</b> object
      * with the specified run-time configuration and authentication 
@@ -167,8 +177,20 @@ public class SVNWCClient extends SVNBasicClient {
         super(authManager, options);
     }
 
-    protected SVNWCClient(ISVNRepositoryPool repositoryPool, ISVNOptions options) {
+    public SVNWCClient(ISVNRepositoryPool repositoryPool, ISVNOptions options) {
         super(repositoryPool, options);
+    }
+    
+    public void setAddParameters(ISVNAddParameters addParameters) {
+        myAddParameters = addParameters;
+    }
+    
+    protected ISVNAddParameters getAddParameters() {
+        if (myAddParameters == null) {
+            return DEFAULT_ADD_PARAMETERS;
+        }
+        
+        return myAddParameters;
     }
     
     /**
@@ -239,7 +261,7 @@ public class SVNWCClient extends SVNBasicClient {
                     String cmtRev = (String) properties.get(SVNProperty.COMMITTED_REVISION);
                     String cmtDate = (String) properties.get(SVNProperty.COMMITTED_DATE);
                     String author = (String) properties.get(SVNProperty.LAST_AUTHOR);
-                    Map keywordsMap = SVNTranslator.computeKeywords(keywords, expandKeywords ? repos.getLocation().toString() : null, author, cmtDate, cmtRev);
+                    Map keywordsMap = SVNTranslator.computeKeywords(keywords, expandKeywords ? repos.getLocation().toString() : null, author, cmtDate, cmtRev, getOptions());
                     OutputStream translatingStream = new SVNTranslatorOutputStream(dst, SVNTranslator.getEOL(eol), false, keywordsMap, expandKeywords); 
                     repos.getFile("", revNumber, null, new SVNCancellableOutputStream(translatingStream, getEventDispatcher()));
                     try {
@@ -306,7 +328,7 @@ public class SVNWCClient extends SVNBasicClient {
                 String cmtRev = (String) properties.get(SVNProperty.COMMITTED_REVISION);
                 String cmtDate = (String) properties.get(SVNProperty.COMMITTED_DATE);
                 String author = (String) properties.get(SVNProperty.LAST_AUTHOR);
-                Map keywordsMap = SVNTranslator.computeKeywords(keywords, expandKeywords ? repos.getLocation().toString() : null, author, cmtDate, cmtRev);
+                Map keywordsMap = SVNTranslator.computeKeywords(keywords, expandKeywords ? repos.getLocation().toString() : null, author, cmtDate, cmtRev, getOptions());
                 OutputStream translatingStream = new SVNTranslatorOutputStream(dst, SVNTranslator.getEOL(eol), false, keywordsMap, expandKeywords); 
                 repos.getFile("", revNumber, null, new SVNCancellableOutputStream(translatingStream, getEventDispatcher()));
                 try {
@@ -860,11 +882,11 @@ public class SVNWCClient extends SVNBasicClient {
         path = new File(SVNPathUtil.validateFilePath(path.getAbsolutePath())).getAbsoluteFile();
         try {
             if (!force) {
-                SVNWCManager.canDelete(path, false, getOptions());
+                SVNWCManager.canDelete(path, getOptions(), this);
             }
             SVNAdminArea root = wcAccess.open(path.getParentFile(), true, 0); 
             if (!dryRun) {
-                SVNWCManager.delete(wcAccess, root, path, deleteFiles);
+                SVNWCManager.delete(wcAccess, root, path, deleteFiles, true);
             }
         } finally {
             wcAccess.close();
@@ -1001,7 +1023,6 @@ public class SVNWCClient extends SVNBasicClient {
             if (fileType == SVNFileType.DIRECTORY && recursive) {
                 addDirectory(path, dir, force, includeIgnored);
             } else if (fileType == SVNFileType.FILE || fileType == SVNFileType.SYMLINK) {
-                dir.getWCAccess().setEventHandler(null);
                 addFile(path, fileType, dir);
             } else {
                 SVNWCManager.add(path, dir, null, SVNRevision.UNDEFINED);
@@ -1030,7 +1051,7 @@ public class SVNWCClient extends SVNBasicClient {
         if (!noIgnore) {
             ignores = SVNStatusEditor.getIgnorePatterns(dir, SVNStatusEditor.getGlobalIgnores(getOptions()));
         }
-        File[] children = dir.getRoot().listFiles();
+        File[] children = SVNFileListUtil.listFiles(dir.getRoot());
         for(int i = 0; children != null && i < children.length; i++) {
             checkCancelled();
             if (SVNFileUtil.getAdminDirectoryName().equals(children[i].getName())) {
@@ -1057,7 +1078,11 @@ public class SVNWCClient extends SVNBasicClient {
     }
     
     private void addFile(File path, SVNFileType type, SVNAdminArea dir) throws SVNException {
+        ISVNEventHandler handler = dir.getWCAccess().getEventHandler(); 
+        dir.getWCAccess().setEventHandler(null);
         SVNWCManager.add(path, dir, null, SVNRevision.UNDEFINED);
+        dir.getWCAccess().setEventHandler(handler);
+
         String mimeType = null;
         if (type == SVNFileType.SYMLINK) {
             SVNPropertiesManager.setProperty(dir.getWCAccess(), path, SVNProperty.SPECIAL, 
@@ -1067,20 +1092,41 @@ public class SVNWCClient extends SVNBasicClient {
             for (Iterator names = props.keySet().iterator(); names.hasNext();) {
                 String propName = (String) names.next();
                 String propValue = (String) props.get(propName);
-                SVNPropertiesManager.setProperty(dir.getWCAccess(), path, propName, propValue, false);
+                try {
+                    SVNPropertiesManager.setProperty(dir.getWCAccess(), path, propName, propValue, false);
+                } catch (SVNException e) {
+                    if (SVNProperty.EOL_STYLE.equals(propName) && 
+                            e.getErrorMessage().getErrorCode() == SVNErrorCode.ILLEGAL_TARGET &&
+                            e.getErrorMessage().getMessage().indexOf("newlines") >= 0) {
+                        ISVNAddParameters.Action action = getAddParameters().onInconsistentEOLs(path);
+                        if (action == ISVNAddParameters.REPORT_ERROR) {
+                            throw e;
+                        } else if (action == ISVNAddParameters.ADD_AS_IS) {
+                            SVNPropertiesManager.setProperty(dir.getWCAccess(), path, propName, null, false);
+                        } else if (action == ISVNAddParameters.ADD_AS_BINARY) {
+                            SVNPropertiesManager.setProperty(dir.getWCAccess(), path, propName, null, false);
+                            mimeType = SVNFileUtil.BINARY_MIME_TYPE;
+                        }
+                    } else {
+                        throw e;
+                    }
+                }
             }
-            mimeType = (String) props.get(SVNProperty.MIME_TYPE);
+            if (mimeType != null) {
+                SVNPropertiesManager.setProperty(dir.getWCAccess(), path, SVNProperty.MIME_TYPE, mimeType, false);
+            } else {
+                mimeType = (String) props.get(SVNProperty.MIME_TYPE);
+            }
         }
         SVNEvent event = SVNEventFactory.createAddedEvent(dir, path.getName(), SVNNodeKind.FILE, mimeType);
         dispatchEvent(event);
     }
     
-    
     /**
      * Reverts all local changes made to a Working Copy item(s) thus
      * bringing it to a 'pristine' state.
      * 
-     * @param  path            a WC path to perform a revert on
+     * @param  paths           a WC paths to perform a revert on
      * @param  recursive       <span class="javakeyword">true</span> to
      *                         descend recursively (relevant for directories)
      * @throws SVNException    if one of the following is true:
@@ -1089,27 +1135,73 @@ public class SVNWCClient extends SVNBasicClient {
      *                         <li>when trying to revert an addition of a directory
      *                         from within the directory itself
      *                         </ul>
+     * @see #doRevert(File[], boolean)
      */
     public void doRevert(File path, boolean recursive) throws SVNException {
-        path = new File(SVNPathUtil.validateFilePath(path.getAbsolutePath()));
-        SVNWCAccess wcAccess = createWCAccess();
+        doRevert(new File[] {path}, recursive);
+    }
+
+    /**
+     * Reverts all local changes made to a Working Copy item(s) thus
+     * bringing it to a 'pristine' state.
+     * 
+     * @param  paths           a WC paths to perform a revert on
+     * @param  recursive       <span class="javakeyword">true</span> to
+     *                         descend recursively (relevant for directories)
+     * @throws SVNException    if one of the following is true:
+     *                         <ul>
+     *                         <li><code>path</code> is not under version control
+     *                         <li>when trying to revert an addition of a directory
+     *                         from within the directory itself
+     *                         </ul>
+     *                         
+     *                         Exception will not be thrown if there are multiple paths passed. 
+     *                         Instead caller should process events received by <code>ISVNEventHandler</code>
+     *                         instance to get information on whether certain path was reverted or not.  
+     */
+    public void doRevert(File[] paths, boolean recursive) throws SVNException {
+        boolean reverted = false;
         try {
-            SVNAdminAreaInfo info = wcAccess.openAnchor(path, true, recursive ? SVNWCAccess.INFINITE_DEPTH : 0);
-            boolean useCommitTimes = getOptions().isUseCommitTimes();
-            doRevert(path, info.getAnchor(), recursive, useCommitTimes);            
-        } catch (SVNException e) {
-            SVNErrorCode code = e.getErrorMessage().getErrorCode();
-            if (code == SVNErrorCode.ENTRY_NOT_FOUND || code == SVNErrorCode.UNVERSIONED_RESOURCE) {
-                SVNEvent event = SVNEventFactory.createSkipEvent(path.getParentFile(), path, SVNEventAction.SKIP, SVNEventAction.REVERT, null);
-                dispatchEvent(event);
-            }            
-            throw e;
+            for (int i = 0; i < paths.length; i++) {
+                File path = paths[i];
+                path = new File(SVNPathUtil.validateFilePath(path.getAbsolutePath()));
+                SVNWCAccess wcAccess = createWCAccess();
+                try {
+                    SVNAdminAreaInfo info = wcAccess.openAnchor(path, true, recursive ? SVNWCAccess.INFINITE_DEPTH : 0);
+                    SVNEntry entry = wcAccess.getEntry(path, false);
+                    if (entry != null && entry.isDirectory() && entry.isScheduledForAddition()) {
+                        if (!recursive) {
+                            getDebugLog().info("Forcing revert on path '" + path + "' to recurse");
+                            recursive = true;
+                            wcAccess.close();
+                            info = wcAccess.openAnchor(path, true, SVNWCAccess.INFINITE_DEPTH);
+                        }
+                    }
+                    
+                    boolean useCommitTimes = getOptions().isUseCommitTimes();
+                    reverted |= doRevert(path, info.getAnchor(), recursive, useCommitTimes);            
+                } catch (SVNException e) {
+                    reverted |= true;
+                    SVNErrorCode code = e.getErrorMessage().getErrorCode();
+                    if (code == SVNErrorCode.ENTRY_NOT_FOUND || code == SVNErrorCode.UNVERSIONED_RESOURCE) {
+                        SVNEvent event = SVNEventFactory.createSkipEvent(path.getParentFile(), path, SVNEventAction.SKIP, SVNEventAction.REVERT, null);
+                        dispatchEvent(event);
+                    }
+                    if (paths.length == 1) { 
+                        throw e;
+                    }
+                } finally {
+                    wcAccess.close();
+                }
+            }
         } finally {
-            wcAccess.close();
+            if (reverted) {
+                sleepForTimeStamp();
+            }
         }
     }
     
-    private void doRevert(File path, SVNAdminArea parent, boolean recursive, boolean useCommitTimes) throws SVNException {
+    private boolean doRevert(File path, SVNAdminArea parent, boolean recursive, boolean useCommitTimes) throws SVNException {
         checkCancelled();
         SVNAdminArea dir = parent.getWCAccess().probeRetrieve(path);
         SVNEntry entry = dir.getWCAccess().getEntry(path, false);
@@ -1122,7 +1214,7 @@ public class SVNWCClient extends SVNBasicClient {
             if (fileType != SVNFileType.DIRECTORY && !entry.isScheduledForAddition()) {
                 SVNEvent event = SVNEventFactory.createNotRevertedEvent(dir, entry);
                 dispatchEvent(event);
-                return;
+                return false;
             }
         }
         if (entry.getKind() != SVNNodeKind.DIR && entry.getKind() != SVNNodeKind.FILE) {
@@ -1167,9 +1259,18 @@ public class SVNWCClient extends SVNBasicClient {
             if (entry.getKind() == SVNNodeKind.FILE) {
                 reverted = revert(parent, entry.getName(), entry, useCommitTimes);
             } else if (entry.getKind() == SVNNodeKind.DIR) {
-                reverted = revert(dir, dir.getThisDirName(), entry, useCommitTimes);
+                boolean notScheduled = entry.getSchedule() == null;
+                reverted = revert(dir, dir.getThisDirName(), entry, useCommitTimes);                
                 if (entry.isScheduledForReplacement()) {
                     recursive = true;
+                }
+                // check parent entry for schedule.
+                if (parent != dir) {
+                    SVNEntry entryInParent = parent.getEntry(path.getName(), false);
+                    if (entryInParent.getSchedule() != null && notScheduled) {
+                        entryInParent.setSchedule(null);
+                        parent.saveEntries(false);
+                    }
                 }
             }
         }
@@ -1183,10 +1284,11 @@ public class SVNWCClient extends SVNBasicClient {
                 if (dir.getThisDirName().equals(childEntry.getName())) {
                     continue;
                 }
-                File childPath = dir.getFile(childEntry.getName());
-                doRevert(childPath, dir, true, useCommitTimes);
+                File childPath = new File(path, childEntry.getName());
+                reverted |= doRevert(childPath, dir, true, useCommitTimes);
             }
         }
+        return reverted;
     }
     
     private boolean revert(SVNAdminArea dir, String name, SVNEntry entry, boolean useCommitTime) throws SVNException {
@@ -1275,6 +1377,11 @@ public class SVNWCClient extends SVNBasicClient {
                     command.put(SVNLog.TIMESTAMP_ATTR, entry.getCommittedDate());
                     log.addCommand(SVNLog.SET_TIMESTAMP, command, false);
                     command.clear();                    
+                } else {
+                    command.put(SVNLog.NAME_ATTR, name);
+                    command.put(SVNLog.TIMESTAMP_ATTR, SVNTimeUtil.formatDate(new Date(System.currentTimeMillis())));
+                    log.addCommand(SVNLog.SET_TIMESTAMP, command, false);
+                    command.clear();                    
                 }
                 command.put(SVNLog.NAME_ATTR, name);
                 command.put(SVNProperty.shortPropertyName(SVNProperty.TEXT_TIME), SVNLog.WC_TIMESTAMP);
@@ -1288,24 +1395,36 @@ public class SVNWCClient extends SVNBasicClient {
             log.addCommand(SVNLog.DELETE, command, false);
             command.clear();
             newEntryProperties.put(SVNProperty.shortPropertyName(SVNProperty.CONFLICT_NEW), null);
+            if (!reverted) {
+                reverted |= dir.getFile(entry.getConflictNew()).exists();
+            }
         }
         if (entry.getConflictOld() != null) {
             command.put(SVNLog.NAME_ATTR, entry.getConflictOld());
             log.addCommand(SVNLog.DELETE, command, false);
             command.clear();
             newEntryProperties.put(SVNProperty.shortPropertyName(SVNProperty.CONFLICT_OLD), null);
+            if (!reverted) {
+                reverted |= dir.getFile(entry.getConflictOld()).exists();
+            }
         }
         if (entry.getConflictWorking() != null) {
             command.put(SVNLog.NAME_ATTR, entry.getConflictWorking());
             log.addCommand(SVNLog.DELETE, command, false);
             command.clear();
             newEntryProperties.put(SVNProperty.shortPropertyName(SVNProperty.CONFLICT_WRK), null);
+            if (!reverted) {
+                reverted |= dir.getFile(entry.getConflictWorking()).exists();
+            }
         }
         if (entry.getPropRejectFile() != null) {
             command.put(SVNLog.NAME_ATTR, entry.getPropRejectFile());
             log.addCommand(SVNLog.DELETE, command, false);
             command.clear();
             newEntryProperties.put(SVNProperty.shortPropertyName(SVNProperty.PROP_REJECT_FILE), null);
+            if (!reverted) {
+                reverted |= dir.getFile(entry.getPropRejectFile()).exists();
+            }
         }
         if (entry.getSchedule() != null) {
             newEntryProperties.put(SVNProperty.shortPropertyName(SVNProperty.SCHEDULE), null);
@@ -1330,6 +1449,7 @@ public class SVNWCClient extends SVNBasicClient {
      * @throws SVNException    if <code>path</code> is not under version control
      */
     public void doResolve(File path, boolean recursive) throws SVNException {
+        path = path.getAbsoluteFile();
         SVNWCAccess wcAccess = createWCAccess();
         try {
             wcAccess.probeOpen(path, true, recursive ? SVNWCAccess.INFINITE_DEPTH : 0);
@@ -1358,7 +1478,7 @@ public class SVNWCClient extends SVNBasicClient {
         }
         SVNAdminArea dir = wcAccess.retrieve(dirPath);
         if (dir.markResolved(entry.getName(), true, true)) {
-            SVNEvent event = SVNEventFactory.createRestoredEvent(null, dir, entry);
+            SVNEvent event = SVNEventFactory.createResolvedEvent(null, dir, entry);
             dispatchEvent(event);
         }
     }
@@ -1371,7 +1491,7 @@ public class SVNWCClient extends SVNBasicClient {
             SVNAdminArea dir = access.retrieve(path);
             for (Iterator ents = dir.entries(false); ents.hasNext();) {
                 SVNEntry childEntry = (SVNEntry) ents.next();
-                if ("".equals(childEntry.getName())) {
+                if (dir.getThisDirName().equals(childEntry.getName())) {
                     continue;
                 }
                 resolveAll(access, dir.getFile(childEntry.getName()));
@@ -1614,7 +1734,7 @@ public class SVNWCClient extends SVNBasicClient {
                 depth = segments;
             }
         }
-        wcAccess.probeOpen(new File(commonParentPath), true, depth);
+        wcAccess.probeOpen(new File(commonParentPath).getAbsoluteFile(), true, depth);
         for (int i = 0; i < paths.length; i++) {
             File file = new File(commonParentPath, paths[i]);
             SVNEntry entry = wcAccess.getEntry(file, false);
@@ -1956,16 +2076,21 @@ public class SVNWCClient extends SVNBasicClient {
      *                         even exported
      */
     public String doGetWorkingCopyID(final File path, String trailURL) throws SVNException {
+        return doGetWorkingCopyID(path, trailURL, false);
+    }
+    
+    public String doGetWorkingCopyID(final File path, String trailURL, final boolean committed) throws SVNException {
         SVNWCAccess wcAccess = createWCAccess();
         try {
-            wcAccess.probeOpen(path, false, 0);
+            wcAccess.open(path, false, 0);
         } catch (SVNException e) {            
             SVNFileType pathType = SVNFileType.getType(path);
             if (pathType == SVNFileType.DIRECTORY) {
                 return "exported";
-            } 
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_PATH_NOT_FOUND, "''{0}'' is not versioned and not exported", path);
-            SVNErrorManager.error(err);
+            } else if (pathType == SVNFileType.NONE) {
+                return null;
+            }
+            return "'" + path + "' is not versioned and not exported"; 
         } finally {
             wcAccess.close();
         }
@@ -1981,7 +2106,7 @@ public class SVNWCClient extends SVNBasicClient {
                     return;
                 }
                 if (status.getContentsStatus() != SVNStatusType.STATUS_ADDED) {
-                    SVNRevision revision = status.getRevision();
+                    SVNRevision revision = committed ? status.getCommittedRevision() : status.getRevision();
                     if (revision != null) {
                         if (minRevision[0] < 0 || minRevision[0] > revision.getNumber()) {
                             minRevision[0] = revision.getNumber();
@@ -2182,10 +2307,19 @@ public class SVNWCClient extends SVNBasicClient {
                 }
             }
         }
+        
         for(Iterator entries = area.entries(false); entries.hasNext();) {
             SVNEntry entry = (SVNEntry) entries.next();
             if (entry.getKind() == SVNNodeKind.DIR && !"".equals(entry.getName())) {
-                SVNAdminArea childArea = area.getWCAccess().retrieve(area.getFile(entry.getName()));
+                SVNAdminArea childArea = null;
+                try {
+                    childArea = area.getWCAccess().retrieve(area.getFile(entry.getName()));
+                } catch (SVNException e) {
+                    if (e.getErrorMessage().getErrorCode() == SVNErrorCode.WC_NOT_LOCKED) {
+                        continue;
+                    }
+                    throw e;
+                }
                 if (childArea != null) {
                     doGetLocalProperty(childArea, propName, base, handler);
                 }
@@ -2405,7 +2539,7 @@ public class SVNWCClient extends SVNBasicClient {
                 String url = entry.getURL();
                 String author = hasMods ? "(local)" : entry.getAuthor();
                 String rev = hasMods ? entry.getCommittedRevision() + "M" : entry.getCommittedRevision() + ""; 
-                keywordsMap = SVNTranslator.computeKeywords(keywords, expandKeywords ? url : null, author, time, rev);
+                keywordsMap = SVNTranslator.computeKeywords(keywords, expandKeywords ? url : null, author, time, rev, getOptions());
             }
             OutputStream translatingStream = eols != null || keywordsMap != null ? new SVNTranslatorOutputStream(dst, eols, false, keywordsMap, expandKeywords) : dst;
             try {
@@ -2415,6 +2549,9 @@ public class SVNWCClient extends SVNBasicClient {
                 }
                 dst.flush();
             } catch (IOException e) {
+                if (e instanceof SVNCancellableOutputStream.IOCancelException) {
+                    SVNErrorManager.cancel(e.getMessage());
+                }
                 SVNErrorManager.error(SVNErrorMessage.create(SVNErrorCode.IO_ERROR, e.getMessage()));
             }
         } finally {
@@ -2439,4 +2576,5 @@ public class SVNWCClient extends SVNBasicClient {
         private SVNRevision myRevision;
         private String myToken;
     }
+    
 }

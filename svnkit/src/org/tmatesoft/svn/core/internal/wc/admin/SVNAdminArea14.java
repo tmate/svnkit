@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -11,8 +11,10 @@
  */
 package org.tmatesoft.svn.core.internal.wc.admin;
 
+import java.io.BufferedOutputStream;
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
@@ -40,12 +42,15 @@ import org.tmatesoft.svn.core.internal.util.SVNFormatUtil;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
 import org.tmatesoft.svn.core.internal.util.SVNTimeUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
+import org.tmatesoft.svn.core.internal.wc.SVNFileListUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNFileType;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNProperties;
+import org.tmatesoft.svn.util.SVNDebugLog;
+
 
 /**
- * @version 1.1.0
+ * @version 1.1.1
  * @author  TMate Software Ltd.
  */
 public class SVNAdminArea14 extends SVNAdminArea {
@@ -54,7 +59,7 @@ public class SVNAdminArea14 extends SVNAdminArea {
         SVNProperty.EXTERNALS, 
         SVNProperty.NEEDS_LOCK
     };
-
+    
     public static final int WC_FORMAT = 8;
     
     private static final String ATTRIBUTE_COPIED = "copied";
@@ -66,10 +71,16 @@ public class SVNAdminArea14 extends SVNAdminArea {
     private File myLockFile;
     private File myEntriesFile;
 
+    private static boolean ourIsOptimizedWritingEnabled;
+
     public SVNAdminArea14(File dir) {
         super(dir);
         myLockFile = new File(getAdminDirectory(), "lock");
         myEntriesFile = new File(getAdminDirectory(), "entries");
+    }
+    
+    public static void setOptimizedWritingEnabled(boolean enabled) {
+        ourIsOptimizedWritingEnabled = enabled;
     }
 
     public static String[] getCachableProperties() {
@@ -395,13 +406,21 @@ public class SVNAdminArea14 extends SVNAdminArea {
                             command.put(SVNProperty.PRESENT_PROPS, "");
                         }
                         
-                        command.put(SVNProperty.HAS_PROPS, SVNProperty.toString(props.isEmpty()));
+                        command.put(SVNProperty.HAS_PROPS, SVNProperty.toString(!props.isEmpty()));
                         SVNVersionedProperties propsDiff = baseProps.compareTo(props);
                         boolean hasPropModifications = !propsDiff.isEmpty();
                         command.put(SVNProperty.HAS_PROP_MODS, SVNProperty.toString(hasPropModifications));
                         command.put(SVNLog.NAME_ATTR, name);
                         log.addCommand(SVNLog.MODIFY_ENTRY, command, false);
                         command.clear();
+                        
+                        if (!hasPropModifications) {
+                            String workingPropsPath = getThisDirName().equals(name) ? "dir-props" : "props/" + name + ".svn-work";
+                            workingPropsPath = getAdminDirectory().getName() + "/" + workingPropsPath;
+                            command.put(SVNLog.NAME_ATTR, workingPropsPath);
+                            log.addCommand(SVNLog.DELETE, command, false);
+                            command.clear();
+                        }
                     }
                 
                     if (baseProps.isEmpty()) {
@@ -451,23 +470,48 @@ public class SVNAdminArea14 extends SVNAdminArea {
                 SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.UNKNOWN, "Entry ''{0}'' has inconsistent repository root and url", getThisDirName());
                 SVNErrorManager.error(err);
             }
-    
-            File tmpFile = new File(getAdminDirectory(), "tmp/entries");
-            Writer os = null;
-            try {
-                os = new OutputStreamWriter(SVNFileUtil.openFileForWriting(tmpFile), "UTF-8");
-                writeEntries(os);
-            } catch (IOException e) {
-                SVNFileUtil.closeFile(os);
-                SVNFileUtil.deleteFile(tmpFile);
-                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, "Cannot wrtie entries file ''{0}'': {1}", new Object[] {myEntriesFile, e.getLocalizedMessage()});
-                SVNErrorManager.error(err, e);
-            } finally {
-                SVNFileUtil.closeFile(os);
-            }
             
-            SVNFileUtil.rename(tmpFile, myEntriesFile);
-            SVNFileUtil.setReadonly(myEntriesFile, true);
+            if (ourIsOptimizedWritingEnabled) {
+                File tmpFile = new File(getAdminDirectory(), "tmp/entries");
+                boolean renamed = myEntriesFile.renameTo(tmpFile);
+                if (!renamed) {
+                    myEntriesFile.delete();
+                    tmpFile = null;
+                }
+                Writer os = null;
+                try {
+                    os = new OutputStreamWriter(new BufferedOutputStream(new FileOutputStream(myEntriesFile)), "UTF-8");
+                    writeEntries(os);
+                } catch (IOException e) {
+                    SVNFileUtil.closeFile(os);
+                    if (tmpFile != null) {
+                        tmpFile.renameTo(myEntriesFile);
+                    }
+                    SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, "Cannot wrtie entries file ''{0}'': {1}", new Object[] {myEntriesFile, e.getLocalizedMessage()});
+                    SVNErrorManager.error(err, e);
+                } finally {
+                    SVNFileUtil.closeFile(os);
+                    SVNFileUtil.deleteFile(tmpFile);
+                }
+                myEntriesFile.setReadOnly();
+            } else {
+                File tmpFile = new File(getAdminDirectory(), "tmp/entries");
+                Writer os = null;
+                try {
+                    os = new OutputStreamWriter(new BufferedOutputStream(new FileOutputStream(tmpFile)), "UTF-8");
+                    writeEntries(os);
+                } catch (IOException e) {
+                    SVNFileUtil.closeFile(os);
+                    SVNFileUtil.deleteFile(tmpFile);
+                    SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, "Cannot wrtie entries file ''{0}'': {1}", new Object[] {myEntriesFile, e.getLocalizedMessage()});
+                    SVNErrorManager.error(err, e);
+                } finally {
+                    SVNFileUtil.closeFile(os);
+                }
+                
+                SVNFileUtil.rename(tmpFile, myEntriesFile);
+                SVNFileUtil.setReadonly(myEntriesFile, true);
+            }
             if (close) {
                 closeEntries();
             }
@@ -500,7 +544,7 @@ public class SVNAdminArea14 extends SVNAdminArea {
                 ++entryNumber;
             }
         } catch (IOException e) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, "Cannot read entries file ''{0}'': {1}", new Object[] {myEntriesFile, e.getLocalizedMessage()});
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, "Cannot read entries file ''{0}'': {1}", new Object[] {myEntriesFile, e.getMessage()});
             SVNErrorManager.error(err, e);
         } finally {
             SVNFileUtil.closeFile(reader);
@@ -847,14 +891,16 @@ public class SVNAdminArea14 extends SVNAdminArea {
             entryAttrs.put(SVNProperty.LOCK_CREATION_DATE, lockCreationDate);
         }
 
-        line = reader.readLine();
-        if (line == null || line.length() != 1) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_CORRUPT, "Missing entry terminator");
-            SVNErrorManager.error(err);
-        } else if (line.length() == 1 && line.charAt(0) != '\f') {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_CORRUPT, "Invalid entry terminator");
-            SVNErrorManager.error(err);
-        }
+        do {
+            line = reader.readLine();
+            if (line == null) {
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_CORRUPT, "Missing entry terminator");
+                SVNErrorManager.error(err);
+            } else if (line.length() == 1 && line.charAt(0) == '\f') {
+                break;
+            }
+        } while (line != null);
+
         return entry;
     }
     
@@ -1405,6 +1451,7 @@ public class SVNAdminArea14 extends SVNAdminArea {
         File logFile = adminArea.getAdminFile("log");
         SVNFileType type = SVNFileType.getType(logFile);
         if (type == SVNFileType.FILE) {
+            SVNDebugLog.getDefaultLog().info("Upgrade failed: found a log file at '" + logFile + "'");
             return adminArea;
         }
 
@@ -1495,7 +1542,7 @@ public class SVNAdminArea14 extends SVNAdminArea {
                     } catch (IOException e) {
                         SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, "Cannot create file ''{0}'': {1}", new Object[] {killMe, e.getLocalizedMessage()}); 
                         SVNErrorManager.error(err, e);
-                    }
+                    } 
                 }
             } else {
                 removeFromRevisionControl(fileName, false, false);
@@ -1536,7 +1583,7 @@ public class SVNAdminArea14 extends SVNAdminArea {
                     File tmpFile2 = SVNFileUtil.createUniqueFile(tmpFile.getParentFile(), fileName, ".tmp");
                     try {
                         String tmpFile2Path = SVNFileUtil.getBasePath(tmpFile2);
-                        SVNTranslator.translate(this, fileName, fileName, tmpFile2Path, false, false);
+                        SVNTranslator.translate(this, fileName, fileName, tmpFile2Path, false);
                         modified = !SVNFileUtil.compareFiles(tmpFile, tmpFile2, null);
                     } catch (SVNException svne) {
                         SVNErrorMessage err = SVNErrorMessage.create(errorCode, "Error comparing ''{0}'' and ''{1}''", new Object[] {workingFile, tmpFile});
@@ -1599,11 +1646,10 @@ public class SVNAdminArea14 extends SVNAdminArea {
                 if (SVNFileUtil.isWindows || !special) {
                     if (fileType == SVNFileType.FILE) {
                         SVNTranslator.translate(this, fileName, 
-                                SVNFileUtil.getBasePath(tmpFile), SVNFileUtil.getBasePath(tmpFile2), true, false);
+                                SVNFileUtil.getBasePath(tmpFile), SVNFileUtil.getBasePath(tmpFile2), true);
                     } else {
                         SVNTranslator.translate(this, fileName, fileName,
-                                SVNFileUtil.getBasePath(tmpFile2), true,
-                                false);
+                                SVNFileUtil.getBasePath(tmpFile2), true);
                     }
                     if (!SVNFileUtil.compareFiles(tmpFile2, wcFile, null)) {
                         SVNFileUtil.copyFile(tmpFile2, wcFile, true);
@@ -1727,7 +1773,7 @@ public class SVNAdminArea14 extends SVNAdminArea {
         if (killMe) {
             return false;
         }
-        File[] logs = getAdminDirectory().listFiles();
+        File[] logs = SVNFileListUtil.listFiles(getAdminDirectory());
         for (int i = 0; logs != null && i < logs.length; i++) {
             File log = logs[i];
             if ("log".equals(log.getName()) || log.getName().startsWith("log.")) {
@@ -1754,7 +1800,7 @@ public class SVNAdminArea14 extends SVNAdminArea {
         }
         return false;
     }
-    
+
     public boolean isLocked() throws SVNException {
         if (!myWasLocked) {
             return false;
@@ -1774,5 +1820,9 @@ public class SVNAdminArea14 extends SVNAdminArea {
     protected int getFormatVersion() {
         return WC_FORMAT;
     }
-    
+
+    protected boolean isEntryPropertyApplicable(String name) {
+        return true;
+    }
+
 }

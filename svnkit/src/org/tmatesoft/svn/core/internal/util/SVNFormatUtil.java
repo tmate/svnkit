@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -18,9 +18,11 @@ import java.util.Date;
 import java.util.StringTokenizer;
 import java.util.TimeZone;
 
+import org.tmatesoft.svn.core.wc.ISVNOptions;
+
 
 /**
- * @version 1.1.0
+ * @version 1.1.1
  * @author  TMate Software Ltd.
  */
 public class SVNFormatUtil {
@@ -36,13 +38,17 @@ public class SVNFormatUtil {
         SHORT_DATE_FORMAT.setTimeZone(TimeZone.getTimeZone("GMT"));
     }
     
-    
-    public static String formatDate(Date date, boolean longFormat) {
-        if (longFormat) {
-            synchronized (HUMAN_DATE_FORMAT) {
-                return HUMAN_DATE_FORMAT.format(date != null ? date : NULL_DATE);
-            }
+    public static String formatHumanDate(Date date, ISVNOptions options) {
+        DateFormat df = options == null ? null : options.getKeywordDateFormat();
+        if (df == null) {
+            df = HUMAN_DATE_FORMAT;
         }
+        synchronized (df) {
+            return df.format(date != null ? date : NULL_DATE);
+        }
+    }
+    
+    public static String formatDate(Date date) {
         synchronized (SHORT_DATE_FORMAT) {
             return SHORT_DATE_FORMAT.format(date != null ? date : NULL_DATE);
         }

@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -30,6 +30,7 @@ import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
 
 import org.tmatesoft.svn.core.SVNErrorMessage;
+import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.auth.ISVNSSLManager;
 import org.tmatesoft.svn.core.auth.SVNSSLAuthentication;
 
@@ -42,7 +43,7 @@ import org.tmatesoft.svn.core.auth.SVNSSLAuthentication;
  * The created socket then used by the inner engine of <b><i>SVNKit</i></b>
  * library to communicate with a Subversion repository.
  * 
- * @version 1.1.0
+ * @version 1.1.1
  * @author  TMate Software Ltd.
  */
 public class SVNSocketFactory {
@@ -53,24 +54,27 @@ public class SVNSocketFactory {
         socket.setReuseAddress(true);
         socket.setTcpNoDelay(true);
         socket.setKeepAlive(true);
+        socket.setSoLinger(true, 0);
         return socket;
     }
 
-    public static Socket createSSLSocket(ISVNSSLManager manager, String host, int port) throws IOException {
+    public static Socket createSSLSocket(ISVNSSLManager manager, String host, int port) throws IOException, SVNException {
         manager = manager == null ? DEFAULT_SSL_MANAGER : manager;
         Socket sslSocket = manager.getSSLContext().getSocketFactory().createSocket(createAddres(host), port);
         sslSocket.setReuseAddress(true);
         sslSocket.setTcpNoDelay(true);
         sslSocket.setKeepAlive(true);
+        sslSocket.setSoLinger(true, 0);
         return sslSocket;
     }
 
-    public static Socket createSSLSocket(ISVNSSLManager manager, String host, int port, Socket socket) throws IOException {
+    public static Socket createSSLSocket(ISVNSSLManager manager, String host, int port, Socket socket) throws IOException, SVNException {
         manager = manager == null ? DEFAULT_SSL_MANAGER : manager;
         Socket sslSocket = manager.getSSLContext().getSocketFactory().createSocket(socket, host, port, true);
         sslSocket.setReuseAddress(true);
         sslSocket.setTcpNoDelay(true);
         sslSocket.setKeepAlive(true);
+        sslSocket.setSoLinger(true, 0);
         return sslSocket;
     }
 

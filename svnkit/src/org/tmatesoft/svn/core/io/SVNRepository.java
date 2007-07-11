@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -15,9 +15,12 @@ import java.io.OutputStream;
 import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.Map;
 
+import org.tmatesoft.svn.core.ISVNCanceller;
 import org.tmatesoft.svn.core.ISVNDirEntryHandler;
 import org.tmatesoft.svn.core.ISVNLogEntryHandler;
 import org.tmatesoft.svn.core.SVNDirEntry;
@@ -117,7 +120,7 @@ import org.tmatesoft.svn.util.SVNDebugLog;
  * To authenticate a user over network <b>SVNRepository</b> drivers use
  * <b>ISVNAuthenticationManager</b> auth drivers.
  * 
- * @version     1.1.0
+ * @version     1.1.1
  * @author      TMate Software Ltd.
  * @see         SVNRepositoryFactory
  * @see         org.tmatesoft.svn.core.auth.ISVNAuthenticationManager
@@ -127,7 +130,7 @@ public abstract class SVNRepository {
         
     protected String myRepositoryUUID;
     protected SVNURL myRepositoryRoot;
-    private SVNURL myLocation;
+    protected SVNURL myLocation;
     
     private int myLockCount;
     private Thread myLocker;
@@ -135,10 +138,13 @@ public abstract class SVNRepository {
     private ISVNSession myOptions;
     private ISVNTunnelProvider myTunnelProvider;
     private ISVNDebugLog myDebugLog;
+    private ISVNCanceller myCanceller;
+    private Collection myConnectionListeners;
 
     protected SVNRepository(SVNURL location, ISVNSession options) {
         myLocation = location;
         myOptions = options;
+        myConnectionListeners = new HashSet();
     }
 	
     /**
@@ -199,7 +205,6 @@ public abstract class SVNRepository {
                 SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.RA_NOT_IMPLEMENTED, "SVNRepository URL could not be changed from ''{0}'' to ''{1}''; create new SVNRepository instance instead", new Object[] {myLocation, url});
                 SVNErrorManager.error(err);
             }
-            
             if (forceReconnect) {
                 closeSession();
                 myRepositoryRoot = null;
@@ -344,6 +349,14 @@ public abstract class SVNRepository {
      */
     public ISVNTunnelProvider getTunnelProvider() {
         return myTunnelProvider;
+    }
+    
+    public void setCanceller(ISVNCanceller canceller) {
+        myCanceller = canceller;
+    }
+    
+    public ISVNCanceller getCanceller() {
+        return myCanceller == null ? ISVNCanceller.NULL : myCanceller;
     }
     
     /**
@@ -730,7 +743,7 @@ public abstract class SVNRepository {
      * 
      * <p>
      * If <code>limit</code> is > 0 then only the first <code>limit</code> log entries
-     * will be handled. Otherwise this number is ignored.
+     * will be handled. Otherwise (i.e. if <code>limit</code> is 0) this number is ignored.
      * 
      * <p>
      * Target paths can be both relative to the location of 
@@ -1762,7 +1775,7 @@ public abstract class SVNRepository {
      *                      and the name of the user who tries to unlock a path does not match
      *                      the lock owner
      *                      <li>a lock token is incorrect for a path
-     *                      <li>a failure occured while connecting to a repository 
+     *                      <li>a failure occurred while connecting to a repository 
      *                      <li>the user authentication failed 
      *                      (see {@link org.tmatesoft.svn.core.SVNAuthenticationException})
      *                      </ul>
@@ -1782,7 +1795,7 @@ public abstract class SVNRepository {
      * 
      * @throws SVNException  if some i/o error has occurred
      */
-    public abstract void closeSession() throws SVNException;
+    public abstract void closeSession();
     
     /**
      * Returns the session options object this driver is using.
@@ -1798,17 +1811,48 @@ public abstract class SVNRepository {
         return myOptions;
     }
     
+    public void addConnectionListener(ISVNConnectionListener listener) {
+        myConnectionListeners.add(listener);
+    }
+
+    public void removeConnectionListener(ISVNConnectionListener listener) {
+        myConnectionListeners.remove(listener);
+    }
+    
+    protected void fireConnectionOpened() {
+        for (Iterator listeners = myConnectionListeners.iterator(); listeners.hasNext();) {
+            ISVNConnectionListener listener = (ISVNConnectionListener) listeners.next();
+            listener.connectionOpened(this);
+        }
+    }
+
+    protected void fireConnectionClosed() {
+        for (Iterator listeners = myConnectionListeners.iterator(); listeners.hasNext();) {
+            ISVNConnectionListener listener = (ISVNConnectionListener) listeners.next();
+            listener.connectionClosed(this);
+        }
+    }
+
     protected synchronized void lock() {
+        lock(false);
+    }
+    
+    protected synchronized void lock(boolean force) {
         try {
             synchronized(this) {
-                while ((myLockCount > 0) || (myLocker != null)) {
-                    if (Thread.currentThread() == myLocker) {
+                if (Thread.currentThread() == myLocker) {
+                    if (!force) {
+                        getDebugLog().info(new Exception());
                         throw new Error("SVNRepository methods are not reenterable");
-                    }
+                    } 
+                    myLockCount++;
+                    return;
+                }
+                while (myLocker != null) {
                     wait();
                 }
                 myLocker = Thread.currentThread();
-                myLockCount = 1;
+                myLockCount++;
             }
     	} catch (InterruptedException e) {
     	    throw new Error("Interrupted attempt to aquire write lock");
@@ -1820,7 +1864,7 @@ public abstract class SVNRepository {
             if (--myLockCount <= 0) {
                 myLockCount = 0;
                 myLocker = null;
-                notifyAll();
+                notify();
             }
         }
     }

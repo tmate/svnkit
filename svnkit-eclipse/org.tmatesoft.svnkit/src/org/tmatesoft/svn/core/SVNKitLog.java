@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -13,6 +13,7 @@ package org.tmatesoft.svn.core;
 
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.UnsupportedEncodingException;
 
 import org.eclipse.core.runtime.ILog;
 import org.eclipse.core.runtime.IStatus;
@@ -22,7 +23,7 @@ import org.osgi.framework.Bundle;
 import org.tmatesoft.svn.util.SVNDebugLogAdapter;
 
 /**
- * @version 1.1.0
+ * @version 1.1.1
  * @author  TMate Software Ltd.
  */
 public class SVNKitLog extends SVNDebugLogAdapter {
@@ -92,7 +93,11 @@ public class SVNKitLog extends SVNDebugLogAdapter {
 
     public void log(String message, byte[] data) {
         if (isFineEnabled()) {
-            myLog.log(createStatus(IStatus.INFO, message + " : " + new String(data), null));
+            try {
+                myLog.log(createStatus(IStatus.INFO, message + " : " + new String(data, "UTF-8"), null));
+            } catch (UnsupportedEncodingException e) {
+                myLog.log(createStatus(IStatus.INFO, message + " : " + new String(data), null));
+            }
         }
     }
 

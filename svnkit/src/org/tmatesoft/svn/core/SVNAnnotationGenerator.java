@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -83,7 +83,7 @@ import de.regnis.q.sequence.line.simplifier.QSequenceLineWhiteSpaceSkippingSimpl
  *     }
  * ...</pre>
  *   
- * @version 1.1.0
+ * @version 1.1.1
  * @author  TMate Software Ltd.
  */
 public class SVNAnnotationGenerator implements ISVNFileRevisionHandler {
@@ -264,7 +264,8 @@ public class SVNAnnotationGenerator implements ISVNFileRevisionHandler {
                 result.close();
             }
         } catch (Throwable e) {
-            throw new SVNException(SVNErrorMessage.UNKNOWN_ERROR_MESSAGE, e);
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.UNKNOWN, "Exception while generating annotation: {0}", e.getMessage());
+            SVNErrorManager.error(err, e);
         } finally {
             if (left != null) {
                 try {

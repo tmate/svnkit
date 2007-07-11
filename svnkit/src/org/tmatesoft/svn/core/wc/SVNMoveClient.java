@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -24,9 +24,9 @@ import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.internal.wc.SVNFileType;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
-import org.tmatesoft.svn.core.internal.wc.admin.SVNLog;
 import org.tmatesoft.svn.core.internal.wc.admin.SVNAdminArea;
 import org.tmatesoft.svn.core.internal.wc.admin.SVNEntry;
+import org.tmatesoft.svn.core.internal.wc.admin.SVNLog;
 import org.tmatesoft.svn.core.internal.wc.admin.SVNVersionedProperties;
 import org.tmatesoft.svn.core.internal.wc.admin.SVNWCAccess;
 
@@ -53,7 +53,7 @@ import org.tmatesoft.svn.core.internal.wc.admin.SVNWCAccess;
  * all the necessary administrative version control information.
  * </ul>
  * 
- * @version 1.1.0
+ * @version 1.1.1
  * @author  TMate Software Ltd.
  */
 public class SVNMoveClient extends SVNBasicClient {
@@ -87,7 +87,7 @@ public class SVNMoveClient extends SVNBasicClient {
         myWCClient = new SVNWCClient(authManager, options);
     }
 
-    protected SVNMoveClient(ISVNRepositoryPool repositoryPool, ISVNOptions options) {
+    public SVNMoveClient(ISVNRepositoryPool repositoryPool, ISVNOptions options) {
         super(repositoryPool, options);
         myWCClient = new SVNWCClient(repositoryPool, options);
     }
@@ -225,6 +225,11 @@ public class SVNMoveClient extends SVNBasicClient {
                     SVNVersionedProperties srcProps = srcParentArea.getProperties(src.getName());
                     SVNVersionedProperties dstProps = dstParentArea.getProperties(dst.getName());
                     srcProps.copyTo(dstProps);
+                    File srcBaseFile = srcParentArea.getBaseFile(src.getName(), false);
+                    File dstBaseFile = dstParentArea.getBaseFile(dst.getName(), false);
+                    if (srcBaseFile.isFile()) {
+                        SVNFileUtil.copy(srcBaseFile, dstBaseFile, false, false);
+                    }
                     
                     if (srcEntry.isScheduledForAddition() && srcEntry.isCopied()) {
                         dstEntry.scheduleForAddition();
@@ -357,8 +362,10 @@ public class SVNMoveClient extends SVNBasicClient {
             }
             entry.setRepositoryRoot(reposRootURL);
             if (entry.isFile()) {
-                dir.getWCProperties(name).removeAll();
-                dir.saveWCProperties(false);
+                if (dir.getWCProperties(name) != null) {
+                    dir.getWCProperties(name).removeAll();
+                    dir.saveWCProperties(false);
+                }
                 if (copyFromURL != null) {
                     entry.setCopyFromURL(copyFromURL);
                     entry.setCopyFromRevision(copyFromRevision);

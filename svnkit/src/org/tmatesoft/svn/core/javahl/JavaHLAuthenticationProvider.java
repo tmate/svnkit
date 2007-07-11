@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -12,7 +12,6 @@
 package org.tmatesoft.svn.core.javahl;
 
 import java.io.File;
-import java.security.MessageDigest;
 import java.security.cert.X509Certificate;
 
 import org.tigris.subversion.javahl.PromptUserPassword;
@@ -27,13 +26,16 @@ import org.tmatesoft.svn.core.auth.SVNPasswordAuthentication;
 import org.tmatesoft.svn.core.auth.SVNSSHAuthentication;
 import org.tmatesoft.svn.core.auth.SVNSSLAuthentication;
 import org.tmatesoft.svn.core.auth.SVNUserNameAuthentication;
+import org.tmatesoft.svn.core.internal.util.SVNSSLUtil;
 
 /**
- * @version 1.1.0
+ * @version 1.1.1
  * @author  TMate Software Ltd.
  */
 class JavaHLAuthenticationProvider implements ISVNAuthenticationProvider {
     
+    private static final String ADAPTER_DEFAULT_PROMPT_CLASS = 
+        "org.tigris.subversion.svnclientadapter.javahl.AbstractJhlClientAdapter$DefaultPromptUserPassword";
     private PromptUserPassword myPrompt;
     
     public JavaHLAuthenticationProvider(PromptUserPassword prompt){
@@ -103,18 +105,18 @@ class JavaHLAuthenticationProvider implements ISVNAuthenticationProvider {
                 if (prompt3.promptUser(realm, userName, authMayBeStored))  {
                     return new SVNUserNameAuthentication(prompt3.getUsername(), prompt3.userAllowedSave());
                 }
-                return null;
+                return getDefaultUserNameCredentials(userName);
             } else if (myPrompt instanceof PromptUserPassword3) {
                 PromptUserPassword3 prompt3 = (PromptUserPassword3) myPrompt;
                 if (prompt3.prompt(realm, userName, authMayBeStored))  {
                     return new SVNUserNameAuthentication(prompt3.getUsername(), prompt3.userAllowedSave());
                 }
-                return null;
+                return getDefaultUserNameCredentials(userName);
             } 
             if (myPrompt.prompt(realm, userName)) {
                 return new SVNUserNameAuthentication(myPrompt.getUsername(), false);
             }
-            return null;            
+            return getDefaultUserNameCredentials(userName);
         } else if(!ISVNAuthenticationManager.PASSWORD.equals(kind)){
             return null;
         }
@@ -140,55 +142,25 @@ class JavaHLAuthenticationProvider implements ISVNAuthenticationProvider {
         return null;
     }
 
+    private SVNAuthentication getDefaultUserNameCredentials(String userName) {
+        if (ADAPTER_DEFAULT_PROMPT_CLASS.equals(myPrompt.getClass().getName())) {
+            // return default username, despite prompt was 'cancelled'.
+            return new SVNUserNameAuthentication(userName, false);
+        }
+        return null;
+    }
+
     public int acceptServerAuthentication(SVNURL url, String realm, Object serverAuth,  boolean resultMayBeStored) {
         if (serverAuth != null && myPrompt instanceof PromptUserPassword2) {
             PromptUserPassword2 sslPrompt = (PromptUserPassword2) myPrompt;
             serverAuth = serverAuth instanceof X509Certificate ? 
-                    getServerCertificateInfo((X509Certificate) serverAuth) : serverAuth;
+                    SVNSSLUtil.getServerCertificatePrompt((X509Certificate) serverAuth, realm, url.getHost()) : serverAuth;
             if (serverAuth == null) {
-                serverAuth = "";
+                serverAuth = "Unsupported certificate type '" + (serverAuth != null ? serverAuth.getClass().getName() : "null") + "'";
             }
             return sslPrompt.askTrustSSLServer(serverAuth.toString(), resultMayBeStored);
         }
         return ACCEPTED;
-    }
-
-    private static String getFingerprint(X509Certificate cert) {
-          StringBuffer s = new StringBuffer();
-          try  {
-             MessageDigest md = MessageDigest.getInstance("SHA1");
-             md.update(cert.getEncoded());
-             byte[] digest = md.digest();
-             for (int i= 0; i < digest.length; i++)  {
-                if (i != 0) {
-                    s.append(':');
-                }
-                int b = digest[i] & 0xFF;
-                String hex = Integer.toHexString(b);
-                if (hex.length() == 1) {
-                    s.append('0');
-                }
-                s.append(hex.toLowerCase());
-             }
-          } catch (Exception e)  {
-          } 
-          return s.toString();
-       }
-
-    private static String getServerCertificateInfo(X509Certificate cert) {
-        StringBuffer info = new StringBuffer();
-        info.append(" - Subject: ");
-        info.append(cert.getSubjectDN().getName());
-        info.append('\n');
-        info.append(" - Valid: ");
-        info.append("from " + cert.getNotBefore() + " until " + cert.getNotAfter());
-        info.append('\n');
-        info.append(" - Issuer: ");
-        info.append(cert.getIssuerDN().getName());
-        info.append('\n');
-        info.append(" - Fingerprint: ");
-        info.append(getFingerprint(cert));
-        return info.toString();
     }
     
     private static String getUserName(String userName, SVNURL url) {

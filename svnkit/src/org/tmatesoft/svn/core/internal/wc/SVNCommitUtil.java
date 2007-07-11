@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -48,8 +48,9 @@ import org.tmatesoft.svn.core.wc.SVNStatusClient;
 import org.tmatesoft.svn.core.wc.SVNStatusType;
 import org.tmatesoft.svn.core.wc.SVNWCUtil;
 
+
 /**
- * @version 1.1.0
+ * @version 1.1.1
  * @author  TMate Software Ltd.
  */
 public class SVNCommitUtil {
@@ -101,7 +102,11 @@ public class SVNCommitUtil {
             if (closeDir) {
                 lastPath = commitPath;
             } else {
-                lastPath = SVNPathUtil.removeTail(commitPath);
+                if (index + 1 < pathsArray.length) {
+                    lastPath = SVNPathUtil.removeTail(commitPath);
+                } else {
+                    lastPath = commitPath;
+                }
             }
         }
         while (lastPath != null && !"".equals(lastPath)) {
@@ -121,7 +126,8 @@ public class SVNCommitUtil {
         if (rootPath == null) {
             return null;
         }
-        File baseDir = new File(rootPath);
+        File baseDir = new File(rootPath).getAbsoluteFile();
+        rootPath = baseDir.getAbsolutePath().replace(File.separatorChar, '/');
         Collection dirsToLock = new HashSet(); // relative paths to lock.
         Collection dirsToLockRecursively = new HashSet(); 
         boolean lockAll = false;
@@ -163,7 +169,7 @@ public class SVNCommitUtil {
                 if (!targetFile.equals(baseDir)) {
                     targetFile = targetFile.getParentFile();
                     targetPath = SVNPathUtil.removeTail(targetPath);
-                    while (!targetFile.equals(baseDir) && !dirsToLock.contains(targetPath)) {
+                    while (targetFile != null && !targetFile.equals(baseDir) && !dirsToLock.contains(targetPath)) {
                         dirsToLock.add(targetPath);
                         targetPath = SVNPathUtil.removeTail(targetPath);
                         targetFile = targetFile.getParentFile();
@@ -220,6 +226,7 @@ public class SVNCommitUtil {
             for(int i = 0; i < paths.length; i++) {
                 statusClient.checkCancelled();
                 File path = new File(SVNPathUtil.validateFilePath(paths[i].getAbsolutePath()));
+                path = path.getAbsoluteFile();
                 try {
                     baseAccess.probeRetrieve(path);
                 } catch (SVNException e) {
@@ -244,6 +251,10 @@ public class SVNCommitUtil {
                 for (int i = 0; i < lockedDirs.length; i++) {
                     statusClient.checkCancelled();
                     SVNAdminArea dir = lockedDirs[i];
+                    if (dir == null) {
+                        // could be null for missing, but known dir.
+                        continue;
+                    }
                     SVNEntry rootEntry = baseAccess.getEntry(dir.getRoot(), true);
                     if (rootEntry.getCopyFromURL() != null) {
                         File dirRoot = dir.getRoot();
@@ -544,22 +555,27 @@ public class SVNCommitUtil {
         boolean textConflicts = false;
         SVNAdminArea entries = null;
         if (entry.getKind() == SVNNodeKind.DIR) {
-            SVNAdminArea childDir = dir.getWCAccess().retrieve(dir.getFile(entry.getName()));
+            SVNAdminArea childDir = null;
+            try {
+                childDir = dir.getWCAccess().retrieve(dir.getFile(entry.getName()));
+            } catch (SVNException e) {
+                if (e.getErrorMessage().getErrorCode() == SVNErrorCode.WC_NOT_LOCKED) {
+                    childDir = null;
+                } else {
+                    throw e;
+                }
+            }
             if (childDir != null && childDir.entries(true) != null) {
                 entries = childDir;
                 if (entries.getEntry("", false) != null) {
                     entry = entries.getEntry("", false);
                     dir = childDir;
                 }
-                propConflicts = entry.getPropRejectFile() != null;
-            } else {
-                propConflicts = entry.getPropRejectFile() != null;
-            }
+            } 
+            propConflicts = dir.hasPropConflict(entry.getName());
         } else {
-            propConflicts = entry.getPropRejectFile() != null;
-            textConflicts = entry.getConflictOld() != null
-                    || entry.getConflictNew() != null
-                    || entry.getConflictWorking() != null;
+            propConflicts = dir.hasPropConflict(entry.getName());
+            textConflicts = dir.hasTextConflict(entry.getName());
         }
         if (propConflicts || textConflicts) {
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_FOUND_CONFLICT, "Aborting commit: ''{0}'' remains in conflict", path);                    
@@ -769,7 +785,17 @@ public class SVNCommitUtil {
                 lockTokens.put(entry.getURL(), entry.getLockToken());
             }
             if (!adminArea.getThisDirName().equals(entry.getName()) && entry.isDirectory()) {
-                SVNAdminArea child = adminArea.getWCAccess().retrieve(adminArea.getFile(entry.getName()));
+                
+                SVNAdminArea child;
+                try {
+                    child = adminArea.getWCAccess().retrieve(adminArea.getFile(entry.getName()));
+                } catch (SVNException e) {
+                    if (e.getErrorMessage().getErrorCode() == SVNErrorCode.WC_NOT_LOCKED) {
+                        child = null;
+                    } else {
+                        throw e;
+                    }
+                }
                 if (child != null) {
                     collectLocks(child, lockTokens);
                 }

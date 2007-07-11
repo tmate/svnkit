@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -13,10 +13,13 @@ package org.tmatesoft.svn.core.wc.xml;
 
 import java.io.File;
 
+import org.tmatesoft.svn.core.SVNErrorCode;
+import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNLock;
 import org.tmatesoft.svn.core.SVNURL;
 import org.tmatesoft.svn.core.internal.util.SVNTimeUtil;
+import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.wc.ISVNInfoHandler;
 import org.tmatesoft.svn.core.wc.SVNInfo;
 import org.tmatesoft.svn.util.ISVNDebugLog;
@@ -25,7 +28,7 @@ import org.xml.sax.SAXException;
 
 
 /**
- * @version 1.1.0
+ * @version 1.1.1
  * @author  TMate Software Ltd.
  */
 public class SVNXMLInfoHandler extends AbstractXMLHandler implements ISVNInfoHandler {
@@ -101,7 +104,9 @@ public class SVNXMLInfoHandler extends AbstractXMLHandler implements ISVNInfoHan
         try {
             sendToHandler(info);
         } catch (SAXException e) {
-            e.printStackTrace();
+            getDebugLog().error(e);
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.XML_MALFORMED, e.getMessage());
+            SVNErrorManager.error(err, e);
         }
     }
 

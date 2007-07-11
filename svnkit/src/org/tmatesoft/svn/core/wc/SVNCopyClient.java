@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -91,7 +91,7 @@ import org.tmatesoft.svn.core.io.SVNRepository;
  * Overloaded <b>doCopy()</b> methods of <b>SVNCopyClient</b> are similar to
  * <code>'svn copy'</code> and <code>'svn move'</code> commands of the SVN command line client. 
  * 
- * @version 1.1.0
+ * @version 1.1.1
  * @author  TMate Software Ltd.
  * @see     <a target="_top" href="http://svnkit.com/kb/examples/">Examples</a>
  * 
@@ -127,7 +127,7 @@ public class SVNCopyClient extends SVNBasicClient {
         super(authManager, options);
     }
 
-    protected SVNCopyClient(ISVNRepositoryPool repositoryPool, ISVNOptions options) {
+    public SVNCopyClient(ISVNRepositoryPool repositoryPool, ISVNOptions options) {
         super(repositoryPool, options);
     }
     
@@ -283,9 +283,10 @@ public class SVNCopyClient extends SVNBasicClient {
             repository = createRepository(topURL, true);
         }
         
-        String srcPath = srcURL.equals(topURL) ? "" : srcURL.toString().substring(topURL.toString().length() + 1);
+        // substring one more char, because path always starts with /, and we need relative path.
+        String srcPath = srcURL.equals(topURL) ? "" : srcURL.getURIEncodedPath().substring(topURL.getURIEncodedPath().length() + 1);
         srcPath = SVNEncodingUtil.uriDecode(srcPath);
-        String dstPath = dstURL.equals(topURL) ? "" : dstURL.toString().substring(topURL.toString().length() + 1);
+        String dstPath = dstURL.equals(topURL) ? "" : dstURL.getURIEncodedPath().substring(topURL.getURIEncodedPath().length() + 1); 
         dstPath = SVNEncodingUtil.uriDecode(dstPath);
         
         if ("".equals(srcPath) && isMove) {
@@ -350,7 +351,7 @@ public class SVNCopyClient extends SVNBasicClient {
             }
             SVNErrorMessage nestedErr = e.getErrorMessage();
             SVNErrorMessage err = SVNErrorMessage.create(nestedErr.getErrorCode(), "Commit failed (details follow):");
-            SVNErrorManager.error(err, e);
+            SVNErrorManager.error(err, e.getErrorMessage());
         }
         if (result != null && result.getNewRevision() >= 0) { 
             dispatchEvent(SVNEventFactory.createCommitCompletedEvent(null, result.getNewRevision()), ISVNEventHandler.UNKNOWN);
@@ -501,8 +502,9 @@ public class SVNCopyClient extends SVNBasicClient {
             tmpFiles = mediator.getTmpFiles();
 
             commitMessage = SVNCommitClient.validateCommitMessage(commitMessage);
+            SVNURL root = repository.getRepositoryRoot(true);
             commitEditor = repository.getCommitEditor(commitMessage, null, false, mediator);
-            info = SVNCommitter.commit(tmpFiles, commitables, repository.getRepositoryRoot(true).getPath(), commitEditor);
+            info = SVNCommitter.commit(tmpFiles, commitables, root.getPath(), commitEditor);
             commitEditor = null;
         } finally {
             if (tmpFiles != null) {
@@ -631,7 +633,7 @@ public class SVNCopyClient extends SVNBasicClient {
                 File tmpFile = null;
     
                 File baseTmpFile = adminArea.getBaseFile(dstPath.getName(), true);
-                tmpFile = SVNFileUtil.createUniqueFile(baseTmpFile.getParentFile(), dstPath.getName(), ".tmp");
+                tmpFile = SVNFileUtil.createUniqueFile(baseTmpFile.getParentFile(), ".copy", ".tmp");
                 OutputStream os = null;
                 
                 long realRevision = -1;
@@ -671,7 +673,11 @@ public class SVNCopyClient extends SVNBasicClient {
             uuid = entry.getUUID();
         } else if (entry.getURL() != null) {
             SVNRepository repos = createRepository(entry.getSVNURL(), false);
-            uuid = repos.getRepositoryUUID(true);
+            try {
+                uuid = repos.getRepositoryUUID(true);
+            } finally {
+                repos.closeSession();
+            }
         } else {
             if (wcAccess.isWCRoot(path)) {
                 SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_MISSING_URL, "''{0}'' has no URL", path);
@@ -792,7 +798,7 @@ public class SVNCopyClient extends SVNBasicClient {
                 
                 if (!force) {
                     try {
-                        SVNWCManager.canDelete(srcPath, false, getOptions());
+                        SVNWCManager.canDelete(srcPath, getOptions(), this);
                     } catch (SVNException svne) {
                         SVNErrorMessage err = svne.getErrorMessage().wrap("Move will not be attempted unless forced");
                         SVNErrorManager.error(err, svne);
@@ -837,7 +843,7 @@ public class SVNCopyClient extends SVNBasicClient {
                 copyAccess.close();
             }
             if (isMove) {
-                SVNWCManager.delete(srcParentArea.getWCAccess(), srcParentArea, srcPath, true);
+                SVNWCManager.delete(srcParentArea.getWCAccess(), srcParentArea, srcPath, true, false);
             }
         } finally {
             wcAccess.close();
@@ -879,7 +885,7 @@ public class SVNCopyClient extends SVNBasicClient {
         Map properties = srcArea.getProperties(srcEntry.getName()).asMap();
         
         SVNFileUtil.copyFile(textBase, tmpTextBase, false);
-        File tmpFile = SVNFileUtil.createUniqueFile(dstParent.getRoot(), dstName, ".tmp");
+        File tmpFile = SVNFileUtil.createUniqueFile(dstParent.getRoot(), ".copy", ".tmp");
         SVNFileUtil.copy(srcArea.getFile(srcEntry.getName()), tmpFile, false, false);
        
         SVNWCManager.addRepositoryFile(dstParent, dstName, tmpFile, tmpTextBase, baseProperties, properties, copyFromURL, copyFromRevision);

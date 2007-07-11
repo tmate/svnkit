@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -11,6 +11,7 @@
  */
 package org.tmatesoft.svn.core.internal.io.dav.http;
 
+import java.io.UnsupportedEncodingException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.security.InvalidKeyException;
@@ -33,7 +34,7 @@ import org.tmatesoft.svn.core.internal.util.SVNFormatUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 
 /**
- * @version 1.1.0
+ * @version 1.1.1
  * @author  TMate Software Ltd.
  */
 class HTTPNTLMAuthentication extends HTTPAuthentication {
@@ -125,10 +126,12 @@ class HTTPNTLMAuthentication extends HTTPAuthentication {
     private int myPosition; 
     private byte[] myNonce;
     private boolean myIsNegotiateLocalCall;
+    private String myCharset;
     
-    protected HTTPNTLMAuthentication () {
+    protected HTTPNTLMAuthentication (String charset) {
         myState = UNINITIATED;
         myIsNegotiateLocalCall = false;
+        myCharset = charset;
     }
     
     public void setType1State(){
@@ -176,8 +179,7 @@ class HTTPNTLMAuthentication extends HTTPAuthentication {
             response = myResponse;
         }
         
-        String base64EncodedResponse = SVNBase64.byteArrayToBase64(response);
-        return new String(HTTPAuthentication.getASCIIBytes(base64EncodedResponse));
+        return SVNBase64.byteArrayToBase64(response);
     }
     
     public void parseChallenge(String challenge) throws SVNException {
@@ -187,7 +189,13 @@ class HTTPNTLMAuthentication extends HTTPAuthentication {
         }
         byte[] challengeBase64Bytes = HTTPAuthentication.getBytes(challenge, DEFAULT_CHARSET);
         byte[] resultBuffer = new byte[challengeBase64Bytes.length];
-        int resultLength = SVNBase64.base64ToByteArray(new StringBuffer(new String(challengeBase64Bytes)), resultBuffer);
+        int resultLength = 0;
+        try {
+            resultLength = SVNBase64.base64ToByteArray(new StringBuffer(new String(challengeBase64Bytes, myCharset)), resultBuffer);
+        } catch (UnsupportedEncodingException e) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.RA_DAV_REQUEST_FAILED, "NTLM HTTP auth: " + e.getMessage());
+            SVNErrorManager.error(err);
+        }
         
         String proto = new String(resultBuffer, 0, 7);
         byte[] typeBytes = new byte[4];

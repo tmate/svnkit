@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -39,13 +39,15 @@ import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
 import org.tmatesoft.svn.core.internal.util.SVNTimeUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNAdminUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
+import org.tmatesoft.svn.core.internal.wc.SVNFileListUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNFileType;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNProperties;
 import org.tmatesoft.svn.util.SVNDebugLog;
 
+
 /**
- * @version 1.1.0
+ * @version 1.1.1
  * @author  TMate Software Ltd.
  */
 public class SVNXMLAdminArea extends SVNAdminArea {
@@ -412,10 +414,11 @@ public class SVNXMLAdminArea extends SVNAdminArea {
             writer.write("<entry");
             for (Iterator names = entryAttrs.keySet().iterator(); names.hasNext();) {
                 String propName = (String) names.next();
-                String propValue = (String) entryAttrs.get(propName);
-                if (propValue == null) {
+                Object value = entryAttrs.get(propName);
+                if (!(value instanceof String)) {
                     continue;
                 }
+                String propValue = (String) value;
                 if (BOOLEAN_PROPERTIES.contains(propName) && !Boolean.TRUE.toString().equals(propValue)) {
                     continue;
                 }
@@ -539,7 +542,7 @@ public class SVNXMLAdminArea extends SVNAdminArea {
             baseTmpFile.getParentFile().mkdirs();
         }
         File versionedFile = getFile(name);
-        SVNTranslator.translate(this, name, name, SVNFileUtil.getBasePath(baseTmpFile), false, false);
+        SVNTranslator.translate(this, name, name, SVNFileUtil.getBasePath(baseTmpFile), false);
 
         // now compare file and get base file checksum (when forced)
         MessageDigest digest;
@@ -656,7 +659,7 @@ public class SVNXMLAdminArea extends SVNAdminArea {
         if (killMe) {
             return false;
         }
-        File[] logs = getAdminDirectory().listFiles();
+        File[] logs = SVNFileListUtil.listFiles(getAdminDirectory());
         for (int i = 0; logs != null && i < logs.length; i++) {
             File log = logs[i];
             if ("log".equals(log.getName()) || log.getName().startsWith("log.")) {
@@ -772,7 +775,7 @@ public class SVNXMLAdminArea extends SVNAdminArea {
                     } catch (IOException e) {
                         SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, "Cannot create file ''{0}'': {1}", new Object[] {killMe, e.getLocalizedMessage()}); 
                         SVNErrorManager.error(err, e);
-                    }
+                    } 
                 }
             } else {
                 removeFromRevisionControl(fileName, false, false);
@@ -809,7 +812,7 @@ public class SVNXMLAdminArea extends SVNAdminArea {
                 File tmpFile2 = SVNFileUtil.createUniqueFile(tmpFile.getParentFile(), fileName, ".tmp");
                 try {
                     String tmpFile2Path = SVNFileUtil.getBasePath(tmpFile2);
-                    SVNTranslator.translate(this, fileName, fileName, tmpFile2Path, false, false);
+                    SVNTranslator.translate(this, fileName, fileName, tmpFile2Path, false);
                     modified = !SVNFileUtil.compareFiles(tmpFile, tmpFile2, null);
                 } catch (SVNException svne) {
                     SVNErrorMessage err = SVNErrorMessage.create(errorCode, "Error comparing ''{0}'' and ''{1}''", new Object[] {workingFile, tmpFile});
@@ -880,11 +883,10 @@ public class SVNXMLAdminArea extends SVNAdminArea {
                 if (SVNFileUtil.isWindows || !special) {
                     if (fileType == SVNFileType.FILE) {
                         SVNTranslator.translate(this, fileName, 
-                                SVNFileUtil.getBasePath(tmpFile), SVNFileUtil.getBasePath(tmpFile2), true, false);
+                                SVNFileUtil.getBasePath(tmpFile), SVNFileUtil.getBasePath(tmpFile2), true);
                     } else {
                         SVNTranslator.translate(this, fileName, fileName,
-                                SVNFileUtil.getBasePath(tmpFile2), true,
-                                false);
+                                SVNFileUtil.getBasePath(tmpFile2), true);
                     }
                     if (!SVNFileUtil.compareFiles(tmpFile2, wcFile, null)) {
                         SVNFileUtil.copyFile(tmpFile2, wcFile, true);
@@ -998,6 +1000,12 @@ public class SVNXMLAdminArea extends SVNAdminArea {
         if (unassociated) {
             getWCAccess().closeAdminArea(dirFile.getParentFile());
         }
+    }
+
+    protected boolean isEntryPropertyApplicable(String propName) {
+        return propName != null && !SVNProperty.CACHABLE_PROPS.equals(propName) && 
+               !SVNProperty.PRESENT_PROPS.equals(propName) && !SVNProperty.HAS_PROP_MODS.equals(propName) && 
+               !SVNProperty.HAS_PROPS.equals(propName);
     }
 
 }

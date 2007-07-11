@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -13,14 +13,13 @@
 package org.tmatesoft.svn.cli;
 
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Set;
 
 import org.tmatesoft.svn.core.SVNException;
 
 /**
- * @version 1.1.0
+ * @version 1.1.1
  * @author  TMate Software Ltd.
  */
 public abstract class SVNArgument {
@@ -37,6 +36,8 @@ public abstract class SVNArgument {
     public static final SVNArgument RECURSIVE = createUnaryArgument(new String[] { "--recursive", "-R" });
     public static final SVNArgument VERBOSE = createUnaryArgument(new String[] { "--verbose", "-v" });
     public static final SVNArgument NO_DIFF_DELETED = createUnaryArgument(new String[] {"--no-diff-deleted"});
+    public static final SVNArgument NO_DIFF_ADDED = createUnaryArgument(new String[] {"--no-diff-added"});
+    public static final SVNArgument DIFF_COPY_FROM = createUnaryArgument(new String[] {"--diff-copy-from"});
     public static final SVNArgument USE_ANCESTRY = createUnaryArgument(new String[] {"--notice-ancestry"});
     public static final SVNArgument QUIET = createUnaryArgument(new String[] { "--quiet", "-q" });
     public static final SVNArgument SHOW_UPDATES = createUnaryArgument(new String[] { "--show-updates", "-u" });
@@ -68,8 +69,25 @@ public abstract class SVNArgument {
     public static final SVNArgument IGNORE_ALL_WS = createUnaryArgument(new String[] { "-w", "--ignore-all-space" });
     public static final SVNArgument IGNORE_EOL_STYLE = createUnaryArgument(new String[] { "--ignore-eol-style" });
 
-    public static SVNArgument findArgument(String name) {
-        for (Iterator arguments = ourArguments.iterator(); arguments.hasNext();) {
+    public static final SVNArgument FS_TYPE = createStringArgument(new String[] { "--fs-type" });
+    public static final SVNArgument PRE_14_COMPATIBLE = createUnaryArgument(new String[] { "--pre-1.4-compatible" });
+    public static final SVNArgument BDB_TXN_NOSYNC = createUnaryArgument(new String[] { "--bdb-txn-nosync" });
+    public static final SVNArgument BDB_LOG_KEEP = createUnaryArgument(new String[] { "--bdb-log-keep" });
+    public static final SVNArgument DELTAS = createUnaryArgument(new String[] { "--deltas" });
+    public static final SVNArgument IGNORE_UUID = createUnaryArgument(new String[] { "--ignore-uuid" });
+    public static final SVNArgument FORCE_UUID = createUnaryArgument(new String[] { "--force-uuid" });
+    public static final SVNArgument USE_PRECOMMIT_HOOK = createUnaryArgument(new String[] { "--use-pre-commit-hook" });
+    public static final SVNArgument USE_POSTCOMMIT_HOOK = createUnaryArgument(new String[] { "--use-post-commit-hook" });
+    public static final SVNArgument PARENT_DIR = createStringArgument(new String[] { "--parent-dir" });
+
+    public static final SVNArgument TRANSACTION = createStringArgument(new String[] { "--transaction", "-t" });
+    public static final SVNArgument COPY_INFO = createUnaryArgument(new String[] { "--copy-info" });
+    public static final SVNArgument SHOW_IDS = createUnaryArgument(new String[] { "--show-ids" });
+    public static final SVNArgument FULL_PATHS = createUnaryArgument(new String[] { "--full-paths" });
+    
+    
+    public static SVNArgument findArgument(String name, Set validArguments) {
+        for (Iterator arguments = validArguments.iterator(); arguments.hasNext();) {
             SVNArgument argument = (SVNArgument) arguments.next();
             for (Iterator names = argument.names(); names.hasNext();) {
                 String argumentName = (String) names.next();
@@ -81,58 +99,11 @@ public abstract class SVNArgument {
         return null;
     }
 
-    private static Set ourArguments;
-
-    static {
-        ourArguments = new HashSet();
-        ourArguments.add(SVNArgument.PASSWORD);
-        ourArguments.add(SVNArgument.USERNAME);
-        ourArguments.add(SVNArgument.CONFIG_DIR);
-
-        ourArguments.add(SVNArgument.NON_RECURSIVE);
-        ourArguments.add(SVNArgument.RECURSIVE);
-        ourArguments.add(SVNArgument.VERBOSE);
-        ourArguments.add(SVNArgument.QUIET);
-        ourArguments.add(SVNArgument.SHOW_UPDATES);
-        ourArguments.add(SVNArgument.NO_IGNORE);
-        ourArguments.add(SVNArgument.MESSAGE);
-        ourArguments.add(SVNArgument.REVISION);
-        ourArguments.add(SVNArgument.FORCE);
-        ourArguments.add(SVNArgument.FORCE_LOG);
-        ourArguments.add(SVNArgument.FILE);
-        ourArguments.add(SVNArgument.EDITOR_CMD);
-        ourArguments.add(SVNArgument.STRICT);
-        ourArguments.add(SVNArgument.NO_UNLOCK);
-        ourArguments.add(SVNArgument.NO_AUTH_CACHE);
-        ourArguments.add(SVNArgument.RELOCATE);
-        ourArguments.add(SVNArgument.EOL_STYLE);
-        ourArguments.add(SVNArgument.NO_DIFF_DELETED);
-        ourArguments.add(SVNArgument.USE_ANCESTRY);
-        ourArguments.add(SVNArgument.OLD);
-        ourArguments.add(SVNArgument.NEW);
-        ourArguments.add(SVNArgument.DRY_RUN);
-        ourArguments.add(SVNArgument.IGNORE_ANCESTRY);
-        ourArguments.add(SVNArgument.NO_AUTO_PROPS);
-        ourArguments.add(SVNArgument.AUTO_PROPS);
-        ourArguments.add(SVNArgument.REV_PROP);
-        ourArguments.add(SVNArgument.INCREMENTAL);
-        ourArguments.add(SVNArgument.XML);
-        ourArguments.add(SVNArgument.LIMIT);
-        ourArguments.add(SVNArgument.STOP_ON_COPY);
-        ourArguments.add(SVNArgument.NON_INTERACTIVE);
-        ourArguments.add(SVNArgument.CHANGE);
-        ourArguments.add(SVNArgument.SUMMARIZE);
-        ourArguments.add(SVNArgument.EXTENSIONS);
-        ourArguments.add(SVNArgument.IGNORE_ALL_WS);
-        ourArguments.add(SVNArgument.IGNORE_EOL_STYLE);
-        ourArguments.add(SVNArgument.IGNORE_WS_CHANGE);
-    }
-
     private static SVNArgument createStringArgument(String[] names) {
         return new SVNStringArgument(names);
     }
 
-    private static SVNArgument createUnaryArgument(String[] names) {
+    static SVNArgument createUnaryArgument(String[] names) {
         return new SVNUnaryArgument(names);
     }
 

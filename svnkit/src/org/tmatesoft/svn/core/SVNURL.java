@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -11,12 +11,12 @@
  */
 package org.tmatesoft.svn.core;
 
+import java.io.File;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.StringTokenizer;
-import java.io.File;
 
 import org.tmatesoft.svn.core.internal.util.SVNEncodingUtil;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
@@ -38,7 +38,7 @@ import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
  * string (like <span class="javastring">"http://userInfo@host:port/path"</span>)
  * to a corresponding <i>parse</i> method of this class. 
  *  
- * @version 1.1.0
+ * @version 1.1.1
  * @author  TMate Software Ltd.
  * @see     <a target="_top" href="http://svnkit.com/kb/examples/">Examples</a>
  */
@@ -198,6 +198,20 @@ public class SVNURL {
         }
         if ("file".equals(myProtocol)) {
             String normalizedPath = norlmalizeURLPath(url, url.substring("file://".length()));
+            int slashInd = normalizedPath.indexOf('/');
+            if (slashInd == -1) {
+                //no path, only host - follow subversion behaviour
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.RA_ILLEGAL_URL, "Local URL ''{0}'' contains only a hostname, no path", url);
+                SVNErrorManager.error(err);
+            }
+            
+            myPath = normalizedPath.substring(slashInd);
+            if (normalizedPath.equals(myPath)) {
+                myHost = "";
+            } else {
+                myHost = normalizedPath.substring(0, slashInd);
+            }
+            
             URL testURL = null;
             try {
                 testURL = new URL(myProtocol + "://" + normalizedPath);
@@ -206,29 +220,22 @@ public class SVNURL {
                 SVNErrorManager.error(err, e);
                 return;
             }
-            String testPath = getPath(testURL);
-            if(testPath == null || "".equals(testPath)){
-                //no path, only host - follow subversion behaviour
-                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.RA_ILLEGAL_URL, "Local URL ''{0}'' contains only a hostname, no path", url);
-                SVNErrorManager.error(err);
-                return;
-            }
-            myHost = testURL.getHost() == null ? "" : testURL.getHost();
+            
             if (uriEncoded) {
                 // autoencode it.
-                myEncodedPath = SVNEncodingUtil.autoURIEncode(testPath);
+                myEncodedPath = SVNEncodingUtil.autoURIEncode(myPath);
                 SVNEncodingUtil.assertURISafe(myEncodedPath);
                 myPath = SVNEncodingUtil.uriDecode(myEncodedPath);
-                myPath = myPath.replace(File.separatorChar, '/');
+                myPath = myPath.replace('\\', '/');
                 if(!myPath.startsWith("/")){
                     myPath = "/" + myPath;
                 }
             } else {
-                myPath = testPath;
+                myEncodedPath = SVNEncodingUtil.uriEncode(myPath);
+                myPath = myPath.replace('\\', '/');
                 if(!myPath.startsWith("/")){
                     myPath = "/" + myPath;
                 }
-                myEncodedPath = SVNEncodingUtil.uriEncode(myPath);
             }
             myUserName = testURL.getUserInfo();
             myPort = testURL.getPort();
@@ -250,7 +257,17 @@ public class SVNURL {
                 SVNEncodingUtil.assertURISafe(myEncodedPath);
                 myPath = SVNEncodingUtil.uriDecode(myEncodedPath);
             } else {
-                myPath = httpPath;
+                // do not use httpPath. 
+                String originalPath = url.substring(index + "://".length());
+                if (originalPath.indexOf("/") < 0) {
+                    originalPath = "";
+                } else {
+                    originalPath = originalPath.substring(originalPath.indexOf("/") + 1);
+                }
+                myPath = originalPath;
+                if(!myPath.startsWith("/")){
+                    myPath = "/" + myPath;
+                }
                 myEncodedPath = SVNEncodingUtil.uriEncode(myPath);
             }
             myUserName = httpURL.getUserInfo();
@@ -260,6 +277,10 @@ public class SVNURL {
                 Integer defaultPort = (Integer) DEFAULT_PORTS.get(myProtocol);
                 myPort = defaultPort != null ? defaultPort.intValue() : 0;
             } 
+        }
+        if (myEncodedPath.equals("/")) {
+            myEncodedPath = "";
+            myPath = "";
         }
     }
     
@@ -413,6 +434,7 @@ public class SVNURL {
      * segment from the path component of this representation.  
      * 
      * @return  a new <b>SVNURL</b> representation
+     * @throws SVNException
      */
     public SVNURL removePathTail() throws SVNException {
         String newPath = SVNPathUtil.removeTail(myPath);
@@ -470,6 +492,12 @@ public class SVNURL {
         if (port >= 0) {
             url.append(":");
             url.append(port);
+        }
+        if (path != null && !path.startsWith("/")) {
+            path = '/' + path;
+        }
+        if ("/".equals(path)) {
+            path = "";
         }
         url.append(path);
         return url.toString();

@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -32,8 +32,9 @@ import org.tmatesoft.svn.core.wc.SVNEventAction;
 import org.tmatesoft.svn.core.wc.SVNStatusType;
 
 
+
 /**
- * @version 1.1.0
+ * @version 1.1.1
  * @author  TMate Software Ltd.
  */
 public class SVNMergeCallback extends AbstractDiffCallback {
@@ -232,7 +233,7 @@ public class SVNMergeCallback extends AbstractDiffCallback {
                 SVNStatusType mergeResult = dir.mergeText(name, file1, file2, localLabel, baseLabel, latestLabel, false, myIsDryRun, myDiffOptions);
                 if (mergeResult == SVNStatusType.CONFLICTED || mergeResult == SVNStatusType.CONFLICTED_UNRESOLVED) {
                     result[0] = mergeResult;
-                } else if (textModified) {
+                } else if (textModified && mergeResult != SVNStatusType.UNCHANGED) {
                     result[0] = SVNStatusType.MERGED;
                 } else if (mergeResult == SVNStatusType.MERGED) {
                     result[0] = SVNStatusType.CHANGED;
@@ -341,11 +342,11 @@ public class SVNMergeCallback extends AbstractDiffCallback {
     
     protected void delete(File path, boolean force, boolean dryRun) throws SVNException {
         if (!force) {
-            SVNWCManager.canDelete(path, false, getWCAccess().getOptions());
+            SVNWCManager.canDelete(path, getWCAccess().getOptions(), getWCAccess());
         }
         SVNAdminArea root = getWCAccess().retrieve(path.getParentFile()); 
         if (!dryRun) {
-            SVNWCManager.delete(getWCAccess(), root, path, true);
+            SVNWCManager.delete(getWCAccess(), root, path, true, false);
         }
     }
 

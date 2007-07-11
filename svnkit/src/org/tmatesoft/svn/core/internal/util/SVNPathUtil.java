@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -26,7 +26,7 @@ import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 
 
 /**
- * @version 1.1.0
+ * @version 1.1.1
  * @author  TMate Software Ltd.
  */
 public class SVNPathUtil {
@@ -232,18 +232,6 @@ public class SVNPathUtil {
         protocol.append(getCommonPathAncestor(url1.substring(index), url2
                 .substring(index)));
         return protocol.toString();
-    }
-
-    public static File getCommonFileAncestor(File file1, File file2) {
-        String path1 = file1.getAbsolutePath();
-        String path2 = file2.getAbsolutePath();
-        path1 = validateFilePath(path1);
-        path2 = validateFilePath(path2);
-        String commonPath = getCommonPathAncestor(path1, path2);
-        if (commonPath != null) {
-            return new File(commonPath);
-        }
-        return null;
     }
 
     public static String condenceURLs(String[] urls, Collection condencedPaths,

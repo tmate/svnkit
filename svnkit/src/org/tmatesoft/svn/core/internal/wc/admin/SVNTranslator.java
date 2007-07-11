@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -33,10 +33,11 @@ import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
 import org.tmatesoft.svn.core.internal.util.SVNTimeUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
+import org.tmatesoft.svn.core.wc.ISVNOptions;
 
 
 /**
- * @version 1.1.0
+ * @version 1.1.1
  * @author  TMate Software Ltd.
  */
 public class SVNTranslator {
@@ -46,18 +47,16 @@ public class SVNTranslator {
 
     public static final byte[] CR = new byte[] { '\r' };
 
-    public static final byte[] NATIVE = System.getProperty("line.separator")
-            .getBytes();
+    public static final byte[] NATIVE = System.getProperty("line.separator").getBytes();
 
     
     public static void translate(SVNAdminArea adminArea, String name, String srcPath,
-            String dstPath, boolean expand, boolean safe) throws SVNException {
-        translate(adminArea, name, adminArea.getFile(srcPath), adminArea.getFile(dstPath), expand, safe);
+            String dstPath, boolean expand) throws SVNException {
+        translate(adminArea, name, adminArea.getFile(srcPath), adminArea.getFile(dstPath), expand);
     }
     public static void translate(SVNAdminArea adminArea, String name, File src,
-            File dst, boolean expand, boolean safe) throws SVNException {
-        safe = false;
-        File dst2 = safe ? SVNFileUtil.createUniqueFile(adminArea.getRoot(), dst.getName(), ".tmp") : dst;
+            File dst, boolean expand) throws SVNException {
+        File dst2 = dst;
         
         SVNVersionedProperties props = adminArea.getProperties(name);
         String keywords = props.getPropertyValue(SVNProperty.KEYWORDS);
@@ -65,16 +64,17 @@ public class SVNTranslator {
         boolean special = props.getPropertyValue(SVNProperty.SPECIAL) != null;
         Map keywordsMap = null;
         byte[] eols;
-        if (keywords != null) {
+        if (keywords != null) {            
             if (expand) {
                 SVNEntry entry = adminArea.getEntry(name, true);
+                ISVNOptions options = adminArea.getWCAccess().getOptions();
                 String url = entry.getURL();
                 String author = entry.getAuthor();
                 String date = entry.getCommittedDate();
                 String rev = Long.toString(entry.getCommittedRevision());
-                keywordsMap = computeKeywords(keywords, url, author, date, rev);
+                keywordsMap = computeKeywords(keywords, url, author, date, rev, options);
             } else {
-                keywordsMap = computeKeywords(keywords, null, null, null, null);
+                keywordsMap = computeKeywords(keywords, null, null, null, null, null);
             }
         }
         if (!expand) {
@@ -83,13 +83,6 @@ public class SVNTranslator {
             eols = getWorkingEOL(eolStyle);
         }
         translate(src, dst2, eols, keywordsMap, special, expand);
-        if (safe) {
-            try {
-                SVNFileUtil.rename(dst2, dst);
-            } finally {
-                dst.delete();
-            }
-        }
     }
 
     public static void translate(File src, File dst, byte[] eol, Map keywords, boolean special, boolean expand) throws SVNException {
@@ -315,7 +308,7 @@ public class SVNTranslator {
 
     }
 
-    public static Map computeKeywords(String keywords, String u, String a, String d, String r) {
+    public static Map computeKeywords(String keywords, String u, String a, String d, String r, ISVNOptions options) {
         if (keywords == null) {
             return Collections.EMPTY_MAP;
         }
@@ -335,7 +328,7 @@ public class SVNTranslator {
             for (StringTokenizer tokens = new StringTokenizer(keywords," \t\n\b\r\f"); tokens.hasMoreTokens();) {
                 String token = tokens.nextToken();
                 if ("LastChangedDate".equalsIgnoreCase(token) || "Date".equalsIgnoreCase(token)) {
-                    date = expand && date == null ? SVNFormatUtil.formatDate(jDate, true).getBytes("UTF-8") : date;
+                    date = expand && date == null ? SVNFormatUtil.formatHumanDate(jDate, options).getBytes("UTF-8") : date;
                     map.put("LastChangedDate", date);
                     map.put("Date", date);
                 } else if ("LastChangedRevision".equalsIgnoreCase(token) || "Revision".equalsIgnoreCase(token) || "Rev".equalsIgnoreCase(token)) {
@@ -354,7 +347,7 @@ public class SVNTranslator {
                 } else if ("Id".equalsIgnoreCase(token)) {
                     if (expand && id == null) {
                         rev = rev == null ? r.getBytes("UTF-8") : rev;
-                        idDate = idDate == null ? SVNFormatUtil.formatDate(jDate, false).getBytes("UTF-8") : idDate;
+                        idDate = idDate == null ? SVNFormatUtil.formatDate(jDate).getBytes("UTF-8") : idDate;
                         name = name == null ? SVNEncodingUtil.uriDecode(SVNPathUtil.tail(u)).getBytes("UTF-8") : name;
                         author = author == null ? (a == null ? new byte[0] : a.getBytes("UTF-8")) : author;
                         ByteArrayOutputStream bos = new ByteArrayOutputStream();

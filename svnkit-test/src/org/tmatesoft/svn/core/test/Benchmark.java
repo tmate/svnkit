@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -22,12 +22,13 @@ import org.tigris.subversion.javahl.Revision;
 import org.tigris.subversion.javahl.SVNClient;
 import org.tigris.subversion.javahl.SVNClientInterface;
 import org.tmatesoft.svn.core.SVNException;
+import org.tmatesoft.svn.core.internal.wc.SVNFileListUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 import org.tmatesoft.svn.core.javahl.SVNClientImpl;
 
 
 /**
- * @version 1.1.0
+ * @version 1.1.1
  * @author  TMate Software Ltd.
  */
 public class Benchmark {
@@ -159,7 +160,7 @@ public class Benchmark {
         String dstPath = path + "/subversion/clients2";
         client.move(srcPath, dstPath, "", true);
         // modify files.
-        File[] files = new File(path + "/www").listFiles();
+        File[] files = SVNFileListUtil.listFiles(new File(path + "/www"));
         try {
             for (int i = 0; i < files.length; i++) {
                 if (files[i].isDirectory()) {

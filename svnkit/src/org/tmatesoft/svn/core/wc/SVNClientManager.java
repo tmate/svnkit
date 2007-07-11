@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -11,11 +11,14 @@
  */
 package org.tmatesoft.svn.core.wc;
 
+import org.tmatesoft.svn.core.ISVNCanceller;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNURL;
 import org.tmatesoft.svn.core.auth.ISVNAuthenticationManager;
 import org.tmatesoft.svn.core.io.SVNRepository;
 import org.tmatesoft.svn.core.io.SVNRepositoryFactory;
+import org.tmatesoft.svn.core.wc.admin.SVNAdminClient;
+import org.tmatesoft.svn.core.wc.admin.SVNLookClient;
 import org.tmatesoft.svn.util.ISVNDebugLog;
 import org.tmatesoft.svn.util.SVNDebugLog;
 
@@ -102,7 +105,7 @@ import org.tmatesoft.svn.util.SVNDebugLog;
  * <li>
  * </ol>
  * 
- * @version 1.1.0
+ * @version 1.1.1
  * @author  TMate Software Ltd.
  * @see     ISVNEventHandler
  * @see     <a target="_top" href="http://svnkit.com/kb/examples/">Examples</a>
@@ -120,6 +123,7 @@ public class SVNClientManager implements ISVNRepositoryPool {
     private SVNUpdateClient myUpdateClient;
     private SVNWCClient myWCClient;
     private SVNAdminClient myAdminClient;
+    private SVNLookClient myLookClient;
     
     private ISVNEventHandler myEventHandler;
     private ISVNRepositoryPool myRepositoryPool;
@@ -245,8 +249,13 @@ public class SVNClientManager implements ISVNRepositoryPool {
 
     public void shutdownConnections(boolean shutdownAll) {
         if (myRepositoryPool != null) {
-            myRepositoryPool.shutdownConnections(shutdownAll);
-            
+            myRepositoryPool.dispose();
+        }
+    }
+
+    public void dispose() {
+        if (myRepositoryPool != null) {
+            myRepositoryPool.dispose();
         }
     }
     
@@ -277,6 +286,7 @@ public class SVNClientManager implements ISVNRepositoryPool {
      */
     public void setEventHandler(ISVNEventHandler handler) {
         myEventHandler = handler;
+        setCanceller(handler);
         if (myCommitClient != null) {
             myCommitClient.setEventHandler(handler);
         }
@@ -304,6 +314,43 @@ public class SVNClientManager implements ISVNRepositoryPool {
         if (myAdminClient != null) {
             myAdminClient.setEventHandler(handler);
         }
+        if (myLookClient != null) {
+            myLookClient.setEventHandler(handler);
+        }
+    }
+
+    public void setOptions(ISVNOptions options) {
+        myOptions = options;
+        if (myCommitClient != null) {
+            myCommitClient.setOptions(options);
+        }
+        if (myCopyClient != null) {
+            myCopyClient.setOptions(options);
+        }
+        if (myDiffClient != null) {
+            myDiffClient.setOptions(options);
+        }
+        if (myLogClient != null) {
+            myLogClient.setOptions(options);
+        }
+        if (myMoveClient != null) {
+            myMoveClient.setOptions(options);
+        }
+        if (myStatusClient != null) {
+            myStatusClient.setOptions(options);
+        }
+        if (myUpdateClient != null) {
+            myUpdateClient.setOptions(options);
+        }
+        if (myWCClient != null) {
+            myWCClient.setOptions(options);
+        }
+        if (myAdminClient != null) {
+            myAdminClient.setOptions(options);
+        }
+        if (myLookClient != null) {
+            myLookClient.setOptions(options);
+        }
     }
     
     /**
@@ -328,7 +375,7 @@ public class SVNClientManager implements ISVNRepositoryPool {
     }
 
     /**
-     * Returns an instance of the {@link SVNAdminClient} class. 
+     * Returns an instance of the {@link org.tmatesoft.svn.core.wc.admin.SVNAdminClient} class. 
      * 
      * <p>
      * If it's the first time this method is being called the object is
@@ -346,6 +393,27 @@ public class SVNClientManager implements ISVNRepositoryPool {
             myAdminClient.setDebugLog(getDebugLog());
         }
         return myAdminClient;
+    }
+
+    /**
+     * Returns an instance of the {@link org.tmatesoft.svn.core.wc.admin.SVNLookClient} class. 
+     * 
+     * <p>
+     * If it's the first time this method is being called the object is
+     * created, initialized and then returned. Further calls to this
+     * method will get the same object instantiated at that moment of 
+     * the first call. <b>SVNClientManager</b> does not reinstantiate
+     * its <b>SVN</b>*<b>Client</b> objects. 
+     * 
+     * @return an <b>SVNLookClient</b> instance
+     */
+    public SVNLookClient getLookClient() {
+        if (myLookClient == null) {
+            myLookClient = new SVNLookClient(this, myOptions);
+            myLookClient.setEventHandler(myEventHandler);
+            myLookClient.setDebugLog(getDebugLog());
+        }
+        return myLookClient;
     }
     
     /**
@@ -547,6 +615,24 @@ public class SVNClientManager implements ISVNRepositoryPool {
         }
         if (myAdminClient != null) {
             myAdminClient.setDebugLog(log);
+        }
+        if (myLookClient != null) {
+            myLookClient.setDebugLog(log);
+        }
+        if (myRepositoryPool != null) {
+            myRepositoryPool.setDebugLog(log);
+        }
+    }
+
+    public void setAuthenticationManager(ISVNAuthenticationManager authManager) {
+        if (myRepositoryPool != null) {
+            myRepositoryPool.setAuthenticationManager(authManager);
+        }
+    }
+
+    public void setCanceller(ISVNCanceller canceller) {
+        if (myRepositoryPool != null) {
+            myRepositoryPool.setCanceller(canceller);
         }
     }
 }

@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -38,8 +38,9 @@ import org.tmatesoft.svn.core.wc.SVNEvent;
 import org.tmatesoft.svn.core.wc.SVNEventAction;
 import org.tmatesoft.svn.core.wc.SVNStatusType;
 
+
 /**
- * @version 1.1.0
+ * @version 1.1.1
  * @author  TMate Software Ltd.
  */
 public class SVNRemoteDiffEditor implements ISVNEditor {
@@ -185,7 +186,7 @@ public class SVNRemoteDiffEditor implements ISVNEditor {
     public void addFile(String path, String copyFromPath, long copyFromRevision) throws SVNException {
         myCurrentFile = new SVNFileInfo(path, true);
         myCurrentFile.myBaseProperties = Collections.EMPTY_MAP;
-        myCurrentFile.myBaseFile = SVNFileUtil.createUniqueFile(getTempDirectory(), "diff", ".tmp");
+        myCurrentFile.myBaseFile = SVNFileUtil.createUniqueFile(getTempDirectory(), ".diff", ".tmp");
         SVNFileUtil.createEmptyFile(myCurrentFile.myBaseFile);
     }
 
@@ -331,7 +332,7 @@ public class SVNRemoteDiffEditor implements ISVNEditor {
             myTempFiles.add(tmpFile);
             return tmpFile;
         }
-        return SVNFileUtil.createUniqueFile(getTempDirectory(), name, ".tmp");
+        return SVNFileUtil.createUniqueFile(getTempDirectory(), ".diff", ".tmp");
         
     }
 
@@ -370,7 +371,7 @@ public class SVNRemoteDiffEditor implements ISVNEditor {
         }
 
         public void loadFromRepository() throws SVNException {
-            myBaseFile = SVNFileUtil.createUniqueFile(getTempDirectory(), "diff", ".tmp");
+            myBaseFile = SVNFileUtil.createUniqueFile(getTempDirectory(), ".diff", ".tmp");
             OutputStream os = null;
             myBaseProperties = new HashMap();
             try {

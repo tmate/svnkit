@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -68,7 +68,7 @@ import org.tmatesoft.svn.core.io.SVNRepository;
  * methods are called non-recursively and allow to get status info on a single 
  * item. 
  * 
- * @version 1.1.0
+ * @version 1.1.1
  * @author  TMate Software Ltd.
  * @see		ISVNStatusHandler
  * @see		SVNStatus
@@ -103,7 +103,7 @@ public class SVNStatusClient extends SVNBasicClient {
         super(authManager, options);
     }
 
-    protected SVNStatusClient(ISVNRepositoryPool repositoryPool, ISVNOptions options) {
+    public SVNStatusClient(ISVNRepositoryPool repositoryPool, ISVNOptions options) {
         super(repositoryPool, options);
     }
     
@@ -257,7 +257,8 @@ public class SVNStatusClient extends SVNBasicClient {
                 } else {
                     editor = new SVNRemoteStatusEditor(getOptions(), wcAccess, info, includeIgnored, reportAll, recursive, realHandler);
                     editor.setExternals(externals);
-                    SVNRepository locksRepos = createRepository(url, false);
+                    // session is closed in SVNStatusReporter.
+                    SVNRepository locksRepos = createRepository(url, false);                    
                     checkCancelled();
                     SVNReporter reporter = new SVNReporter(info, path, false, recursive, getDebugLog());
                     SVNStatusReporter statusReporter = new SVNStatusReporter(locksRepos, reporter, editor);
@@ -299,7 +300,7 @@ public class SVNStatusClient extends SVNBasicClient {
                             throw e;
                         }
                     } finally {
-                        setEventPathPrefix(externalPath);
+                        setEventPathPrefix(null);
                     }
                 }
             }
@@ -357,7 +358,7 @@ public class SVNStatusClient extends SVNBasicClient {
                 }
             }
         };
-        doStatus(path, false, remote, true, true, collectParentExternals, handler);
+        doStatus(absPath, false, remote, true, true, collectParentExternals, handler);
         return result[0];
     }
 

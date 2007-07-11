@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2006 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -40,14 +40,14 @@ import org.tmatesoft.svn.core.wc.SVNStatus;
 import org.tmatesoft.svn.core.wc.SVNStatusType;
 
 
+
 /**
- * @version 1.1.0
+ * @version 1.1.1
  * @author  TMate Software Ltd.
  */
 public class SVNRemoteStatusEditor extends SVNStatusEditor implements ISVNEditor, ISVNStatusHandler {
     
     private boolean myIsRootOpen;
-    private long myTargetRevision;
     private SVNStatus myAnchorStatus;
     
     private DirectoryInfo myDirectoryInfo;
@@ -55,7 +55,6 @@ public class SVNRemoteStatusEditor extends SVNStatusEditor implements ISVNEditor
 
     public SVNRemoteStatusEditor(ISVNOptions options, SVNWCAccess wcAccess, SVNAdminAreaInfo info, boolean noIgnore, boolean reportAll, boolean descend, ISVNStatusHandler handler) throws SVNException {
         super(options, wcAccess, info, noIgnore, reportAll, descend, handler);
-        myTargetRevision = -1;
         myAnchorStatus = createStatus(info.getAnchor().getRoot());
     }
 
@@ -112,7 +111,12 @@ public class SVNRemoteStatusEditor extends SVNStatusEditor implements ISVNEditor
             myDirectoryInfo.myIsPropertiesChanged = true;
         }
         if (SVNProperty.COMMITTED_REVISION.equals(name) && value != null) {
-            myDirectoryInfo.myRemoteRevision = SVNRevision.parse(value);
+            try {
+                long number = Long.parseLong(value);
+                myDirectoryInfo.myRemoteRevision = SVNRevision.create(number);
+            } catch (NumberFormatException nfe) {
+                myDirectoryInfo.myRemoteRevision = SVNRevision.UNDEFINED;
+            }
         } else if (SVNProperty.COMMITTED_DATE.equals(name) && value != null) {
             myDirectoryInfo.myRemoteDate = SVNTimeUtil.parseDate(value);
         } else if (SVNProperty.LAST_AUTHOR.equals(name)) {
@@ -154,10 +158,10 @@ public class SVNRemoteStatusEditor extends SVNStatusEditor implements ISVNEditor
                 File targetPath = getAnchor().getFile(getAdminAreaInfo().getTargetName());
                 SVNStatus tgtStatus = (SVNStatus) myDirectoryInfo.myChildrenStatuses.get(targetPath);
                 if (tgtStatus != null) {
-                    if (isDescend() && tgtStatus.getKind() == SVNNodeKind.DIR) {
+                    if (tgtStatus.getKind() == SVNNodeKind.DIR) {
                         SVNAdminArea dir = getWCAccess().retrieve(targetPath);
-                        getDirStatus(null, dir, null, true, isReportAll(), isNoIgnore(), null, true, getDefaultHandler());
-                    }
+                        getDirStatus(null, dir, null, isDescend(), isReportAll(), isNoIgnore(), null, true, getDefaultHandler());
+                    } 
                     if (isSendableStatus(tgtStatus)) {
                         getDefaultHandler().handleStatus(tgtStatus);
                     }
@@ -190,7 +194,12 @@ public class SVNRemoteStatusEditor extends SVNStatusEditor implements ISVNEditor
             myFileInfo.myIsPropertiesChanged = true;
         }
         if (SVNProperty.COMMITTED_REVISION.equals(name) && value != null) {
-            myFileInfo.myRemoteRevision = SVNRevision.parse(value);
+            try {
+                long number = Long.parseLong(value);
+                myFileInfo.myRemoteRevision = SVNRevision.create(number);
+            } catch (NumberFormatException nfe) {
+                myFileInfo.myRemoteRevision = SVNRevision.UNDEFINED;
+            }
         } else if (SVNProperty.COMMITTED_DATE.equals(name) && value != null) {
             myFileInfo.myRemoteDate = SVNTimeUtil.parseDate(value);
         } else if (SVNProperty.LAST_AUTHOR.equals(name)) {
@@ -235,7 +244,7 @@ public class SVNRemoteStatusEditor extends SVNStatusEditor implements ISVNEditor
         } else {
             super.closeEdit();
         }
-        return new SVNCommitInfo(myTargetRevision, null, null);
+        return new SVNCommitInfo(getTargetRevision(), null, null);
     }
 
     public void abortEdit() throws SVNException {
