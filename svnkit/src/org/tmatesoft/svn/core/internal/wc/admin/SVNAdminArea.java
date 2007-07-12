@@ -481,7 +481,7 @@ public abstract class SVNAdminArea {
                         if (SVNProperty.MERGE_INFO.equals(propName)) {
                             toValue = SVNMergeInfoManager.combineMergeInfoProperties(workingValue, toValue);
                             working.setPropertyValue(propName, toValue);
-                            result = SVNStatusType.MERGED;
+                            result = result != SVNStatusType.CONFLICTED && isNormal ? SVNStatusType.MERGED : result;
                         } else {
                             result = isNormal ? SVNStatusType.CONFLICTED : result;                            
                             conflicts.add(MessageFormat.format("Trying to add new property ''{0}'' with value ''{1}'',\n" +
@@ -496,11 +496,11 @@ public abstract class SVNAdminArea {
                     if (toValue != null) {
                         if (SVNProperty.MERGE_INFO.equals(propName)) {
                             Map addedMergeInfo = new TreeMap();
-                            SVNMergeInfoManager.diffMergeInfoProperties(null, addedMergeInfo, fromValue, toValue);
+                            SVNMergeInfoManager.diffMergeInfoProperties(null, addedMergeInfo, fromValue, null, toValue, null);
                             toValue = SVNMergeInfo.formatMergeInfoToString(addedMergeInfo);
                             //TODO: ?
 //                            working.setPropertyValue(propName, toValue);
-//                            result = SVNStatusType.MERGED;
+//                            result = result != SVNStatusType.CONFLICTED && isNormal ? SVNStatusType.MERGED : result;
                         } else {
                             result = isNormal ? SVNStatusType.CONFLICTED : result;                            
                             conflicts.add(MessageFormat.format("Trying to change property ''{0}'' from ''{1}'' to ''{2}'',\n" +
@@ -515,11 +515,11 @@ public abstract class SVNAdminArea {
                     } else if (toValue == null && !workingValue.equals(fromValue)) {
                         if (SVNProperty.MERGE_INFO.equals(propName)) {
                             Map addedMergeInfo = new TreeMap();
-                            SVNMergeInfoManager.diffMergeInfoProperties(null, addedMergeInfo, fromValue, workingValue);
+                            SVNMergeInfoManager.diffMergeInfoProperties(null, addedMergeInfo, fromValue, null, workingValue, null);
                             toValue = SVNMergeInfo.formatMergeInfoToString(addedMergeInfo);
                             //TODO: ?
 //                            working.setPropertyValue(propName, toValue);
-//                            result = SVNStatusType.MERGED;
+//                            result = result != SVNStatusType.CONFLICTED && isNormal ? SVNStatusType.MERGED : result;
                         } else {
                             result = isNormal ? SVNStatusType.CONFLICTED : result;
                             conflicts.add(MessageFormat.format("Trying to delete property ''{0}'' but value has been modified from ''{1}'' to ''{2}''.",
@@ -529,12 +529,15 @@ public abstract class SVNAdminArea {
                         result = result != SVNStatusType.CONFLICTED && isNormal ? SVNStatusType.MERGED : result;
                     } else {
                         if (SVNProperty.MERGE_INFO.equals(propName)) {
-                        }
-                        
-                        result = isNormal ? SVNStatusType.CONFLICTED : result;
+                            toValue = SVNMergeInfoManager.combineForkedMergeInfoProperties(fromValue, workingValue, toValue);
+                            working.setPropertyValue(propName, toValue);
+                            result = result != SVNStatusType.CONFLICTED && isNormal ? SVNStatusType.MERGED : result;
+                        } else {
+                            result = isNormal ? SVNStatusType.CONFLICTED : result;
 
-                        conflicts.add(MessageFormat.format("Trying to change property ''{0}'' from ''{1}'' to ''{2}'',\n" +
-                                "but property already exists with value ''{3}''.", new Object[] { propName, fromValue, toValue, workingValue }));
+                            conflicts.add(MessageFormat.format("Trying to change property ''{0}'' from ''{1}'' to ''{2}'',\n" +
+                                    "but property already exists with value ''{3}''.", new Object[] { propName, fromValue, toValue, workingValue }));
+                        }
                     }
                 }
             }
@@ -558,7 +561,6 @@ public abstract class SVNAdminArea {
                 SVNErrorManager.error(err);
             }
             String prejPath = entry.getPropRejectFile();
-//            closeEntries();
 
             if (prejPath == null) {
                 prejPath = getThisDirName().equals(name) ? "dir_conflicts" : name;
