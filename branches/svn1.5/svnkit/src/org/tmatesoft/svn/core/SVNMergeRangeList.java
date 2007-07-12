@@ -165,12 +165,8 @@ public class SVNMergeRangeList {
                 }
             } else if (range2.intersects(range1)) {
                 if (range1.getStartRevision() < range2.getStartRevision()) {
-                    SVNMergeRange tmpRange = null;
-                    if (remove) {
-                        tmpRange = new SVNMergeRange(range1.getStartRevision(), range2.getStartRevision() - 1);
-                    } else {
-                        tmpRange = new SVNMergeRange(range2.getStartRevision(), range1.getEndRevision());
-                    }
+                    SVNMergeRange tmpRange = remove ? new SVNMergeRange(range1.getStartRevision(), range2.getStartRevision() - 1)
+                                                    : new SVNMergeRange(range2.getStartRevision(), range1.getEndRevision());
 
                     SVNMergeRange combinedRange = lastRange == null ? tmpRange : lastRange.combine(tmpRange, true);
                     if (combinedRange != lastRange) {

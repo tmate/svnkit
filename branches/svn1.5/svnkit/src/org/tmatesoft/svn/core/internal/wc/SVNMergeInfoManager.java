@@ -20,7 +20,6 @@ import java.util.TreeMap;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNMergeInfo;
 import org.tmatesoft.svn.core.SVNMergeInfoInheritance;
-import org.tmatesoft.svn.core.SVNMergeRange;
 import org.tmatesoft.svn.core.SVNMergeRangeList;
 import org.tmatesoft.svn.core.internal.io.fs.FSRevisionRoot;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
@@ -197,13 +196,32 @@ public class SVNMergeInfoManager {
         return SVNMergeInfo.formatMergeInfoToString(srcsToRanges1);
     }
     
-    public static void diffMergeInfoProperties(Map deleted, Map added, String fromPropValue, String toPropValue) throws SVNException {
+    public static String combineForkedMergeInfoProperties(String fromPropValue, String workingPropValue, String toPropValue) throws SVNException {
+        Map leftDeleted = new TreeMap();
+        Map leftAdded = new TreeMap();
+        Map fromMergeInfo = SVNMergeInfo.parseMergeInfo(new StringBuffer(fromPropValue), null);
+        diffMergeInfoProperties(leftDeleted, leftAdded, null, fromMergeInfo, workingPropValue, null);
+        
+        Map rightDeleted = new TreeMap();
+        Map rightAdded = new TreeMap();
+        diffMergeInfoProperties(rightDeleted, rightAdded, fromPropValue, null, toPropValue, null);
+        leftDeleted = mergeMergeInfos(leftDeleted, rightDeleted);
+        leftAdded = mergeMergeInfos(leftAdded, rightAdded);
+        fromMergeInfo = mergeMergeInfos(fromMergeInfo, leftAdded);
+        Map result = new TreeMap();
+        walkMergeInfoHashForDiff(result, null, fromMergeInfo, leftDeleted);
+        return SVNMergeInfo.formatMergeInfoToString(result);
+    }
+    
+    public static void diffMergeInfoProperties(Map deleted, Map added, String fromPropValue, Map fromMergeInfo, String toPropValue, Map toMergeInfo) throws SVNException {
         if (fromPropValue.equals(toPropValue)) {
             return;
         } 
-        Map from = SVNMergeInfo.parseMergeInfo(new StringBuffer(fromPropValue), null);
-        Map to = SVNMergeInfo.parseMergeInfo(new StringBuffer(toPropValue), null);
-        diffMergeInfo(deleted, added, from, to);
+        fromMergeInfo = fromMergeInfo == null ? SVNMergeInfo.parseMergeInfo(new StringBuffer(fromPropValue), null) 
+                                              : fromMergeInfo;
+        toMergeInfo = toMergeInfo == null ? SVNMergeInfo.parseMergeInfo(new StringBuffer(toPropValue), null) 
+                                          : toMergeInfo;
+        diffMergeInfo(deleted, added, fromMergeInfo, toMergeInfo);
     }
     
     public static void diffMergeInfo(Map deleted, Map added, Map from, Map to) {
