@@ -45,7 +45,6 @@ import org.tmatesoft.svn.core.internal.wc.SVNAdminUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNCancellableOutputStream;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.internal.wc.SVNEventFactory;
-import org.tmatesoft.svn.core.internal.wc.SVNExternalInfo;
 import org.tmatesoft.svn.core.internal.wc.SVNFileListUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNFileType;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
@@ -2791,11 +2790,7 @@ public class SVNWCClient extends SVNBasicClient {
                 value += "\n";
             }
             if (SVNProperty.EXTERNALS.equals(name)) {
-                SVNExternalInfo[] externalInfos = SVNWCAccess.parseExternals("", value);
-                for (int i = 0; externalInfos != null && i < externalInfos.length; i++) {
-                    String path = externalInfos[i].getPath();
-                    SVNExternalInfo.checkPath(path);
-                }
+                SVNWCAccess.parseExternals("", value);
             }
         } else if (SVNProperty.KEYWORDS.equals(name)) {
             value = value.trim();

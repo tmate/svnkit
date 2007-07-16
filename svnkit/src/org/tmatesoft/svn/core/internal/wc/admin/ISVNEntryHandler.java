@@ -9,32 +9,22 @@
  * newer version instead, at your option.
  * ====================================================================
  */
-package org.tmatesoft.svn.core;
+package org.tmatesoft.svn.core.internal.wc.admin;
 
-import java.util.Map;
+import java.io.File;
+
+import org.tmatesoft.svn.core.SVNErrorMessage;
+import org.tmatesoft.svn.core.SVNException;
+
 
 /**
  * @version 1.1.2
  * @author  TMate Software Ltd.
  */
-public class SVNMergeInfo {
-    private String myPath;
-    private Map myMergeSrcPathsToRangeLists;
-
-    public SVNMergeInfo(String path, Map srcsToRangeLists) {
-        myPath = path;
-        myMergeSrcPathsToRangeLists = srcsToRangeLists;
-    }
-
-    public String getPath() {
-        return myPath;
-    }
+public interface ISVNEntryHandler {
     
-    /**
-     * keys are String paths, values - SVNMergeRange[]
-     */
-    public Map getMergeSourcesToMergeLists() {
-        return myMergeSrcPathsToRangeLists;
-    }
+    public void handleEntry(File path, SVNEntry entry, SVNAdminArea adminArea) throws SVNException;
+    
+    public void handleError(File path, SVNErrorMessage error) throws SVNException; 
 
 }

@@ -695,5 +695,4 @@ public class SVNWCManager {
         log.logChangedEntryProperties(fileName, entryProps);
         log.logChangedWCProperties(fileName, wcProps);
     }
-
 }
