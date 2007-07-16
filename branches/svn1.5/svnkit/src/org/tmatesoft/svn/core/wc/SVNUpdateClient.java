@@ -322,6 +322,25 @@ public class SVNUpdateClient extends SVNBasicClient {
                 handleExternals(info);
                 dispatchEvent(SVNEventFactory.createUpdateCompletedEvent(info, editor.getTargetRevision()));
             }
+            
+            SVNAdminArea pathAdminArea = wcAccess.probeRetrieve(file);
+            Map childrenMergeInfo = null;
+            try {
+                childrenMergeInfo = SVNPropertiesManager.getWorkingCopyPropertyValues(pathAdminArea, 
+                                                                                      file.equals(pathAdminArea.getRoot()) ? 
+                                                                                      pathAdminArea.getThisDirName() :
+                                                                                      file.getName(), 
+                                                                                      SVNProperty.MERGE_INFO, 
+                                                                                      true, false);
+            } catch (SVNException svne) {
+                if (svne.getErrorMessage().getErrorCode() != SVNErrorCode.UNVERSIONED_RESOURCE) {
+                    throw svne;
+                }
+                return editor.getTargetRevision();
+            }
+            
+            elideMergeInfoForTree(wcAccess, childrenMergeInfo);
+            
             return editor.getTargetRevision();
         } finally {
             wcAccess.close();

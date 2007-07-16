@@ -33,7 +33,6 @@ import org.tmatesoft.svn.core.SVNDepth;
 import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
-import org.tmatesoft.svn.core.SVNMergeInfo;
 import org.tmatesoft.svn.core.SVNNodeKind;
 import org.tmatesoft.svn.core.SVNProperty;
 import org.tmatesoft.svn.core.internal.util.SVNEncodingUtil;
@@ -497,7 +496,7 @@ public abstract class SVNAdminArea {
                         if (SVNProperty.MERGE_INFO.equals(propName)) {
                             Map addedMergeInfo = new TreeMap();
                             SVNMergeInfoManager.diffMergeInfoProperties(null, addedMergeInfo, fromValue, null, toValue, null);
-                            toValue = SVNMergeInfo.formatMergeInfoToString(addedMergeInfo);
+                            toValue = SVNMergeInfoManager.formatMergeInfoToString(addedMergeInfo);
                             //TODO: ?
 //                            working.setPropertyValue(propName, toValue);
 //                            result = result != SVNStatusType.CONFLICTED && isNormal ? SVNStatusType.MERGED : result;
@@ -516,7 +515,7 @@ public abstract class SVNAdminArea {
                         if (SVNProperty.MERGE_INFO.equals(propName)) {
                             Map addedMergeInfo = new TreeMap();
                             SVNMergeInfoManager.diffMergeInfoProperties(null, addedMergeInfo, fromValue, null, workingValue, null);
-                            toValue = SVNMergeInfo.formatMergeInfoToString(addedMergeInfo);
+                            toValue = SVNMergeInfoManager.formatMergeInfoToString(addedMergeInfo);
                             //TODO: ?
 //                            working.setPropertyValue(propName, toValue);
 //                            result = result != SVNStatusType.CONFLICTED && isNormal ? SVNStatusType.MERGED : result;
@@ -1540,6 +1539,80 @@ public abstract class SVNAdminArea {
         }
     }
 
+    public void walkEntries(String name, ISVNEntryHandler handler, boolean showHidden, boolean recursive) throws SVNException {
+        File path = getFile(name);
+        SVNEntry entry = getEntry(name, showHidden);
+        if (entry == null) {
+            handler.handleError(path, SVNErrorMessage.create(SVNErrorCode.UNVERSIONED_RESOURCE, "''{0}'' is not under version control", path));
+            return;
+        }
+        if (entry.isFile()) {
+            try {
+                handler.handleEntry(path, entry, this);
+            } catch (SVNException svne) {
+                handler.handleError(path, svne.getErrorMessage());
+            }
+            return;
+        } 
+
+        if (getThisDirName().equals(name)) {
+            try {
+                walkThisDirectory(handler, showHidden, recursive);
+            } catch (SVNException svne) {
+                handler.handleError(path, svne.getErrorMessage());
+            }
+        }
+    }
+    
+    private void walkThisDirectory(ISVNEntryHandler handler, boolean showHidden, boolean recursive) throws SVNException {
+        File thisDir = getFile("");
+        
+        SVNEntry thisEntry = getEntry(getThisDirName(), showHidden);
+        if (thisEntry == null) {
+            handler.handleError(thisDir, SVNErrorMessage.create(SVNErrorCode.ENTRY_NOT_FOUND, "Directory ''{0}'' has no THIS_DIR entry", thisDir));
+            return;
+        }
+        
+        try {
+            handler.handleEntry(thisDir, thisEntry, this);
+        } catch (SVNException svne) {
+            handler.handleError(thisDir, svne.getErrorMessage());
+        }
+        
+        if (!recursive) {
+            return;
+        }
+        
+        for (Iterator entries = entries(showHidden); entries.hasNext();) {
+            getWCAccess().checkCancelled();
+
+            SVNEntry entry = (SVNEntry) entries.next();
+            if (getThisDirName().equals(entry.getName())) {
+                continue;
+            }
+
+            File childPath = getFile(entry.getName()); 
+            if (entry.isFile()) {
+                try {
+                    handler.handleEntry(childPath, entry, this);
+                } catch (SVNException svne) {
+                    handler.handleError(childPath, svne.getErrorMessage());
+                }
+                
+            } else if (entry.isDirectory()) {
+                SVNAdminArea childArea = null;
+                try {
+                    childArea = getWCAccess().retrieve(childPath);
+                } catch (SVNException svne) {
+                    handler.handleError(childPath, svne.getErrorMessage());
+                }
+                if (childArea != null) {
+                    childArea.walkThisDirectory(handler, showHidden, recursive);
+                }
+            }
+        }
+    }
+    
     public void setCommitParameters(ISVNCommitParameters commitParameters) {
         myCommitParameters = commitParameters;
     }

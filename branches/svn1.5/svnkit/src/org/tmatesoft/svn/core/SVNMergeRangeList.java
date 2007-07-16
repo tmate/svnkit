@@ -26,7 +26,7 @@ public class SVNMergeRangeList {
     private SVNMergeRange[] myRanges;
     
     public SVNMergeRangeList(SVNMergeRange[] ranges) {
-        myRanges = ranges;
+        myRanges = ranges == null ? new SVNMergeRange[0] : ranges;
     }
     
     public SVNMergeRange[] getRanges() {

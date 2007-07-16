@@ -12,17 +12,26 @@
 package org.tmatesoft.svn.core.internal.wc;
 
 import java.io.File;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.Map;
 import java.util.TreeMap;
 
+import org.tmatesoft.svn.core.SVNErrorCode;
+import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNMergeInfo;
 import org.tmatesoft.svn.core.SVNMergeInfoInheritance;
+import org.tmatesoft.svn.core.SVNMergeRange;
 import org.tmatesoft.svn.core.SVNMergeRangeList;
+import org.tmatesoft.svn.core.SVNProperty;
 import org.tmatesoft.svn.core.internal.io.fs.FSRevisionRoot;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
+import org.tmatesoft.svn.core.internal.wc.admin.SVNWCAccess;
 
 
 /**
@@ -190,16 +199,16 @@ public class SVNMergeInfoManager {
     }
     
     public static String combineMergeInfoProperties(String propValue1, String propValue2) throws SVNException {
-        Map srcsToRanges1 = SVNMergeInfo.parseMergeInfo(new StringBuffer(propValue1), null);
-        Map srcsToRanges2 = SVNMergeInfo.parseMergeInfo(new StringBuffer(propValue2), null);
+        Map srcsToRanges1 = parseMergeInfo(new StringBuffer(propValue1), null);
+        Map srcsToRanges2 = parseMergeInfo(new StringBuffer(propValue2), null);
         srcsToRanges1 = mergeMergeInfos(srcsToRanges1, srcsToRanges2);
-        return SVNMergeInfo.formatMergeInfoToString(srcsToRanges1);
+        return formatMergeInfoToString(srcsToRanges1);
     }
     
     public static String combineForkedMergeInfoProperties(String fromPropValue, String workingPropValue, String toPropValue) throws SVNException {
         Map leftDeleted = new TreeMap();
         Map leftAdded = new TreeMap();
-        Map fromMergeInfo = SVNMergeInfo.parseMergeInfo(new StringBuffer(fromPropValue), null);
+        Map fromMergeInfo = parseMergeInfo(new StringBuffer(fromPropValue), null);
         diffMergeInfoProperties(leftDeleted, leftAdded, null, fromMergeInfo, workingPropValue, null);
         
         Map rightDeleted = new TreeMap();
@@ -210,16 +219,16 @@ public class SVNMergeInfoManager {
         fromMergeInfo = mergeMergeInfos(fromMergeInfo, leftAdded);
         Map result = new TreeMap();
         walkMergeInfoHashForDiff(result, null, fromMergeInfo, leftDeleted);
-        return SVNMergeInfo.formatMergeInfoToString(result);
+        return formatMergeInfoToString(result);
     }
     
     public static void diffMergeInfoProperties(Map deleted, Map added, String fromPropValue, Map fromMergeInfo, String toPropValue, Map toMergeInfo) throws SVNException {
         if (fromPropValue.equals(toPropValue)) {
             return;
         } 
-        fromMergeInfo = fromMergeInfo == null ? SVNMergeInfo.parseMergeInfo(new StringBuffer(fromPropValue), null) 
+        fromMergeInfo = fromMergeInfo == null ? parseMergeInfo(new StringBuffer(fromPropValue), null) 
                                               : fromMergeInfo;
-        toMergeInfo = toMergeInfo == null ? SVNMergeInfo.parseMergeInfo(new StringBuffer(toPropValue), null) 
+        toMergeInfo = toMergeInfo == null ? parseMergeInfo(new StringBuffer(toPropValue), null) 
                                           : toMergeInfo;
         diffMergeInfo(deleted, added, fromMergeInfo, toMergeInfo);
     }
@@ -228,12 +237,243 @@ public class SVNMergeInfoManager {
         from = from == null ? Collections.EMPTY_MAP : from;
         to = to == null ? Collections.EMPTY_MAP : to;
         if (!from.isEmpty() && to.isEmpty()) {
-            SVNMergeInfo.dupMergeInfo(from, deleted);
+            dupMergeInfo(from, deleted);
         } else if (from.isEmpty() && !to.isEmpty()) {
-            SVNMergeInfo.dupMergeInfo(to, added);
+            dupMergeInfo(to, added);
         } else if (!from.isEmpty() && !to.isEmpty()) {
             walkMergeInfoHashForDiff(deleted, added, from, to);
         }
+    }
+    
+    public static Map dupMergeInfo(Map srcsToRangeLists, Map target) {
+        if (srcsToRangeLists == null) {
+            return null;
+        }
+        target = target == null ? new TreeMap() : target;
+        for (Iterator paths = srcsToRangeLists.keySet().iterator(); paths.hasNext();) {
+            String path = (String) paths.next();
+            SVNMergeRangeList rangeList = (SVNMergeRangeList) srcsToRangeLists.get(path);
+            target.put(path, rangeList.dup());
+        }
+        return target;
+    }
+    
+    public static Map parseMergeInfo(StringBuffer mergeInfo, Map srcPathsToRangeLists) throws SVNException {
+        srcPathsToRangeLists = srcPathsToRangeLists == null ? new TreeMap() : srcPathsToRangeLists;
+        int ind = mergeInfo.indexOf(":");
+        if (ind == -1) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.MERGE_INFO_PARSE_ERROR, "Pathname not terminated by ':'");
+            SVNErrorManager.error(err);
+        }
+        String path = mergeInfo.substring(0, ind);
+        mergeInfo = mergeInfo.delete(0, ind + 1);
+        SVNMergeRange[] ranges = parseRanges(mergeInfo);
+        if (mergeInfo.length() != 0 && mergeInfo.charAt(0) != '\n') {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.MERGE_INFO_PARSE_ERROR, "Could not find end of line in range list line in ''{0}''", mergeInfo);
+            SVNErrorManager.error(err);
+        }
+        if (mergeInfo.length() > 0) {
+            mergeInfo = mergeInfo.deleteCharAt(0);
+        }
+        Arrays.sort(ranges);
+        srcPathsToRangeLists.put(path, new SVNMergeRangeList(ranges));
+        return srcPathsToRangeLists;
+    }
+
+    /**
+     * Each element of the resultant array is formed like this:
+     * %s:%ld-%ld,.. where the first %s is a merge src path 
+     * and %ld-%ld is startRev-endRev merge range.
+     */
+    public static String[] formatMergeInfoToArray(Map srcsToRangeLists) {
+        srcsToRangeLists = srcsToRangeLists == null ? Collections.EMPTY_MAP : srcsToRangeLists;
+        String[] pathRanges = new String[srcsToRangeLists.size()];
+        int k = 0;
+        for (Iterator paths = srcsToRangeLists.keySet().iterator(); paths.hasNext();) {
+            String path = (String) paths.next();
+            SVNMergeRangeList rangeList = (SVNMergeRangeList) srcsToRangeLists.get(path);
+            String output = path + ':' + rangeList;  
+            pathRanges[k++] = output;
+        }
+        return pathRanges;
+    }
+
+    public static String formatMergeInfoToString(Map srcsToRangeLists) {
+        String[] infosArray = formatMergeInfoToArray(srcsToRangeLists);
+        String result = "";
+        for (int i = 0; i < infosArray.length; i++) {
+            result += infosArray[i];
+            if (i < infosArray.length - 1) {
+                result += '\n';
+            }
+        }
+        return result;
+    }
+
+    public static void elideMergeInfo(Map parentMergeInfo, Map childMergeInfo, File path, 
+                                      String pathSuffix, SVNWCAccess access) throws SVNException {
+        if (childMergeInfo.isEmpty()) {
+            return;
+        }
+        
+        boolean noElide = true;
+        boolean elidePartially = false;
+        boolean elideFull = false;
+        
+        Map mergeInfo = parentMergeInfo;
+        if (pathSuffix != null && !parentMergeInfo.isEmpty()) {
+            mergeInfo = new TreeMap();
+            for (Iterator paths = parentMergeInfo.keySet().iterator(); paths.hasNext();) {
+                String mergeSrcPath = (String) paths.next();
+                mergeInfo.put(SVNPathUtil.concatToAbs(mergeSrcPath, pathSuffix), parentMergeInfo.get(mergeSrcPath));
+            }
+        } 
+        
+        Map childEmptyMergeInfo = new HashMap();
+        Map childNonEmptyMergeInfo = new TreeMap();
+        fillEmptyRangeListsUniqueToChild(childEmptyMergeInfo, childNonEmptyMergeInfo, 
+                                         childMergeInfo, mergeInfo);
+        
+        if (!childEmptyMergeInfo.isEmpty()) {
+            noElide = false;
+            if (childNonEmptyMergeInfo.isEmpty()) {
+                elideFull = true;
+            } else {
+                elidePartially = true;
+            }
+        }
+        
+        if (noElide && !mergeInfo.isEmpty()) {
+            Map parentNonEmptyMergeInfo = new TreeMap();
+            fillEmptyRangeListsUniqueToChild(null, parentNonEmptyMergeInfo, 
+                                             mergeInfo, childMergeInfo);
+            if (mergeInfoEquals(parentNonEmptyMergeInfo, childMergeInfo)) {
+                noElide = false;
+                elideFull = true;
+            }
+        }
+        
+        if (!elideFull && !mergeInfo.isEmpty()) {
+            if (mergeInfoEquals(childNonEmptyMergeInfo, mergeInfo)) {
+                elideFull = true;
+                noElide = elidePartially = false;
+            }
+        }
+        
+        if (elideFull) {
+            SVNPropertiesManager.setProperty(access, path, SVNProperty.MERGE_INFO, null, true);
+        } else if (elidePartially) {
+            String value = childNonEmptyMergeInfo.isEmpty() ? 
+                                            null : formatMergeInfoToString(childNonEmptyMergeInfo);
+            SVNPropertiesManager.setProperty(access, path, SVNProperty.MERGE_INFO, value, true);
+        }
+    }
+    
+    public static boolean mergeInfoEquals(Map mergeInfo1, Map mergeInfo2) {
+        if (mergeInfo1.size() == mergeInfo2.size()) {
+            Map deleted = new HashMap();
+            Map added = new HashMap();
+            diffMergeInfo(deleted, added, mergeInfo1, mergeInfo2);
+            return deleted.isEmpty() && added.isEmpty();
+        }
+        return false;
+    }
+    
+    private static void fillEmptyRangeListsUniqueToChild(Map emptyRangeMergeInfo, 
+                                                        Map nonEmptyRangeMergeInfo, 
+                                                        Map childMergeInfo, 
+                                                        Map parentMergeInfo) {
+        for (Iterator paths = childMergeInfo.keySet().iterator(); paths.hasNext();) {
+            String childPath = (String) paths.next();
+            SVNMergeRangeList childRangeList = (SVNMergeRangeList) childMergeInfo.get(childPath);
+            if (childRangeList.getSize() == 0 && (parentMergeInfo.isEmpty() || 
+                !parentMergeInfo.containsKey(childPath))) {
+                if (emptyRangeMergeInfo != null) {
+                    emptyRangeMergeInfo.put(childPath, childRangeList.dup());
+                }
+            } else {
+                if (nonEmptyRangeMergeInfo != null) {
+                    nonEmptyRangeMergeInfo.put(childPath, childRangeList.dup());
+                }
+            }
+        }
+    }
+    
+    private static SVNMergeRange[] parseRanges(StringBuffer mergeInfo) throws SVNException {
+        Collection ranges = new LinkedList();
+        while (mergeInfo.length() > 0 && mergeInfo.charAt(0) != '\n' && 
+                Character.isWhitespace(mergeInfo.charAt(0))) {
+            mergeInfo = mergeInfo.deleteCharAt(0);
+        }
+        if (mergeInfo.length() == 0 || mergeInfo.charAt(0) == '\n') {
+            return null;
+        }
+        
+        SVNMergeRange lastRange = null;
+        while (mergeInfo.length() > 0 && mergeInfo.charAt(0) != '\n') {
+            long startRev = parseRevision(mergeInfo);
+            if (mergeInfo.length() > 0 && mergeInfo.charAt(0) != '\n' && 
+                mergeInfo.charAt(0) != '-' && mergeInfo.charAt(0) != ',') {
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.MERGE_INFO_PARSE_ERROR, 
+                                                             "Invalid character ''{0}'' found in revision list", 
+                                                             new Character(mergeInfo.charAt(0)));
+                SVNErrorManager.error(err);
+            }
+            
+            SVNMergeRange range = new SVNMergeRange(startRev, startRev);
+            if (mergeInfo.length() > 0 && mergeInfo.charAt(0) == '-') {
+                mergeInfo = mergeInfo.deleteCharAt(0);
+                long endRev = parseRevision(mergeInfo);
+                range.setEndRevision(endRev);
+            }
+            if (mergeInfo.length() == 0 || mergeInfo.charAt(0) == '\n') {
+                SVNMergeRange combinedRange = lastRange == null ? range : 
+                                                                  lastRange.combine(range, false);
+                if (lastRange != combinedRange) {
+                    lastRange = combinedRange;
+                    ranges.add(lastRange);
+                }
+                return (SVNMergeRange[]) ranges.toArray(new SVNMergeRange[ranges.size()]);
+            } else if (mergeInfo.length() > 0 && mergeInfo.charAt(0) == ',') {
+                SVNMergeRange combinedRange = lastRange == null ? range :
+                                                                  lastRange.combine(range, false);
+                if (lastRange != combinedRange) {
+                    lastRange = combinedRange;
+                    ranges.add(lastRange);
+                }
+                mergeInfo = mergeInfo.deleteCharAt(0);
+            } else {
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.MERGE_INFO_PARSE_ERROR, 
+                                                             "Invalid character ''{0}'' found in range list", 
+                                                             mergeInfo.length() > 0 ?  mergeInfo.charAt(0) + "" : "");
+                SVNErrorManager.error(err);
+            }
+        }
+        
+        if (mergeInfo.length() == 0 || mergeInfo.charAt(0) != '\n' ) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.MERGE_INFO_PARSE_ERROR, "Range list parsing ended before hitting newline");
+            SVNErrorManager.error(err);
+        }
+        
+        return (SVNMergeRange[]) ranges.toArray(new SVNMergeRange[ranges.size()]);
+    }
+
+    private static long parseRevision(StringBuffer mergeInfo) throws SVNException {
+        int ind = 0;
+        while (ind < mergeInfo.length() && Character.isDigit(mergeInfo.charAt(ind))) {
+            ind++;
+        }
+        
+        if (ind == 0) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.MERGE_INFO_PARSE_ERROR, 
+                                                         "Invalid revision number found parsing ''{0}''", 
+                                                         mergeInfo.length() > 0 ? mergeInfo.charAt(0) + "" : "");
+            SVNErrorManager.error(err);
+        }
+        
+        String numberStr = mergeInfo.substring(0, ind);
+        mergeInfo = mergeInfo.delete(0, ind);
+        return Long.parseLong(numberStr);
     }
     
     private static void walkMergeInfoHashForDiff(Map deleted, Map added, Map from, Map to) {
