@@ -327,6 +327,17 @@ public class FSTransactionRoot extends FSRoot {
         }
     }
 
+    public void setTxnMergeInfo(String name, String value) throws SVNException {
+        FSFS fs = getOwner(); 
+        Map txnMergeInfo = fs.getTransactionMergeInfo(myTxnID);
+        txnMergeInfo.put(name, value);
+        File txnMergeInfoFile = fs.getTransactionMergeInfoFile(myTxnID);
+        SVNProperties.setProperties(txnMergeInfo, txnMergeInfoFile, 
+                                    SVNFileUtil.createUniqueFile(txnMergeInfoFile.getParentFile(), 
+                                                                 "mergeinfo", ".tmp"), 
+                                    SVNProperties.SVN_HASH_TERMINATOR);
+    }
+    
     public FSID createSuccessor(FSID oldId, FSRevisionNode newRevNode, String copyId) throws SVNException {
         if (copyId == null) {
             copyId = oldId.getCopyID();

@@ -226,6 +226,10 @@ public class FSCommitEditor implements ISVNEditor {
                 continue;
             }
 
+            if (propName.equals(SVNProperty.MERGE_INFO)) {
+                
+            }
+            
             if (propValue == null) {
                 properties.remove(propName);
             } else {

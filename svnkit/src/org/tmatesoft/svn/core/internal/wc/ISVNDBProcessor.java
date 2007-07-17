@@ -15,6 +15,7 @@ import java.io.File;
 import java.util.Map;
 
 import org.tmatesoft.svn.core.SVNException;
+import org.tmatesoft.svn.core.SVNMergeRange;
 
 
 /**
@@ -33,5 +34,12 @@ public interface ISVNDBProcessor {
 
     public Map getMergeInfoForChildren(String path, long revision, Map mergeInfo) throws SVNException;
         
+    public void beginTransaction() throws SVNException;
+    
+    public void commitTransaction() throws SVNException;
 
+    public void cleanUpFailedTransactionsInfo(long revision) throws SVNException;
+
+    public void insertMergeInfo(long revision, String mergedFrom, String mergedTo, SVNMergeRange[] ranges) throws SVNException;
+    
 }
