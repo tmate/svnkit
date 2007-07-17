@@ -39,7 +39,17 @@ import org.tmatesoft.svn.core.wc.SVNRevision;
 public class SVNSQLiteDBProcessor implements ISVNDBProcessor {
     protected static final int MERGE_INFO_INDEX_SCHEMA_FORMAT = 1;
     protected static final String MERGEINFO_DB_NAME = "mergeinfo.db";
-
+    private static boolean OUR_HAS_DRIVER;
+    
+    static {
+        try {
+            Class.forName("org.sqlite.JDBC");
+            OUR_HAS_DRIVER = true;
+        } catch (ClassNotFoundException e) {
+            OUR_HAS_DRIVER = false;
+        }
+    }
+    
     private static String[] CREATE_TABLES_COMMANDS = { 
         "PRAGMA auto_vacuum = 1;",
         "CREATE TABLE mergeinfo (revision INTEGER NOT NULL, mergedfrom TEXT NOT " +
@@ -60,10 +70,11 @@ public class SVNSQLiteDBProcessor implements ISVNDBProcessor {
     private File myDBFile;
     private String myDBPath; 
     private Connection myConnection;
-    private PreparedStatement myUserVersionStatement;
     private PreparedStatement mySinglePathSelectFromMergeInfoChangedStatement;
     private PreparedStatement mySelectMergeInfoStatement;
     private PreparedStatement myPathLikeSelectFromMergeInfoChangedStatement;
+    private PreparedStatement myInsertToMergeInfoTableStatement;
+    private PreparedStatement myInsertToMergeInfoChangedTableStatement;
     
     public void openDB(File dbDir) throws SVNException {
         if (myDBDirectory == null || !myDBDirectory.equals(dbDir)) {
@@ -85,10 +96,6 @@ public class SVNSQLiteDBProcessor implements ISVNDBProcessor {
         if (myConnection != null) {
             try {
                 myConnection.close();
-                if (myUserVersionStatement != null) {
-                    myUserVersionStatement.close();
-                    myUserVersionStatement = null;
-                }
                 if (mySinglePathSelectFromMergeInfoChangedStatement != null) {
                     mySinglePathSelectFromMergeInfoChangedStatement.close();
                     mySinglePathSelectFromMergeInfoChangedStatement = null;
@@ -100,6 +107,10 @@ public class SVNSQLiteDBProcessor implements ISVNDBProcessor {
                 if (mySelectMergeInfoStatement != null) {
                     mySelectMergeInfoStatement.close();
                     mySelectMergeInfoStatement = null;
+                }
+                if (myInsertToMergeInfoTableStatement != null) {
+                    myInsertToMergeInfoTableStatement.close();
+                    myInsertToMergeInfoTableStatement = null;
                 }
             } catch (SQLException sqle) {
                 SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_SQLITE_ERROR, sqle.getLocalizedMessage());
@@ -186,6 +197,69 @@ public class SVNSQLiteDBProcessor implements ISVNDBProcessor {
         return parentMergeInfo;
     }
 
+    public void beginTransaction() throws SVNException {
+        Connection connection = getConnection();
+        try {
+            Statement stmt = connection.createStatement();
+            stmt.execute("BEGIN TRANSACTION;");
+            stmt.close();
+        } catch (SQLException sqle) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_SQLITE_ERROR, sqle.getLocalizedMessage());
+            SVNErrorManager.error(err, sqle);
+        }
+    }
+
+    public void commitTransaction() throws SVNException {
+        Connection connection = getConnection();
+        try {
+            Statement stmt = connection.createStatement();
+            stmt.execute("COMMIT TRANSACTION;");
+            stmt.close();
+        } catch (SQLException sqle) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_SQLITE_ERROR, sqle.getLocalizedMessage());
+            SVNErrorManager.error(err, sqle);
+        }
+    }
+
+    public void cleanUpFailedTransactionsInfo(long revision) throws SVNException {
+        Connection connection = getConnection();
+        try {
+            Statement stmt = connection.createStatement();
+            stmt.executeUpdate("DELETE FROM mergeinfo_changed WHERE revision = " + revision + ";");
+            stmt.executeUpdate("DELETE FROM mergeinfo WHERE revision = " + revision + ";");
+            stmt.close();
+        } catch (SQLException sqle) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_SQLITE_ERROR, sqle.getLocalizedMessage());
+            SVNErrorManager.error(err, sqle);
+        }
+    }
+
+    public void insertMergeInfo(long revision, String mergedFrom, String mergedTo, 
+                                SVNMergeRange[] ranges) throws SVNException {
+        PreparedStatement insertIntoMergeInfoTableStmt = createInsertToMergeInfoTableStatement();
+        PreparedStatement insertIntoMergeInfoChangedTableStmt = 
+                                                     createInsertToMergeInfoChangedTableStatement(); 
+        try {
+            insertIntoMergeInfoTableStmt.setLong(1, revision);
+            insertIntoMergeInfoTableStmt.setString(2, mergedFrom);
+            insertIntoMergeInfoTableStmt.setString(3, mergedTo);
+            for (int i = 0; i < ranges.length; i++) {
+                SVNMergeRange range = ranges[i];
+                insertIntoMergeInfoTableStmt.setLong(4, range.getStartRevision());
+                insertIntoMergeInfoTableStmt.setLong(5, range.getEndRevision());
+                insertIntoMergeInfoTableStmt.execute();
+            }
+            
+            insertIntoMergeInfoChangedTableStmt.setLong(1, revision);
+            insertIntoMergeInfoChangedTableStmt.setString(2, mergedTo);
+            insertIntoMergeInfoChangedTableStmt.execute();
+        } catch (SQLException sqle) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_SQLITE_ERROR, 
+                                                         sqle.getLocalizedMessage());
+            SVNErrorManager.error(err, sqle);
+        }
+    }
+
     private void createMergeInfoTables() throws SVNException {
         Connection connection = getConnection();
         try {
@@ -194,6 +268,7 @@ public class SVNSQLiteDBProcessor implements ISVNDBProcessor {
                 stmt.addBatch(CREATE_TABLES_COMMANDS[i]);
             }
             stmt.executeBatch();
+            stmt.close();
         } catch (SQLException sqle) {
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_SQLITE_ERROR, sqle.getLocalizedMessage());
             SVNErrorManager.error(err, sqle);
@@ -207,9 +282,11 @@ public class SVNSQLiteDBProcessor implements ISVNDBProcessor {
     }
     
     private void checkFormat() throws SVNException {
-        PreparedStatement userVersionStatement = createUserVersionStatement();
+        Connection connection = getConnection();
+        Statement stmt = null;
         try {
-            ResultSet result = userVersionStatement.executeQuery();
+            stmt = connection.createStatement();
+            ResultSet result = stmt.executeQuery("PRAGMA user_version;");
             if (result.next()) {
                 int schemaFormat = result.getInt(1);
                 if (schemaFormat == MERGE_INFO_INDEX_SCHEMA_FORMAT) {
@@ -228,20 +305,41 @@ public class SVNSQLiteDBProcessor implements ISVNDBProcessor {
         } catch (SQLException sqle) {
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_SQLITE_ERROR, sqle.getLocalizedMessage());
             SVNErrorManager.error(err, sqle);
+        } finally {
+            if (stmt != null) {
+                try {
+                    stmt.close();
+                } catch (SQLException sqle) {
+                    //
+                }
+            }
         }
     }
     
-    private PreparedStatement createUserVersionStatement() throws SVNException {
-        if (myUserVersionStatement == null) {
+    private PreparedStatement createInsertToMergeInfoTableStatement() throws SVNException {
+        if (myInsertToMergeInfoTableStatement == null) {
             Connection connection = getConnection();
             try {
-                myUserVersionStatement = connection.prepareStatement("PRAGMA user_version;");
+                myInsertToMergeInfoTableStatement = connection.prepareStatement("INSERT INTO mergeinfo (revision, mergedfrom, mergedto, mergedrevstart, mergedrevend) VALUES (?, ?, ?, ?, ?);");
             } catch (SQLException sqle) {
                 SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_SQLITE_ERROR, sqle.getLocalizedMessage());
                 SVNErrorManager.error(err, sqle);
             }
         }
-        return myUserVersionStatement;
+        return myInsertToMergeInfoTableStatement;
+    }
+
+    private PreparedStatement createInsertToMergeInfoChangedTableStatement() throws SVNException {
+        if (myInsertToMergeInfoChangedTableStatement == null) {
+            Connection connection = getConnection();
+            try {
+                myInsertToMergeInfoChangedTableStatement = connection.prepareStatement("INSERT INTO mergeinfo_changed (revision, path) VALUES (?, ?);");
+            } catch (SQLException sqle) {
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_SQLITE_ERROR, sqle.getLocalizedMessage());
+                SVNErrorManager.error(err, sqle);
+            }
+        }
+        return myInsertToMergeInfoChangedTableStatement;
     }
 
     private PreparedStatement createPathLikeSelectFromMergeInfoChangedStatement() throws SVNException {
@@ -284,14 +382,11 @@ public class SVNSQLiteDBProcessor implements ISVNDBProcessor {
     }
 
     private Connection getConnection() throws SVNException {
+        if (!OUR_HAS_DRIVER) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_SQLITE_ERROR, "No sqlite driver found");
+            SVNErrorManager.error(err);
+        }
         if (myConnection == null) {
-            try {
-                Class.forName("org.sqlite.JDBC");
-            } catch (ClassNotFoundException e) {
-                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_SQLITE_ERROR, e.getLocalizedMessage());
-                SVNErrorManager.error(err, e);
-            }
-
             try {
                 myConnection = DriverManager.getConnection("jdbc:sqlite:" + myDBPath);
             } catch (SQLException sqle) {

@@ -15,6 +15,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.LinkedList;
 
+import org.tmatesoft.svn.core.io.SVNRepository;
 import org.tmatesoft.svn.util.SVNDebugLog;
 
 
@@ -23,6 +24,12 @@ import org.tmatesoft.svn.util.SVNDebugLog;
  * @author  TMate Software Ltd.
  */
 public class SVNMergeRangeList {
+    
+    public static SVNMergeRangeList EMPTY_RANGE_LIST = new SVNMergeRangeList(new SVNMergeRange[] {
+                                                       new SVNMergeRange(SVNRepository.INVALID_REVISION, 
+                                                                         SVNRepository.INVALID_REVISION)
+                                                       });
+    
     private SVNMergeRange[] myRanges;
     
     public SVNMergeRangeList(SVNMergeRange[] ranges) {

@@ -53,6 +53,7 @@ public class FSFS {
 
     public static final String SVN_REPOS_DB_DIR = "db";
     public static final String TXN_PATH_EXT = ".txn";
+    public static final String TXN_MERGEINFO_PATH = "mergeinfo";
     public static final String TXN_PATH_EXT_CHILDREN = ".children";
     public static final String PATH_PREFIX_NODE = "node.";
     public static final String TXN_PATH_EXT_PROPS = ".props";
@@ -94,7 +95,7 @@ public class FSFS {
     
     public FSFS(File repositoryRoot) {
         myRepositoryRoot = repositoryRoot;
-        myDBRoot = new File(myRepositoryRoot, "db");
+        myDBRoot = new File(myRepositoryRoot, SVN_REPOS_DB_DIR);
         myRevisionsRoot = new File(myDBRoot, "revs");
         myRevisionPropertiesRoot = new File(myDBRoot, "revprops");
         myTransactionsRoot = new File(myDBRoot, "transactions");
@@ -475,7 +476,7 @@ public class FSFS {
         return result;
     }
 
-    public File getNewRevisionFile(long newRevision) throws SVNException {
+    public File getNewRevisionFile(long newRevision) {
         if (myMaxFilesPerDirectory > 0 && (newRevision % myMaxFilesPerDirectory == 0)) {
             File shardDir = new File(myRevisionsRoot, String.valueOf(newRevision/myMaxFilesPerDirectory));
             shardDir.mkdirs();
@@ -488,15 +489,10 @@ public class FSFS {
         } else {
             revFile = new File(myRevisionsRoot, String.valueOf(newRevision));
         }
-        
-        if (revFile.exists()) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_CONFLICT, "Revision already exists");
-            SVNErrorManager.error(err);
-        }
         return revFile;
     }
 
-    public File getNewRevisionPropertiesFile(long newRevision) throws SVNException {
+    public File getNewRevisionPropertiesFile(long newRevision) {
         if (myMaxFilesPerDirectory > 0 && (newRevision % myMaxFilesPerDirectory == 0)) {
             File shardDir = new File(myRevisionPropertiesRoot, String.valueOf(newRevision/myMaxFilesPerDirectory));
             shardDir.mkdirs();
@@ -508,11 +504,6 @@ public class FSFS {
             revPropsFile = new File(shardDir, String.valueOf(newRevision));
         } else {
             revPropsFile = new File(myRevisionPropertiesRoot, String.valueOf(newRevision));
-        }
-
-        if (revPropsFile.exists()) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_CONFLICT, "Revision already exists");
-            SVNErrorManager.error(err);
         }
         return revPropsFile;
     }
@@ -615,6 +606,19 @@ public class FSFS {
 
     public File getTransactionPropertiesFile(String txnID) {
         return new File(getTransactionDir(txnID), "props");
+    }
+
+    public Map getTransactionMergeInfo(String txnID) throws SVNException {
+        FSFile txnMergeInfoFile = new FSFile(getTransactionMergeInfoFile(txnID));
+        try {
+            return txnMergeInfoFile.readProperties(false);
+        } finally {
+            txnMergeInfoFile.close();
+        }
+    }
+
+    public File getTransactionMergeInfoFile(String txnID) {
+        return new File(getTransactionDir(txnID), TXN_MERGEINFO_PATH);
     }
 
     public void createNewTxnNodeRevisionFromRevision(String txnID, FSRevisionNode sourceNode) throws SVNException {

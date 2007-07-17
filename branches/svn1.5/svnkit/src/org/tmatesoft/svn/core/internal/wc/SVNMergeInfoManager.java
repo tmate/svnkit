@@ -53,6 +53,20 @@ public class SVNMergeInfoManager {
         }
     }
     
+    public void updateIndex(File dbDirectory, long newRevision, Map mergeInfo) throws SVNException {
+        try {
+            myDBProcessor.openDB(dbDirectory);
+            myDBProcessor.beginTransaction();
+            myDBProcessor.cleanUpFailedTransactionsInfo(newRevision);
+            if (mergeInfo != null) {
+                indexTxnMergeInfo(newRevision, mergeInfo);
+            }
+            myDBProcessor.commitTransaction();
+        } finally {
+            myDBProcessor.closeDB();
+        }
+    }
+    
     public Map getMergeInfo(String[] paths, FSRevisionRoot root, SVNMergeInfoInheritance inherit) throws SVNException {
         Map mergeInfo = null; 
         try {
@@ -86,6 +100,34 @@ public class SVNMergeInfoManager {
         return pathsToMergeInfos == null ? new TreeMap() : pathsToMergeInfos;
     }
     
+    private void indexTxnMergeInfo(long revision, Map pathsToMergeInfos) throws SVNException {
+        for (Iterator paths = pathsToMergeInfos.keySet().iterator(); paths.hasNext();) {
+            String path = (String) paths.next();
+            String mergeInfoToParse = (String) pathsToMergeInfos.get(path);
+            indexPathMergeInfo(revision, path, mergeInfoToParse);
+        }
+    }
+
+    private void  indexPathMergeInfo(long revision, String path, String mergeInfoToParse) throws SVNException {
+        boolean removeMergeInfo = false;
+        Map mergeInfo = SVNMergeInfoManager.parseMergeInfo(new StringBuffer(mergeInfoToParse), null);
+        if (mergeInfo.isEmpty()) {
+            mergeInfo = getMergeInfoForPath(path, revision, new HashMap(), mergeInfo, SVNMergeInfoInheritance.INHERITED);
+            SVNMergeInfo info = (SVNMergeInfo) mergeInfo.get(path);
+            if (info == null) {
+                return;
+            }
+            mergeInfo = info.getMergeSourcesToMergeLists();
+            removeMergeInfo = true;
+        }
+        for (Iterator paths = mergeInfo.keySet().iterator(); paths.hasNext();) {
+            String srcMergePath = (String) paths.next();
+            SVNMergeRangeList rangeList = removeMergeInfo ? SVNMergeRangeList.EMPTY_RANGE_LIST
+                                                          : (SVNMergeRangeList) mergeInfo.get(srcMergePath);
+            myDBProcessor.insertMergeInfo(revision, srcMergePath, path, rangeList.getRanges());
+        }
+    }
+
     private Map getMergeInfoImpl(String[] paths, FSRevisionRoot root, SVNMergeInfoInheritance inherit) throws SVNException {
         Map mergeInfoCache = new TreeMap();
         Map result = null;
