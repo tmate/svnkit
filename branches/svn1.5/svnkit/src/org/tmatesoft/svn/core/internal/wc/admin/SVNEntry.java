@@ -472,7 +472,7 @@ public class SVNEntry implements Comparable {
             return false;
         }
         
-        SVNWCAccess access = myAdminArea.getWCAccess();
+        SVNWCAccess access = SVNWCAccess.newInstance(myAdminArea.getWCAccess());
         SVNAdminArea parentAdminArea = null;
         SVNEntry parentEntry = null;
         try {
@@ -484,7 +484,7 @@ public class SVNEntry implements Comparable {
             } 
             throw svne;
         } finally {
-            access.closeAdminArea(parent);
+            access.close();
         }
         
         SVNURL parentSVNURL = parentEntry.getSVNURL();
