@@ -2062,6 +2062,15 @@ public class SVNClientImpl implements SVNClientInterface {
         notImplementedYet();
     }
 
+    public void setConflictResolver(ConflictResolverCallback listener) {
+        //TODO: implement
+    }
+
+    public long doSwitch(String path, String url, Revision revision, int depth, boolean ignoreExternals, boolean allowUnverObstructions) throws ClientException {
+        notImplementedYet(null);
+        return 0;
+    }
+
     private void notImplementedYet() throws ClientException {
         notImplementedYet(null);
     }
@@ -2070,10 +2079,6 @@ public class SVNClientImpl implements SVNClientInterface {
         SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.UNSUPPORTED_FEATURE, 
                 message == null ? "Requested SVNAdmin functionality is not yet implemented" : message);
         JavaHLObjectFactory.throwException(new SVNException(err), this);
-    }
-
-    public void setConflictResolver(ConflictResolverCallback listener) {
-        //TODO: implement
     }
 
 }
