@@ -241,13 +241,15 @@ public class SVNPropertiesManager {
     
     public static Map getWorkingCopyPropertyValues(SVNAdminArea adminArea, String entryName, final String propName, boolean recursive, final boolean base) throws SVNException {
         final Map pathsToPropValues = new HashMap();
+        
         ISVNEntryHandler handler = new ISVNEntryHandler() {
             public void handleEntry(File path, SVNEntry entry, SVNAdminArea adminArea) throws SVNException {
                 if (entry.isDirectory() && !entry.getName().equals(adminArea.getThisDirName())) {
                     return;
                 }
+                
                 if ((entry.isScheduledForAddition() && base) ||
-                        (entry.isScheduledForDeletion() && !base)) {
+                    (entry.isScheduledForDeletion() && !base)) {
                     return;
                 }
                 
@@ -265,7 +267,6 @@ public class SVNPropertiesManager {
                 }
             }
             
-          
             public void handleError(File path, SVNErrorMessage error) throws SVNException {
                 while (error.hasChildErrorMessage()) {
                     error = error.getChildErrorMessage();

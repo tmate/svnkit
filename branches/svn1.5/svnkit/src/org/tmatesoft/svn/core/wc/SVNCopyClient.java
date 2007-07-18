@@ -558,13 +558,17 @@ public class SVNCopyClient extends SVNBasicClient {
     
                 revision = updateClient.doCheckout(srcURL, dstPath, srcRevision, srcRevision, SVNDepth.INFINITY, false);
                 
-                if (srcRevision == SVNRevision.HEAD && sameRepositories) {
+                if (sameRepositories) {
                     SVNAdminArea dstArea = dstAccess.open(dstPath, true, SVNWCAccess.INFINITE_DEPTH);
                     SVNEntry dstRootEntry = dstArea.getEntry(dstArea.getThisDirName(), false);
-                    revision = dstRootEntry.getRevision();
-                }
-                if (sameRepositories) {
+                    if (srcRevision == SVNRevision.HEAD) {
+                        revision = dstRootEntry.getRevision();
+                    }
                     SVNWCManager.add(dstPath, adminArea, srcURL, revision);
+                    Map srcMergeInfo = calculateTargetMergeInfo(srcURL, null, "", 
+                                                                srcRevisionNumber, 
+                                                                repository, null);
+                    extendWCMergeInfo(dstPath, dstRootEntry.getName(), srcMergeInfo, dstArea);
                 } else {
                     SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.UNSUPPORTED_FEATURE, "Source URL ''{0}'' is from foreign repository; leaving it as a disjoint WC", srcURL);
                     SVNErrorManager.error(err);
@@ -587,10 +591,14 @@ public class SVNCopyClient extends SVNBasicClient {
                 if (!SVNRevision.isValidRevisionNumber(srcRevisionNumber)) {
                     srcRevisionNumber = realRevision;
                 }
-                
                 SVNWCManager.addRepositoryFile(adminArea, dstPath.getName(), null, tmpFile, null, properties,  
                         sameRepositories ? srcURL.toString() : null, 
                         sameRepositories ? srcRevisionNumber : -1);
+                
+                Map srcMergeInfo = calculateTargetMergeInfo(srcURL, null, "", 
+                                                            srcRevisionNumber, 
+                                                            repository, null);
+                extendWCMergeInfo(dstPath, dstPath.getName(), srcMergeInfo, adminArea);
                 
                 dispatchEvent(SVNEventFactory.createAddedEvent(null, adminArea, dstAccess.getEntry(dstPath, false)));
                 revision = srcRevisionNumber;
@@ -1437,6 +1445,26 @@ public class SVNCopyClient extends SVNBasicClient {
         return new SVNLocationEntry(copyFromRevision, copyFromURL);
     }
 
+    private void extendWCMergeInfo(File path, String entryName, Map mergeInfo, 
+                                                     SVNAdminArea adminArea) throws SVNException {
+        Map fileToProp = SVNPropertiesManager.getWorkingCopyPropertyValues(adminArea, 
+                                                                           entryName, 
+                                                                           SVNProperty.MERGE_INFO, 
+                                                                           false, 
+                                                                           false);
+        String mergeInfoString = (String) fileToProp.get(path);
+        Map wcMergeInfo = mergeInfo;
+        if (mergeInfoString != null) {
+            wcMergeInfo = SVNMergeInfoManager.parseMergeInfo(new StringBuffer(mergeInfoString), null);
+            wcMergeInfo = SVNMergeInfoManager.mergeMergeInfos(wcMergeInfo, mergeInfo);
+        }
+        
+        mergeInfoString = wcMergeInfo != null ? SVNMergeInfoManager.formatMergeInfoToString(wcMergeInfo) 
+                                              : null;
+        SVNPropertiesManager.setProperty(adminArea.getWCAccess(), path, SVNProperty.MERGE_INFO, 
+                                         mergeInfoString, true);
+    }
+    
     private Map calculateTargetMergeInfo(SVNURL srcURL, SVNURL reposRoot, 
                                           String srcRelativePath, long srcRevision, 
                                           SVNRepository repository, 
