@@ -557,4 +557,8 @@ public class SVNClient implements SVNClientInterface {
     public void setConflictResolver(ConflictResolverCallback listener) {
         myDelegate.setConflictResolver(listener);
     }
+
+    public long doSwitch(String path, String url, Revision revision, int depth, boolean ignoreExternals, boolean allowUnverObstructions) throws ClientException {
+        return myDelegate.doSwitch(path, url, revision, depth, ignoreExternals, allowUnverObstructions);
+    }
 }
