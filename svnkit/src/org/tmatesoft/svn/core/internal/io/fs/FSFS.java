@@ -609,7 +609,17 @@ public class FSFS {
     }
 
     public Map getTransactionMergeInfo(String txnID) throws SVNException {
-        FSFile txnMergeInfoFile = new FSFile(getTransactionMergeInfoFile(txnID));
+        File mergeInfoFile = getTransactionMergeInfoFile(txnID);
+        if (!mergeInfoFile.exists()) {
+            try {
+                mergeInfoFile.createNewFile();
+            } catch (IOException e) {
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, e.getLocalizedMessage());
+                SVNErrorManager.error(err);
+            }
+            return new HashMap();
+        }
+        FSFile txnMergeInfoFile = new FSFile(mergeInfoFile);
         try {
             return txnMergeInfoFile.readProperties(false);
         } finally {

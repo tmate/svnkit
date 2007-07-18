@@ -21,11 +21,17 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
+import org.tmatesoft.svn.core.ISVNLogEntryHandler;
 import org.tmatesoft.svn.core.SVNCommitInfo;
 import org.tmatesoft.svn.core.SVNDepth;
 import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
+import org.tmatesoft.svn.core.SVNLogEntry;
+import org.tmatesoft.svn.core.SVNMergeInfo;
+import org.tmatesoft.svn.core.SVNMergeInfoInheritance;
+import org.tmatesoft.svn.core.SVNMergeRange;
+import org.tmatesoft.svn.core.SVNMergeRangeList;
 import org.tmatesoft.svn.core.SVNNodeKind;
 import org.tmatesoft.svn.core.SVNProperty;
 import org.tmatesoft.svn.core.SVNURL;
@@ -43,6 +49,7 @@ import org.tmatesoft.svn.core.internal.wc.SVNEventFactory;
 import org.tmatesoft.svn.core.internal.wc.SVNFileListUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNFileType;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
+import org.tmatesoft.svn.core.internal.wc.SVNMergeInfoManager;
 import org.tmatesoft.svn.core.internal.wc.SVNPropertiesManager;
 import org.tmatesoft.svn.core.internal.wc.SVNWCManager;
 import org.tmatesoft.svn.core.internal.wc.admin.SVNAdminArea;
@@ -1364,14 +1371,19 @@ public class SVNCopyClient extends SVNBasicClient {
         commitMessage = SVNCommitClient.validateCommitMessage(commitMessage);
         for (int i = 0; i < sources.length; i++) {
             SVNCopySource source = sources[i];
-            
-            //TODO:merge-tracking stuff
-            
+            PathDriverInfo info = (PathDriverInfo) actionHash.get(source.getDstPath());
+            if (info != null && !info.isDirAdded) {
+                Map mergeInfo = calculateTargetMergeInfo(source.getURL(), repositoryRoot, 
+                                                         info.mySrcPath, info.mySrcRevisionNumber, 
+                                                         repository, null);
+                info.myMergeInfoProp = SVNMergeInfoManager.formatMergeInfoToString(mergeInfo);
+            }
             paths.add(source.getDstPath());
             if (isMove && !source.isRessurection()) {
                 paths.add(source.getSrcPath());
             }
         }
+        
         
         ISVNEditor commitEditor = repository.getCommitEditor(commitMessage, null, true, revisionProperties, null);
         ISVNCommitPathHandler committer = new CopyCommitPathHandler2(actionHash, isMove);
@@ -1425,6 +1437,51 @@ public class SVNCopyClient extends SVNBasicClient {
         return new SVNLocationEntry(copyFromRevision, copyFromURL);
     }
 
+    private Map calculateTargetMergeInfo(SVNURL srcURL, SVNURL reposRoot, 
+                                          String srcRelativePath, long srcRevision, 
+                                          SVNRepository repository, 
+                                          SVNWCAccess access) throws SVNException {
+        
+        reposRoot = reposRoot == null ? repository.getRepositoryRoot(true) : reposRoot;
+        String srcPath = srcURL.getPath().substring(reposRoot.getPath().length());
+        if (!srcPath.startsWith("/")) {
+            srcPath = "/" + srcPath;
+        }
+        
+        Map targetMergeInfo = new TreeMap();
+        long oldestRev = SVNRepository.INVALID_REVISION;
+        try {
+            final long[] rev = new long[1];
+            rev[0] = SVNRepository.INVALID_REVISION;
+            repository.log(new String[] {srcRelativePath}, 1, srcRevision, false, true, 1, new ISVNLogEntryHandler() {
+                public void handleLogEntry(SVNLogEntry logEntry) throws SVNException {
+                    rev[0] = logEntry.getRevision();
+                }
+            });
+            oldestRev = rev[0];
+        } catch (SVNException svne) {
+            SVNErrorCode errCode = svne.getErrorMessage().getErrorCode(); 
+            if (errCode != SVNErrorCode.FS_NOT_FOUND && 
+                errCode != SVNErrorCode.RA_DAV_REQUEST_FAILED) {
+                throw svne;
+            }
+        }
+        
+        if (SVNRevision.isValidRevisionNumber(oldestRev)) {
+            SVNMergeRange range = new SVNMergeRange(oldestRev, srcRevision);
+            targetMergeInfo.put(srcPath, new SVNMergeRangeList(new SVNMergeRange[] {range}));
+        }
+        
+        Map srcMergeInfo = repository.getMergeInfo(new String[] {srcPath}, srcRevision, 
+                                                           SVNMergeInfoInheritance.INHERITED);
+        SVNMergeInfo srcInfo = (SVNMergeInfo) srcMergeInfo.get(srcPath);
+        if (srcInfo != null) {
+            srcMergeInfo = srcInfo.getMergeSourcesToMergeLists();
+            targetMergeInfo = SVNMergeInfoManager.mergeMergeInfos(targetMergeInfo, srcMergeInfo);
+        }
+        return targetMergeInfo;
+    }
+    
     private static class CopyCommitPathHandler2 implements ISVNCommitPathHandler {
         
         private Map myPathInfos;
@@ -1466,10 +1523,20 @@ public class SVNCopyClient extends SVNBasicClient {
             if (doAdd) {
                 SVNPathUtil.checkPathIsValid(commitPath);
                 if (pathInfo.mySrcKind == SVNNodeKind.DIR) {
-                    commitEditor.addDir(commitPath, pathInfo.mySrcPath, pathInfo.mySrcRevisionNumber);
+                    commitEditor.addDir(commitPath, pathInfo.mySrcPath, 
+                                        pathInfo.mySrcRevisionNumber);
+                    if (pathInfo.myMergeInfoProp != null) {
+                        commitEditor.changeDirProperty(SVNProperty.MERGE_INFO, 
+                                                       pathInfo.myMergeInfoProp);
+                    }
                     closeDir = true;
                 } else {
-                    commitEditor.addFile(commitPath, pathInfo.mySrcPath, pathInfo.mySrcRevisionNumber);
+                    commitEditor.addFile(commitPath, pathInfo.mySrcPath, 
+                                         pathInfo.mySrcRevisionNumber);
+                    if (pathInfo.myMergeInfoProp != null) {
+                        commitEditor.changeFileProperty(commitPath, SVNProperty.MERGE_INFO, 
+                                                        pathInfo.myMergeInfoProp);
+                    }
                     commitEditor.closeFile(commitPath, null);
                 }
             }
@@ -1484,6 +1551,7 @@ public class SVNCopyClient extends SVNBasicClient {
         SVNNodeKind mySrcKind;
         String mySrcPath;
         String myDstPath;
+        String myMergeInfoProp;
         long mySrcRevisionNumber;
     }
     
