@@ -125,7 +125,7 @@ public class SVNCommitter implements ISVNCommitPathHandler {
                 }
                 closeDir = true;
             }
-            sendPropertiedDelta(commitPath, item, commitEditor);
+            sendPropertiesDelta(commitPath, item, commitEditor);
         }
         if (item.isContentsModified() && item.getKind() == SVNNodeKind.FILE) {
             if (!fileOpen) {
@@ -193,7 +193,7 @@ public class SVNCommitter implements ISVNCommitPathHandler {
         }
     }
 
-    private void sendPropertiedDelta(String commitPath, SVNCommitItem item, ISVNEditor editor) throws SVNException {
+    private void sendPropertiesDelta(String commitPath, SVNCommitItem item, ISVNEditor editor) throws SVNException {
         SVNAdminArea dir;
         String name;
         SVNWCAccess wcAccess = item.getWCAccess();
@@ -204,6 +204,15 @@ public class SVNCommitter implements ISVNCommitPathHandler {
             dir = wcAccess.retrieve(item.getFile().getParentFile());
             name = SVNPathUtil.tail(item.getPath());
         }
+        
+        if (item.getMergeInfo() != null) {
+            if (item.getKind() == SVNNodeKind.FILE) {
+                editor.changeFileProperty(commitPath, SVNProperty.MERGE_INFO, item.getMergeInfo());
+            } else {
+                editor.changeDirProperty(SVNProperty.MERGE_INFO, item.getMergeInfo());
+            }
+        }
+
         if (!dir.hasPropModifications(name)) {
             return;
         }

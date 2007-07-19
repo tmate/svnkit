@@ -58,6 +58,7 @@ import org.tmatesoft.svn.core.internal.wc.admin.SVNWCAccess;
 import org.tmatesoft.svn.core.io.ISVNEditor;
 import org.tmatesoft.svn.core.io.SVNLocationEntry;
 import org.tmatesoft.svn.core.io.SVNRepository;
+import org.tmatesoft.svn.util.SVNDebugLog;
 
 /**
  * The <b>SVNCopyClient</b> provides methods to perform any kinds of copying and moving that SVN
@@ -509,7 +510,7 @@ public class SVNCopyClient extends SVNBasicClient {
         if (dstParentType == SVNFileType.NONE && makeParents) {
             SVNWCClient wcClient = new SVNWCClient(getRepositoryPool(), getOptions());
             try {
-                wcClient.doAdd(dstParent, false, true, true, false, false);
+                wcClient.doAdd(dstParent, false, true, true, false, false, true);
             } catch (SVNException svne) {
                 SVNFileUtil.deleteAll(dstParent, true);
                 throw svne;
@@ -565,9 +566,9 @@ public class SVNCopyClient extends SVNBasicClient {
                         revision = dstRootEntry.getRevision();
                     }
                     SVNWCManager.add(dstPath, adminArea, srcURL, revision);
-                    Map srcMergeInfo = calculateTargetMergeInfo(srcURL, null, "", 
+                    Map srcMergeInfo = calculateTargetMergeInfo(srcURL, null, null, "", 
                                                                 srcRevisionNumber, 
-                                                                repository, null);
+                                                                repository);
                     extendWCMergeInfo(dstPath, dstRootEntry.getName(), srcMergeInfo, dstArea);
                 } else {
                     SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.UNSUPPORTED_FEATURE, "Source URL ''{0}'' is from foreign repository; leaving it as a disjoint WC", srcURL);
@@ -595,9 +596,9 @@ public class SVNCopyClient extends SVNBasicClient {
                         sameRepositories ? srcURL.toString() : null, 
                         sameRepositories ? srcRevisionNumber : -1);
                 
-                Map srcMergeInfo = calculateTargetMergeInfo(srcURL, null, "", 
+                Map srcMergeInfo = calculateTargetMergeInfo(srcURL, null, null, "", 
                                                             srcRevisionNumber, 
-                                                            repository, null);
+                                                            repository);
                 extendWCMergeInfo(dstPath, dstPath.getName(), srcMergeInfo, adminArea);
                 
                 dispatchEvent(SVNEventFactory.createAddedEvent(null, adminArea, dstAccess.getEntry(dstPath, false)));
@@ -823,7 +824,7 @@ public class SVNCopyClient extends SVNBasicClient {
         if (dstParentType == SVNFileType.NONE && makeParents) {
             SVNWCClient wcClient = new SVNWCClient(getRepositoryPool(), getOptions());
             try {
-                wcClient.doAdd(dstParent, false, true, true, false, false);
+                wcClient.doAdd(dstParent, false, true, true, false, false, true);
             } catch (SVNException svne) {
                 SVNFileUtil.deleteAll(dstParent, true);
                 throw svne;
@@ -1107,15 +1108,14 @@ public class SVNCopyClient extends SVNBasicClient {
             }
             topDstURL = rootURL;
         }
-        boolean gotReposRoot = false;
+
         for (int i = 0; i < sources.length; i++) {
             SVNCopySource source = sources[i];
             SVNEntry entry = wcAccess.getVersionedEntry(source.getPath(), false);
             SVNURL srcURL = entry.getSVNURL();
             SVNURL reposRoot = entry.getRepositoryRootURL();
             if (reposRoot == null) {
-                reposRoot = repository.getRepositoryRoot(!gotReposRoot);
-                gotReposRoot = true;
+                reposRoot = repository.getRepositoryRoot(true);
             }
             String srcPath = SVNPathUtil.getPathAsChild(reposRoot.getPath(), srcURL.getPath());
             if (srcPath == null || "".equals(srcPath)) {
@@ -1184,6 +1184,28 @@ public class SVNCopyClient extends SVNBasicClient {
                         entry, source.getDstURL().toString(), entry.getURL(), 
                         true, false, false, null, true, false, null, getCommitParameters());
                 
+                SVNCommitItem item = (SVNCommitItem) commitables.get(source.getPath());
+                SVNURL reposRoot = entry.getRepositoryRootURL();
+                SVNURL srcURL = entry.getSVNURL();
+                Map mergeInfo = calculateTargetMergeInfo(srcURL, reposRoot, 
+                                                         source.getSrcPath(), 
+                                                         source.getSrcPath(), 
+                                                         source.getSrcRevisionNumber(), 
+                                                         repository);
+                Map fileToProp = SVNPropertiesManager.getWorkingCopyPropertyValues(dirArea, 
+                                                                                   entry.getName(), 
+                                                                                   SVNProperty.MERGE_INFO, 
+                                                                                   false, 
+                                                                                   false);
+
+                String mergeInfoString = (String) fileToProp.get(source.getPath());
+                if (mergeInfoString != null) {
+                    Map wcMergeInfo = SVNMergeInfoManager.parseMergeInfo(new StringBuffer(mergeInfoString), null);
+                    mergeInfo = SVNMergeInfoManager.mergeMergeInfos(mergeInfo, wcMergeInfo);
+                }
+                
+                mergeInfoString = SVNMergeInfoManager.formatMergeInfoToString(mergeInfo); 
+                item.setMergeInfoProp(mergeInfoString);
             }
             
             Collection cmtItems = new LinkedList(commitables.values());
@@ -1381,9 +1403,9 @@ public class SVNCopyClient extends SVNBasicClient {
             SVNCopySource source = sources[i];
             PathDriverInfo info = (PathDriverInfo) actionHash.get(source.getDstPath());
             if (info != null && !info.isDirAdded) {
-                Map mergeInfo = calculateTargetMergeInfo(source.getURL(), repositoryRoot, 
+                Map mergeInfo = calculateTargetMergeInfo(source.getURL(), repositoryRoot, null,
                                                          info.mySrcPath, info.mySrcRevisionNumber, 
-                                                         repository, null);
+                                                         repository);
                 info.myMergeInfoProp = SVNMergeInfoManager.formatMergeInfoToString(mergeInfo);
             }
             paths.add(source.getDstPath());
@@ -1465,15 +1487,15 @@ public class SVNCopyClient extends SVNBasicClient {
                                          mergeInfoString, true);
     }
     
-    private Map calculateTargetMergeInfo(SVNURL srcURL, SVNURL reposRoot, 
-                                          String srcRelativePath, long srcRevision, 
-                                          SVNRepository repository, 
-                                          SVNWCAccess access) throws SVNException {
-        
-        reposRoot = reposRoot == null ? repository.getRepositoryRoot(true) : reposRoot;
-        String srcPath = srcURL.getPath().substring(reposRoot.getPath().length());
-        if (!srcPath.startsWith("/")) {
-            srcPath = "/" + srcPath;
+    private Map calculateTargetMergeInfo(SVNURL srcURL, SVNURL reposRoot,
+                                         String srcPath, String srcRelativePath,  
+                                         long srcRevision, SVNRepository repository) throws SVNException {
+        if (srcPath == null) {
+            reposRoot = reposRoot == null ? repository.getRepositoryRoot(true) : reposRoot;
+            srcPath = srcURL.getPath().substring(reposRoot.getPath().length());
+            if (!srcPath.startsWith("/")) {
+                srcPath = "/" + srcPath;
+            }
         }
         
         Map targetMergeInfo = new TreeMap();

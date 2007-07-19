@@ -125,7 +125,7 @@ public class SVNMergeRangeList {
             if (startRev == endRev) {
                 output += String.valueOf(startRev);
             } else {
-                output += startRev + '-' + endRev;
+                output += String.valueOf(startRev) + "-" + String.valueOf(endRev);
             }
             if (i < myRanges.length - 1) {
                 output += ',';
