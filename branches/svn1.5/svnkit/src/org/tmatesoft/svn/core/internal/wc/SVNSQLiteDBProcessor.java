@@ -96,22 +96,7 @@ public class SVNSQLiteDBProcessor implements ISVNDBProcessor {
         if (myConnection != null) {
             try {
                 myConnection.close();
-                if (mySinglePathSelectFromMergeInfoChangedStatement != null) {
-                    mySinglePathSelectFromMergeInfoChangedStatement.close();
-                    mySinglePathSelectFromMergeInfoChangedStatement = null;
-                }
-                if (myPathLikeSelectFromMergeInfoChangedStatement != null) {
-                    myPathLikeSelectFromMergeInfoChangedStatement.close();
-                    myPathLikeSelectFromMergeInfoChangedStatement = null;
-                }
-                if (mySelectMergeInfoStatement != null) {
-                    mySelectMergeInfoStatement.close();
-                    mySelectMergeInfoStatement = null;
-                }
-                if (myInsertToMergeInfoTableStatement != null) {
-                    myInsertToMergeInfoTableStatement.close();
-                    myInsertToMergeInfoTableStatement = null;
-                }
+                dispose();
             } catch (SQLException sqle) {
                 SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_SQLITE_ERROR, sqle.getLocalizedMessage());
                 SVNErrorManager.error(err, sqle);
@@ -212,6 +197,7 @@ public class SVNSQLiteDBProcessor implements ISVNDBProcessor {
     public void commitTransaction() throws SVNException {
         Connection connection = getConnection();
         try {
+            dispose();
             Statement stmt = connection.createStatement();
             stmt.execute("COMMIT TRANSACTION;");
             stmt.close();
@@ -260,6 +246,30 @@ public class SVNSQLiteDBProcessor implements ISVNDBProcessor {
         }
     }
 
+    private void dispose() throws SVNException {
+        try {
+            if (mySinglePathSelectFromMergeInfoChangedStatement != null) {
+                mySinglePathSelectFromMergeInfoChangedStatement.close();
+                mySinglePathSelectFromMergeInfoChangedStatement = null;
+            }
+            if (myPathLikeSelectFromMergeInfoChangedStatement != null) {
+                myPathLikeSelectFromMergeInfoChangedStatement.close();
+                myPathLikeSelectFromMergeInfoChangedStatement = null;
+            }
+            if (mySelectMergeInfoStatement != null) {
+                mySelectMergeInfoStatement.close();
+                mySelectMergeInfoStatement = null;
+            }
+            if (myInsertToMergeInfoTableStatement != null) {
+                myInsertToMergeInfoTableStatement.close();
+                myInsertToMergeInfoTableStatement = null;
+            }
+        } catch (SQLException sqle) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_SQLITE_ERROR, sqle.getLocalizedMessage());
+            SVNErrorManager.error(err, sqle);
+        }
+    }
+    
     private void createMergeInfoTables() throws SVNException {
         Connection connection = getConnection();
         try {

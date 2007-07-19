@@ -302,6 +302,10 @@ public class SVNMergeInfoManager {
     
     public static Map parseMergeInfo(StringBuffer mergeInfo, Map srcPathsToRangeLists) throws SVNException {
         srcPathsToRangeLists = srcPathsToRangeLists == null ? new TreeMap() : srcPathsToRangeLists;
+        if (mergeInfo.length() == 0) {
+            return srcPathsToRangeLists;
+        }
+        
         int ind = mergeInfo.indexOf(":");
         if (ind == -1) {
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.MERGE_INFO_PARSE_ERROR, "Pathname not terminated by ':'");
