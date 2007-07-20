@@ -116,6 +116,7 @@ public class SVNMkDirCommand extends SVNCommand {
                 SVNErrorMessage error = e.getErrorMessage().wrap("Try 'svn mkdir --parents' instead?");
                 SVNErrorManager.error(error);
             }
+            throw e;
         }
     }
 }
