@@ -182,7 +182,7 @@ public class SVNUpdateClient extends SVNBasicClient {
         SVNWCAccess wcAccess = createWCAccess();
         SVNAdminAreaInfo adminInfo = null;
         int admOpenDepth = SVNWCAccess.INFINITE_DEPTH;
-        if (depth == SVNDepth.EMPTY || depth == SVNDepth.FILES || depth == SVNDepth.IMMEDIATES) {
+        if (depth == SVNDepth.EMPTY || depth == SVNDepth.FILES) {
             admOpenDepth = 0;
         }
         try {
