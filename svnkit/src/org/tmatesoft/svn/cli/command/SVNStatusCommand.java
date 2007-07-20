@@ -146,7 +146,7 @@ public class SVNStatusCommand extends SVNCommand implements ISVNStatusHandler, I
 
         SVNStatusClient stClient = getClientManager().getStatusClient();
         myDebugLog = stClient.getDebugLog();
-        ISVNStatusHandler handler = new SVNCommandStatusHandler(System.out, reportAll || showUpdates, reportAll, myIsQuiet, showUpdates);
+        ISVNStatusHandler handler = new SVNCommandStatusHandler(out, reportAll || showUpdates, reportAll, myIsQuiet, showUpdates);
         SVNXMLSerializer serializer = myIsXML ? new SVNXMLSerializer(System.out) : null;
         if (myIsXML) {
             handler = new SVNXMLStatusHandler(serializer);

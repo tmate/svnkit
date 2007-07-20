@@ -824,6 +824,11 @@ public class SVNUpdateEditor implements ISVNEditor, ISVNCleanupHandler {
                 }
                 thisEntry.setIncomplete(false);
                 
+                if (myDepth == SVNDepth.INFINITY || (dirInfo.Parent == null && 
+                        myDepth.compareTo(thisEntry.getDepth()) > 0)) {
+                    thisEntry.setDepth(myDepth);
+                }
+                
                 for (Iterator ents = adminArea.entries(true); ents.hasNext();) {
                     SVNEntry entry = (SVNEntry) ents.next();
                     if (entry.isDeleted()) {
