@@ -538,8 +538,11 @@ class DAVRepository extends SVNRepository {
 		}
     }
     
-    public long log(String[] targetPaths, long startRevision, long endRevision,
-            boolean changedPath, boolean strictNode, long limit, final ISVNLogEntryHandler handler) throws SVNException {
+    //TODO: FIXME
+    public long log(String[] targetPaths, long startRevision, long endRevision, 
+                    boolean changedPath, boolean strictNode, long limit, 
+                    boolean includeMergedRevisions, boolean omitLogText, 
+                    final ISVNLogEntryHandler handler) throws SVNException {
         if (targetPaths == null || targetPaths.length == 0) {
             targetPaths = new String[]{""};
         }
@@ -553,7 +556,7 @@ class DAVRepository extends SVNRepository {
                 }
             
         };
-		
+        
         long latestRev = -1;
         if (isInvalidRevision(startRevision)) {
             startRevision = latestRev = getLatestRevision();
@@ -563,11 +566,11 @@ class DAVRepository extends SVNRepository {
         }
         
         try {
-			openConnection();
-			String[] fullPaths = new String[targetPaths.length];
-			
-			for (int i = 0; i < targetPaths.length; i++) {
-				fullPaths[i] = getFullPath(targetPaths[i]);
+            openConnection();
+            String[] fullPaths = new String[targetPaths.length];
+            
+            for (int i = 0; i < targetPaths.length; i++) {
+                fullPaths[i] = getFullPath(targetPaths[i]);
             }
             Collection relativePaths = new HashSet();
             String path = SVNPathUtil.condencePaths(fullPaths, relativePaths, false);
@@ -576,11 +579,11 @@ class DAVRepository extends SVNRepository {
             }
             fullPaths = (String[]) relativePaths.toArray(new String[relativePaths.size()]);
             
-	        StringBuffer request = DAVLogHandler.generateLogRequest(null, startRevision, endRevision,
-	        		changedPath, strictNode, limit, fullPaths);
-	        
+            StringBuffer request = DAVLogHandler.generateLogRequest(null, startRevision, endRevision,
+                    changedPath, strictNode, limit, fullPaths);
+            
             davHandler = new DAVLogHandler(cachingHandler, limit); 
-			long revision = Math.max(startRevision, endRevision);
+            long revision = Math.max(startRevision, endRevision);
             path = SVNEncodingUtil.uriEncode(path);
             DAVBaselineInfo info = DAVUtil.getBaselineInfo(myConnection, this, path, revision, false, false, null);
             path = SVNPathUtil.append(info.baselineBase, info.baselinePath);
@@ -588,11 +591,12 @@ class DAVRepository extends SVNRepository {
             if (status.getError() != null && !davHandler.isCompatibleMode()) {
                 SVNErrorManager.error(status.getError());
             }
-		} finally {
-			closeConnection();
-		}
+        } finally {
+            closeConnection();
+        }
         return davHandler.getEntriesCount();
     }
+
     
     private void openConnection() throws SVNException {
         lock();

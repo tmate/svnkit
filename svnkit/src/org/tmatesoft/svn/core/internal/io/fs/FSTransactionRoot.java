@@ -35,6 +35,7 @@ import org.tmatesoft.svn.core.internal.util.SVNTimeUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNProperties;
+import org.tmatesoft.svn.core.io.SVNRepository;
 
 /**
  * @version 1.1.1
@@ -374,7 +375,7 @@ public class FSTransactionRoot extends FSRoot {
                 dst = SVNFileUtil.openFileForWriting(childrenFile);
                 SVNProperties.setProperties(unparsedEntries, dst, SVNProperties.SVN_HASH_TERMINATOR);
                 textRep = new FSRepresentation();
-                textRep.setRevision(FSRepository.SVN_INVALID_REVNUM);
+                textRep.setRevision(SVNRepository.INVALID_REVISION);
                 textRep.setTxnId(myTxnID);
                 parentRevNode.setTextRepresentation(textRep);
                 getOwner().putTxnRevisionNode(parentRevNode.getId(), parentRevNode);
@@ -420,7 +421,7 @@ public class FSTransactionRoot extends FSRoot {
         String copyfromPath = pathChange.getCopyPath();
         long copyfromRevision = pathChange.getCopyRevision();
 
-        if (copyfromPath != null && copyfromRevision != FSRepository.SVN_INVALID_REVNUM) {
+        if (copyfromPath != null && copyfromRevision != SVNRepository.INVALID_REVISION) {
             String copyfromLine = copyfromRevision + " " + copyfromPath;
             changesFile.write(copyfromLine.getBytes("UTF-8"));
         }
@@ -570,7 +571,7 @@ public class FSTransactionRoot extends FSRoot {
             myCopyId = copyId;
         }
 
-        if (revNode.getCopyRootRevision() == FSRepository.SVN_INVALID_REVNUM) {
+        if (revNode.getCopyRootRevision() == SVNRepository.INVALID_REVISION) {
             revNode.setCopyRootRevision(revision);
         }
 
@@ -604,7 +605,7 @@ public class FSTransactionRoot extends FSRoot {
                 childNode.setCopyRootRevision(parent.getCopyRootRevision());
             }
             childNode.setCopyFromPath(null);
-            childNode.setCopyFromRevision(FSRepository.SVN_INVALID_REVNUM);
+            childNode.setCopyFromRevision(SVNRepository.INVALID_REVISION);
             childNode.setPredecessorId(childNode.getId());
             if (childNode.getCount() != -1) {
                 childNode.setCount(childNode.getCount() + 1);
