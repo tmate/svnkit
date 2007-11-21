@@ -13,8 +13,6 @@ package org.tmatesoft.svn.core.internal.io.fs;
 
 import java.io.Serializable;
 
-import org.tmatesoft.svn.core.io.SVNRepository;
-
 /**
  * @version 1.1.1
  * @author  TMate Software Ltd.
@@ -32,7 +30,7 @@ public class FSID implements Serializable {
     }
 
     public static FSID createTxnId(String nodeId, String copyId, String txnId) {
-        return new FSID(nodeId, txnId, copyId, SVNRepository.INVALID_REVISION, -1);
+        return new FSID(nodeId, txnId, copyId, FSRepository.SVN_INVALID_REVNUM, -1);
     }
 
     public static FSID createRevId(String nodeId, String copyId, long revision, long offset) {

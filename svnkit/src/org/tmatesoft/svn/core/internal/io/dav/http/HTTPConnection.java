@@ -23,35 +23,35 @@ import java.io.UnsupportedEncodingException;
 import java.net.HttpURLConnection;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
+import java.net.UnknownHostException;
+import java.security.cert.CertificateException;
 import java.text.ParseException;
 import java.util.Collection;
 import java.util.zip.GZIPInputStream;
 
-import javax.net.ssl.KeyManager;
 import javax.net.ssl.SSLHandshakeException;
-import javax.net.ssl.TrustManager;
 import javax.xml.parsers.FactoryConfigurationError;
 import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
 
+import org.tmatesoft.svn.core.SVNCancelException;
 import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNURL;
 import org.tmatesoft.svn.core.auth.ISVNAuthenticationManager;
 import org.tmatesoft.svn.core.auth.ISVNProxyManager;
+import org.tmatesoft.svn.core.auth.ISVNSSLManager;
 import org.tmatesoft.svn.core.auth.SVNAuthentication;
 import org.tmatesoft.svn.core.auth.SVNPasswordAuthentication;
+import org.tmatesoft.svn.core.auth.SVNSSLAuthentication;
 import org.tmatesoft.svn.core.internal.io.dav.handlers.DAVErrorHandler;
-import org.tmatesoft.svn.core.internal.util.SVNSSLUtil;
 import org.tmatesoft.svn.core.internal.util.SVNSocketFactory;
-import org.tmatesoft.svn.core.internal.wc.IOExceptionWrapper;
 import org.tmatesoft.svn.core.internal.wc.SVNCancellableOutputStream;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 import org.tmatesoft.svn.core.io.SVNRepository;
-
 import org.xml.sax.EntityResolver;
 import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
@@ -89,8 +89,7 @@ class HTTPConnection implements IHTTPConnection {
     private HTTPAuthentication myChallengeCredentials;
     private HTTPAuthentication myProxyAuthentication;
     private boolean myIsSpoolResponse;
-    private TrustManager myTrustManager;
-    private HTTPSSLKeyManager myKeyManager;
+    private ISVNSSLManager mySSLManager;
     private String myCharset;
     private boolean myIsSpoolAll;
     private File mySpoolDirectory;
@@ -108,17 +107,16 @@ class HTTPConnection implements IHTTPConnection {
         return myHost;
     }
 
-    private void connect(HTTPSSLKeyManager keyManager, TrustManager trustManager) throws IOException, SVNException {
-      SVNURL location = myRepository.getLocation();
-
-	    if (mySocket == null || SVNSocketFactory.isSocketStale(mySocket)) {
+    private void connect(ISVNSSLManager sslManager) throws IOException, SVNException {
+        SVNURL location = myRepository.getLocation();
+        if (mySocket == null || SVNSocketFactory.isSocketStale(mySocket)) {
             close();
             String host = location.getHost();
             int port = location.getPort();
             
-		        ISVNAuthenticationManager authManager = myRepository.getAuthenticationManager();
-		        ISVNProxyManager proxyAuth = authManager != null ? authManager.getProxyManager(location) : null;
-		    if (proxyAuth != null && proxyAuth.getProxyHost() != null) {
+            ISVNAuthenticationManager authManager = myRepository.getAuthenticationManager();
+            ISVNProxyManager proxyAuth = authManager != null ? authManager.getProxyManager(location) : null;
+            if (proxyAuth != null && proxyAuth.getProxyHost() != null) {
                 mySocket = SVNSocketFactory.createPlainSocket(proxyAuth.getProxyHost(), proxyAuth.getProxyPort());
                 if (myProxyAuthentication == null) {
                     myProxyAuthentication = new HTTPBasicAuthentication(proxyAuth.getProxyUserName(), proxyAuth.getProxyPassword(), myCharset);
@@ -135,7 +133,7 @@ class HTTPConnection implements IHTTPConnection {
                     if (status.getCode() == HttpURLConnection.HTTP_OK) {
                         myInputStream = null;
                         myOutputStream = null;
-                        mySocket = SVNSocketFactory.createSSLSocket(keyManager != null ? new KeyManager[] { keyManager } : new KeyManager[0], trustManager, host, port, mySocket);
+                        mySocket = SVNSocketFactory.createSSLSocket(sslManager, host, port, mySocket);
                         proxyAuth.acknowledgeProxyContext(true, null);
                         return;
                     }
@@ -147,7 +145,7 @@ class HTTPConnection implements IHTTPConnection {
             } else {
                 myIsProxied = false;
                 myProxyAuthentication = null;
-                mySocket = myIsSecured ? SVNSocketFactory.createSSLSocket(keyManager != null ? new KeyManager[] { keyManager } : new KeyManager[0], trustManager, host, port) : SVNSocketFactory.createPlainSocket(host, port);
+                mySocket = myIsSecured ? SVNSocketFactory.createSSLSocket(sslManager, host, port) : SVNSocketFactory.createPlainSocket(host, port);
             }
             long timeout = myRepository.getAuthenticationManager() != null ? myRepository.getAuthenticationManager().getHTTPTimeout(myRepository) : DEFAULT_HTTP_TIMEOUT;
             if (timeout < 0) {
@@ -220,8 +218,7 @@ class HTTPConnection implements IHTTPConnection {
     
     public void clearAuthenticationCache() {
         myLastValidAuth = null;
-        myTrustManager = null;
-        myKeyManager = null;
+        mySSLManager = null;
     }
 
     public HTTPStatus request(String method, String path, HTTPHeader header, StringBuffer body, int ok1, int ok2, OutputStream dst, DefaultHandler handler) throws SVNException {
@@ -250,9 +247,7 @@ class HTTPConnection implements IHTTPConnection {
         }
         
         // 1. prompt for ssl client cert if needed, if cancelled - throw cancellation exception.
-        HTTPSSLKeyManager keyManager = myKeyManager == null && myRepository.getAuthenticationManager() != null ? createKeyManager() : myKeyManager;
-	      TrustManager trustManager = myTrustManager == null && myRepository.getAuthenticationManager() != null ? myRepository.getAuthenticationManager().getTrustManager(myRepository.getLocation()) : myTrustManager;
-
+        ISVNSSLManager sslManager = mySSLManager != null ? mySSLManager : promptSSLClientCertificate(true, false);
         String sslRealm = "<" + myHost.getProtocol() + "://" + myHost.getHost() + ":" + myHost.getPort() + ">";
         SVNAuthentication httpAuth = myLastValidAuth;
         boolean isAuthForced = myRepository.getAuthenticationManager() != null ? myRepository.getAuthenticationManager().isAuthenticationForced() : false;
@@ -276,7 +271,7 @@ class HTTPConnection implements IHTTPConnection {
             HTTPStatus status = null;
             try {
                 err = null;
-                connect(keyManager, trustManager);
+                connect(sslManager);
                 request.reset();
                 request.setProxied(myIsProxied);
                 request.setSecured(myIsSecured);
@@ -293,31 +288,43 @@ class HTTPConnection implements IHTTPConnection {
                 status = request.getStatus();
             } catch (SSLHandshakeException ssl) {
                 myRepository.getDebugLog().info(ssl);
-	              close();
-	            if (ssl.getCause() instanceof SVNSSLUtil.CertificateNotTrustedException) {
-		            SVNErrorManager.cancel(ssl.getCause().getMessage());
-	            }
-                SVNErrorMessage sslErr = SVNErrorMessage.create(SVNErrorCode.RA_NOT_AUTHORIZED, "SSL handshake failed: ''{0}''", ssl.getMessage());
-		            if (keyManager != null) {
-			            keyManager.acknowledgeAndClearAuthentication(sslErr);
-		            }
+                if (ssl.getCause() instanceof CertificateException &&
+                        ssl.getCause().getCause() instanceof SVNCancelException) {
+                    SVNErrorManager.cancel(ssl.getCause().getCause().getMessage());
+                }
+                if (sslManager != null) {
+                    close();
+                    SVNSSLAuthentication sslAuth = sslManager.getClientAuthentication();
+                    if (sslAuth != null) {
+                        SVNErrorMessage sslErr = SVNErrorMessage.create(SVNErrorCode.RA_NOT_AUTHORIZED, "SSL handshake failed: ''{0}''", ssl.getMessage());
+                        myRepository.getAuthenticationManager().acknowledgeAuthentication(false, ISVNAuthenticationManager.SSL, sslRealm, sslErr, sslAuth);
+                    }
+                    sslManager = promptSSLClientCertificate(sslAuth == null, true);
+                    continue;
+                }
                 err = SVNErrorMessage.create(SVNErrorCode.RA_DAV_REQUEST_FAILED, ssl);
-	              continue;
+            } catch (UnknownHostException ioe) {
+                myRepository.getDebugLog().info(ioe);
+                err = SVNErrorMessage.create(SVNErrorCode.RA_DAV_REQUEST_FAILED, ioe);
+            } catch (SocketTimeoutException timeout) {
+                myRepository.getDebugLog().info(timeout);
+                err = SVNErrorMessage.create(SVNErrorCode.RA_DAV_REQUEST_FAILED, "timed out waiting for server");
+            } catch (SVNCancellableOutputStream.IOCancelException cancel) {
+                myRepository.getDebugLog().info(cancel);
+                SVNErrorManager.cancel(cancel.getMessage());
             } catch (IOException e) {
                 myRepository.getDebugLog().info(e);
-                if (e instanceof SocketTimeoutException) {
-                    err = SVNErrorMessage.create(SVNErrorCode.RA_DAV_REQUEST_FAILED, "timed out waiting for server");
-                } else if (e instanceof SVNCancellableOutputStream.IOCancelException) {
-                    SVNErrorManager.cancel(e.getMessage());
-                } else {
-                    if (keyManager != null) {
-	                    close();
-	                    SVNErrorMessage sslErr = SVNErrorMessage.create(SVNErrorCode.RA_NOT_AUTHORIZED, "SSL handshake failed: ''{0}''", e.getMessage());
-	                    keyManager.acknowledgeAndClearAuthentication(SVNErrorMessage.create(SVNErrorCode.RA_NOT_AUTHORIZED, "SSL handshake failed: ''{0}''", sslErr));
-                      continue;
+                if (sslManager != null) {
+                    close();
+                    SVNSSLAuthentication sslAuth = sslManager.getClientAuthentication();
+                    if (sslAuth != null) {
+                        SVNErrorMessage sslErr = SVNErrorMessage.create(SVNErrorCode.RA_NOT_AUTHORIZED, "SSL handshake failed: ''{0}''", e.getMessage());
+                        myRepository.getAuthenticationManager().acknowledgeAuthentication(false, ISVNAuthenticationManager.SSL, sslRealm, sslErr, sslAuth);
                     }
-                    err = SVNErrorMessage.create(SVNErrorCode.RA_DAV_REQUEST_FAILED, e.getMessage());
+                    sslManager = promptSSLClientCertificate(sslAuth == null, true);
+                    continue;
                 }
+                err = SVNErrorMessage.create(SVNErrorCode.RA_DAV_REQUEST_FAILED, e.getMessage());
             } catch (SVNException e) {
                 myRepository.getDebugLog().info(e);
                 // force connection close on SVNException 
@@ -329,12 +336,18 @@ class HTTPConnection implements IHTTPConnection {
             }
             if (err != null) {
                 close();
+                if (sslManager != null) {
+                    sslManager.acknowledgeSSLContext(false, err);
+                }
                 break;
             }
-            if (keyManager != null) {
-	            myKeyManager = keyManager;
-	            myTrustManager = trustManager;
-	            keyManager.acknowledgeAndClearAuthentication(null);
+            if (sslManager != null) {
+                sslManager.acknowledgeSSLContext(true, null);
+                SVNSSLAuthentication sslAuth = sslManager.getClientAuthentication();
+                if (sslAuth != null) {
+                    mySSLManager = sslManager;
+                    myRepository.getAuthenticationManager().acknowledgeAuthentication(true, ISVNAuthenticationManager.SSL, sslRealm, null, sslAuth);
+                }
             }
 
             if (status.getCode() == HttpURLConnection.HTTP_FORBIDDEN) {
@@ -516,18 +529,41 @@ class HTTPConnection implements IHTTPConnection {
         return null;
     }
 
-	private HTTPSSLKeyManager createKeyManager() {
-		if (!myIsSecured) {
-			return null;
-		}
+    private ISVNSSLManager promptSSLClientCertificate(boolean firstAuth, boolean onError) throws SVNException {
+        SVNURL location = myRepository.getLocation();
+        ISVNAuthenticationManager authManager = myRepository.getAuthenticationManager();
+        ISVNSSLManager sslManager = null;
+        SVNSSLAuthentication sslAuth = null;
+        String sslRealm = "<" + location.getProtocol() + "://" + location.getHost() + ":" + location.getPort() + ">";
+        if (myIsSecured) {
+            sslManager = authManager != null ? authManager.getSSLManager(location) : null;
+        }
+        if (authManager != null && sslManager != null && 
+                (onError || sslManager.isClientCertPromptRequired() || (firstAuth && sslManager.getClientCertLoadingError() != null))) {
+            // prompt if there is error or prompt has been forced.
+            while(true) {
+                if (firstAuth) {
+                    sslAuth = (SVNSSLAuthentication) authManager.getFirstAuthentication(ISVNAuthenticationManager.SSL, sslRealm, location);
+                } else {
+                    sslAuth = (SVNSSLAuthentication) authManager.getNextAuthentication(ISVNAuthenticationManager.SSL, sslRealm, location);
+                }
+                if (sslAuth == null) {
+                    SVNErrorManager.cancel("SSL authentication with client certificate cancelled");
+                }
+                // this will set error.
+                sslManager.setClientAuthentication(sslAuth);
+                if (sslManager.getClientCertLoadingError() != null) {
+                    sslManager.acknowledgeSSLContext(false, SVNErrorMessage.create(SVNErrorCode.RA_NOT_AUTHORIZED, sslManager.getClientCertLoadingError().getMessage()));
+                    // prompt again.
+                    continue;
+                }
+                break;
+            }
+        } 
+        return sslManager;
+    }
 
-		SVNURL location = myRepository.getLocation();
-		ISVNAuthenticationManager authManager = myRepository.getAuthenticationManager();
-		String sslRealm = "<" + location.getProtocol() + "://" + location.getHost() + ":" + location.getPort() + ">";
-		return new HTTPSSLKeyManager(authManager, sslRealm, location);
-	}
-
-	public SVNErrorMessage readData(HTTPRequest request, OutputStream dst) throws IOException {
+    public SVNErrorMessage readData(HTTPRequest request, OutputStream dst) throws IOException {
         InputStream stream = createInputStream(request.getResponseHeader(), getInputStream());
         byte[] buffer = getBuffer();
         boolean willCloseConnection = false;
@@ -543,10 +579,6 @@ class HTTPConnection implements IHTTPConnection {
             }
         } catch (IOException e) {
             willCloseConnection = true;
-            if (e instanceof IOExceptionWrapper) {
-                IOExceptionWrapper wrappedException = (IOExceptionWrapper) e; 
-                return wrappedException.getOriginalException().getErrorMessage();
-            }
             if (e.getCause() instanceof SVNException) {
                 return ((SVNException) e.getCause()).getErrorMessage();
             }
@@ -800,4 +832,5 @@ class HTTPConnection implements IHTTPConnection {
     public void setSpoolResponse(boolean spoolResponse) {
         myIsSpoolResponse = spoolResponse;
     }
+
 }

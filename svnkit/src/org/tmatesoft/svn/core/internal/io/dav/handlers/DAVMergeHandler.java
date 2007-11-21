@@ -22,10 +22,8 @@ import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.internal.io.dav.DAVElement;
 import org.tmatesoft.svn.core.internal.util.SVNEncodingUtil;
-import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
-import org.tmatesoft.svn.core.internal.util.SVNDate;
+import org.tmatesoft.svn.core.internal.util.SVNTimeUtil;
 import org.tmatesoft.svn.core.io.ISVNWorkspaceMediator;
-
 import org.xml.sax.Attributes;
 
 
@@ -60,11 +58,12 @@ public class DAVMergeHandler extends BasicDAVHandler {
         target.append("<S:lock-token-list xmlns:S=\"svn:\">");
         for (Iterator paths = locks.keySet().iterator(); paths.hasNext();) {
             String lockPath = (String) paths.next();
-            if (path == null || SVNPathUtil.getPathAsChild(path, lockPath) != null) {
-                String relativePath = SVNPathUtil.getRelativePath(root, lockPath);
+            if (path == null || isChildPath(path, lockPath)) {
                 String token = (String) locks.get(lockPath);
                 target.append("<S:lock><S:lock-path>");
-                target.append(SVNEncodingUtil.xmlEncodeCDATA(SVNEncodingUtil.uriDecode(relativePath)));
+                lockPath = getRelativePath(lockPath, root);
+                
+                target.append(SVNEncodingUtil.xmlEncodeCDATA(SVNEncodingUtil.uriDecode(lockPath)));
                 target.append("</S:lock-path><S:lock-token>");
                 target.append(token);
                 target.append("</S:lock-token></S:lock>");
@@ -74,14 +73,29 @@ public class DAVMergeHandler extends BasicDAVHandler {
         return target;
     }
     
+    // both paths shouldn't end with '/'
+    private static String getRelativePath(String path, String root) {
+        if (path.length() <= root.length()) {
+            return "";
+        }
+        return path.substring(root.length() + 1);
+    }
+    
     public static boolean hasChildPaths(String path, Map locks) {
         for (Iterator paths = locks.keySet().iterator(); paths.hasNext();) {
             String lockPath = (String) paths.next();
-            if (SVNPathUtil.getPathAsChild(path, lockPath) != null) {
+            if (isChildPath(path, lockPath)) {
                 return true;
             }
         }
         return false;
+    }
+    
+    private static boolean isChildPath(String path, String childPath) {
+        if (path.equals(childPath)) {
+            return true;
+        }
+        return childPath.startsWith(path + "/");
     }
     
     private ISVNWorkspaceMediator myMediator;
@@ -150,7 +164,7 @@ public class DAVMergeHandler extends BasicDAVHandler {
                 } 
             }
         } else if (element == DAVElement.CREATION_DATE) {
-            myCommitDate = SVNDate.parseDate(cdata.toString());
+            myCommitDate = SVNTimeUtil.parseDate(cdata.toString());
         } else if (element == DAVElement.CREATOR_DISPLAY_NAME) {
             myAuthor = cdata.toString();
         } else if (element == DAVElement.VERSION_NAME) {

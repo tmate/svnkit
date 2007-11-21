@@ -12,7 +12,6 @@
 package org.tmatesoft.svn.core.internal.util;
 
 import java.security.MessageDigest;
-import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.Date;
 
@@ -111,14 +110,4 @@ public class SVNSSLUtil {
       return mask;
   }
 
-	public static class CertificateNotTrustedException extends CertificateException {
-
-		public CertificateNotTrustedException() {
-			super();
-		}
-
-		public CertificateNotTrustedException(String msg) {
-			super(msg);
-		}
-	}
 }

@@ -105,9 +105,26 @@ public class SVNGanymedSession {
             SVNDebugLog.getDefaultLog().info(ourRequestor + ": EXISTING CONNECTIONS COUNT: " + connectionsList.size());
             for (Iterator infos = connectionsList.iterator(); infos.hasNext();) {
                 SSHConnectionInfo info = (SSHConnectionInfo) infos.next();
+                // ping connection here. if it is stale - close connection and remove it from the pool.
+                try {
+                    info.myConnection.ping();
+                } catch (IOException e) {
+                    // ping failed, remove _this_ info only and close its connection.
+                    // the we may check next available connection.
+                    
+                    // all channels binded to the closed connection will be closed
+                    // on the next attempt to access them.
+                    SVNDebugLog.getDefaultLog().info(ourRequestor + ": ROTTEN CONNECTION DETECTED, WILL CLOSE IT: " + info);
+                    infos.remove();
+                    // to let it be closed even if it is the last one.
+                    info.setPersistent(false);
+                    SVNDebugLog.getDefaultLog().info(ourRequestor + ": ROTTEN CONNECTION MADE NOT PERSISTENT: " + info);
+                    closeConnection(info);
+                    continue;
+                }
                 if (info.getSessionCount() < MAX_SESSIONS_PER_CONNECTION) {
                     info.resetTimeout();
-                    SVNDebugLog.getDefaultLog().info(ourRequestor + ": REUSING ONE WITH " + info.getSessionCount() + " SESSIONS");
+                    SVNDebugLog.getDefaultLog().info(ourRequestor + ": REUSING ONE WITH " + info.getSessionCount() + " SESSIONS: " + info.myConnection);
                     return info;
                 }
             }
@@ -126,7 +143,7 @@ public class SVNGanymedSession {
         lock(Thread.currentThread());
         try {
             if (!connectionInfo.isPersistent()) {
-                SVNDebugLog.getDefaultLog().info(ourRequestor + ": CLOSED, NOT PERSISTENT: " + connectionInfo);
+                SVNDebugLog.getDefaultLog().info(ourRequestor + ": CLOSED, NOT PERSISTENT OR STALE: " + connectionInfo);
                 connectionInfo.dispose();
                 return;
             }
@@ -383,6 +400,15 @@ public class SVNGanymedSession {
                     myConnection.close();
                     myConnection = null;
                 }
+            } finally {
+                unlock();
+            }
+        }
+        
+        public void setPersistent(boolean persistent) {
+            lock(Thread.currentThread());
+            try {
+                myIsPersistent = persistent;
             } finally {
                 unlock();
             }

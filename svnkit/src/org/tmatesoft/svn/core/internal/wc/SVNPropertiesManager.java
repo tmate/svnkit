@@ -19,21 +19,20 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.StringTokenizer;
 
-import org.tmatesoft.svn.core.SVNDepth;
 import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNNodeKind;
 import org.tmatesoft.svn.core.SVNProperty;
-import org.tmatesoft.svn.core.internal.wc.admin.ISVNEntryHandler;
+import org.tmatesoft.svn.core.internal.wc.admin.SVNLog;
 import org.tmatesoft.svn.core.internal.wc.admin.SVNAdminArea;
 import org.tmatesoft.svn.core.internal.wc.admin.SVNEntry;
-import org.tmatesoft.svn.core.internal.wc.admin.SVNLog;
 import org.tmatesoft.svn.core.internal.wc.admin.SVNTranslator;
 import org.tmatesoft.svn.core.internal.wc.admin.SVNVersionedProperties;
 import org.tmatesoft.svn.core.internal.wc.admin.SVNWCAccess;
 import org.tmatesoft.svn.core.wc.ISVNOptions;
 import org.tmatesoft.svn.core.wc.SVNStatusType;
+
 
 
 /**
@@ -56,17 +55,17 @@ public class SVNPropertiesManager {
         NOT_ALLOWED_FOR_DIR.add(SVNProperty.MIME_TYPE);
     }
 
-    public static boolean setWCProperty(SVNWCAccess access, File path, String propName, String propValue, 
-            boolean write) throws SVNException {
-        SVNEntry entry = access.getVersionedEntry(path, false);
+    public static void setWCProperty(SVNWCAccess access, File path, String propName, String propValue, boolean write) throws SVNException {
+        SVNEntry entry = access.getEntry(path, false);
+        if (entry == null) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.UNVERSIONED_RESOURCE, "''{0}'' is not under version control", path);
+            SVNErrorManager.error(err);
+        }
         SVNAdminArea dir = entry.getKind() == SVNNodeKind.DIR ? access.retrieve(path) : access.retrieve(path.getParentFile());
-        SVNVersionedProperties wcProps = dir.getWCProperties(entry.getName());
-        String oldValue = wcProps.getPropertyValue(propName);
-        wcProps.setPropertyValue(propName, propValue);
+        dir.getWCProperties(entry.getName()).setPropertyValue(propName, propValue);
         if (write) {
             dir.saveWCProperties(false);
         }
-        return oldValue == null ? propValue != null : !oldValue.equals(propValue);
     }
 
     public static String getWCProperty(SVNWCAccess access, File path, String propName) throws SVNException {
@@ -129,16 +128,20 @@ public class SVNPropertiesManager {
         return dir.getProperties(entry.getName()).getPropertyValue(propName);
     }
 
-    public static boolean setProperty(SVNWCAccess access, File path, String propName, String propValue, 
-            boolean skipChecks) throws SVNException {
+    public static void setProperty(SVNWCAccess access, File path, String propName, String propValue, boolean skipChecks) throws SVNException {
         if (SVNProperty.isWorkingCopyProperty(propName)) {
-            return setWCProperty(access, path, propName, propValue, true);
+            setWCProperty(access, path, propName, propValue, true);
+            return;
         } else if (SVNProperty.isEntryProperty(propName)) {
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.BAD_PROP_KIND, "Property ''{0}'' is an entry property", propName);
             SVNErrorManager.error(err);
         }
-        SVNEntry entry = access.getVersionedEntry(path, false);
-        SVNAdminArea dir = entry.getAdminArea();
+        SVNEntry entry = access.getEntry(path, false);
+        if (entry == null) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.UNVERSIONED_RESOURCE, "''{0}'' is not under version control", path);
+            SVNErrorManager.error(err);
+        }
+        SVNAdminArea dir = entry.getKind() == SVNNodeKind.DIR ? access.retrieve(path) : access.retrieve(path.getParentFile());
         boolean updateTimeStamp = SVNProperty.EOL_STYLE.equals(propName);
         if (propValue != null) {
             validatePropertyName(path, propName, entry.getKind());
@@ -153,7 +156,7 @@ public class SVNPropertiesManager {
                     propValue += "\n";
                 }
                 if (SVNProperty.EXTERNALS.equals(propName)) {
-                    SVNExternal.parseExternals(path.getAbsolutePath(), propValue);
+                    // TODO validate
                 }
             } else if (SVNProperty.KEYWORDS.equals(propName)) {
                 propValue = propValue.trim();
@@ -175,8 +178,8 @@ public class SVNPropertiesManager {
             }
         }
         SVNVersionedProperties properties = dir.getProperties(entry.getName());
-        String oldValue = properties.getPropertyValue(propName);
         if (!updateTimeStamp && (entry.getKind() == SVNNodeKind.FILE && SVNProperty.KEYWORDS.equals(propName))) {
+            String oldValue = properties.getPropertyValue(SVNProperty.KEYWORDS);
             Collection oldKeywords = getKeywords(oldValue);
             Collection newKeywords = getKeywords(propValue);
             updateTimeStamp = !oldKeywords.equals(newKeywords); 
@@ -192,11 +195,14 @@ public class SVNPropertiesManager {
         dir.saveVersionedProperties(log, false);
         log.save();
         dir.runLogs();
-        return oldValue == null ? propValue != null : !oldValue.equals(propValue);
     }
     
     public static SVNStatusType mergeProperties(SVNWCAccess wcAccess, File path, Map baseProperties, Map diff, boolean baseMerge, boolean dryRun) throws SVNException {
-        SVNEntry entry = wcAccess.getVersionedEntry(path, false);
+        SVNEntry entry = wcAccess.getEntry(path, false);
+        if (entry == null) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.UNVERSIONED_RESOURCE, "''{0}'' is not under version control", path);
+            SVNErrorManager.error(err);
+        }
         File parent = null;
         String name = null;
         if (entry.isDirectory()) {
@@ -239,102 +245,6 @@ public class SVNPropertiesManager {
         return properties;
     }
     
-    public static Map getWorkingCopyPropertyValues(File path, SVNEntry entry, final String propName, 
-            SVNDepth depth, final boolean base) throws SVNException {
-        final Map pathsToPropValues = new HashMap();
-        
-        ISVNEntryHandler handler = new ISVNEntryHandler() {
-            public void handleEntry(File path, SVNEntry entry) throws SVNException {
-                SVNAdminArea adminArea = entry.getAdminArea();
-                if (entry.isDirectory() && !entry.getName().equals(adminArea.getThisDirName())) {
-                    return;
-                }
-                
-                if ((entry.isScheduledForAddition() && base) ||
-                    (entry.isScheduledForDeletion() && !base)) {
-                    return;
-                }
-                
-                String propValue = null;
-                if (base) {
-                    SVNVersionedProperties baseProps = adminArea.getBaseProperties(entry.getName());
-                    propValue = baseProps.getPropertyValue(propName);
-                } else {
-                    SVNVersionedProperties workingProps = adminArea.getProperties(entry.getName());
-                    propValue = workingProps.getPropertyValue(propName);
-                }
-                
-                if (propValue != null) {
-                    pathsToPropValues.put(path, propValue);
-                }
-            }
-            
-            public void handleError(File path, SVNErrorMessage error) throws SVNException {
-                while (error.hasChildErrorMessage()) {
-                    error = error.getChildErrorMessage();
-                }
-                if (error.getErrorCode() == SVNErrorCode.WC_PATH_NOT_FOUND) {
-                    return;
-                }
-                SVNErrorManager.error(error);
-            }
-        };
-        
-        if (depth == SVNDepth.UNKNOWN) {
-            depth = SVNDepth.INFINITY;
-        }
-        
-        SVNAdminArea adminArea = entry.getAdminArea();
-        if (entry.isDirectory() && depth.compareTo(SVNDepth.FILES) >= 0) {
-            SVNWCAccess wcAccess = adminArea.getWCAccess(); 
-            wcAccess.walkEntries(path, handler, false, depth);    
-        } else {
-            handler.handleEntry(path, entry);
-        }
-        
-        return pathsToPropValues;
-    }
-
-    public static void recordWCMergeInfo(File path, Map mergeInfo, SVNWCAccess wcAccess) throws SVNException {
-        String value = null;
-        if (mergeInfo != null) {
-            value = SVNMergeInfoManager.formatMergeInfoToString(mergeInfo); 
-        }
-        setProperty(wcAccess, path, SVNProperty.MERGE_INFO, value, true);
-    }
-    
-    public static Map parseMergeInfo(File path, SVNEntry entry, boolean base) throws SVNException {
-        Map fileToProp = SVNPropertiesManager.getWorkingCopyPropertyValues(path, entry, SVNProperty.MERGE_INFO, 
-                SVNDepth.EMPTY, base); 
-
-        Map result = null;
-        String propValue = (String) fileToProp.get(path);
-        if (propValue != null) {
-            result = SVNMergeInfoManager.parseMergeInfo(new StringBuffer(propValue), result);
-        }
-        return result;
-    }
-    
-    public static boolean isValidPropertyName(String name) throws SVNException {
-        if (name == null || name.length() == 0) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.CLIENT_PROPERTY_NAME, 
-            "Property name is empty");
-            SVNErrorManager.error(err);
-        }
-
-        if (!(Character.isLetter(name.charAt(0)) || name.charAt(0) == ':' || name.charAt(0) == '_')) {
-            return false;
-        }
-        for (int i = 1; i < name.length(); i++) {
-            if (!(Character.isLetterOrDigit(name.charAt(i))
-                    || name.charAt(i) == '-' || name.charAt(i) == '.'
-                    || name.charAt(i) == ':' || name.charAt(i) == '_')) {
-                return false;
-            }
-        }
-        return true;
-    }
-
     private static void validatePropertyName(File path, String name, SVNNodeKind kind) throws SVNException {
         SVNErrorMessage err = null;
         if (kind == SVNNodeKind.DIR) {

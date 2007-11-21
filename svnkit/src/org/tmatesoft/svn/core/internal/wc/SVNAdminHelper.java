@@ -120,20 +120,17 @@ public class SVNAdminHelper {
         }
     }
     
-    public static void deltifyDir(FSFS fsfs, FSRevisionRoot srcRoot, String srcParentDir, 
-                                  String srcEntry, FSRevisionRoot tgtRoot, String tgtFullPath, 
-                                  ISVNEditor editor) throws SVNException {
+    public static void deltifyDir(FSFS fsfs, FSRevisionRoot srcRoot, String srcParentDir, String srcEntry, FSRevisionRoot tgtRoot, String tgtFullPath, ISVNEditor editor) throws SVNException {
         if (srcParentDir == null) {
             generateNotADirError("source parent", srcParentDir);
         }
         
         if (tgtFullPath == null) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_PATH_SYNTAX, 
-                                                         "Invalid target path");
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_PATH_SYNTAX, "Invalid target path");
             SVNErrorManager.error(err);
         }
         
-        String srcFullPath = SVNPathUtil.getAbsolutePath(SVNPathUtil.append(srcParentDir, srcEntry));
+        String srcFullPath = SVNPathUtil.concatToAbs(srcParentDir, srcEntry);
         SVNNodeKind tgtKind = tgtRoot.checkNodeKind(tgtFullPath); 
         SVNNodeKind srcKind = srcRoot.checkNodeKind(srcFullPath);
         
@@ -218,8 +215,7 @@ public class SVNAdminHelper {
         return ++readLength;
     }
 
-    private static void addFileOrDir(FSFS fsfs, ISVNEditor editor, FSRevisionRoot srcRoot, 
-            FSRevisionRoot tgtRoot, String tgtPath, String editPath, SVNNodeKind tgtKind) throws SVNException {
+    private static void addFileOrDir(FSFS fsfs, ISVNEditor editor, FSRevisionRoot srcRoot, FSRevisionRoot tgtRoot, String tgtPath, String editPath, SVNNodeKind tgtKind) throws SVNException {
         if (tgtKind == SVNNodeKind.DIR) {
             editor.addDir(editPath, null, -1);
             deltifyDirs(fsfs, editor, srcRoot, tgtRoot, null, tgtPath, editPath);
@@ -282,12 +278,12 @@ public class SVNAdminHelper {
             FSEntry tgtEntry = (FSEntry) targetEntries.get(name);
             
             SVNNodeKind tgtKind = tgtEntry.getType();
-            String targetFullPath = SVNPathUtil.getAbsolutePath(SVNPathUtil.append(tgtPath, tgtEntry.getName()));
-            String editFullPath = SVNPathUtil.getAbsolutePath(SVNPathUtil.append(editPath, tgtEntry.getName()));
+            String targetFullPath = SVNPathUtil.concatToAbs(tgtPath, tgtEntry.getName());
+            String editFullPath = SVNPathUtil.concatToAbs(editPath, tgtEntry.getName());
             
             if (sourceEntries != null && sourceEntries.containsKey(name)) {
                 FSEntry srcEntry = (FSEntry) sourceEntries.get(name);
-                String sourceFullPath = SVNPathUtil.getAbsolutePath(SVNPathUtil.append(srcPath, tgtEntry.getName()));
+                String sourceFullPath = SVNPathUtil.concatToAbs(srcPath, tgtEntry.getName());
                 SVNNodeKind srcKind = srcEntry.getType();
                 
                 int distance = srcEntry.getId().compareTo(tgtEntry.getId());
@@ -307,7 +303,7 @@ public class SVNAdminHelper {
             for (Iterator srcEntries = sourceEntries.keySet().iterator(); srcEntries.hasNext();) {
                 String name = (String) srcEntries.next();
                 FSEntry entry = (FSEntry) sourceEntries.get(name);
-                String editFullPath = SVNPathUtil.getAbsolutePath(SVNPathUtil.append(editPath, entry.getName()));
+                String editFullPath = SVNPathUtil.concatToAbs(editPath, entry.getName());
                 editor.deleteEntry(editFullPath, -1);
             }
         }
@@ -361,6 +357,7 @@ public class SVNAdminHelper {
     public static final String DUMPFILE_TEXT_DELTA             = "Text-delta";
     public static final String DUMPFILE_UUID                   = "UUID";
     public static final String DUMPFILE_TEXT_CONTENT_CHECKSUM  = "Text-content-md5";    
+    public static final int STREAM_CHUNK_SIZE                  = 16384;
     public static final int DUMPFILE_FORMAT_VERSION            = 3;
 
     public static final int NODE_ACTION_ADD     = 1;

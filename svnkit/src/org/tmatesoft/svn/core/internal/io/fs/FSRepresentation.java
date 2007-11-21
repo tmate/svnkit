@@ -11,8 +11,6 @@
  */
 package org.tmatesoft.svn.core.internal.io.fs;
 
-import org.tmatesoft.svn.core.io.SVNRepository;
-
 /**
  * @version 1.1.1
  * @author  TMate Software Ltd.
@@ -48,7 +46,7 @@ public class FSRepresentation {
     }
 
     public FSRepresentation() {
-        myRevision = SVNRepository.INVALID_REVISION;
+        myRevision = FSRepository.SVN_INVALID_REVNUM;
         myOffset = -1;
         mySize = -1;
         myExpandedSize = -1;

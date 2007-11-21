@@ -32,11 +32,10 @@ import org.tmatesoft.svn.core.internal.io.dav.http.HTTPStatus;
 import org.tmatesoft.svn.core.internal.io.dav.http.IHTTPConnection;
 import org.tmatesoft.svn.core.internal.io.dav.http.IHTTPConnectionFactory;
 import org.tmatesoft.svn.core.internal.util.SVNEncodingUtil;
+import org.tmatesoft.svn.core.internal.util.SVNTimeUtil;
 import org.tmatesoft.svn.core.internal.util.SVNUUIDGenerator;
-import org.tmatesoft.svn.core.internal.util.SVNDate;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.io.SVNRepository;
-
 import org.xml.sax.helpers.DefaultHandler;
 
 
@@ -52,19 +51,10 @@ public class DAVConnection {
     private boolean myKeepLocks;
     private IHTTPConnectionFactory myConnectionFactory;
     private SVNRepository myRepository;
-    private boolean myIsSpoolReport;
     
     public DAVConnection(IHTTPConnectionFactory connectionFactory, SVNRepository repository) {
         myRepository = repository;
         myConnectionFactory = connectionFactory;
-    }
-    
-    public boolean isReportResponseSpooled() {
-        return myIsSpoolReport;
-    }
-    
-    public void setReportResponseSpooled(boolean spool) {
-        myIsSpoolReport = spool;
     }
     
     public SVNURL getLocation() {
@@ -121,7 +111,7 @@ public class DAVConnection {
         String comment = handler.getComment();
         String owner = rc.getHeader().getFirstHeaderValue(HTTPHeader.LOCK_OWNER_HEADER);
         String created = rc.getHeader().getFirstHeaderValue(HTTPHeader.CREATION_DATE_HEADER);
-        Date createdDate = created != null ? SVNDate.parseDate(created) : null;
+        Date createdDate = created != null ? SVNTimeUtil.parseDate(created) : null;
         path = SVNEncodingUtil.uriDecode(info.baselinePath);
         if (!path.startsWith("/")) {
             path = "/" + path;
@@ -186,7 +176,7 @@ public class DAVConnection {
                 SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.RA_DAV_MALFORMED_DATA, "Incomplete lock data returned");
                 SVNErrorManager.error(err);
             }
-            Date createdDate = created != null ? SVNDate.parseDate(created) : null;
+            Date createdDate = created != null ? SVNTimeUtil.parseDate(created) : null;            
             return new SVNLock(info.baselinePath, handler.getID(), userName, comment, createdDate, null);
         }
         return null;
@@ -222,7 +212,7 @@ public class DAVConnection {
     }
 
     public HTTPStatus doReport(String path, StringBuffer requestBody, DefaultHandler handler, boolean spool) throws SVNException {
-        myHttpConnection.setSpoolResponse(spool || isReportResponseSpooled());
+        myHttpConnection.setSpoolResponse(spool);
         try {
             HTTPHeader header = new HTTPHeader();
             header.addHeaderValue("Accept-Encoding", "svndiff1;q=0.9,svndiff;q=0.8");

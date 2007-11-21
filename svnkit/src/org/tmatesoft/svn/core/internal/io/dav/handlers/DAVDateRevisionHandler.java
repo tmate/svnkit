@@ -15,8 +15,7 @@ package org.tmatesoft.svn.core.internal.io.dav.handlers;
 import java.util.Date;
 
 import org.tmatesoft.svn.core.internal.io.dav.DAVElement;
-import org.tmatesoft.svn.core.internal.util.SVNDate;
-
+import org.tmatesoft.svn.core.internal.util.SVNTimeUtil;
 import org.xml.sax.Attributes;
 
 
@@ -32,7 +31,7 @@ public class DAVDateRevisionHandler extends BasicDAVHandler {
         body.append("<S:dated-rev-report xmlns:S=\"svn:\" ");
         body.append("xmlns:D=\"DAV:\">");
         body.append("<D:creationdate>");
-        body.append(SVNDate.formatDate(date));
+        SVNTimeUtil.formatDate(date, body);
         body.append("</D:creationdate>");
         body.append("</S:dated-rev-report>");
         return body;

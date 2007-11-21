@@ -34,35 +34,26 @@ import org.tmatesoft.svn.core.SVNNodeKind;
 import org.tmatesoft.svn.core.SVNProperty;
 import org.tmatesoft.svn.core.SVNRevisionProperty;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
+import org.tmatesoft.svn.core.internal.util.SVNTimeUtil;
 import org.tmatesoft.svn.core.internal.util.SVNUUIDGenerator;
-import org.tmatesoft.svn.core.internal.util.SVNDate;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.internal.wc.SVNFileListUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNFileType;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNProperties;
 import org.tmatesoft.svn.core.io.ISVNLockHandler;
-import org.tmatesoft.svn.core.io.SVNRepository;
 
 /**
  * @version 1.1.1
  * @author  TMate Software Ltd.
  */
 public class FSFS {
-    public static final String DB_DIR = "db";
-    public static final String REVS_DIR = "revs";
-    public static final String TXN_CURRENT_FILE = "transaction-current";
-    public static final String REVISION_PROPERTIES_DIR = "revprops";
-    public static final String WRITE_LOCK_FILE = "write-lock";
-    public static final String LOCKS_DIR = "locks";
-    public static final String TRANSACTIONS_DIR = "transactions";
-    
+    public static final String SVN_REPOS_DB_DIR = "db";
     public static final String TXN_PATH_EXT = ".txn";
-    public static final String TXN_MERGEINFO_PATH = "mergeinfo";
     public static final String TXN_PATH_EXT_CHILDREN = ".children";
     public static final String PATH_PREFIX_NODE = "node.";
     public static final String TXN_PATH_EXT_PROPS = ".props";
-    public static final int    DIGEST_SUBDIR_LEN = 3;
+    public static final int DIGEST_SUBDIR_LEN = 3;
     public static final String SVN_OPAQUE_LOCK_TOKEN = "opaquelocktoken:";
     public static final String TXN_PATH_REV = "rev";
     public static final String PATH_LOCK_KEY = "path";
@@ -74,15 +65,8 @@ public class FSFS {
     public static final String EXPIRATION_DATE_LOCK_KEY = "expiration_date";
     public static final String COMMENT_LOCK_KEY = "comment";
     
-    public static final int REPOSITORY_FORMAT = 5;
-    public static final int REPOSITORY_FORMAT_LEGACY = 3;
-    public static final int DB_FORMAT = 3;
-    public static final int DB_FORMAT_LOW = 1;
-    public static final int LAYOUT_FORMAT_OPTION_MINIMAL_FORMAT = 3;
-    public static final int MIN_CURRENT_TXN_FORMAT = 3;
-
-    //TODO: we should be able to change this via some option
-    private static long DEFAULT_MAX_FILES_PER_DIRECTORY = 1000;
+    private static final int REPOSITORY_FORMAT = 5;
+    private static final int DB_FORMAT = 2;
     private static final String DB_TYPE = "fsfs";
     
     private int myDBFormat;
@@ -98,26 +82,19 @@ public class FSFS {
     private File myDBRoot;
     private File myWriteLockFile;
     private File myCurrentFile;
-    private File myTransactionCurrentFile;
-    private long myMaxFilesPerDirectory;
 
     public FSFS(File repositoryRoot) {
         myRepositoryRoot = repositoryRoot;
-        myDBRoot = new File(myRepositoryRoot, DB_DIR);
-        myRevisionsRoot = new File(myDBRoot, REVS_DIR);
-        myRevisionPropertiesRoot = new File(myDBRoot, REVISION_PROPERTIES_DIR);
-        myTransactionsRoot = new File(myDBRoot, TRANSACTIONS_DIR);
-        myWriteLockFile = new File(myDBRoot, WRITE_LOCK_FILE);
-        myLocksRoot = new File(myDBRoot, LOCKS_DIR);
-        myMaxFilesPerDirectory = 0;
+        myDBRoot = new File(myRepositoryRoot, "db");
+        myRevisionsRoot = new File(myDBRoot, "revs");
+        myRevisionPropertiesRoot = new File(myDBRoot, "revprops");
+        myTransactionsRoot = new File(myDBRoot, "transactions");
+        myWriteLockFile = new File(myDBRoot, "write-lock");
+        myLocksRoot = new File(myDBRoot, "locks");
     }
     
     public int getDBFormat() {
         return myDBFormat;
-    }
-    
-    public long getMaxFilesPerDirectory() {
-        return myMaxFilesPerDirectory;
     }
     
     public int getReposFormat() {
@@ -130,20 +107,11 @@ public class FSFS {
         int format = -1;
         try {
             format = formatFile.readInt();
-        } catch (NumberFormatException nfe) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.BAD_VERSION_FILE_FORMAT, "First line of ''{0}'' contains non-digit", formatFile.getFile());
-            SVNErrorManager.error(err);
         } finally {
             formatFile.close();
         }
-
-        if (format != REPOSITORY_FORMAT && format != REPOSITORY_FORMAT_LEGACY) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.REPOS_UNSUPPORTED_VERSION, 
-                                  "Expected repository format ''{0,number,integer}'' or " +
-                                  "''{1,number,integer}''; found format ''{2,number,integer}''",
-                                  new Object[] {new Integer(REPOSITORY_FORMAT_LEGACY),
-                                                new Integer(REPOSITORY_FORMAT),
-                                                new Integer(format)});
+        if (format > REPOSITORY_FORMAT) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.REPOS_UNSUPPORTED_VERSION, "Expected format ''{0,number,integer}'' of repository; found format ''{1,number,integer}''", new Object[]{new Integer(REPOSITORY_FORMAT), new Integer(format)});
             SVNErrorManager.error(err);
         }
         myReposFormat = format;
@@ -151,30 +119,15 @@ public class FSFS {
         formatFile = new FSFile(new File(myDBRoot, "format"));
         try {
             format = formatFile.readInt();
-            readOptions(formatFile, format);
         } catch (SVNException svne) {
             if (svne.getCause() instanceof FileNotFoundException) {
                 format = DB_FORMAT;
-            } else if (svne.getErrorMessage().getErrorCode() == SVNErrorCode.STREAM_UNEXPECTED_EOF) {
-                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.BAD_VERSION_FILE_FORMAT, "Can''t read first line of format file ''{0}''", formatFile.getFile());
-                SVNErrorManager.error(err);
-            } else {
-                throw svne;
             }
-        } catch (NumberFormatException nfe) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.BAD_VERSION_FILE_FORMAT, "Format file ''{0}'' contains an unexpected non-digit", formatFile.getFile());
-            SVNErrorManager.error(err);
         } finally {
             formatFile.close();
         }
-        
-        if (format < DB_FORMAT_LOW || format > DB_FORMAT) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_UNSUPPORTED_FORMAT, 
-                                  "Expected FS format between ''{0,number,integer}'' and " +
-                                  "''{1,number,integer}''; found format ''{2,number,integer}''", 
-                                  new Object[] {new Integer(DB_FORMAT_LOW), 
-                                                new Integer(DB_FORMAT), 
-                                                new Integer(format)});
+        if (format > DB_FORMAT) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_UNSUPPORTED_FORMAT, "Expected FS format ''{0,number,integer}''; found format ''{1,number,integer}''", new Object[]{new Integer(DB_FORMAT), new Integer(format)});
             SVNErrorManager.error(err);
         }
         myDBFormat = format;
@@ -289,8 +242,8 @@ public class FSFS {
         return new FSRevisionRoot(this, revision);
     }
     
-    public FSTransactionRoot createTransactionRoot(FSTransactionInfo txn) throws SVNException {
-        Map txnProps = getTransactionProperties(txn.getTxnId());
+    public FSTransactionRoot createTransactionRoot(String txnId) throws SVNException {
+        Map txnProps = getTransactionProperties(txnId);
         int flags = 0;
         if (txnProps.get(SVNProperty.TXN_CHECK_OUT_OF_DATENESS) != null) {
             flags |= FSTransactionRoot.SVN_FS_TXN_CHECK_OUT_OF_DATENESS;
@@ -299,7 +252,7 @@ public class FSFS {
             flags |= FSTransactionRoot.SVN_FS_TXN_CHECK_LOCKS;
         }
 
-        return new FSTransactionRoot(this, txn.getTxnId(), txn.getBaseRevision(), flags);
+        return new FSTransactionRoot(this, txnId, flags);
     }
 
     public FSTransactionInfo openTxn(String txnName) throws SVNException {
@@ -309,7 +262,7 @@ public class FSFS {
             SVNErrorManager.error(err);
         }
         
-        FSTransactionRoot txnRoot = new FSTransactionRoot(this, txnName, -1, 0);
+        FSTransactionRoot txnRoot = new FSTransactionRoot(this, txnName, 0);
         FSTransactionInfo localTxn = txnRoot.getTxn();
         return new FSTransactionInfo(localTxn.getBaseRevision(), txnName);
     }
@@ -331,12 +284,8 @@ public class FSFS {
         } finally{
             revisionFile.close();
         }
-        
-        FSRevisionNode node = FSRevisionNode.fromMap(headers);
-        if (node.isFreshTxnRoot()) {
-            node.setFreshRootPredecessorId(node.getPredecessorId());
-        }
-        return node;
+
+        return FSRevisionNode.fromMap(headers);
     }
     
     public Map getDirContents(FSRevisionNode revNode) throws SVNException {
@@ -377,9 +326,7 @@ public class FSFS {
                 String checksum = revisionFile.digest();
                
                 if (!checksum.equals(textRep.getHexDigest())) {
-                    SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_CORRUPT, "Checksum mismatch while reading representation:\n   expected:  {0}\n     actual:  {1}", new Object[] {
-                            checksum, textRep.getHexDigest()
-                    });
+                    SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_CORRUPT, "Checksum mismatch while reading representation:\n   expected:  {0}\n     actual:  {1}", new Object[]{checksum, textRep.getHexDigest()});
                     SVNErrorManager.error(err);
                 }
 
@@ -422,9 +369,7 @@ public class FSFS {
                 String checksum = revisionFile.digest();
 
                 if (!checksum.equals(propsRep.getHexDigest())) {
-                    SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_CORRUPT, "Checksum mismatch while reading representation:\n   expected:  {0}\n     actual:  {1}", new Object[] {
-                            checksum, propsRep.getHexDigest()
-                    });
+                    SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_CORRUPT, "Checksum mismatch while reading representation:\n   expected:  {0}\n     actual:  {1}", new Object[]{checksum, propsRep.getHexDigest()});
                     SVNErrorManager.error(err);
                 }
                 return props;
@@ -472,45 +417,6 @@ public class FSFS {
         ids[1] = copyID;
         return ids;
     }
-    
-    public String getAndIncrementTxnKey() throws SVNException {
-        FSWriteLock writeLock = FSWriteLock.getWriteLock(this);
-        synchronized (writeLock) {
-            try {
-                writeLock.lock();
-                File txnCurrentFile = getTransactionCurrentFile();
-                FSFile reader = new FSFile(txnCurrentFile);
-                String txnId = null;
-                try {
-                    txnId = reader.readLine(200);
-                } finally {
-                    reader.close();
-                }
-                
-                String nextTxnId = FSTransactionRoot.generateNextKey(txnId);
-
-                OutputStream txnCurrentOS = null;
-                File tmpFile = null;
-                try {
-                    tmpFile = SVNFileUtil.createUniqueFile(txnCurrentFile.getParentFile(),
-                                                           TXN_CURRENT_FILE, ".tmp");
-                    txnCurrentOS = SVNFileUtil.openFileForWriting(tmpFile);
-                    nextTxnId = nextTxnId + "\n";
-                    txnCurrentOS.write(nextTxnId.getBytes("UTF-8"));
-                } catch (IOException ioe) {
-                    SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, ioe.getLocalizedMessage());
-                    SVNErrorManager.error(err, ioe);
-                } finally {
-                    SVNFileUtil.closeFile(txnCurrentOS);
-                }
-                SVNFileUtil.rename(tmpFile, txnCurrentFile);
-                return txnId;
-            } finally {
-                writeLock.unlock();
-                FSWriteLock.realease(writeLock);
-            }
-        }
-    }
 
     public Map listTransactions() {
         Map result = new HashMap(); 
@@ -528,34 +434,20 @@ public class FSFS {
         return result;
     }
     
-    public File getNewRevisionFile(long newRevision) {
-        if (myMaxFilesPerDirectory > 0 && (newRevision % myMaxFilesPerDirectory == 0)) {
-            File shardDir = new File(myRevisionsRoot, String.valueOf(newRevision/myMaxFilesPerDirectory));
-            shardDir.mkdirs();
-        }
-        
-        File revFile = null;
-        if (myMaxFilesPerDirectory > 0) {
-            File shardDir = new File(myRevisionsRoot, String.valueOf(newRevision/myMaxFilesPerDirectory));
-            revFile = new File(shardDir, String.valueOf(newRevision));
-        } else {
-            revFile = new File(myRevisionsRoot, String.valueOf(newRevision));
+    public File getNewRevisionFile(long revision) throws SVNException {
+        File revFile = new File(myRevisionsRoot, String.valueOf(revision));
+        if (revFile.exists()) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_CONFLICT, "Revision already exists");
+            SVNErrorManager.error(err);
         }
         return revFile;
     }
 
-    public File getNewRevisionPropertiesFile(long newRevision) {
-        if (myMaxFilesPerDirectory > 0 && (newRevision % myMaxFilesPerDirectory == 0)) {
-            File shardDir = new File(myRevisionPropertiesRoot, String.valueOf(newRevision/myMaxFilesPerDirectory));
-            shardDir.mkdirs();
-    }
-
-        File revPropsFile = null;
-        if (myMaxFilesPerDirectory > 0) {
-            File shardDir = new File(myRevisionPropertiesRoot, String.valueOf(newRevision/myMaxFilesPerDirectory));
-            revPropsFile = new File(shardDir, String.valueOf(newRevision));
-        } else {
-            revPropsFile = new File(myRevisionPropertiesRoot, String.valueOf(newRevision));
+    public File getNewRevisionPropertiesFile(long revision) throws SVNException {
+        File revPropsFile = new File(myRevisionPropertiesRoot, String.valueOf(revision));
+        if (revPropsFile.exists()) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_CONFLICT, "Revision already exists");
+            SVNErrorManager.error(err);
         }
         return revPropsFile;
     }
@@ -588,19 +480,12 @@ public class FSFS {
     }
     
     public File getRevisionPropertiesFile(long revision) throws SVNException {
-        File revPropsFile = null; 
-        if (myMaxFilesPerDirectory > 0) {
-            File shardDir = new File(myRevisionPropertiesRoot, String.valueOf(revision/myMaxFilesPerDirectory));
-            revPropsFile = new File(shardDir, String.valueOf(revision));
-        } else {
-            revPropsFile = new File(myRevisionPropertiesRoot, String.valueOf(revision));
-        }
-        
-        if (!revPropsFile.exists()) {
+        File file = new File(myRevisionPropertiesRoot, String.valueOf(revision));
+        if (!file.exists()) {
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_NO_SUCH_REVISION, "No such revision {0,number,integer}", new Long(revision));
             SVNErrorManager.error(err);
         }
-        return revPropsFile;
+        return file;
     }
     
     public File getRepositoryRoot(){
@@ -633,27 +518,13 @@ public class FSFS {
     }
 
     public void setTransactionProperty(String txnID, String propertyName, String propertyValue) throws SVNException {
-        if (!SVNProperty.isRegularProperty(propertyName)) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.REPOS_BAD_ARGS,
-                    "Storage of non-regular property ''{0}'' is disallowed through the repository interface, and could indicate a bug in your client", propertyName);
-            SVNErrorManager.error(err);
-        }
         SVNProperties revProps = new SVNProperties(getTransactionPropertiesFile(txnID), null);
         revProps.setPropertyValue(propertyName, propertyValue);
     }
 
     public void setRevisionProperty(long revision, String propertyName, String propertyValue) throws SVNException {
-        FSWriteLock writeLock = FSWriteLock.getWriteLock(this);
-        synchronized (writeLock) {
-            try {
-                writeLock.lock();
-                SVNProperties revProps = new SVNProperties(getRevisionPropertiesFile(revision), null);
-                revProps.setPropertyValue(propertyName, propertyValue);
-            } finally {
-                writeLock.unlock();
-                FSWriteLock.realease(writeLock);
-            }
-        }
+        SVNProperties revProps = new SVNProperties(getRevisionPropertiesFile(revision), null);
+        revProps.setPropertyValue(propertyName, propertyValue);
     }
 
     public Map getTransactionProperties(String txnID) throws SVNException {
@@ -669,29 +540,6 @@ public class FSFS {
         return new File(getTransactionDir(txnID), "props");
     }
 
-    public Map getTransactionMergeInfo(String txnID) throws SVNException {
-        File mergeInfoFile = getTransactionMergeInfoFile(txnID);
-        if (!mergeInfoFile.exists()) {
-            try {
-                mergeInfoFile.createNewFile();
-            } catch (IOException e) {
-                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, e.getLocalizedMessage());
-                SVNErrorManager.error(err);
-            }
-            return new HashMap();
-        }
-        FSFile txnMergeInfoFile = new FSFile(mergeInfoFile);
-        try {
-            return txnMergeInfoFile.readProperties(false);
-        } finally {
-            txnMergeInfoFile.close();
-        }
-    }
-
-    public File getTransactionMergeInfoFile(String txnID) {
-        return new File(getTransactionDir(txnID), TXN_MERGEINFO_PATH);
-    }
-
     public void createNewTxnNodeRevisionFromRevision(String txnID, FSRevisionNode sourceNode) throws SVNException {
         if (sourceNode.getId().isTxn()) {
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_CORRUPT, "Copying from transactions not allowed");
@@ -701,8 +549,7 @@ public class FSFS {
         revNode.setPredecessorId(sourceNode.getId());
         revNode.setCount(revNode.getCount() + 1);
         revNode.setCopyFromPath(null);
-        revNode.setIsFreshTxnRoot(true);
-        revNode.setCopyFromRevision(SVNRepository.INVALID_REVISION);
+        revNode.setCopyFromRevision(FSRepository.SVN_INVALID_REVNUM);
         revNode.setId(FSID.createTxnId(sourceNode.getId().getNodeID(), sourceNode.getId().getCopyID(), txnID));
         putTxnRevisionNode(revNode.getId(), revNode);
     }
@@ -733,45 +580,31 @@ public class FSFS {
         revNodeFile.write(id.getBytes("UTF-8"));
         String type = FSRevisionNode.HEADER_TYPE + ": " + revNode.getType() + "\n";
         revNodeFile.write(type.getBytes("UTF-8"));
-        
         if (revNode.getPredecessorId() != null) {
             String predId = FSRevisionNode.HEADER_PRED + ": " + revNode.getPredecessorId() + "\n";
             revNodeFile.write(predId.getBytes("UTF-8"));
         }
-        
         String count = FSRevisionNode.HEADER_COUNT + ": " + revNode.getCount() + "\n";
         revNodeFile.write(count.getBytes("UTF-8"));
-        
         if (revNode.getTextRepresentation() != null) {
             String textRepresentation = FSRevisionNode.HEADER_TEXT + ": "
                     + (revNode.getTextRepresentation().getTxnId() != null && revNode.getType() == SVNNodeKind.DIR ? "-1" : revNode.getTextRepresentation().toString()) + "\n";
             revNodeFile.write(textRepresentation.getBytes("UTF-8"));
         }
-        
         if (revNode.getPropsRepresentation() != null) {
             String propsRepresentation = FSRevisionNode.HEADER_PROPS + ": " + (revNode.getPropsRepresentation().getTxnId() != null ? "-1" : revNode.getPropsRepresentation().toString()) + "\n";
             revNodeFile.write(propsRepresentation.getBytes("UTF-8"));
         }
-        
         String cpath = FSRevisionNode.HEADER_CPATH + ": " + revNode.getCreatedPath() + "\n";
         revNodeFile.write(cpath.getBytes("UTF-8"));
-        
         if (revNode.getCopyFromPath() != null) {
             String copyFromPath = FSRevisionNode.HEADER_COPYFROM + ": " + revNode.getCopyFromRevision() + " " + revNode.getCopyFromPath() + "\n";
             revNodeFile.write(copyFromPath.getBytes("UTF-8"));
         }
-        
-        if (revNode.getCopyRootRevision() != revNode.getId().getRevision() || 
-            !revNode.getCopyRootPath().equals(revNode.getCreatedPath())) {
+        if (revNode.getCopyRootRevision() != revNode.getId().getRevision() || !revNode.getCopyRootPath().equals(revNode.getCreatedPath())) {
             String copyroot = FSRevisionNode.HEADER_COPYROOT + ": " + revNode.getCopyRootRevision() + " " + revNode.getCopyRootPath() + "\n";
             revNodeFile.write(copyroot.getBytes("UTF-8"));
         }
-        
-        if (revNode.isFreshTxnRoot()) {
-            String isFreshRootStr = FSRevisionNode.HEADER_IS_FRESH_TXN_ROOT + ": y\n";
-            revNodeFile.write(isFreshRootStr.getBytes("UTF-8"));
-        }
-        
         revNodeFile.write("\n".getBytes("UTF-8"));
     }
     
@@ -901,11 +734,11 @@ public class FSFS {
             if (creationTime == null) {
                 SVNErrorManager.error(FSErrors.errorCorruptLockFile(lockPath, this));
             }
-            Date creationDate = SVNDate.parseDateString(creationTime);
+            Date creationDate = SVNTimeUtil.parseDateString(creationTime);
             String expirationTime = (String) lockProps.get(FSFS.EXPIRATION_DATE_LOCK_KEY);
             Date expirationDate = null;
             if (expirationTime != null) {
-                expirationDate = SVNDate.parseDateString(expirationTime);
+                expirationDate = SVNTimeUtil.parseDateString(expirationTime);
             }
             String comment = (String) lockProps.get(FSFS.COMMENT_LOCK_KEY);
             lock = new SVNLock(lockPath, lockToken, lockOwner, comment, creationDate, expirationDate);
@@ -977,7 +810,7 @@ public class FSFS {
     }
 
     public SVNLock lockPath(String path, String token, String username, String comment, Date expirationDate, long currentRevision, boolean stealLock) throws SVNException {
-        String[] paths = { path };
+        String[] paths = {path};
         
         if (username == null) {
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_NO_USER, "Cannot lock path ''{0}'', no authenticated username available.", path);
@@ -1024,88 +857,6 @@ public class FSFS {
         return metaProps;
     }
 
-    public long getDeletedRevision(String path, long startRev, long endRev) throws SVNException {
-        if (FSRepository.isInvalidRevision(startRev)) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_NO_SUCH_REVISION, "Invalid start revision {0,number,integer}", new Long(startRev));
-            SVNErrorManager.error(err);
-        }
-        if (FSRepository.isInvalidRevision(endRev)) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_NO_SUCH_REVISION, "Invalid end revision {0,number,integer}", new Long(endRev));
-            SVNErrorManager.error(err);
-        }
-        if (startRev > endRev) {
-            long tmpRev = endRev;
-            endRev = startRev;
-            startRev = tmpRev;
-        }
-        
-        FSRevisionRoot startRoot = createRevisionRoot(startRev);
-        FSRevisionNode startNode = null;
-        try {
-            startNode = startRoot.getRevisionNode(path);
-        } catch (SVNException svne) {
-            if (svne.getErrorMessage().getErrorCode() == SVNErrorCode.FS_NOT_FOUND) {
-                return SVNRepository.INVALID_REVISION;
-            }
-            throw svne;
-        }
-        FSID startNodeId = startNode.getId();
-
-        FSRevisionRoot endRoot = createRevisionRoot(endRev);
-        FSRevisionNode endNode = null;
-        try {
-            endNode = endRoot.getRevisionNode(path);
-        } catch (SVNException svne) {
-            if (svne.getErrorMessage().getErrorCode() != SVNErrorCode.FS_NOT_FOUND) {
-                throw svne;
-            }
-        }
-        
-        if (endNode != null) {
-            FSID endNodeId = endNode.getId();
-            if (startNodeId.compareTo(endNodeId) != -1) {
-                FSClosestCopy closestCopy = endRoot.getClosestCopy(path);
-                if (closestCopy == null || closestCopy.getRevisionRoot() == null ||
-                        closestCopy.getRevisionRoot().getRevision() <= startRev) {
-                    return SVNRepository.INVALID_REVISION;
-                }
-            }
-        }
-        
-        long midRev = (startRev + endRev)/2;
-        while (true) {
-            FSRevisionRoot root = createRevisionRoot(midRev);
-            FSRevisionNode node = null;
-            try {
-                node = root.getRevisionNode(path);
-            } catch (SVNException svne) {
-                if (svne.getErrorMessage().getErrorCode() == SVNErrorCode.FS_NOT_FOUND) {
-                    endRev = midRev;
-                    midRev = (startRev + endRev)/2;
-                } else {
-                    throw svne;
-    }
-            }
-
-            if (node != null) {
-                FSID currentNodeId = node.getId();
-                int nodeRelationship = startNodeId.compareTo(currentNodeId);
-                FSClosestCopy closestCopy = root.getClosestCopy(path);
-                if (nodeRelationship == -1 || (closestCopy != null && 
-                    closestCopy.getRevisionRoot() != null && 
-                    closestCopy.getRevisionRoot().getRevision() > startRev)) {
-                    endRev = midRev;
-                    midRev = (startRev + endRev)/2;
-                } else if (endRev - midRev == 1) {
-                    return endRev;
-                } else {
-                    startRev = midRev;
-                    midRev = (startRev + endRev)/2; 
-                }
-            }
-        }
-    }
-    
     public static File findRepositoryRoot(File path) {
         if (path == null) {
             path = new File("");
@@ -1124,6 +875,7 @@ public class FSFS {
         if (path == null) {
             path = "";
         }
+
         String testPath = host != null ? SVNPathUtil.append("\\\\" + host, path) : path;
         File rootPath = new File(testPath).getAbsoluteFile();
         while (!isRepositoryRoot(rootPath)) {
@@ -1142,14 +894,6 @@ public class FSFS {
         return path;
     }
 
-    public static long getDefaultMaxFilesPerDirectory() {
-        return DEFAULT_MAX_FILES_PER_DIRECTORY;
-    }
-    
-    public static void setDefaultMaxFilesPerDirectory(long maxFilesPerDirectory) {
-        DEFAULT_MAX_FILES_PER_DIRECTORY = maxFilesPerDirectory;
-    }
-
     protected FSFile getTransactionRevisionPrototypeFile(String txnID) {
         File revFile = new File(getTransactionDir(txnID), TXN_PATH_REV);
         return new FSFile(revFile);
@@ -1166,14 +910,7 @@ public class FSFS {
     }
     
     protected FSFile getRevisionFile(long revision)  throws SVNException {
-        File revisionFile = null;
-        if (myMaxFilesPerDirectory > 0) {
-            File shardDir = new File(myRevisionsRoot, String.valueOf(revision/myMaxFilesPerDirectory));
-            revisionFile = new File(shardDir, String.valueOf(revision));
-        } else {
-            revisionFile = new File(myRevisionsRoot, String.valueOf(revision));
-        }
-        
+        File revisionFile = new File(myRevisionsRoot, String.valueOf(revision));
         if (!revisionFile.exists()) {
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_NO_SUCH_REVISION, "No such revision {0,number,integer}", new Long(revision));
             SVNErrorManager.error(err);
@@ -1191,50 +928,6 @@ public class FSFS {
             myCurrentFile = new File(myDBRoot, "current"); 
         }
         return myCurrentFile;
-    }
-
-    protected File getTransactionCurrentFile(){
-        if(myTransactionCurrentFile == null){
-            myTransactionCurrentFile = new File(myDBRoot, TXN_CURRENT_FILE); 
-        }
-        return myTransactionCurrentFile;
-    }
-
-    public void readOptions(FSFile formatFile, int formatNumber) throws SVNException {
-        while (true) {
-            String line = null;
-            try {
-                line = formatFile.readLine(80);
-            } catch (SVNException svne) {
-                if (svne.getErrorMessage().getErrorCode() == SVNErrorCode.STREAM_UNEXPECTED_EOF) {
-                    break;
-                }
-            }
-            
-            if (formatNumber >= LAYOUT_FORMAT_OPTION_MINIMAL_FORMAT && line.startsWith("layout ")) {
-                String optionValue = line.substring(7);
-                if (optionValue.equals("linear")) {
-                    myMaxFilesPerDirectory = 0;
-                    continue;
-                } else if (optionValue.startsWith("sharded ")) {
-                    optionValue = optionValue.substring(8);
-                    try {
-                        myMaxFilesPerDirectory = Long.parseLong(optionValue); 
-                    } catch (NumberFormatException nfe) {
-                        SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.BAD_VERSION_FILE_FORMAT, "Format file ''{0}'' contains an unexpected non-digit", formatFile.getFile());
-                        SVNErrorManager.error(err);
-                    }
-                    continue;
-                }
-            }
-            
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.BAD_VERSION_FILE_FORMAT, 
-                                                         "''{0}'' contains invalid filesystem " +
-                                                         "format option ''{1}''", 
-                                                         new Object[] {formatFile.getFile(), 
-                                                                       line});
-            SVNErrorManager.error(err);
-        }
     }
 
     private void unlock(String path, String token, String username, boolean breakLock) throws SVNException {
@@ -1271,7 +964,7 @@ public class FSFS {
 
         if (FSRepository.isValidRevision(currentRevision)) {
             FSRevisionNode node = root.getRevisionNode(path);
-            long createdRev = node.getCreatedRevision();
+            long createdRev = node.getId().getRevision();
             if (FSRepository.isInvalidRevision(createdRev)) {
                 SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_OUT_OF_DATE, "Path ''{0}'' doesn't exist in HEAD revision", path);
                 SVNErrorManager.error(err);
@@ -1377,10 +1070,10 @@ public class FSFS {
                 props.put(FSFS.COMMENT_LOCK_KEY, lock.getComment());
             }
             if (lock.getCreationDate() != null) {
-                props.put(FSFS.CREATION_DATE_LOCK_KEY, SVNDate.formatDate(lock.getCreationDate()));
+                props.put(FSFS.CREATION_DATE_LOCK_KEY, SVNTimeUtil.formatDate(lock.getCreationDate()));
             }
             if (lock.getExpirationDate() != null) {
-                props.put(FSFS.EXPIRATION_DATE_LOCK_KEY, SVNDate.formatDate(lock.getExpirationDate()));
+                props.put(FSFS.EXPIRATION_DATE_LOCK_KEY, SVNTimeUtil.formatDate(lock.getExpirationDate()));
             }
         }
         if (children != null && children.size() > 0) {
@@ -1459,7 +1152,7 @@ public class FSFS {
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_GENERAL, "Failed to find time on revision {0,number,integer}", new Long(revision));
             SVNErrorManager.error(err);
         }
-        return SVNDate.parseDateString(timeString);
+        return SVNTimeUtil.parseDateString(timeString);
     }
 
     private static boolean isRepositoryRoot(File candidatePath) {
@@ -1468,7 +1161,7 @@ public class FSFS {
         if (fileType != SVNFileType.FILE) {
             return false;
         }
-        File dbFile = new File(candidatePath, DB_DIR);
+        File dbFile = new File(candidatePath, SVN_REPOS_DB_DIR);
         fileType = SVNFileType.getType(dbFile);
         if (fileType != SVNFileType.DIRECTORY && fileType != SVNFileType.SYMLINK) {
             return false;

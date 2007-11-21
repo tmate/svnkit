@@ -94,7 +94,7 @@ public class FSParentPath {
         if (myParent != null) {
             pathSoFar = myParent.getAbsPath();
         }
-        return SVNPathUtil.getAbsolutePath(SVNPathUtil.append(pathSoFar, getNameEntry()));
+        return getNameEntry() != null ? SVNPathUtil.concatToAbs(pathSoFar, getNameEntry()) : pathSoFar;
     }
 
 }

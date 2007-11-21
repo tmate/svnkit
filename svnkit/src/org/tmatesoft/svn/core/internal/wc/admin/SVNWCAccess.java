@@ -12,12 +12,15 @@
 package org.tmatesoft.svn.core.internal.wc.admin;
 
 import java.io.File;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
+import java.util.StringTokenizer;
 
 import org.tmatesoft.svn.core.SVNCancelException;
-import org.tmatesoft.svn.core.SVNDepth;
 import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
@@ -27,6 +30,7 @@ import org.tmatesoft.svn.core.internal.util.SVNEncodingUtil;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
 import org.tmatesoft.svn.core.internal.wc.DefaultSVNOptions;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
+import org.tmatesoft.svn.core.internal.wc.SVNExternalInfo;
 import org.tmatesoft.svn.core.internal.wc.SVNFileType;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 import org.tmatesoft.svn.core.wc.ISVNEventHandler;
@@ -120,7 +124,7 @@ public class SVNWCAccess implements ISVNEventHandler {
 
     public SVNAdminAreaInfo openAnchor(File path, boolean writeLock, int depth) throws SVNException {
         File parent = path.getParentFile();
-        if (parent == null || "..".equals(path.getName())) {
+        if (parent == null) {
             SVNAdminArea anchor = open(path, writeLock, depth);
             return new SVNAdminAreaInfo(this, anchor, anchor, "");
         }
@@ -487,16 +491,6 @@ public class SVNWCAccess implements ISVNEventHandler {
         return null;
     }
     
-    public SVNEntry getVersionedEntry(File path, boolean showHidden) throws SVNException {
-        SVNEntry entry = getEntry(path, showHidden);
-        if (entry == null) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_NOT_FOUND, "''{0}'' is not under version control", path);
-            SVNErrorManager.error(err);
-        }
-        return entry;
-
-    }
-    
     public void setRepositoryRoot(File path, SVNURL reposRoot) throws SVNException {
         SVNEntry entry = getEntry(path, false);
         if (entry == null) {
@@ -553,9 +547,7 @@ public class SVNWCAccess implements ISVNEventHandler {
             SVNFileType wcType = SVNFileType.getType(adminDir);
             
             if (type == SVNFileType.NONE) {
-                SVNErrorMessage childErr = SVNErrorMessage.create(SVNErrorCode.WC_PATH_NOT_FOUND, "Directory ''{0}'' is missing", path);
                 SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_NOT_LOCKED, "Directory ''{0}'' is missing", path);
-                err.setChildErrorMessage(childErr);
                 SVNErrorManager.error(err);
             } else if (type == SVNFileType.DIRECTORY && wcType == SVNFileType.NONE) {
                 SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_NOT_LOCKED, "Directory ''{0}'' containing working copy admin area is missing", adminDir);
@@ -569,8 +561,8 @@ public class SVNWCAccess implements ISVNEventHandler {
         }
         return adminArea;
     }
-/*
-    public static SVNExternalInfo[] parseExternals(String rootPath, String externals) throws SVNException {
+
+    public static SVNExternalInfo[] parseExternals(String rootPath, String externals) {
         Collection result = new ArrayList();
         if (externals == null) {
             return (SVNExternalInfo[]) result.toArray(new SVNExternalInfo[result.size()]);
@@ -585,7 +577,8 @@ public class SVNWCAccess implements ISVNEventHandler {
             String path;
             long rev = -1;
             List parts = new ArrayList(4);
-            for (StringTokenizer tokens = new StringTokenizer(line, " \t"); tokens.hasMoreTokens();) {
+            for (StringTokenizer tokens = new StringTokenizer(line, " \t"); tokens
+                    .hasMoreTokens();) {
                 String token = tokens.nextToken().trim();
                 parts.add(token);
             }
@@ -624,7 +617,6 @@ public class SVNWCAccess implements ISVNEventHandler {
                 if ("".equals(rootPath) && ((String) parts.get(0)).startsWith("/")) {
                     path = "/" + path;
                 }
-                SVNExternalInfo.checkPath(path);
                 try {
                     url = SVNURL.parseURIEncoded(url).toString();
                 } catch (SVNException e) {
@@ -640,7 +632,8 @@ public class SVNWCAccess implements ISVNEventHandler {
         }
         return (SVNExternalInfo[]) result.toArray(new SVNExternalInfo[result.size()]);
     }
-*/
+
+
     //analogous to retrieve_internal
     public SVNAdminArea getAdminArea(File path) {
         //internal retrieve
@@ -651,35 +644,6 @@ public class SVNWCAccess implements ISVNEventHandler {
         return adminArea;
     }
     
-    public void walkEntries(File path, ISVNEntryHandler handler, boolean showHidden, SVNDepth depth) throws SVNException {
-        SVNEntry entry = getEntry(path, showHidden);
-        if (entry == null) {
-            handler.handleError(path, SVNErrorMessage.create(SVNErrorCode.UNVERSIONED_RESOURCE, 
-                    "''{0}'' is not under version control", path));
-            return;
-        }
-        
-        if (entry.isFile()) {
-            if (depth.compareTo(SVNDepth.FILES) >= 0) {
-                try {
-                    handler.handleEntry(path, entry);
-                } catch (SVNException svne) {
-                    handler.handleError(path, svne.getErrorMessage());
-                }
-            }
-        } else if (entry.isDirectory()) {
-            SVNAdminArea adminArea = entry.getAdminArea();
-            try {
-                adminArea.walkThisDirectory(handler, showHidden, depth);
-            } catch (SVNException svne) {
-                handler.handleError(path, svne.getErrorMessage());
-            }
-        } else {
-           handler.handleError(path, SVNErrorMessage.create(SVNErrorCode.NODE_UNKNOWN_KIND, 
-                   "''{0}'' has an unrecognized node kind", path));
-        }
-    }
-
     private File probe(File path) throws SVNException {
         int wcFormat = -1;
         SVNFileType type = SVNFileType.getType(path);
@@ -699,5 +663,4 @@ public class SVNWCAccess implements ISVNEventHandler {
         } 
         return path;
     }
-    
 }

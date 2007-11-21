@@ -25,7 +25,6 @@ import org.tmatesoft.svn.core.SVNNodeKind;
 import org.tmatesoft.svn.core.internal.delta.SVNDeltaCombiner;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
-import org.tmatesoft.svn.core.io.SVNRepository;
 
 /**
  * @version 1.1.1
@@ -46,15 +45,14 @@ public abstract class FSRoot {
     }
 
     public FSRevisionNode getRevisionNode(String path) throws SVNException {
-        FSRevisionNode node = fetchRevNodeFromCache(path);
+        String canonPath = path;
+        FSRevisionNode node = fetchRevNodeFromCache(canonPath);
         if (node == null) {
             FSParentPath parentPath = openPath(path, true, false);
             node = parentPath.getRevNode();
         }
         return node;
     }
-
-    public abstract long getRevision();
 
     public abstract FSRevisionNode getRootRevisionNode() throws SVNException;
 
@@ -63,11 +61,6 @@ public abstract class FSRoot {
     public abstract FSCopyInheritance getCopyInheritance(FSParentPath child) throws SVNException;
 
     public FSParentPath openPath(String path, boolean lastEntryMustExist, boolean storeParents) throws SVNException {
-        if (path == null) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_NOT_FOUND, "null path is not supported");
-            SVNErrorManager.error(err);
-        }
-        
         String canonPath = path;
         FSRevisionNode here = getRootRevisionNode();
         String pathSoFar = "/";
@@ -81,7 +74,7 @@ public abstract class FSRoot {
         while (true) {
             String entry = SVNPathUtil.head(rest);
             String next = SVNPathUtil.removeHead(rest);
-            pathSoFar = SVNPathUtil.getAbsolutePath(SVNPathUtil.append(pathSoFar, entry));
+            pathSoFar = SVNPathUtil.concatToAbs(pathSoFar, entry);
             FSRevisionNode child = null;
             if (entry == null || "".equals(entry)) {
                 child = here;
@@ -184,7 +177,7 @@ public abstract class FSRoot {
         mapChanges = mapChanges != null ? mapChanges : new HashMap();
         FSPathChange newChange = null;
         String copyfromPath = null;
-        long copyfromRevision = SVNRepository.INVALID_REVISION;
+        long copyfromRevision = FSRepository.SVN_INVALID_REVNUM;
 
         FSPathChange oldChange = (FSPathChange) mapChanges.get(change.getPath());
         if (oldChange != null) {
@@ -232,12 +225,12 @@ public abstract class FSRoot {
                 }
 
                 copyfromPath = null;
-                copyfromRevision = SVNRepository.INVALID_REVISION;
+                copyfromRevision = FSRepository.SVN_INVALID_REVNUM;
 
             } else if (FSPathChangeKind.FS_PATH_CHANGE_RESET == change.getChangeKind()) {
                 oldChange = null;
                 copyfromPath = null;
-                copyfromRevision = SVNRepository.INVALID_REVISION;
+                copyfromRevision = FSRepository.SVN_INVALID_REVNUM;
                 mapChanges.remove(change.getPath());
             }
 
@@ -266,7 +259,7 @@ public abstract class FSRoot {
                     if (change.getPath().equals(hashKeyPath)) {
                         continue;
                     }
-                    if (SVNPathUtil.getPathAsChild(change.getPath(), hashKeyPath) != null) {
+                    if (SVNPathUtil.pathIsChild(change.getPath(), hashKeyPath) != null) {
                         curIter.remove();
                     }
                 }

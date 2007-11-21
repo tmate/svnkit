@@ -96,16 +96,16 @@ public class UpdateEventHandler implements ISVNEventHandler {
             System.out.println("At revision " + event.getRevision());
             return;
         } else if (action == SVNEventAction.ADD){
-            System.out.println("A     " + event.getFile());
+            System.out.println("A     " + event.getPath());
             return;
         } else if (action == SVNEventAction.DELETE){
-            System.out.println("D     " + event.getFile());
+            System.out.println("D     " + event.getPath());
             return;
         } else if (action == SVNEventAction.LOCKED){
-            System.out.println("L     " + event.getFile());
+            System.out.println("L     " + event.getPath());
             return;
         } else if (action == SVNEventAction.LOCK_FAILED){
-            System.out.println("failed to lock    " + event.getFile());
+            System.out.println("failed to lock    " + event.getPath());
             return;
         }
 
@@ -153,7 +153,7 @@ public class UpdateEventHandler implements ISVNEventHandler {
                 + propertiesChangeType
                 + lockLabel
                 + "       "
-                + event.getFile());
+                + event.getPath());
     }
 
     /*

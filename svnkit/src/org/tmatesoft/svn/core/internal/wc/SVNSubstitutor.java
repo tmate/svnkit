@@ -16,10 +16,6 @@ import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Map;
 
-import org.tmatesoft.svn.core.SVNErrorCode;
-import org.tmatesoft.svn.core.SVNErrorMessage;
-import org.tmatesoft.svn.core.SVNException;
-
 
 
 /**
@@ -63,7 +59,7 @@ public class SVNSubstitutor {
         myKeywordBufferLength = 0;
     }
     
-    public ByteBuffer translateChunk(ByteBuffer src, ByteBuffer dst) throws SVNException {
+    public ByteBuffer translateChunk(ByteBuffer src, ByteBuffer dst) {
         if (src != null) {
             while(src.hasRemaining()) {
                 byte p = src.get(src.position());
@@ -295,12 +291,10 @@ public class SVNSubstitutor {
     
     private static ByteBuffer substituteEOL(ByteBuffer dst, 
             byte[] eol, int eolLength, byte[] lastEOL, int[] lastEOLLength, byte[] nextEOL, int nextEOLLength, 
-            boolean repair) throws SVNException {
+            boolean repair) {
         if (lastEOLLength[0] > 0) {
             if (!repair && (lastEOLLength[0] != nextEOLLength || !Arrays.equals(lastEOL, nextEOL))) {
                 // inconsistent EOLs.
-                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_INCONSISTENT_EOL);
-                SVNErrorManager.error(err);
             }
         } else {
             lastEOLLength[0] = nextEOLLength;

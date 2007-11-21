@@ -68,7 +68,7 @@ public class DefaultLoadHandler implements ISVNLoadHandler {
         myIsUsePreCommitHook = usePreCommitHook;
         myIsUsePostCommitHook = usePostCommitHook;
         myUUIDAction = uuidAction;
-//        myParentDir = SVNPathUtil.getAbsolutePath(SVNPathUtil.canonicalizePath(parentDir));
+        myParentDir = SVNPathUtil.canonicalizeAbsPath(parentDir);
         myRevisionsMap = new HashMap();
         myDecoder = decoder;
     }
@@ -160,7 +160,7 @@ public class DefaultLoadHandler implements ISVNLoadHandler {
         
         if (revision > 0) {
             myCurrentRevisionBaton.myTxn = FSTransactionRoot.beginTransaction(headRevision, 0, myFSFS);
-            myCurrentRevisionBaton.myTxnRoot = myFSFS.createTransactionRoot(myCurrentRevisionBaton.myTxn);
+            myCurrentRevisionBaton.myTxnRoot = myFSFS.createTransactionRoot(myCurrentRevisionBaton.myTxn.getTxnId());
             String message = "<<< Started new transaction, based on original revision " + revision;
             if (myProgressHandler != null) {
                 SVNAdminEvent event = new SVNAdminEvent(revision, SVNAdminEventAction.REVISION_LOAD, message); 
@@ -260,10 +260,10 @@ public class DefaultLoadHandler implements ISVNLoadHandler {
             if (contentLength == 0) {
                 getDeltaGenerator().sendDelta(myCurrentNodeBaton.myPath, SVNFileUtil.DUMMY_IN, fsConsumer, false);
             } else {
-                buffer = new byte[SVNFileUtil.STREAM_CHUNK_SIZE];
+                buffer = new byte[SVNAdminHelper.STREAM_CHUNK_SIZE];
                 try {
                     while (contentLength > 0) {
-                        int numToRead = contentLength > SVNFileUtil.STREAM_CHUNK_SIZE ? SVNFileUtil.STREAM_CHUNK_SIZE : contentLength;
+                        int numToRead = contentLength > SVNAdminHelper.STREAM_CHUNK_SIZE ? SVNAdminHelper.STREAM_CHUNK_SIZE : contentLength;
                         int numRead = dumpStream.read(buffer, 0, numToRead);
                         
                         if (numRead != numToRead) {
@@ -471,9 +471,9 @@ public class DefaultLoadHandler implements ISVNLoadHandler {
         if (headers.containsKey(SVNAdminHelper.DUMPFILE_NODE_PATH)) {
             String nodePath = (String) headers.get(SVNAdminHelper.DUMPFILE_NODE_PATH); 
             if (myParentDir != null) {
-                baton.myPath = SVNPathUtil.getAbsolutePath(SVNPathUtil.append(myParentDir, nodePath));
+                baton.myPath = SVNPathUtil.concatToAbs(myParentDir, nodePath.startsWith("/") ? nodePath.substring(1) : nodePath);
             } else {
-                baton.myPath = SVNPathUtil.getAbsolutePath(SVNPathUtil.canonicalizePath(nodePath));
+                baton.myPath = SVNPathUtil.canonicalizeAbsPath(nodePath);
             }
         }
         
@@ -508,11 +508,10 @@ public class DefaultLoadHandler implements ISVNLoadHandler {
         if (headers.containsKey(SVNAdminHelper.DUMPFILE_NODE_COPYFROM_PATH)) {
             String copyFromPath = (String) headers.get(SVNAdminHelper.DUMPFILE_NODE_COPYFROM_PATH);
             if (myParentDir != null) {
-                baton.myCopyFromPath = SVNPathUtil.append(myParentDir, copyFromPath);
+                baton.myCopyFromPath = SVNPathUtil.concatToAbs(myParentDir, copyFromPath.startsWith("/") ? copyFromPath.substring(1) : copyFromPath);
             } else {
-                baton.myCopyFromPath = SVNPathUtil.canonicalizePath(copyFromPath);
+                baton.myCopyFromPath = SVNPathUtil.canonicalizeAbsPath(copyFromPath);
             }
-            baton.myCopyFromPath = SVNPathUtil.getAbsolutePath(baton.myCopyFromPath);
         }
         
         if (headers.containsKey(SVNAdminHelper.DUMPFILE_TEXT_CONTENT_LENGTH)) {

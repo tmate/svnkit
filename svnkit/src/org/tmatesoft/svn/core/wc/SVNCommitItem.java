@@ -56,7 +56,6 @@ public class SVNCommitItem {
     private String myPath;
     private SVNWCAccess myWCAccess;
     private SVNRevision myCopyFromRevision;
-    private String myMergeInfo; 
     
     /**
      * Constructs and initializes an <b>SVNCommitItem</b> object.
@@ -247,15 +246,6 @@ public class SVNCommitItem {
      */
     public void setPath(String path) {
         myPath = path;
-    }
-    
-    public void setMergeInfoProp(String mergeInfo) {
-        myIsPropertiesModified = true;
-        myMergeInfo = mergeInfo;
-    }
-    
-    public String getMergeInfo() {
-        return myMergeInfo;
     }
     
     /**

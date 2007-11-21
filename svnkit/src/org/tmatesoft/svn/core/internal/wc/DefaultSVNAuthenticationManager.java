@@ -19,8 +19,6 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.StringTokenizer;
 
-import javax.net.ssl.TrustManager;
-
 import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNURL;
@@ -28,11 +26,12 @@ import org.tmatesoft.svn.core.auth.ISVNAuthenticationManager;
 import org.tmatesoft.svn.core.auth.ISVNAuthenticationProvider;
 import org.tmatesoft.svn.core.auth.ISVNAuthenticationStorage;
 import org.tmatesoft.svn.core.auth.ISVNProxyManager;
+import org.tmatesoft.svn.core.auth.ISVNSSLManager;
 import org.tmatesoft.svn.core.auth.SVNAuthentication;
 import org.tmatesoft.svn.core.auth.SVNPasswordAuthentication;
 import org.tmatesoft.svn.core.auth.SVNSSHAuthentication;
-import org.tmatesoft.svn.core.auth.SVNSSLAuthentication;
 import org.tmatesoft.svn.core.auth.SVNUserNameAuthentication;
+import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
 import org.tmatesoft.svn.core.io.SVNRepository;
 import org.tmatesoft.svn.core.wc.SVNWCUtil;
 
@@ -107,25 +106,30 @@ public class DefaultSVNAuthenticationManager implements ISVNAuthenticationManage
         return new SimpleProxyManager(proxyHost, proxyPort, proxyUser, proxyPassword);
     }
 
-	public TrustManager getTrustManager(SVNURL url) throws SVNException {
-		String host = url.getHost();
-
-		Map properties = getHostProperties(host);
-		boolean trustAll = !"no".equalsIgnoreCase((String) properties.get("ssl-trust-default-ca")); // jdk keystore
-		String sslAuthorityFiles = (String) properties.get("ssl-authority-files"); // "pem" files
-		Collection trustStorages = new ArrayList();
-		if (sslAuthorityFiles != null) {
-		    for(StringTokenizer files = new StringTokenizer(sslAuthorityFiles, ","); files.hasMoreTokens();) {
-		        String fileName = files.nextToken();
-		        if (fileName != null && !"".equals(fileName.trim())) {
-		            trustStorages.add(new File(fileName));
-		        }
-		    }
-		}
-		File[] serverCertFiles = (File[]) trustStorages.toArray(new File[trustStorages.size()]);
-		File authDir = new File(myConfigDirectory, "auth/svn.ssl.server");
-		return new DefaultSVNSSLTrustManager(authDir, url, serverCertFiles, trustAll, this);
-	}
+    public ISVNSSLManager getSSLManager(SVNURL url) throws SVNException {
+        String host = url.getHost();
+        
+        Map properties = getHostProperties(host);
+        boolean trustAll = !"no".equalsIgnoreCase((String) properties.get("ssl-trust-default-ca")); // jdk keystore
+        String sslAuthorityFiles = (String) properties.get("ssl-authority-files"); // "pem" files
+        String sslClientCert = (String) properties.get("ssl-client-cert-file"); // PKCS#12
+        String sslClientCertPassword = (String) properties.get("ssl-client-cert-password");
+        boolean promptForClientCert = "yes".equalsIgnoreCase((String) properties.get("ssl-client-cert-prompt"));
+        
+        File clientCertFile = sslClientCert != null ? new File(sslClientCert) : null;
+        Collection trustStorages = new ArrayList();
+        if (sslAuthorityFiles != null) {
+            for(StringTokenizer files = new StringTokenizer(sslAuthorityFiles, ";"); files.hasMoreTokens();) {
+                String fileName = files.nextToken();
+                if (fileName != null && !"".equals(fileName.trim())) {
+                    trustStorages.add(new File(fileName));
+                }
+            }
+        }
+        File[] serverCertFiles = (File[]) trustStorages.toArray(new File[trustStorages.size()]);
+        File authDir = new File(myConfigDirectory, "auth/svn.ssl.server");
+        return new DefaultSVNSSLManager(authDir, url, serverCertFiles, trustAll, clientCertFile, sslClientCertPassword, promptForClientCert, this);
+    }
 
     private Map getHostProperties(String host) {
         Map globalProps = getServersFile().getProperties("global");
@@ -454,15 +458,6 @@ public class DefaultSVNAuthenticationManager implements ISVNAuthenticationManage
         }
 
         public SVNAuthentication requestClientAuthentication(String kind, SVNURL url, String realm, SVNErrorMessage errorMessage, SVNAuthentication previousAuth, boolean authMayBeStored) {
-	        if (ISVNAuthenticationManager.SSL.equals(kind)) {
-		        String host = url.getHost();
-		        Map properties = getHostProperties(host);
-		        String sslClientCert = (String) properties.get("ssl-client-cert-file"); // PKCS#12
-		        String sslClientCertPassword = (String) properties.get("ssl-client-cert-password");
-		        File clientCertFile = sslClientCert != null ? new File(sslClientCert) : null;
-		        return new SVNSSLAuthentication(clientCertFile, sslClientCertPassword, authMayBeStored);
-	        }
-
             File dir = new File(myDirectory, kind);
             if (!dir.isDirectory()) {
                 return null;
@@ -544,16 +539,22 @@ public class DefaultSVNAuthenticationManager implements ISVNAuthenticationManage
                 values.put("password", cipher.encrypt(passwordAuth.getPassword()));
             } else if (ISVNAuthenticationManager.SSH.equals(kind)) {
                 SVNSSHAuthentication sshAuth = (SVNSSHAuthentication) auth;
-                values.put("password", cipher.encrypt(sshAuth.getPassword()));
+                if (sshAuth.getPassword() != null) {
+                    values.put("password", cipher.encrypt(sshAuth.getPassword()));
+                }
                 int port = sshAuth.getPortNumber();
                 if (sshAuth.getPortNumber() < 0) {
                     port = getDefaultSSHPortNumber() ;
                 }
                 values.put("port", Integer.toString(port));
                 if (sshAuth.getPrivateKeyFile() != null) { 
-                    String path = sshAuth.getPrivateKeyFile().getAbsolutePath();
-                    values.put("passphrase", cipher.encrypt(sshAuth.getPassphrase()));
-                    values.put("key", path);
+                    String path = SVNPathUtil.validateFilePath(sshAuth.getPrivateKeyFile().getAbsolutePath());
+                    if (sshAuth.getPassphrase() != null) {
+                        values.put("passphrase", cipher.encrypt(sshAuth.getPassphrase()));
+                    }
+                    if (path != null) {
+                        values.put("key", path);
+                    }
                 }
             }
             // get file name for auth and store password.

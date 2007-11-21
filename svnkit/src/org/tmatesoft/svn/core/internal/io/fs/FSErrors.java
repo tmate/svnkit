@@ -15,7 +15,6 @@ import java.io.File;
 
 import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
-import org.tmatesoft.svn.core.SVNNodeKind;
 
 /**
  * @version 1.1.1
@@ -79,19 +78,10 @@ public class FSErrors {
         return err;
     }
 
-    public static SVNErrorMessage errorOutOfDate(String path, SVNNodeKind kind) {
-        if ("/".equals(path)) {
-            path = "";
-        }
-        
-        SVNErrorMessage err = null;
-        if (kind == SVNNodeKind.DIR) {
-            err = SVNErrorMessage.create(SVNErrorCode.FS_TXN_OUT_OF_DATE, 
-                    "Directory ''{0}'' is out of date", path); 
-        } else {
-            err = SVNErrorMessage.create(SVNErrorCode.FS_TXN_OUT_OF_DATE, 
-                    "File ''{0}'' is out of date", path);
-        }
+    public static SVNErrorMessage errorOutOfDate(String path, String txnId) {
+        SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_TXN_OUT_OF_DATE, "Out of date: ''{0}'' in transaction ''{1}''", new Object[] {
+                path, txnId
+        });
         return err;
     }
 

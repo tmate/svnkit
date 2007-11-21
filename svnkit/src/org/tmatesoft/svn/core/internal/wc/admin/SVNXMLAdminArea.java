@@ -29,7 +29,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.tmatesoft.svn.core.SVNDepth;
 import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
@@ -37,7 +36,7 @@ import org.tmatesoft.svn.core.SVNNodeKind;
 import org.tmatesoft.svn.core.SVNProperty;
 import org.tmatesoft.svn.core.internal.util.SVNEncodingUtil;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
-import org.tmatesoft.svn.core.internal.util.SVNDate;
+import org.tmatesoft.svn.core.internal.util.SVNTimeUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNAdminUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.internal.wc.SVNFileListUtil;
@@ -313,6 +312,7 @@ public class SVNXMLAdminArea extends SVNAdminArea {
                 myEntries = null;
             }
         }
+    
     }
 
     public void saveVersionedProperties(SVNLog log, boolean close) throws SVNException {
@@ -397,7 +397,7 @@ public class SVNXMLAdminArea extends SVNAdminArea {
         return THIS_DIR;
     }
 
-    protected void writeEntries(Writer writer) throws IOException, SVNException {
+    protected void writeEntries(Writer writer) throws IOException {
         SVNEntry rootEntry = (SVNEntry)myEntries.get(getThisDirName());
         Map rootEntryAttrs = rootEntry.asMap();
         
@@ -492,7 +492,7 @@ public class SVNXMLAdminArea extends SVNAdminArea {
         if (propLength != baseFile.length()) {
             return true;
         }
-        String realTimestamp = SVNDate.formatDate(new Date(propFile.lastModified()));
+        String realTimestamp = SVNTimeUtil.formatDate(new Date(propFile.lastModified()));
         String fullRealTimestamp = realTimestamp;
         realTimestamp = realTimestamp.substring(0, 23);
         String timeStamp = entry.getPropTime();
@@ -525,7 +525,7 @@ public class SVNXMLAdminArea extends SVNAdminArea {
         }
         if (!forceComparison) {
             String textTime = entry.getTextTime();
-            long textTimeAsLong = SVNFileUtil.roundTimeStamp(SVNDate.parseDateAsMilliseconds(textTime));
+            long textTimeAsLong = SVNFileUtil.roundTimeStamp(SVNTimeUtil.parseDateAsLong(textTime));
             long tstamp = SVNFileUtil.roundTimeStamp(getFile(name).lastModified());
             if (textTimeAsLong == tstamp ) {
                 return false;
@@ -568,7 +568,7 @@ public class SVNXMLAdminArea extends SVNAdminArea {
         }
 
         if (equals && isLocked()) {
-            entry.setTextTime(SVNDate.formatDate(new Date(versionedFile.lastModified())));
+            entry.setTextTime(SVNTimeUtil.formatDate(new Date(versionedFile.lastModified())));
             saveEntries(false);
         }
         return !equals;
@@ -692,7 +692,7 @@ public class SVNXMLAdminArea extends SVNAdminArea {
         return false;
     }
     
-    public SVNAdminArea createVersionedDirectory(File dir, String url, String rootURL, String uuid, long revNumber, boolean createMyself, SVNDepth depth) throws SVNException {
+    public SVNAdminArea createVersionedDirectory(File dir, String url, String rootURL, String uuid, long revNumber, boolean createMyself) throws SVNException {
         dir = createMyself ? getRoot() : dir;
         dir.mkdirs();
         File adminDir = createMyself ? getAdminDirectory() : new File(dir, SVNFileUtil.getAdminDirectoryName());
@@ -757,39 +757,6 @@ public class SVNXMLAdminArea extends SVNAdminArea {
     public void postUpgradeFormat(int format) throws SVNException {
     }
 
-    public void handleKillMe() throws SVNException {
-        boolean killMe = isKillMe();
-        if (killMe) {
-            SVNEntry entry = getEntry(getThisDirName(), false);
-            long dirRevision = entry != null ? entry.getRevision() : -1;
-            // deleted dir, files and entry in parent.
-            File dir = getRoot();
-            SVNWCAccess access = getWCAccess(); 
-            boolean isWCRoot = access.isWCRoot(getRoot());
-            try {
-                removeFromRevisionControl(getThisDirName(), true, false);
-            } catch (SVNException svne) {
-                SVNDebugLog.getDefaultLog().info(svne);
-                if (svne.getErrorMessage().getErrorCode() != SVNErrorCode.WC_LEFT_LOCAL_MOD) {
-                    throw svne;
-                }
-            }
-            if (isWCRoot) {
-                return;
-            }
-            // compare revision with parent's one
-            SVNAdminArea parentArea = access.retrieve(dir.getParentFile());
-            SVNEntry parentEntry = parentArea.getEntry(parentArea.getThisDirName(), false);
-            if (dirRevision > parentEntry.getRevision()) {
-                SVNEntry entryInParent = parentArea.addEntry(dir.getName());
-                entryInParent.setDeleted(true);
-                entryInParent.setKind(SVNNodeKind.DIR);
-                entryInParent.setRevision(dirRevision);
-                parentArea.saveEntries(false);
-            }
-        }
-    }
-
     public void postCommit(String fileName, long revisionNumber, boolean implicit, SVNErrorCode errorCode) throws SVNException {
         SVNEntry entry = getEntry(fileName, true);
         if (entry == null || (!getThisDirName().equals(fileName) && entry.getKind() != SVNNodeKind.FILE)) {
@@ -801,7 +768,7 @@ public class SVNXMLAdminArea extends SVNAdminArea {
             if (getThisDirName().equals(fileName)) {
                 entry.setRevision(revisionNumber);
                 entry.setKind(SVNNodeKind.DIR);
-                File killMe = getAdminFile(ADM_KILLME);
+                File killMe = getAdminFile("KILLME");
                 if (killMe.getParentFile().isDirectory()) {
                     try {
                         killMe.createNewFile();
@@ -961,26 +928,26 @@ public class SVNXMLAdminArea extends SVNAdminArea {
         
         // update entry
         Map entryAttrs = new HashMap();
-        entryAttrs.put(SVNProperty.REVISION, SVNProperty.toString(revisionNumber));
-        entryAttrs.put(SVNProperty.KIND, getThisDirName().equals(fileName) ? SVNProperty.KIND_DIR : SVNProperty.KIND_FILE);
+        entryAttrs.put(SVNProperty.shortPropertyName(SVNProperty.REVISION), SVNProperty.toString(revisionNumber));
+        entryAttrs.put(SVNProperty.shortPropertyName(SVNProperty.KIND), getThisDirName().equals(fileName) ? SVNProperty.KIND_DIR : SVNProperty.KIND_FILE);
         if (!implicit) {
-            entryAttrs.put(SVNProperty.SCHEDULE, null);
+            entryAttrs.put(SVNProperty.shortPropertyName(SVNProperty.SCHEDULE), null);
         }
-        entryAttrs.put(SVNProperty.COPIED, SVNProperty.toString(false));
-        entryAttrs.put(SVNProperty.DELETED, SVNProperty.toString(false));
+        entryAttrs.put(SVNProperty.shortPropertyName(SVNProperty.COPIED), SVNProperty.toString(false));
+        entryAttrs.put(SVNProperty.shortPropertyName(SVNProperty.DELETED), SVNProperty.toString(false));
         if (textTime != 0 && !implicit) {
-            entryAttrs.put(SVNProperty.TEXT_TIME, SVNDate.formatDate(new Date(textTime)));
+            entryAttrs.put(SVNProperty.shortPropertyName(SVNProperty.TEXT_TIME), SVNTimeUtil.formatDate(new Date(textTime)));
         }
         if (propTime != 0 && !implicit) {
-            entryAttrs.put(SVNProperty.PROP_TIME, SVNDate.formatDate(new Date(propTime)));
+            entryAttrs.put(SVNProperty.shortPropertyName(SVNProperty.PROP_TIME), SVNTimeUtil.formatDate(new Date(propTime)));
         }
 
-        entryAttrs.put(SVNProperty.CONFLICT_NEW, null);
-        entryAttrs.put(SVNProperty.CONFLICT_OLD, null);
-        entryAttrs.put(SVNProperty.CONFLICT_WRK, null);
-        entryAttrs.put(SVNProperty.PROP_REJECT_FILE, null);
-        entryAttrs.put(SVNProperty.COPYFROM_REVISION, null);
-        entryAttrs.put(SVNProperty.COPYFROM_URL, null);
+        entryAttrs.put(SVNProperty.shortPropertyName(SVNProperty.CONFLICT_NEW), null);
+        entryAttrs.put(SVNProperty.shortPropertyName(SVNProperty.CONFLICT_OLD), null);
+        entryAttrs.put(SVNProperty.shortPropertyName(SVNProperty.CONFLICT_WRK), null);
+        entryAttrs.put(SVNProperty.shortPropertyName(SVNProperty.PROP_REJECT_FILE), null);
+        entryAttrs.put(SVNProperty.shortPropertyName(SVNProperty.COPYFROM_REVISION), null);
+        entryAttrs.put(SVNProperty.shortPropertyName(SVNProperty.COPYFROM_URL), null);
         
         try {
             modifyEntry(fileName, entryAttrs, false, true);
@@ -1015,12 +982,12 @@ public class SVNXMLAdminArea extends SVNAdminArea {
             entryAttrs.clear();
 
             if (!implicit) {
-                entryAttrs.put(SVNProperty.SCHEDULE, null);
+                entryAttrs.put(SVNProperty.shortPropertyName(SVNProperty.SCHEDULE), null);
             }
-            entryAttrs.put(SVNProperty.COPIED, SVNProperty.toString(false));
-            entryAttrs.put(SVNProperty.COPYFROM_REVISION, null);
-            entryAttrs.put(SVNProperty.COPYFROM_URL, null);
-            entryAttrs.put(SVNProperty.DELETED, SVNProperty.toString(false));
+            entryAttrs.put(SVNProperty.shortPropertyName(SVNProperty.COPIED), SVNProperty.toString(false));
+            entryAttrs.put(SVNProperty.shortPropertyName(SVNProperty.COPYFROM_REVISION), null);
+            entryAttrs.put(SVNProperty.shortPropertyName(SVNProperty.COPYFROM_URL), null);
+            entryAttrs.put(SVNProperty.shortPropertyName(SVNProperty.DELETED), SVNProperty.toString(false));
             try {
                 parentArea.modifyEntry(entryInParent.getName(), entryAttrs, true, true);
             } catch (SVNException svne) {
@@ -1039,13 +1006,6 @@ public class SVNXMLAdminArea extends SVNAdminArea {
         return propName != null && !SVNProperty.CACHABLE_PROPS.equals(propName) && 
                !SVNProperty.PRESENT_PROPS.equals(propName) && !SVNProperty.HAS_PROP_MODS.equals(propName) && 
                !SVNProperty.HAS_PROPS.equals(propName);
-    }
-
-    protected boolean readExtraOptions(BufferedReader reader, Map entryAttrs) throws SVNException, IOException {
-        return false;
-    }
-
-    protected void writeExtraOptions(Writer writer, String entryName, Map entryAttrs, int emptyFields) throws SVNException, IOException {
     }
 
 }

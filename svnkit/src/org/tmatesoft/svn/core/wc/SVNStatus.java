@@ -126,7 +126,6 @@ public class SVNStatus {
     private Date myLocalContentsDate;
     private Date myLocalPropertiesDate;
     private SVNEntry myEntry;
-    private String myChangelistName;
 
     /**
      * Constructs an <b>SVNStatus</b> object filling it with status information
@@ -169,8 +168,7 @@ public class SVNStatus {
             boolean isCopied, boolean isSwitched, File conflictNewFile,
             File conflictOldFile, File conflictWrkFile, File projRejectFile,
             String copyFromURL, SVNRevision copyFromRevision,
-            SVNLock remoteLock, SVNLock localLock, Map entryProperties,
-            String changelistName) {
+            SVNLock remoteLock, SVNLock localLock, Map entryProperties) {
         myURL = url;
         myFile = file;
         myKind = kind == null ? SVNNodeKind.NONE : kind;
@@ -200,7 +198,6 @@ public class SVNStatus {
         myLocalLock = localLock;
         myPropRejectFile = projRejectFile;
         myEntryProperties = entryProperties;
-        myChangelistName = changelistName;
     }
     
     /**
@@ -629,9 +626,5 @@ public class SVNStatus {
      */
     public SVNEntry getEntry() {
         return myEntry;
-    }
-
-    public String getChangelistName() {
-        return myChangelistName;
     }
 }

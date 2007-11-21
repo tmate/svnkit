@@ -28,15 +28,12 @@
 
     <target name="compile-library">
         <mkdir dir="svnkit/bin" />
-        <mkdir dir="svnkit-cli/bin" />
         <mkdir dir="contrib/javahl/bin" />
         <mkdir dir="contrib/sequence/bin" />
-        <mkdir dir="contrib/sqlite/bin" />
 
         <path id="library.classpath">
             <pathelement location="contrib/ganymed/ganymed.jar" />
-            <pathelement location="contrib/sqlite/sqlitejdbc.jar" />
-            <pathelement location="contrib/jna/jna.jar" />            
+            <pathelement location="contrib/jna/jna.jar" />
             <pathelement path="contrib/javahl/bin" />
             <pathelement path="contrib/sequence/bin" />
         </path>
@@ -47,39 +44,22 @@
             <exclude name="org/tigris/subversion/javahl/tests/**" />
         </javac>
         <javac debug="true" destdir="contrib/sequence/bin" srcdir="contrib/sequence/src" />
-        <javac debug="true" destdir="contrib/sqlite/bin" 
-        	                srcdir="contrib/sqlite/src" 
-        	                classpathref="library.classpath" />
         <javac debug="true"
                destdir="svnkit/bin"
-               srcdir="svnkit/src:svnkit-cli/src"
+               srcdir="svnkit/src"
                classpathref="library.classpath">
             <exclude name="org/tmatesoft/svn/util/SVNTest.java" />
             <exclude name="org/tmatesoft/svn/core/internal/wc/FSMergerBySequenceTest.java" />
         </javac>
+        	
     </target>
-
-	<target name="compile-dav" depends="init-environment,compile-library"> 
-        <mkdir dir="svnkit-dav/bin" />
-        <path id="library-dav.classpath">
-            <pathelement location="contrib/servlet-api/servlet-api.jar" />
-            <pathelement path="svnkit/bin"/>
-        </path>
-        <javac debug="true"
-               destdir="svnkit-dav/bin"
-               srcdir="svnkit-dav/src"
-               classpathref="library-dav.classpath">
-        </javac>
-	</target>
 
 	<target name="compile-library-eclipse" depends="init-environment" if="eclipse.present"> 
         <path id="library-eclipse.classpath">
             <pathelement location="contrib/ganymed/ganymed.jar" />
-            <pathelement location="contrib/sqlite/sqlitejdbc.jar" />
             <pathelement location="contrib/jna/jna.jar" />
             <pathelement path="contrib/javahl/bin" />
             <pathelement path="contrib/sequence/bin" />
-            <pathelement path="contrib/sqlite/bin" />
         	<fileset dir="${eclipse.home}/plugins">
     	        <include name="**/*.jar"/>
 	        </fileset>
@@ -110,7 +90,6 @@
         <path id="eclipse.classpath">
             <pathelement path="build/lib/svnkit.jar" />
             <pathelement path="build/lib/ganymed.jar" />
-            <pathelement path="build/lib/sqlitejdbc.jar" />
             <pathelement path="build/lib/jna.jar" />
         	<fileset dir="${eclipse.home}/plugins">
     	        <include name="**/*.jar"/>
@@ -131,12 +110,10 @@
         <mkdir dir="svnkit-test/bin" />
         <path id="tests.classpath">
             <pathelement location="contrib/ganymed/ganymed.jar" />
-            <pathelement location="contrib/sqlite/sqlitejdbc.jar" />
             <pathelement location="contrib/jna/jna.jar" />
             <pathelement location="contrib/junit/junit.jar" />
             <pathelement path="contrib/javahl/bin" />
             <pathelement path="contrib/sequence/bin" />
-            <pathelement path="contrib/sqlite/bin" />
             <pathelement path="contrib/sequence/bin-test" />
             <pathelement path="svnkit/bin" />
         </path>
@@ -167,7 +144,6 @@
         <jar destfile="build/lib/svnkit.jar">
             <fileset dir="svnkit/bin">
                 <exclude name="org/tmatesoft/svn/cli/**" />
-                <exclude name="org/tmatesoft/svn/cli2/**" />
                 <exclude name="org/tigris/subversion/javahl/SVNClient**" />
                 <exclude name="org/tigris/subversion/javahl/SVNAdmin**" />
             </fileset>
@@ -181,10 +157,6 @@
                 <include name="SEQUENCE-LICENSE" />
         	</fileset>
             <fileset dir="contrib/sequence/bin" />
-          	<fileset dir="contrib/sqlite">
-          		<include name="SQLITEJDBC-LICENSE" />
-           	</fileset>
-        	<fileset dir="contrib/sqlite/bin" />
             <fileset dir="svnkit/src">
                 <include name="org/tmatesoft/svn/core/internal/wc/config/**" />
                 <include name="org/tmatesoft/svn/core/io/repository/**" />
@@ -208,7 +180,6 @@
             </fileset>
         </jar>
         <copy file="contrib/ganymed/ganymed.jar" todir="build/lib" />
-        <copy file="contrib/sqlite/sqlitejdbc.jar" todir="build/lib" />
         <copy file="contrib/jna/jna.jar" todir="build/lib" />
     	<!-- copy licences and changelog -->
         <copy todir="build/lib" flatten="true">
@@ -220,39 +191,21 @@
                 <include name="contrib/javahl/JAVAHL-LICENSE" />
                 <include name="contrib/sequence/SEQUENCE-LICENSE" />
                 <include name="contrib/ganymed/GANYMED-LICENSE" />
-                <include name="contrib/sqlite/SQLITEJDBC-LICENSE" />
             </fileset>
         </copy>
     </target>
-
-	<target name="build-dav" depends="compile-dav,build-library">
-		<war destfile="build/lib/svnkit.war" webxml="svnkit-dav/WEB-INF/web.xml">
-			<classes dir="svnkit-dav/bin"/>
-			<lib dir="build/lib">
-				<include name="svnkit.jar"/>
-				<include name="sqlitejdbc.jar"/>
-			</lib>
-		</war>
-	</target>
 
     <target name="build-cli" depends="build-library">
         <jar destfile="build/lib/svnkit-cli.jar">
             <fileset dir="svnkit/bin">
                 <include name="org/tmatesoft/svn/cli/**" />
-                <include name="org/tmatesoft/svn/cli2/**" />
-            </fileset>
-            <fileset dir="svnkit-cli/bin">
-                <include name="org/tmatesoft/svn/cli2/**" />
-            </fileset>
-            <fileset dir="svnkit-cli/src">
-                <include name="org/tmatesoft/svn/cli2/**/*.properties" />
             </fileset>
             <fileset dir="${basedir}">
                 <include name="COPYING" />
             </fileset>
         </jar>
         <copy todir="build/lib">
-            <fileset dir="svnkit-cli/scripts">
+            <fileset dir="svnkit/cli">
                 <include name="**" />
             </fileset>
         </copy>
@@ -288,10 +241,6 @@
             <fileset dir="contrib/sequence" >
                 <include name="SEQUENCE-LICENSE" />
             </fileset>
-            <fileset dir="contrib/sqlite/src" />
-            <fileset dir="contrib/sqlite" >
-                <include name="SQLITEJDBC-LICENSE" />
-            </fileset>
         </zip>
     </target>
 
@@ -320,8 +269,7 @@
                 <include name="GANYMED-LICENSE" />
                 <include name="SEQUENCE-LICENSE" />
                 <include name="JAVAHL-LICENSE" />
-                <include name="SQLITEJDBC-LICENSE" />
-				<include name="JNA-LICENSE" />
+                <include name="JNA-LICENSE" />
             </fileset>
             <fileset dir="svnkit-eclipse/org.tmatesoft.svnkit">
                 <include name="plugin.xml" />
@@ -394,12 +342,9 @@
                 <include name="contrib/javahl/bin/**" />
                 <include name="contrib/sequence/bin/**" />
                 <include name="contrib/sequence/bin-test/**" />
-                <include name="contrib/sqlite/bin/**" />
                 <include name="svnkit/bin/**" />
                 <include name="svnkit-eclipse/bin/**" />
                 <include name="svnkit-test/bin/**" />
-                <include name="svnkit-cli/bin/**" />
-			    <include name="svnkit-dav/bin/**" />
             </fileset>
         </delete>
     </target>
@@ -461,9 +406,6 @@
             <fileset dir="contrib/sequence" >
                 <include name="SEQUENCE-LICENSE" />
             </fileset>
-            <fileset dir="contrib/sqlite" >
-                <include name="SQLITEJDBC-LICENSE" />
-            </fileset>
 		</jar>
 
 		<jar destfile="build/maven/svnkit-${build.number}-sources.jar">
@@ -490,11 +432,7 @@
 				<exclude name=".svn"/>
 				<exclude name=".svn/**"/>
 			</fileset>
-    		<fileset dir="contrib/sqlite/src">
-    			<exclude name=".svn"/>
-    			<exclude name=".svn/**"/>
-    		</fileset>
-			<fileset dir="${basedir}" >
+            <fileset dir="${basedir}" >
                 <include name="COPYING" />
             </fileset>
             <fileset dir="build/lib" >
@@ -508,9 +446,6 @@
             </fileset>
             <fileset dir="contrib/sequence" >
                 <include name="SEQUENCE-LICENSE" />
-            </fileset>
-            <fileset dir="contrib/sqlite" >
-                <include name="SQLITEJDBC-LICENSE" />
             </fileset>
 		</jar>
 		
@@ -571,10 +506,7 @@
         </zip>
     </target>
 
-	<target name="deploy-dav" depends="build-dav">
-	</target>
-
-    <target name="deploy" depends="clean,deploy-library,deploy-eclipse,deploy-snapshot,deploy-dav,deploy-bundle" />
+    <target name="deploy" depends="clean,deploy-library,deploy-eclipse,deploy-snapshot,deploy-bundle" />
 
     <target name="test-java" depends="init-environment,compile-tests">
         <path id="test.classpath">
@@ -630,14 +562,15 @@
     			<exclude name=".svn/**"/>
     		</fileset>
         </copy>
-    	<chmod perm="ugo+x">
-    		<fileset dir="${python.test.home}/python/cmdline">
-    			<include name="**/*.py"/>
-			</fileset>
-    	</chmod>
+        <copy file="svnkit-test/python/patch/main.py"
+              overwrite="true"
+              tofile="${python.test.home}/python/cmdline/svntest/main.py"
+              failonerror="true"
+        />
     	<pathconvert targetos="unix" property="basedir.unix">
     		<path location="${basedir}"></path>
     	</pathconvert>
+    	<replace token="%ant.dir%" value="${basedir.unix}" file="${python.test.home}/python/cmdline/svntest/main.py"></replace>
 
     	<path id="python.classpath">
             <pathelement path="build/lib/svnkit.jar" />
@@ -665,14 +598,14 @@
     			<include name="**/*"/>
     	    </fileset>
         </delete>
+
     	<java classpathref="python.classpath"
               dir="${python.test.home}"
               fork="true"
               classname="org.tmatesoft.svn.core.test.PythonTests">        
          <jvmarg value="-Djava.util.logging.config.file=${python.test.home}/logging.python.properties" />
          <arg line="${python.test.home}/test.properties" />
-         <arg path="${basedir}/build/lib" />
-    	</java>
+        </java>
     	<delete file="build/lib/logging.properties" failonerror="false"></delete>
     	<delete file="build/lib/logging.python.properties" failonerror="false"></delete>
     	<delete failonerror="false">

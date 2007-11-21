@@ -264,17 +264,4 @@ public class SVNEventAction {
      * area is upgraded to a newer one. 
      */
     public static final SVNEventAction UPGRADE = new SVNEventAction(-2, "wc_upgrade");
-    
-    public static final SVNEventAction UPDATE_EXISTS = new SVNEventAction(25, "update_exists");
-    
-    public static final SVNEventAction CHANGELIST_SET = new SVNEventAction(26, "changelist_set");
-
-    public static final SVNEventAction CHANGELIST_CLEAR = new SVNEventAction(27, "changelist_clear");
-
-    public static final SVNEventAction CHANGELIST_FAILED = new SVNEventAction(28, "changelist_failed");
-
-    public static final SVNEventAction CHANGELIST_MOVED = new SVNEventAction(30, "changelist_moved");
-    
-    public static final SVNEventAction MERGE_BEGIN = new SVNEventAction(29, "merge_begin");
-    
 }

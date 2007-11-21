@@ -25,7 +25,6 @@ import java.util.Iterator;
 import java.util.Map;
 
 import org.tmatesoft.svn.core.ISVNLogEntryHandler;
-import org.tmatesoft.svn.core.SVNDepth;
 import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
@@ -43,7 +42,6 @@ import org.tmatesoft.svn.core.internal.util.SVNDate;
 import org.tmatesoft.svn.core.internal.util.SVNUUIDGenerator;
 import org.tmatesoft.svn.core.internal.wc.DefaultLoadHandler;
 import org.tmatesoft.svn.core.internal.wc.ISVNLoadHandler;
-import org.tmatesoft.svn.core.internal.wc.SVNAdminDeltifier;
 import org.tmatesoft.svn.core.internal.wc.SVNAdminHelper;
 import org.tmatesoft.svn.core.internal.wc.SVNCancellableEditor;
 import org.tmatesoft.svn.core.internal.wc.SVNDumpEditor;
@@ -894,9 +892,9 @@ public class SVNAdminClient extends SVNBasicClient {
                         SVNErrorManager.error(err);
                     }
                     
-                    byte buf[] = new byte[SVNFileUtil.STREAM_CHUNK_SIZE];
+                    byte buf[] = new byte[SVNAdminHelper.STREAM_CHUNK_SIZE];
                     while (remaining > 0) {
-                        int numToRead = remaining >= SVNFileUtil.STREAM_CHUNK_SIZE ? SVNFileUtil.STREAM_CHUNK_SIZE : remaining;
+                        int numToRead = remaining >= SVNAdminHelper.STREAM_CHUNK_SIZE ? SVNAdminHelper.STREAM_CHUNK_SIZE : remaining;
                         int numRead = dumpStream.read(buf, 0, numToRead);
                         
                         remaining -= numRead;
@@ -921,11 +919,9 @@ public class SVNAdminClient extends SVNBasicClient {
     }
 
     private void dump(FSFS fsfs, OutputStream dumpStream, long start, long end, boolean isIncremental, boolean useDeltas) throws SVNException, IOException {
-        boolean isDumping = dumpStream != null && dumpStream != SVNFileUtil.DUMMY_OUT;
+        boolean isDumping = dumpStream != null;
         long youngestRevision = fsfs.getYoungestRevision();
-        SVNAdminDeltifier deltifier = new SVNAdminDeltifier(fsfs, SVNDepth.INFINITY, 
-                false, false, false, null);
-            
+
         if (!SVNRevision.isValidRevisionNumber(start)) {
             start = 0;
         }
@@ -994,8 +990,7 @@ public class SVNAdminClient extends SVNBasicClient {
 
             if (i == start && !isIncremental) {
                 FSRevisionRoot fromRoot = fsfs.createRevisionRoot(fromRev);
-                deltifier.setEditor(dumpEditor);
-                deltifier.deltifyDir(fromRoot, "/", "", toRoot, "/");
+                SVNAdminHelper.deltifyDir(fsfs, fromRoot, "/", "", toRoot, "/", dumpEditor);
             } else {
                 FSRepositoryUtil.replay(fsfs, toRoot, "", -1, false, dumpEditor);
             }
@@ -1012,7 +1007,7 @@ public class SVNAdminClient extends SVNBasicClient {
         
         String revisionDate = (String) revProps.get(SVNRevisionProperty.DATE);
         if (revisionDate != null) {
-            SVNDate date = SVNDate.parseDate(revisionDate);
+            SVNDate date = SVNDate.parseDatestamp(revisionDate);
             revProps.put(SVNRevisionProperty.DATE, date.format());
         }
         

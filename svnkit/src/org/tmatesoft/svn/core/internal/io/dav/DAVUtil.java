@@ -43,7 +43,7 @@ public class DAVUtil {
         } else if (depth == DEPTH_ONE) {
             header.setHeaderValue(HTTPHeader.DEPTH_HEADER, "1");
         } else if (depth == DEPTH_INFINITE) {
-            header.setHeaderValue(HTTPHeader.DEPTH_HEADER, "infinity");
+            header.setHeaderValue(HTTPHeader.DEPTH_HEADER, "infinite");
         } else {
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.RA_DAV_MALFORMED_DATA, "Invalid PROPFIND depth value: '{0}'", new Integer(depth));
             SVNErrorManager.error(err);
@@ -63,8 +63,14 @@ public class DAVUtil {
         if (status.getError() != null) {
             SVNErrorManager.error(status.getError());
         }
-        if (!resultMap.isEmpty()) {
-            return (DAVProperties) resultMap.values().iterator().next();
+        if (label != null || true) {
+            if (!resultMap.isEmpty()) {
+                return (DAVProperties) resultMap.values().iterator().next();
+            }
+        } else {
+            if (resultMap.containsKey(path)) {
+                return (DAVProperties) resultMap.get(path);
+            }
         }
         label = label == null ? "NULL" : label;
         SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.RA_DAV_REQUEST_FAILED, "Failed to find label ''{0}'' for URL ''{1}''", new Object[] {label, path});

@@ -14,11 +14,8 @@ package org.tmatesoft.svn.core;
 
 import java.io.Serializable;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
-
-import org.tmatesoft.svn.core.io.SVNRepository;
 
 
 /**
@@ -34,13 +31,11 @@ import org.tmatesoft.svn.core.io.SVNRepository;
  */
 public class SVNLogEntry implements Serializable {
     
-    public static SVNLogEntry EMPTY_ENTRY = new SVNLogEntry(new HashMap(), SVNRepository.INVALID_REVISION, 
-            null, false);
-
     private long myRevision;
+    private String myAuthor;
+    private Date myDate;
+    private String myMessage;
     private Map myChangedPaths;
-    private Map myRevisionProperties;
-    private boolean myHasChildren;
     
     /**
      * Constructs an <b>SVNLogEntry</b> object. 
@@ -57,30 +52,12 @@ public class SVNLogEntry implements Serializable {
      */
     public SVNLogEntry(Map changedPaths, long revision, String author, Date date, String message) {
         myRevision = revision;
-        myRevisionProperties = new HashMap();
+        myAuthor = author;
+        myDate = date;
+        myMessage = message;
         myChangedPaths = changedPaths;
-        if (author != null) {
-            myRevisionProperties.put(SVNRevisionProperty.AUTHOR, author);    
-        }
-        if (date != null) {
-            myRevisionProperties.put(SVNRevisionProperty.DATE, date);
-        }
-        if (message != null) {
-            myRevisionProperties.put(SVNRevisionProperty.LOG, message);    
-        }
     }
-
-    public SVNLogEntry(Map changedPaths, long revision, Map revisionProperties, boolean hasChildren) {
-        myRevision = revision;
-        myChangedPaths = changedPaths;
-        myRevisionProperties = revisionProperties != null ? revisionProperties : new HashMap();
-        myHasChildren = hasChildren;
-    }
-
-    public void setHasChildren(boolean hasChildren) {
-        myHasChildren = hasChildren;
-    }
-
+    
     /**
      * Gets a map containing all the paths that were changed in the 
      * revision that this object represents.
@@ -100,16 +77,16 @@ public class SVNLogEntry implements Serializable {
      * @return the author of the revision
      */
     public String getAuthor() {
-        return (String) myRevisionProperties.get(SVNRevisionProperty.AUTHOR); 
+        return myAuthor;
     }
     
     /**
      * Gets the datestamp when the revision was committed.
      * 
-     * @return 	   the moment in time when the revision was committed
+     * @return 	the moment in time when the revision was committed
      */
     public Date getDate() {
-        return (Date) myRevisionProperties.get(SVNRevisionProperty.DATE);
+        return myDate;
     }
     
     /**
@@ -118,11 +95,7 @@ public class SVNLogEntry implements Serializable {
      * @return 		the commit log message
      */
     public String getMessage() {
-        return (String) myRevisionProperties.get(SVNRevisionProperty.LOG);
-    }
-    
-    public Map getRevisionProperties() {
-        return myRevisionProperties;
+        return myMessage;
     }
     
     /**
@@ -143,8 +116,10 @@ public class SVNLogEntry implements Serializable {
         final int PRIME = 31;
         int result = 1;
         result = PRIME * result + (int) (myRevision ^ (myRevision >>> 32));
+        result = PRIME * result + ((myAuthor == null) ? 0 : myAuthor.hashCode());
+        result = PRIME * result + ((myDate == null) ? 0 : myDate.hashCode());
+        result = PRIME * result + ((myMessage == null) ? 0 : myMessage.hashCode());
         result = PRIME * result + ((myChangedPaths == null) ? 0 : myChangedPaths.hashCode());
-        result = PRIME * result + ((myRevisionProperties == null) ? 0 : myRevisionProperties.hashCode());
         return result;
     }
     
@@ -165,7 +140,9 @@ public class SVNLogEntry implements Serializable {
         }
         SVNLogEntry other = (SVNLogEntry) obj;
         return myRevision == other.myRevision &&
-            compare(myRevisionProperties, other.myRevisionProperties) &&
+            compare(myAuthor, other.myAuthor) &&
+            compare(myMessage, other.myMessage) &&
+            compare(myDate, other.myDate) &&
             compare(myChangedPaths, other.myChangedPaths);
     }
     
@@ -177,13 +154,17 @@ public class SVNLogEntry implements Serializable {
     public String toString() {
         StringBuffer result = new StringBuffer();
         result.append(myRevision);
-        for (Iterator propNames = myRevisionProperties.keySet().iterator(); propNames.hasNext();) {
-            String propName = (String) propNames.next();
-            Object propVal = myRevisionProperties.get(propName);
+        if (myDate != null) {
+            result.append(' ');
+            result.append(myDate);
+        }
+        if (myAuthor != null) {
+            result.append(' ');
+            result.append(myAuthor);
+        }
+        if (myMessage != null) {
             result.append('\n');
-            result.append(propName);
-            result.append('=');
-            result.append(propVal);
+            result.append(myMessage);
         }
         if (myChangedPaths != null && !myChangedPaths.isEmpty()) {
             for (Iterator paths = myChangedPaths.values().iterator(); paths.hasNext();) {
@@ -195,10 +176,6 @@ public class SVNLogEntry implements Serializable {
         return result.toString();
     }
     
-    public boolean hasChildren() {
-        return myHasChildren;
-    }
-
     /**
      * Compares two objects.
      * 
@@ -214,5 +191,4 @@ public class SVNLogEntry implements Serializable {
         } 
         return o1.equals(o2);
     }
-
 }

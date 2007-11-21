@@ -19,7 +19,7 @@ import java.util.Set;
 
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNProperty;
-import org.tmatesoft.svn.core.internal.wc.admin.SVNAdminArea;
+import org.tmatesoft.svn.core.internal.wc.admin.SVNAdminAreaInfo;
 import org.tmatesoft.svn.core.internal.wc.admin.SVNWCAccess;
 import org.tmatesoft.svn.core.wc.SVNStatusType;
 
@@ -31,12 +31,12 @@ import org.tmatesoft.svn.core.wc.SVNStatusType;
  */
 public abstract class AbstractDiffCallback {
     
-    private SVNAdminArea myAdminArea;
+    private SVNAdminAreaInfo myAdminInfo;
     private File myBasePath;
     private Set myDeletedPaths;
     
-    protected AbstractDiffCallback(SVNAdminArea adminArea) {
-        myAdminArea = adminArea;
+    protected AbstractDiffCallback(SVNAdminAreaInfo info) {
+        myAdminInfo = info;
     }
     
     public void setBasePath(File path) {
@@ -63,13 +63,13 @@ public abstract class AbstractDiffCallback {
     public abstract SVNStatusType directoryDeleted(String path) throws SVNException;
     
     protected String getDisplayPath(String path) {
-        if (myAdminArea == null) {
+        if (myAdminInfo == null) {
             if (myBasePath != null) {
                 return new File(myBasePath, path).getAbsolutePath().replace(File.separatorChar, '/');
             }
             return path.replace(File.separatorChar, '/');
         }
-        return myAdminArea.getFile(path).getAbsolutePath().replace(File.separatorChar, '/');
+        return myAdminInfo.getAnchor().getFile(path).getAbsolutePath().replace(File.separatorChar, '/');
     }
     
     protected void categorizeProperties(Map original, Map regular, Map entry, Map wc) {
@@ -88,12 +88,12 @@ public abstract class AbstractDiffCallback {
         }
     }
     
-    protected SVNAdminArea getAdminArea() {
-        return myAdminArea;        
+    protected SVNAdminAreaInfo getAdminInfo() {
+        return myAdminInfo;        
     }
     
     protected SVNWCAccess getWCAccess() {
-        return getAdminArea().getWCAccess();
+        return getAdminInfo().getWCAccess();
     }
     
     protected void addDeletedPath(String path) {

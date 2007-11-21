@@ -16,8 +16,6 @@ import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.util.Map;
 
-import org.tmatesoft.svn.core.SVNException;
-import org.tmatesoft.svn.core.internal.wc.IOExceptionWrapper;
 import org.tmatesoft.svn.core.internal.wc.SVNSubstitutor;
 
 
@@ -43,13 +41,7 @@ public class SVNTranslatorOutputStream extends OutputStream {
         mySrcBuffer = write(mySrcBuffer, b, off, len);        
         mySrcBuffer.flip();
         // now src is ready for reading untill limit.
-        try {
-            myDstBuffer = mySubstitutor.translateChunk(mySrcBuffer, myDstBuffer);
-        } catch (SVNException svne) {
-            IOExceptionWrapper wrappedException = new IOExceptionWrapper(svne);
-            throw wrappedException;
-        }
-
+        myDstBuffer = mySubstitutor.translateChunk(mySrcBuffer, myDstBuffer);
         myDstBuffer.flip();
         // push all from dst buffer to dst stream.
         myDst.write(myDstBuffer.array(), myDstBuffer.arrayOffset() + myDstBuffer.position(), myDstBuffer.remaining());
@@ -60,12 +52,7 @@ public class SVNTranslatorOutputStream extends OutputStream {
     }
 
     public void close() throws IOException {        
-        try {
-            myDstBuffer = mySubstitutor.translateChunk(null, myDstBuffer);
-        } catch (SVNException svne) {
-            IOExceptionWrapper wrappedException = new IOExceptionWrapper(svne);
-            throw wrappedException;
-        }
+        myDstBuffer = mySubstitutor.translateChunk(null, myDstBuffer);
         myDstBuffer.flip();
         if (myDstBuffer.hasRemaining()) {
             myDst.write(myDstBuffer.array(), myDstBuffer.arrayOffset() + myDstBuffer.position(), myDstBuffer.remaining());

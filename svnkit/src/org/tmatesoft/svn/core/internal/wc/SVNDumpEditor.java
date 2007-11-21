@@ -188,13 +188,12 @@ public class SVNDumpEditor implements ISVNEditor {
                 comparePath = cmpPath;
                 compareRevision = cmpRev;
             }
-            comparePath = SVNPathUtil.canonicalizePath(comparePath);
-            comparePath = SVNPathUtil.getAbsolutePath(comparePath);
+            comparePath = SVNPathUtil.canonicalizeAbsPath(comparePath);
             
-            FSRevisionRoot compareRoot = null;
+            FSRevisionRoot compareRoot = null; 
             boolean mustDumpProps = false;
             boolean mustDumpText = false;
-            String canonicalPath = SVNPathUtil.getAbsolutePath(SVNPathUtil.canonicalizePath(path));
+            String canonicalPath = SVNPathUtil.canonicalizeAbsPath(path);
             switch(nodeAction) {
                 case SVNAdminHelper.NODE_ACTION_CHANGE:
                     writeDumpData(SVNAdminHelper.DUMPFILE_NODE_ACTION + ": change\n");
@@ -383,10 +382,10 @@ public class SVNDumpEditor implements ISVNEditor {
         return myDeltaCombiner;
     }
 
-    private DirectoryInfo createDirectoryInfo(String path, String copyFromPath, long copyFromRev, boolean added, DirectoryInfo parent) {
+    private DirectoryInfo createDirectoryInfo(String path, String copyFromPath, long copyFromRev, boolean added, DirectoryInfo parent) throws SVNException {
         String fullPath = null;
         if (parent != null) {
-            fullPath = SVNPathUtil.getAbsolutePath(SVNPathUtil.append(myRootPath, path));
+            fullPath = SVNPathUtil.concatToAbs(myRootPath, path);
         } else {
             fullPath = myRootPath;
         }

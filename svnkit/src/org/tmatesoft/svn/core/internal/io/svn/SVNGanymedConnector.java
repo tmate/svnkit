@@ -48,6 +48,10 @@ public class SVNGanymedConnector implements ISVNConnector {
 
     public void open(SVNRepositoryImpl repository) throws SVNException {
         ISVNAuthenticationManager authManager = repository.getAuthenticationManager();
+        if (authManager == null) {
+            SVNErrorManager.authenticationFailed("Authentication required for ''{0}''", repository.getLocation());
+            return;
+        }
 
         String realm = repository.getLocation().getProtocol() + "://" + repository.getLocation().getHost();
         if (repository.getLocation().hasPort()) {
@@ -170,10 +174,21 @@ public class SVNGanymedConnector implements ISVNConnector {
     }
 
     public boolean isConnected(SVNRepositoryImpl repos) throws SVNException {
-        return true;
+        return mySession != null && !isStale();
     }
     
     public boolean isStale() {
+        if (mySession == null) {
+            return true;
+        }
+        try {
+            mySession.ping();
+        } catch (IOException e) {
+            // any failure here means that channel is stale.
+            // session will be closed then.
+            SVNDebugLog.getDefaultLog().info(Thread.currentThread() + ": DETECTED STALE SESSION : " + myConnection);
+            return true;
+        }
         return false;
     }
 }

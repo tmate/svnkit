@@ -22,7 +22,6 @@ import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.internal.io.dav.DAVElement;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.util.SVNDebugLog;
-
 import org.xml.sax.Attributes;
 import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;
@@ -37,7 +36,6 @@ public abstract class BasicDAVHandler extends DefaultHandler {
 	private static final Object ROOT = new Object();
     
     private Map myPrefixesMap;
-    private String myNamespace;
     private StringBuffer myCDATA;
     private Stack myParent;
     private byte[] myDeltaBuffer;
@@ -47,14 +45,6 @@ public abstract class BasicDAVHandler extends DefaultHandler {
         myParent = new Stack();
     }
 
-    private void setNamespace(String uri){
-        if ("".equals(uri)){
-            myNamespace = null;            
-        } else {
-            myNamespace = uri;
-        }                             
-    }
-
     protected void init() {
         myPrefixesMap.clear();
         myParent.clear();
@@ -62,7 +52,6 @@ public abstract class BasicDAVHandler extends DefaultHandler {
     }
     
     public void startElement(String uri, String localName, String qName, Attributes attributes) throws SAXException {
-        setNamespace(uri);
         DAVElement element = getDAVElement(qName);
         try {
             startElement(getParent(), element, attributes);
@@ -126,7 +115,7 @@ public abstract class BasicDAVHandler extends DefaultHandler {
     }
     
     private DAVElement getDAVElement(String qName) {
-        String prefix = myNamespace;
+        String prefix = null;
         int index = qName.indexOf(':');
         if (index >= 0) {
             prefix = qName.substring(0, index);

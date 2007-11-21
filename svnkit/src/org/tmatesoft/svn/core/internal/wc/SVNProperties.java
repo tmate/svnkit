@@ -19,12 +19,12 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.UnsupportedEncodingException;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.TreeSet;
+import java.util.Arrays;
 
 import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
@@ -356,12 +356,13 @@ public class SVNProperties {
     public static void setProperties(Map namesToValues, File target, File tmpFile, String terminator) throws SVNException {
         OutputStream dst = null;
         try {
+            //tmpFile = SVNFileUtil.createUniqueFile(target.getParentFile(), target.getName(), ".tmp");
             dst = SVNFileUtil.openFileForWriting(tmpFile);
             setProperties(namesToValues, dst, terminator);
         } finally {
             SVNFileUtil.closeFile(dst);
         }
-        if (tmpFile != null && target != null) {
+        if (tmpFile != null) {
             SVNFileUtil.rename(tmpFile, target);
             SVNFileUtil.setReadonly(target, true);
         }

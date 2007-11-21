@@ -22,9 +22,8 @@ import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNLock;
 import org.tmatesoft.svn.core.SVNNodeKind;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
-import org.tmatesoft.svn.core.internal.util.SVNDate;
+import org.tmatesoft.svn.core.internal.util.SVNTimeUtil;
 import org.tmatesoft.svn.util.ISVNDebugLog;
-
 import org.xml.sax.ContentHandler;
 import org.xml.sax.SAXException;
 
@@ -120,11 +119,6 @@ public class SVNXMLDirEntryHandler extends AbstractXMLHandler implements ISVNDir
     }
     
     private void sendToHandler(SVNDirEntry entry) throws SAXException {
-        if ("".equals(entry.getRelativePath())) {
-            if (entry.getKind() == SVNNodeKind.DIR) {
-                return;
-            }
-        }
         openTag(ENTRY_TAG);
         addTag(NAME_TAG, entry.getRelativePath());
         if (entry.getKind() == SVNNodeKind.FILE) {
@@ -134,7 +128,7 @@ public class SVNXMLDirEntryHandler extends AbstractXMLHandler implements ISVNDir
         addAttribute(REVISION_ATTR, entry.getRevision() + "");
         openTag(COMMIT_TAG);
         addTag(AUTHOR_TAG, entry.getAuthor());
-        addTag(DATE_TAG, SVNDate.formatDate(entry.getDate()));
+        addTag(DATE_TAG, SVNTimeUtil.formatDate(entry.getDate()));        
         closeTag(COMMIT_TAG);
         SVNLock lock = entry.getLock();
         if (lock != null) {
@@ -142,9 +136,9 @@ public class SVNXMLDirEntryHandler extends AbstractXMLHandler implements ISVNDir
             addTag(TOKEN_TAG, lock.getID());
             addTag(OWNER_TAG, lock.getOwner());
             addTag(COMMENT_TAG, lock.getComment());
-            addTag(CREATED_TAG, SVNDate.formatDate(lock.getCreationDate()));
+            addTag(CREATED_TAG, SVNTimeUtil.formatDate(lock.getCreationDate()));
             if (lock.getExpirationDate() != null && lock.getExpirationDate().getTime() > 0) {
-                addTag(EXPIRES_TAG, SVNDate.formatDate(lock.getExpirationDate()));
+                addTag(EXPIRES_TAG, SVNTimeUtil.formatDate(lock.getExpirationDate()));
             }
             closeTag(LOCK_TAG);
         }
