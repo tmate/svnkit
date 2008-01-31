@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2008 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -18,11 +18,9 @@ import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNNodeKind;
-import org.tmatesoft.svn.core.SVNProperties;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
-import org.tmatesoft.svn.core.io.SVNRepository;
 
 /**
  * @version 1.1.1
@@ -80,7 +78,10 @@ public class FSRevisionNode {
     //changed yet (fresh) or was
     private boolean myIsFreshTxnRoot;
     private FSID myFreshRootPredecessorId;
-    
+
+    public FSRevisionNode() {
+    }
+
     public void setId(FSID revNodeID) {
         myId = revNodeID;
     }
@@ -161,7 +162,7 @@ public class FSRevisionNode {
         }
         return myId.getRevision();
     }
-    
+
     public long getCopyFromRevision() {
         return myCopyFromRevision;
     }
@@ -292,11 +293,10 @@ public class FSRevisionNode {
         String copyfrom = (String) headers.get(FSRevisionNode.HEADER_COPYFROM);
         if (copyfrom == null) {
             revNode.setCopyFromPath(null);
-            revNode.setCopyFromRevision(SVNRepository.INVALID_REVISION);
+            revNode.setCopyFromRevision(FSRepository.SVN_INVALID_REVNUM);
         } else {
             parseCopyFrom(copyfrom, revNode);
         }
-        
         revNode.myIsFreshTxnRoot = headers.containsKey(HEADER_IS_FRESH_TXN_ROOT);
         return revNode;
     }
@@ -495,7 +495,7 @@ public class FSRevisionNode {
         return Collections.unmodifiableMap(dirContents);
     }
 
-    public SVNProperties getProperties(FSFS fsfsOwner) throws SVNException {
+    public Map getProperties(FSFS fsfsOwner) throws SVNException {
         return fsfsOwner.getProperties(this);
     }
 
@@ -540,4 +540,5 @@ public class FSRevisionNode {
     public void setFreshRootPredecessorId(FSID freshRootPredecessorId) {
         myFreshRootPredecessorId = freshRootPredecessorId;
     }
+
 }

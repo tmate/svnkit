@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2008 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -15,14 +15,12 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Collection;
 
-import org.tmatesoft.svn.core.SVNException;
-import org.tmatesoft.svn.core.SVNURL;
-import org.tmatesoft.svn.core.SVNPropertyValue;
-import org.tmatesoft.svn.core.wc.ISVNPropertyHandler;
-import org.tmatesoft.svn.core.wc.SVNPropertyData;
-
 import org.tigris.subversion.javahl.JavaHLObjectFactory;
 import org.tigris.subversion.javahl.PropertyData;
+import org.tmatesoft.svn.core.SVNException;
+import org.tmatesoft.svn.core.SVNURL;
+import org.tmatesoft.svn.core.wc.ISVNPropertyHandler;
+import org.tmatesoft.svn.core.wc.SVNPropertyData;
 
 /**
  * @version 1.1.1
@@ -40,17 +38,17 @@ class JavaHLPropertyHandler implements ISVNPropertyHandler{
     }
 
     public void handleProperty(File path, SVNPropertyData property) throws SVNException {
-        myData = JavaHLObjectFactory.createPropertyData(myOwner, path.getAbsolutePath(), property.getName(), property.getValue().getString(), SVNPropertyValue.getPropertyAsBytes(property.getValue()));
+        myData = JavaHLObjectFactory.createPropertyData(myOwner, path.getAbsolutePath(), property.getName(), property.getValue(), property.getValue().getBytes());
         myAllData.add(myData);
     }
 
     public void handleProperty(SVNURL url, SVNPropertyData property) throws SVNException {
-        myData = JavaHLObjectFactory.createPropertyData(myOwner, url.toString(), property.getName(), property.getValue().getString(), SVNPropertyValue.getPropertyAsBytes(property.getValue()));
+        myData = JavaHLObjectFactory.createPropertyData(myOwner, url.toString(), property.getName(), property.getValue(), property.getValue().getBytes());
         myAllData.add(myData);
     }
 
     public void handleProperty(long revision, SVNPropertyData property) throws SVNException {
-        myData = JavaHLObjectFactory.createPropertyData(myOwner, null, property.getName(), property.getValue().getString(), SVNPropertyValue.getPropertyAsBytes(property.getValue()));
+        myData = JavaHLObjectFactory.createPropertyData(myOwner, null, property.getName(), property.getValue(), property.getValue().getBytes());
         myAllData.add(myData);
     }
     

@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2008 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -21,9 +21,8 @@ import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNLock;
-import org.tmatesoft.svn.core.SVNURL;
-import org.tmatesoft.svn.core.SVNPropertyValue;
 import org.tmatesoft.svn.core.SVNRevisionProperty;
+import org.tmatesoft.svn.core.SVNURL;
 import org.tmatesoft.svn.core.internal.io.fs.FSRepository;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 import org.tmatesoft.svn.core.internal.wc.admin.SVNTranslator;
@@ -325,7 +324,7 @@ public class SVNAdmin {
     public void setLog(String path, Revision rev, String message, boolean bypassHooks) throws ClientException {
         try {
             SVNRepository repository = SVNRepositoryFactory.create(SVNURL.fromFile(new File(path).getAbsoluteFile()));
-            ((FSRepository) repository).setRevisionPropertyValue(JavaHLObjectFactory.getSVNRevision(rev).getNumber(), SVNRevisionProperty.LOG, SVNPropertyValue.create(message), bypassHooks);
+            ((FSRepository) repository).setRevisionPropertyValue(JavaHLObjectFactory.getSVNRevision(rev).getNumber(), SVNRevisionProperty.LOG, message, bypassHooks);
         } catch (SVNException e) {
             JavaHLObjectFactory.throwException(e, myDelegate);
         } 

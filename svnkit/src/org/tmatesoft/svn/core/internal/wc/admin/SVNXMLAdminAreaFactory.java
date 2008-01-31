@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2008 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -16,7 +16,6 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 
-import org.tmatesoft.svn.core.SVNDepth;
 import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
@@ -32,9 +31,9 @@ import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 class SVNXMLAdminAreaFactory extends SVNAdminAreaFactory {
     public static final int WC_FORMAT = 4;
 
-    protected void doCreateVersionedDirectory(File path, String url, String rootURL, String uuid, long revNumber, SVNDepth depth) throws SVNException {
+    protected void doCreateVersionedDirectory(File path, String url, String rootURL, String uuid, long revNumber) throws SVNException {
         SVNXMLAdminArea adminArea = new SVNXMLAdminArea(path);
-        adminArea.createVersionedDirectory(path, url, rootURL, uuid, revNumber, true, depth);
+        adminArea.createVersionedDirectory(path, url, rootURL, uuid, revNumber, true);
     }
 
     protected SVNAdminArea doOpen(File path, int version) throws SVNException {

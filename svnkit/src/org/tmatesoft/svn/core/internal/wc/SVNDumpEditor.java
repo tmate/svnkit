@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2008 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -19,14 +19,13 @@ import java.io.OutputStream;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.LinkedList;
+import java.util.Map;
 
 import org.tmatesoft.svn.core.SVNCommitInfo;
 import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNNodeKind;
-import org.tmatesoft.svn.core.SVNProperties;
-import org.tmatesoft.svn.core.SVNPropertyValue;
 import org.tmatesoft.svn.core.internal.delta.SVNDeltaCombiner;
 import org.tmatesoft.svn.core.internal.io.fs.CountingStream;
 import org.tmatesoft.svn.core.internal.io.fs.FSFS;
@@ -41,6 +40,7 @@ import org.tmatesoft.svn.core.io.diff.SVNDeltaGenerator;
 import org.tmatesoft.svn.core.io.diff.SVNDiffWindow;
 import org.tmatesoft.svn.core.wc.SVNRevision;
 import org.tmatesoft.svn.util.SVNDebugLog;
+
 
 
 /**
@@ -100,14 +100,14 @@ public class SVNDumpEditor implements ISVNEditor {
         }
     }
 
-    public void changeDirProperty(String name, SVNPropertyValue value) throws SVNException {
+    public void changeDirProperty(String name, String value) throws SVNException {
         if (!myCurrentDirInfo.myIsWrittenOut) {
             dumpNode(myCurrentDirInfo.myFullPath, SVNNodeKind.DIR, SVNAdminHelper.NODE_ACTION_CHANGE, false, myCurrentDirInfo.myComparePath, myCurrentDirInfo.myCompareRevision);
             myCurrentDirInfo.myIsWrittenOut = true;
         }
     }
 
-    public void changeFileProperty(String path, String name, SVNPropertyValue value) throws SVNException {
+    public void changeFileProperty(String path, String name, String value) throws SVNException {
     }
 
     public void closeDir() throws SVNException {
@@ -188,13 +188,12 @@ public class SVNDumpEditor implements ISVNEditor {
                 comparePath = cmpPath;
                 compareRevision = cmpRev;
             }
-            comparePath = SVNPathUtil.canonicalizePath(comparePath);
-            comparePath = SVNPathUtil.getAbsolutePath(comparePath);
+            comparePath = SVNPathUtil.canonicalizeAbsPath(comparePath);
             
-            FSRevisionRoot compareRoot = null;
+            FSRevisionRoot compareRoot = null; 
             boolean mustDumpProps = false;
             boolean mustDumpText = false;
-            String canonicalPath = SVNPathUtil.getAbsolutePath(SVNPathUtil.canonicalizePath(path));
+            String canonicalPath = SVNPathUtil.canonicalizeAbsPath(path);
             switch(nodeAction) {
                 case SVNAdminHelper.NODE_ACTION_CHANGE:
                     writeDumpData(SVNAdminHelper.DUMPFILE_NODE_ACTION + ": change\n");
@@ -255,8 +254,8 @@ public class SVNDumpEditor implements ISVNEditor {
             String propContents = null;
             if (mustDumpProps) {
                 FSRevisionNode node = myRoot.getRevisionNode(canonicalPath);
-                SVNProperties props = node.getProperties(myFSFS);
-                SVNProperties oldProps = null;
+                Map props = node.getProperties(myFSFS);
+                Map oldProps = null;
                 if (myUseDeltas && compareRoot != null) {
                     FSRevisionNode cmpNode = myRoot.getRevisionNode(comparePath);
                     oldProps = cmpNode.getProperties(myFSFS);
@@ -383,10 +382,10 @@ public class SVNDumpEditor implements ISVNEditor {
         return myDeltaCombiner;
     }
 
-    private DirectoryInfo createDirectoryInfo(String path, String copyFromPath, long copyFromRev, boolean added, DirectoryInfo parent) {
+    private DirectoryInfo createDirectoryInfo(String path, String copyFromPath, long copyFromRev, boolean added, DirectoryInfo parent) throws SVNException {
         String fullPath = null;
         if (parent != null) {
-            fullPath = SVNPathUtil.getAbsolutePath(SVNPathUtil.append(myRootPath, path));
+            fullPath = SVNPathUtil.concatToAbs(myRootPath, path);
         } else {
             fullPath = myRootPath;
         }

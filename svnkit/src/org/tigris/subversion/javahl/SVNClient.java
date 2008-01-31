@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2008 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -118,11 +118,6 @@ public class SVNClient implements SVNClientInterface {
         myDelegate.revert(path, recurse);
     }
 
-    public void revert(String path, int depth) throws ClientException {
-        myDelegate.revert(path, depth);
-    }
-
-
     public void add(String path, boolean recurse) throws ClientException {
         myDelegate.add(path, recurse);
     }
@@ -207,16 +202,8 @@ public class SVNClient implements SVNClientInterface {
         myDelegate.diff(target1, revision1, target2, revision2, outFileName, recurse, ignoreAncestry, noDiffDeleted, force);
     }
 
-    public void diff(String target1, Revision revision1, String target2, Revision revision2, String relativeToDir, String outFileName, int depth, boolean ignoreAncestry, boolean noDiffDeleted, boolean force) throws ClientException {
-        myDelegate.diff(target1, revision1,  target2, revision2, relativeToDir, outFileName, depth, ignoreAncestry, noDiffDeleted, force);
-    }
-
     public void diff(String target, Revision pegRevision, Revision startRevision, Revision endRevision, String outFileName, boolean recurse, boolean ignoreAncestry, boolean noDiffDeleted, boolean force) throws ClientException {
         myDelegate.diff(target, pegRevision, startRevision, endRevision, outFileName, recurse, ignoreAncestry, noDiffDeleted, force);
-    }
-
-    public void diff(String target, Revision pegRevision, Revision startRevision, Revision endRevision, String relativeToDir, String outFileName, int depth, boolean ignoreAncestry, boolean noDiffDeleted, boolean force) throws ClientException {
-        myDelegate.diff(target, pegRevision, startRevision, endRevision, relativeToDir, outFileName, depth, ignoreAncestry, noDiffDeleted, force);
     }
 
     public PropertyData[] properties(String path) throws ClientException {
@@ -265,10 +252,6 @@ public class SVNClient implements SVNClientInterface {
 
     public void propertyCreate(String path, String name, byte[] value, boolean recurse, boolean force) throws ClientException {
         myDelegate.propertyCreate(path, name, value, recurse, force);
-    }
-
-    public void propertyCreate(String path, String name, String value, int depth, boolean force) throws ClientException {
-        myDelegate.propertyCreate(path, name, value, depth, force);
     }
 
     public PropertyData revProperty(String path, String name, Revision rev) throws ClientException {
@@ -389,246 +372,4 @@ public class SVNClient implements SVNClientInterface {
     
     public static void initNative() {
     }
-
-    public void setProgressListener(ProgressListener listener) {
-        myDelegate.setProgressListener(listener);
-    }
-
-    public void addToChangelist(String[] paths, String changelist) throws ClientException {
-        myDelegate.addToChangelist(paths, changelist);
-    }
-
-    public String[] getChangelist(String changelist, String rootPath) throws ClientException {
-        return myDelegate.getChangelist(changelist, rootPath);
-    }
-
-    public void getChangelists(String rootPath, String[] changelists, int depth, ChangelistCallback callback) throws ClientException {
-        myDelegate.getChangelists(rootPath, changelists, depth, callback);
-    }
-
-    public void removeFromChangelist(String[] paths, String changelist) throws ClientException {
-        myDelegate.removeFromChangelist(paths, changelist);
-    }
-
-    public long commit(String[] path, String message, int depth, boolean noUnlock, boolean keepChangelist, String[] changelists) throws ClientException {
-        return myDelegate.commit(path, message, depth, noUnlock, keepChangelist, changelists);
-    }
-
-    public void remove(String[] path, String message, boolean force, boolean keepLocal) throws ClientException {
-        myDelegate.remove(path, message, force, keepLocal);
-    }
-
-    public long checkout(String moduleName, String destPath, Revision revision, Revision pegRevision, int depth, boolean ignoreExternals, boolean allowUnverObstructions) throws ClientException {
-        return myDelegate.checkout(moduleName, destPath, revision, pegRevision, depth, ignoreExternals, allowUnverObstructions);
-    }
-
-    public void diff(String target1, Revision revision1, String target2, Revision revision2, String outFileName, int depth, boolean ignoreAncestry, boolean noDiffDeleted, boolean force) throws ClientException {
-        myDelegate.diff(target1, revision1, target2, revision2, outFileName, depth, ignoreAncestry, noDiffDeleted, force);
-    }
-
-    public void diff(String target, Revision pegRevision, Revision startRevision, Revision endRevision, String outFileName, int depth, boolean ignoreAncestry, boolean noDiffDeleted, boolean force) throws ClientException {
-        myDelegate.diff(target, pegRevision, startRevision, endRevision, outFileName, depth, ignoreAncestry, noDiffDeleted, force);
-    }
-
-    public void diffSummarize(String target1, Revision revision1, String target2, Revision revision2, int depth, boolean ignoreAncestry, DiffSummaryReceiver receiver) throws ClientException {
-        myDelegate.diffSummarize(target1, revision1, target2, revision2, depth, ignoreAncestry, receiver);
-    }
-
-    public void diffSummarize(String target, Revision pegRevision, Revision startRevision, Revision endRevision, int depth, boolean ignoreAncestry, DiffSummaryReceiver receiver) throws ClientException {
-        myDelegate.diffSummarize(target, pegRevision, startRevision, endRevision, depth, ignoreAncestry, receiver);
-    }
-
-    public long doExport(String srcPath, String destPath, Revision revision, Revision pegRevision, boolean force, boolean ignoreExternals, int depth, String nativeEOL) throws ClientException {
-        return myDelegate.doExport(srcPath, destPath, revision, pegRevision, force, ignoreExternals, depth, nativeEOL);
-    }
-
-    public MergeInfo getMergeInfo(String path, Revision revision) throws SubversionException {
-        return myDelegate.getMergeInfo(path, revision);
-    }
-
-    public void merge(String path1, Revision revision1, String path2, Revision revision2, String localPath, boolean force, int depth, boolean ignoreAncestry, boolean dryRun) throws ClientException {
-        myDelegate.merge(path1, revision1, path2, revision2, localPath, force, depth, ignoreAncestry, dryRun);
-    }
-
-    public void merge(String path, Revision pegRevision, RevisionRange[] revisions, String localPath, boolean force, int depth, boolean ignoreAncestry, boolean dryRun) throws ClientException {
-        myDelegate.merge(path, pegRevision, revisions, localPath, force, depth, ignoreAncestry, dryRun);
-    }
-
-    public long update(String path, Revision revision, int depth, boolean depthIsSticky, boolean ignoreExternals, boolean allowUnverObstructions) throws ClientException {
-        return myDelegate.update(path, revision, depth, depthIsSticky, ignoreExternals, allowUnverObstructions);
-    }
-
-    public long[] update(String[] path, Revision revision, int depth, boolean depthIsSticky, boolean ignoreExternals, boolean allowUnverObstructions) throws ClientException {
-        return myDelegate.update(path, revision, depth, depthIsSticky, ignoreExternals, allowUnverObstructions);
-    }
-
-    public void status(String path, int depth, boolean onServer, boolean getAll, boolean noIgnore, boolean ignoreExternals, StatusCallback callback) throws ClientException {
-        myDelegate.status(path, depth, onServer, getAll, noIgnore, ignoreExternals, callback);
-    }
-
-    public void status(String path, int depth, boolean onServer, boolean getAll, boolean noIgnore, boolean ignoreExternals, String[] changelists, StatusCallback callback) throws ClientException {
-        myDelegate.status(path, depth, onServer, getAll, noIgnore, ignoreExternals, changelists, callback);
-    }
-
-    public void list(String url, Revision revision, Revision pegRevision, int depth, int direntFields, boolean fetchLocks, ListCallback callback) throws ClientException {
-        myDelegate.list(url, revision, pegRevision, depth, direntFields, fetchLocks, callback);
-    }
-
-    public void mkdir(String[] path, String message, boolean makeParents) throws ClientException {
-        myDelegate.mkdir(path, message, makeParents);
-    }
-
-    public void properties(String path, Revision revision, Revision pegRevision, int depth, ProplistCallback callback) throws ClientException {
-        myDelegate.properties(path, revision, pegRevision, depth, callback);
-    }
-
-    public void setConflictResolver(ConflictResolverCallback listener) {
-        myDelegate.setConflictResolver(listener);
-    }
-
-    public void blame(String path, Revision pegRevision, Revision revisionStart, Revision revisionEnd, boolean ignoreMimeType, boolean includeMergedRevisions, BlameCallback2 callback) throws ClientException {
-        myDelegate.blame(path, pegRevision, revisionStart, revisionEnd, ignoreMimeType, includeMergedRevisions, callback);
-    }
-
-    public String[] suggestMergeSources(String path, Revision pegRevision) throws SubversionException {
-        return myDelegate.suggestMergeSources(path, pegRevision);
-    }
-
-    public void copy(CopySource[] sources, String destPath, String message, boolean copyAsChild, boolean makeParents) throws ClientException {
-        myDelegate.copy(sources, destPath, message, copyAsChild, makeParents);
-    }
-
-    public void move(String[] srcPaths, String destPath, String message, boolean force, boolean moveAsChild, boolean makeParents) throws ClientException {
-        myDelegate.move(srcPaths, destPath, message, force, moveAsChild, makeParents);
-    }
-
-    public void add(String path, int depth, boolean force, boolean noIgnores, boolean addParents) throws ClientException {
-        myDelegate.add(path, depth, force, noIgnores, addParents);
-    }
-
-    public void doImport(String path, String url, String message, int depth, boolean noIgnore, boolean ignoreUnknownNodeTypes) throws ClientException {
-        myDelegate.doImport(path, url, message, depth, noIgnore, ignoreUnknownNodeTypes);
-    }
-
-    public void info2(String pathOrUrl, Revision revision, Revision pegRevision, int depth, InfoCallback callback) throws ClientException {
-        myDelegate.info2(pathOrUrl, revision, pegRevision, depth, callback);
-    }
-
-    public void propertyRemove(String path, String name, int depth) throws ClientException {
-        myDelegate.propertyRemove(path, name, depth);
-    }
-
-    public void propertySet(String path, String name, String value, int depth, boolean force) throws ClientException {
-        myDelegate.propertySet(path, name, value, depth, force);
-    }
-
-    public RevisionRange[] getAvailableMerges(String path, Revision pegRevision, String mergeSource) throws SubversionException {
-        return myDelegate.getAvailableMerges(path, pegRevision, mergeSource);
-    }
-
-    public void resolved(String path, int depth, int conflictResult) throws SubversionException {
-        myDelegate.resolved(path, depth, conflictResult);
-    }
-
-    public long doSwitch(String path, String url, Revision revision, Revision pegRevision, int depth, boolean depthIsSticky, boolean ignoreExternals, boolean allowUnverObstructions) throws ClientException {
-        return myDelegate.doSwitch(path, url, revision, pegRevision, depth, depthIsSticky, ignoreExternals, allowUnverObstructions);
-    }
-
-    public void logMessages(String path, Revision pegRevision, Revision revisionStart, Revision revisionEnd, boolean stopOnCopy, boolean discoverPath, boolean includeMergedRevisions,
-            String[] revProps, long limit, LogMessageCallback callback) throws ClientException {
-        myDelegate.logMessages(path, pegRevision, revisionStart, revisionEnd, stopOnCopy, discoverPath, includeMergedRevisions, revProps, limit, callback);
-    }
-
-    public void merge(String path1, Revision revision1, String path2, Revision revision2, String localPath, 
-            boolean force, int depth, boolean ignoreAncestry, boolean dryRun, boolean recordOnly) throws ClientException {
-        myDelegate.merge(path1, revision1, path2, revision2, localPath, force, depth, ignoreAncestry, 
-                dryRun, recordOnly);
-    }
-
-    public void merge(String path, Revision pegRevision, RevisionRange[] revisions, String localPath, 
-            boolean force, int depth, boolean ignoreAncestry, boolean dryRun, boolean recordOnly) throws ClientException {
-        myDelegate.merge(path, pegRevision, revisions, localPath, force, depth, ignoreAncestry, dryRun, recordOnly);
-    }
-
-
-    public void mergeReintegrate(String path, Revision pegRevision, String localPath, boolean force, boolean dryRun) throws ClientException {
-        myDelegate.mergeReintegrate(path, pegRevision, localPath, force, dryRun);
-    }
-
-    public void info2(String pathOrUrl, Revision revision,
-			Revision pegRevision, int depth, String[] changelists,
-			InfoCallback callback) throws ClientException {
-		myDelegate.info2(pathOrUrl, revision, pegRevision, depth, changelists, callback);
-	}
-
-	public void diff(String target1, Revision revision1, String target2,
-			Revision revision2, String relativeToDir, String outFileName,
-			int depth, String[] changelists, boolean ignoreAncestry,
-			boolean noDiffDeleted, boolean force) throws ClientException {
-		myDelegate.diff(target1, revision1, target2, revision2, relativeToDir, outFileName, depth, 
-				changelists, ignoreAncestry, noDiffDeleted, force);
-	}
-
-	public void diff(String target, Revision pegRevision,
-			Revision startRevision, Revision endRevision, String relativeToDir,
-			String outFileName, int depth, String[] changelists,
-			boolean ignoreAncestry, boolean noDiffDeleted, boolean force)
-			throws ClientException {
-		myDelegate.diff(target, pegRevision, startRevision, endRevision, relativeToDir, outFileName, 
-				depth, changelists, ignoreAncestry, noDiffDeleted, force);
-	}
-
-	public void diffSummarize(String target1, Revision revision1,
-			String target2, Revision revision2, int depth,
-			String[] changelists, boolean ignoreAncestry,
-			DiffSummaryReceiver receiver) throws ClientException {
-		myDelegate.diffSummarize(target1, revision1, target2, revision2, depth, changelists, 
-				ignoreAncestry,	receiver);
-	}
-
-	public void diffSummarize(String target, Revision pegRevision,
-			Revision startRevision, Revision endRevision, int depth,
-			String[] changelists, boolean ignoreAncestry,
-			DiffSummaryReceiver receiver) throws ClientException {
-		myDelegate.diffSummarize(target, pegRevision, startRevision, endRevision, depth, changelists, 
-				ignoreAncestry, receiver);
-	}
-
-	public void addToChangelist(String[] paths, String changelist, int depth,
-			String[] changelists) throws ClientException {
-		myDelegate.addToChangelist(paths, changelist, depth, changelists);
-	}
-
-	public void removeFromChangelists(String[] paths, int depth,
-			String[] changelist) throws ClientException {
-		myDelegate.removeFromChangelists(paths, depth, changelist);
-	}
-
-	public void properties(String path, Revision revision,
-			Revision pegRevision, int depth, String[] changelists,
-			ProplistCallback callback) throws ClientException {
-		myDelegate.properties(path, revision, pegRevision, depth, changelists, callback);
-	}
-
-	public void propertyCreate(String path, String name, String value,
-			int depth, String[] changelists, boolean force)
-			throws ClientException {
-		myDelegate.propertyCreate(path, name, value, depth, changelists, force);
-	}
-
-	public void propertyRemove(String path, String name, int depth,
-			String[] changelists) throws ClientException {
-		myDelegate.propertyRemove(path, name, depth, changelists);
-	}
-
-	public void propertySet(String path, String name, String value, int depth,
-			String[] changelists, boolean force) throws ClientException {
-		myDelegate.propertySet(path, name, value, depth, changelists, force);
-	}
-
-	public void revert(String path, int depth, String[] changelists)
-			throws ClientException {
-		myDelegate.revert(path, depth, changelists);
-	}
-
 }

@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2008 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -11,11 +11,11 @@
  */
 package org.tmatesoft.svn.util;
 
+import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Properties;
-
-import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 
 /**
  * @version 1.1.1

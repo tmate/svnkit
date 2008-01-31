@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2008 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -40,8 +40,7 @@ public class SVNLookCatCommand extends SVNCommand {
             System.exit(1);
         }
         File reposRoot = new File(getCommandLine().getPathAt(0));  
-        String path = SVNPathUtil.canonicalizePath(getCommandLine().getPathAt(1));
-        path = SVNPathUtil.getAbsolutePath(path);
+        String path = SVNPathUtil.canonicalizeAbsPath(getCommandLine().getPathAt(1));
         
         SVNRevision revision = SVNRevision.HEAD;
         SVNLookClient lookClient = getClientManager().getLookClient();

@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2008 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -18,7 +18,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
-import java.io.UnsupportedEncodingException;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -27,13 +27,9 @@ import java.util.TreeMap;
 import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
-import org.tmatesoft.svn.core.SVNMergeRangeList;
-import org.tmatesoft.svn.core.SVNProperties;
 import org.tmatesoft.svn.core.SVNProperty;
-import org.tmatesoft.svn.core.SVNPropertyValue;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
-import org.tmatesoft.svn.core.internal.wc.SVNMergeInfoManager;
 import org.tmatesoft.svn.core.internal.wc.admin.SVNTranslator;
 
 import de.regnis.q.sequence.line.diff.QDiffGenerator;
@@ -137,7 +133,7 @@ public class DefaultSVNDiffGenerator implements ISVNDiffGenerator {
         return myDiffOptions;
     }
 
-    protected String getDisplayPath(String path) throws SVNException {
+    protected String getDisplayPath(String path) {
         if (myBasePath == null) {
             return path;
         }
@@ -157,8 +153,6 @@ public class DefaultSVNDiffGenerator implements ISVNDiffGenerator {
             if (path.startsWith("./")) {
                 path = path.substring("./".length());
             }
-        } else if (path.startsWith("/")) {
-            createBadRelativePathError(path);
         }
         return path;
     }
@@ -171,14 +165,14 @@ public class DefaultSVNDiffGenerator implements ISVNDiffGenerator {
         return myIsForcedBinaryDiff;
     }
 
-    public void displayPropDiff(String path, SVNProperties baseProps, SVNProperties diff, OutputStream result) throws SVNException {
-        baseProps = baseProps != null ? baseProps : SVNProperties.EMPTY_PROPERTIES;
-        diff = diff != null ? diff : SVNProperties.EMPTY_PROPERTIES;
-        for (Iterator changedPropNames = diff.nameSet().iterator(); changedPropNames.hasNext();) {
+    public void displayPropDiff(String path, Map baseProps, Map diff, OutputStream result) throws SVNException {
+        baseProps = baseProps != null ? baseProps : Collections.EMPTY_MAP;
+        diff = diff != null ? diff : Collections.EMPTY_MAP;
+        for (Iterator changedPropNames = diff.keySet().iterator(); changedPropNames.hasNext();) {
             String name = (String) changedPropNames.next();
-            SVNPropertyValue originalValue = baseProps.getSVNPropertyValue(name);
-            SVNPropertyValue newValue = diff.getSVNPropertyValue(name);
-            if ((originalValue != null && originalValue.equals(newValue)) || (originalValue == null && newValue == null)) {
+            String originalValue = (String) baseProps.get(name);
+            String newValue = (String) diff.get(name);
+            if ((originalValue != null && originalValue.equals(newValue)) || originalValue == newValue) {
                 changedPropNames.remove();
             }
         }
@@ -187,41 +181,27 @@ public class DefaultSVNDiffGenerator implements ISVNDiffGenerator {
         }
         path = getDisplayPath(path);
         ByteArrayOutputStream bos = new ByteArrayOutputStream();
-        diff = new SVNProperties(diff);
+        diff = new TreeMap(diff);
         try {
             bos.write(EOL);
             bos.write(("Property changes on: " + (useLocalFileSeparatorChar() ? path.replace('/', File.separatorChar) : path)).getBytes(getEncoding()));
             bos.write(EOL);
             bos.write(PROPERTIES_SEPARATOR);
             bos.write(EOL);
-            for (Iterator changedPropNames = diff.nameSet().iterator(); changedPropNames.hasNext();) {
+            for (Iterator changedPropNames = diff.keySet().iterator(); changedPropNames.hasNext();) {
                 String name = (String) changedPropNames.next();
-                SVNPropertyValue originalValue = baseProps != null ? baseProps.getSVNPropertyValue(name) : null;
-                SVNPropertyValue newValue = diff.getSVNPropertyValue(name);
-                String headerFormat = null;
-                
-                if (originalValue == null) {
-                    headerFormat = "Added: ";
-                } else if (newValue == null) {
-                    headerFormat = "Deleted: ";
-                } else {
-                    headerFormat = "Modified: ";
-                }
-                
-                bos.write((headerFormat + name).getBytes(getEncoding()));
+                String originalValue = baseProps != null ? (String) baseProps.get(name) : null;
+                String newValue = (String) diff.get(name);
+                bos.write(("Name: " + name).getBytes(getEncoding()));
                 bos.write(EOL);
-                if (SVNProperty.MERGE_INFO.equals(name)) {
-                    displayMergeInfoDiff(bos, originalValue == null ? null : originalValue.getString(), newValue == null ? null : newValue.getString());
-                    continue;
-                }
                 if (originalValue != null) {
                     bos.write("   - ".getBytes(getEncoding()));
-                    bos.write(getPropertyAsBytes(originalValue, getEncoding()));
+                    bos.write(originalValue.getBytes(getEncoding()));
                     bos.write(EOL);
                 }
                 if (newValue != null) {
                     bos.write("   + ".getBytes(getEncoding()));
-                    bos.write(getPropertyAsBytes(newValue, getEncoding()));
+                    bos.write(newValue.getBytes(getEncoding()));
                     bos.write(EOL);
                 } 
             }
@@ -235,21 +215,6 @@ public class DefaultSVNDiffGenerator implements ISVNDiffGenerator {
                 bos.writeTo(result);
             } catch (IOException e) {
             }
-        }
-    }
-
-    private byte[] getPropertyAsBytes(SVNPropertyValue value, String encoding){
-        if (value == null){
-            return null;            
-        }
-        if (value.isString()){
-            try {
-                return value.getString().getBytes(encoding);
-            } catch (UnsupportedEncodingException e) {
-                return value.getString().getBytes();
-            }
-        } else {
-            return value.getBytes();
         }
     }
 
@@ -528,45 +493,5 @@ public class DefaultSVNDiffGenerator implements ISVNDiffGenerator {
     
     protected boolean useLocalFileSeparatorChar() {
         return true;
-    }
-    
-    private void displayMergeInfoDiff(ByteArrayOutputStream baos, String oldValue, String newValue) throws SVNException, IOException {
-        Map oldMergeInfo = null;
-        Map newMergeInfo = null;
-        if (oldValue != null) {
-            oldMergeInfo = SVNMergeInfoManager.parseMergeInfo(new StringBuffer(oldValue), 
-                                                              null);
-        }
-        if (newValue != null) {
-            newMergeInfo = SVNMergeInfoManager.parseMergeInfo(new StringBuffer(newValue), 
-                                                              null);
-        }
-        
-        Map deleted = new TreeMap();
-        Map added = new TreeMap();
-        SVNMergeInfoManager.diffMergeInfo(deleted, added, oldMergeInfo, newMergeInfo, true);
-
-        for (Iterator paths = deleted.keySet().iterator(); paths.hasNext();) {
-            String path = (String) paths.next();
-            SVNMergeRangeList rangeList = (SVNMergeRangeList) deleted.get(path);
-            baos.write(("   Reverted " + path + ":r").getBytes(getEncoding())); 
-            baos.write(rangeList.toString().getBytes(getEncoding()));
-            baos.write(EOL);
-        }
-        
-        for (Iterator paths = added.keySet().iterator(); paths.hasNext();) {
-            String path = (String) paths.next();
-            SVNMergeRangeList rangeList = (SVNMergeRangeList) added.get(path);
-            baos.write(("   Merged " + path + ":r").getBytes(getEncoding())); 
-            baos.write(rangeList.toString().getBytes(getEncoding()));
-            baos.write(EOL);
-        }
-    }
-    
-    private void createBadRelativePathError(String path) throws SVNException {
-        SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.BAD_RELATIVE_PATH, 
-                "Path ''{0}'' must be an immediate child of the directory ''{1}''", 
-                new Object[] { path, myBasePath });
-        SVNErrorManager.error(err);
     }
 }

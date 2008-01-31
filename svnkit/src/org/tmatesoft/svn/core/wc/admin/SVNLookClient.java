@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2008 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -26,7 +26,6 @@ import org.tmatesoft.svn.core.SVNLock;
 import org.tmatesoft.svn.core.SVNLogEntry;
 import org.tmatesoft.svn.core.SVNNodeKind;
 import org.tmatesoft.svn.core.SVNRevisionProperty;
-import org.tmatesoft.svn.core.SVNProperties;
 import org.tmatesoft.svn.core.auth.ISVNAuthenticationManager;
 import org.tmatesoft.svn.core.internal.delta.SVNDeltaCombiner;
 import org.tmatesoft.svn.core.internal.io.fs.FSEntry;
@@ -39,7 +38,7 @@ import org.tmatesoft.svn.core.internal.io.fs.FSRevisionRoot;
 import org.tmatesoft.svn.core.internal.io.fs.FSRoot;
 import org.tmatesoft.svn.core.internal.io.fs.FSTransactionInfo;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
-import org.tmatesoft.svn.core.internal.util.SVNDate;
+import org.tmatesoft.svn.core.internal.util.SVNTimeUtil;
 import org.tmatesoft.svn.core.internal.wc.DefaultSVNGNUDiffGenerator;
 import org.tmatesoft.svn.core.internal.wc.SVNAdminHelper;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
@@ -180,11 +179,11 @@ public class SVNLookClient extends SVNBasicClient {
     public SVNLogEntry doGetInfo(File repositoryRoot, SVNRevision revision) throws SVNException {
         FSFS fsfs = open(repositoryRoot, revision);
         long revNum = SVNAdminHelper.getRevisionNumber(revision, fsfs.getYoungestRevision(), fsfs);
-        SVNProperties revProps = fsfs.getRevisionProperties(revNum);
-        String date = revProps.getStringValue(SVNRevisionProperty.DATE);
-        String author = revProps.getStringValue(SVNRevisionProperty.AUTHOR);
-        String logMessage = revProps.getStringValue(SVNRevisionProperty.LOG);
-        return new SVNLogEntry(null, revNum, author, SVNDate.parseDateString(date), logMessage);
+        Map revProps = fsfs.getRevisionProperties(revNum);
+        String date = (String) revProps.get(SVNRevisionProperty.DATE);
+        String author = (String) revProps.get(SVNRevisionProperty.AUTHOR);
+        String logMessage = (String) revProps.get(SVNRevisionProperty.LOG);
+        return new SVNLogEntry(null, revNum, author, SVNTimeUtil.parseDateString(date), logMessage);
     }
 
     /**
@@ -218,11 +217,11 @@ public class SVNLookClient extends SVNBasicClient {
         FSFS fsfs = open(repositoryRoot, transactionName);
         FSTransactionInfo txn = fsfs.openTxn(transactionName);
 
-        SVNProperties txnProps = fsfs.getTransactionProperties(txn.getTxnId());
-        String date = txnProps.getStringValue(SVNRevisionProperty.DATE);
-        String author = txnProps.getStringValue(SVNRevisionProperty.AUTHOR);
-        String logMessage = txnProps.getStringValue(SVNRevisionProperty.LOG);
-        return new SVNLogEntry(null, -1, author, SVNDate.parseDateString(date), logMessage);
+        Map txnProps = fsfs.getTransactionProperties(txn.getTxnId());
+        String date = (String) txnProps.get(SVNRevisionProperty.DATE);
+        String author = (String) txnProps.get(SVNRevisionProperty.AUTHOR);
+        String logMessage = (String) txnProps.get(SVNRevisionProperty.LOG);
+        return new SVNLogEntry(null, -1, author, SVNTimeUtil.parseDateString(date), logMessage);
     }
 
     /**
@@ -263,8 +262,8 @@ public class SVNLookClient extends SVNBasicClient {
     public String doGetAuthor(File repositoryRoot, SVNRevision revision) throws SVNException {
         FSFS fsfs = open(repositoryRoot, revision);
         long revNum = SVNAdminHelper.getRevisionNumber(revision, fsfs.getYoungestRevision(), fsfs);
-        SVNProperties revProps = fsfs.getRevisionProperties(revNum);
-        return revProps.getStringValue(SVNRevisionProperty.AUTHOR);
+        Map revProps = fsfs.getRevisionProperties(revNum);
+        return (String) revProps.get(SVNRevisionProperty.AUTHOR);
     }
 
     /**
@@ -282,8 +281,8 @@ public class SVNLookClient extends SVNBasicClient {
     public String doGetAuthor(File repositoryRoot, String transactionName) throws SVNException {
         FSFS fsfs = open(repositoryRoot, transactionName);
         FSTransactionInfo txn = fsfs.openTxn(transactionName);
-        SVNProperties txnProps = fsfs.getTransactionProperties(txn.getTxnId());
-        return txnProps.getStringValue(SVNRevisionProperty.AUTHOR);
+        Map txnProps = fsfs.getTransactionProperties(txn.getTxnId());
+        return (String) txnProps.get(SVNRevisionProperty.AUTHOR);
     }
     
     /**
@@ -346,7 +345,7 @@ public class SVNLookClient extends SVNBasicClient {
         
         FSFS fsfs = open(repositoryRoot, transactionName);
         FSTransactionInfo txn = fsfs.openTxn(transactionName);
-        FSRoot root = fsfs.createTransactionRoot(txn);
+        FSRoot root = fsfs.createTransactionRoot(txn.getTxnId());
         catFile(root, path, out);
     }
 
@@ -362,10 +361,10 @@ public class SVNLookClient extends SVNBasicClient {
     public Date doGetDate(File repositoryRoot, SVNRevision revision) throws SVNException {
         FSFS fsfs = open(repositoryRoot, revision);
         long revNum = SVNAdminHelper.getRevisionNumber(revision, fsfs.getYoungestRevision(), fsfs);
-        SVNProperties revProps = fsfs.getRevisionProperties(revNum);
-        String date = revProps.getStringValue(SVNRevisionProperty.DATE);
+        Map revProps = fsfs.getRevisionProperties(revNum);
+        String date = (String) revProps.get(SVNRevisionProperty.DATE);
         if (date != null) {
-            return SVNDate.parseDate(date);
+            return SVNTimeUtil.parseDate(date);
         }
         return null;
     }
@@ -387,10 +386,10 @@ public class SVNLookClient extends SVNBasicClient {
     public Date doGetDate(File repositoryRoot, String transactionName) throws SVNException {
         FSFS fsfs = open(repositoryRoot, transactionName);
         FSTransactionInfo txn = fsfs.openTxn(transactionName);
-        SVNProperties txnProps = fsfs.getTransactionProperties(txn.getTxnId());
-        String date = txnProps.getStringValue(SVNRevisionProperty.DATE);
+        Map txnProps = fsfs.getTransactionProperties(txn.getTxnId());
+        String date = (String) txnProps.get(SVNRevisionProperty.DATE);
         if (date != null) {
-            return SVNDate.parseDate(date);
+            return SVNTimeUtil.parseDate(date);
         }
         return null;
     }
@@ -407,8 +406,8 @@ public class SVNLookClient extends SVNBasicClient {
     public String doGetLog(File repositoryRoot, SVNRevision revision) throws SVNException {
         FSFS fsfs = open(repositoryRoot, revision);
         long revNum = SVNAdminHelper.getRevisionNumber(revision, fsfs.getYoungestRevision(), fsfs);
-        SVNProperties revProps = fsfs.getRevisionProperties(revNum);
-        return revProps.getStringValue(SVNRevisionProperty.LOG);
+        Map revProps = fsfs.getRevisionProperties(revNum);
+        return (String) revProps.get(SVNRevisionProperty.LOG);
     }
 
     /**
@@ -428,8 +427,8 @@ public class SVNLookClient extends SVNBasicClient {
     public String doGetLog(File repositoryRoot, String transactionName) throws SVNException {
         FSFS fsfs = open(repositoryRoot, transactionName);
         FSTransactionInfo txn = fsfs.openTxn(transactionName);
-        SVNProperties txnProps = fsfs.getTransactionProperties(txn.getTxnId());
-        return txnProps.getStringValue(SVNRevisionProperty.LOG);
+        Map txnProps = fsfs.getTransactionProperties(txn.getTxnId());
+        return (String) txnProps.get(SVNRevisionProperty.LOG);
     }
 
     /**
@@ -473,7 +472,7 @@ public class SVNLookClient extends SVNBasicClient {
     public void doGetChanged(File repositoryRoot, String transactionName, ISVNChangeEntryHandler handler, boolean includeCopyInfo) throws SVNException {
         FSFS fsfs = open(repositoryRoot, transactionName);
         FSTransactionInfo txn = fsfs.openTxn(transactionName);
-        FSRoot root = fsfs.createTransactionRoot(txn);
+        FSRoot root = fsfs.createTransactionRoot(txn.getTxnId());
         long baseRevision = txn.getBaseRevision();
 
         if (!SVNRevision.isValidRevisionNumber(baseRevision)) {
@@ -521,7 +520,7 @@ public class SVNLookClient extends SVNBasicClient {
     public void doGetChangedDirectories(File repositoryRoot, String transactionName, ISVNChangedDirectoriesHandler handler) throws SVNException {
         FSFS fsfs = open(repositoryRoot, transactionName);
         FSTransactionInfo txn = fsfs.openTxn(transactionName);
-        FSRoot root = fsfs.createTransactionRoot(txn);
+        FSRoot root = fsfs.createTransactionRoot(txn.getTxnId());
         long baseRevision = txn.getBaseRevision();
 
         if (!SVNRevision.isValidRevisionNumber(baseRevision)) {
@@ -680,7 +679,7 @@ public class SVNLookClient extends SVNBasicClient {
     public void doGetTree(File repositoryRoot, String path, String transactionName, boolean includeIDs, ISVNTreeHandler handler) throws SVNException {
         FSFS fsfs = open(repositoryRoot, transactionName);
         FSTransactionInfo txn = fsfs.openTxn(transactionName);
-        FSRoot root = fsfs.createTransactionRoot(txn);
+        FSRoot root = fsfs.createTransactionRoot(txn.getTxnId());
         path = path == null ? "/" : path;
         FSRevisionNode node = root.getRevisionNode(path);
         FSID id = includeIDs ? node.getId() : null;
@@ -760,7 +759,7 @@ public class SVNLookClient extends SVNBasicClient {
     public void doGetDiff(File repositoryRoot, String transactionName, boolean diffDeleted, boolean diffAdded, boolean diffCopyFrom, OutputStream os) throws SVNException {
         FSFS fsfs = open(repositoryRoot, transactionName);
         FSTransactionInfo txn = fsfs.openTxn(transactionName);
-        FSRoot root = fsfs.createTransactionRoot(txn);
+        FSRoot root = fsfs.createTransactionRoot(txn.getTxnId());
         long baseRevision = txn.getBaseRevision();
 
         if (!SVNRevision.isValidRevisionNumber(baseRevision)) {
@@ -796,8 +795,8 @@ public class SVNLookClient extends SVNBasicClient {
      *                          </ul>
      */
     public String doGetProperty(File repositoryRoot, String propName, String path, SVNRevision revision) throws SVNException {
-        SVNProperties props = getProperties(repositoryRoot, propName, path, revision, null, true, false);
-        return props.getStringValue(propName);
+        Map props = getProperties(repositoryRoot, propName, path, revision, null, true, false);
+        return (String) props.get(propName);
     }
     
     /**
@@ -819,7 +818,7 @@ public class SVNLookClient extends SVNBasicClient {
      *                          </li>
      *                          </ul>
      */
-    public SVNProperties doGetProperties(File repositoryRoot, String path, SVNRevision revision) throws SVNException {
+    public Map doGetProperties(File repositoryRoot, String path, SVNRevision revision) throws SVNException {
         return getProperties(repositoryRoot, null, path, revision, null, false, false);
     }
     
@@ -846,8 +845,8 @@ public class SVNLookClient extends SVNBasicClient {
      *                          </ul>
      */
     public String doGetProperty(File repositoryRoot, String propName, String path, String transactionName) throws SVNException {
-        SVNProperties props = getProperties(repositoryRoot, propName, path, null, transactionName, true, false);
-        return props.getStringValue(propName);
+        Map props = getProperties(repositoryRoot, propName, path, null, transactionName, true, false);
+        return (String) props.get(propName);
     }
 
     /**
@@ -871,7 +870,7 @@ public class SVNLookClient extends SVNBasicClient {
      *                          </li>
      *                          </ul>
      */
-    public SVNProperties doGetProperties(File repositoryRoot, String path, String transactionName) throws SVNException {
+    public Map doGetProperties(File repositoryRoot, String path, String transactionName) throws SVNException {
         return getProperties(repositoryRoot, null, path, null, transactionName, false, false);
     }
 
@@ -886,8 +885,8 @@ public class SVNLookClient extends SVNBasicClient {
      *                          <code>repositoryRoot</code>
      */
     public String doGetRevisionProperty(File repositoryRoot, String propName, SVNRevision revision) throws SVNException {
-        SVNProperties revProps = getProperties(repositoryRoot, propName, null, revision, null, true, true);
-        return revProps.getStringValue(propName);
+        Map revProps = getProperties(repositoryRoot, propName, null, revision, null, true, true);
+        return (String) revProps.get(propName);
     }
 
     /**
@@ -899,7 +898,7 @@ public class SVNLookClient extends SVNBasicClient {
      * @throws SVNException     no repository is found at 
      *                          <code>repositoryRoot</code>
      */
-    public SVNProperties doGetRevisionProperties(File repositoryRoot, SVNRevision revision) throws SVNException {
+    public Map doGetRevisionProperties(File repositoryRoot, SVNRevision revision) throws SVNException {
         return getProperties(repositoryRoot, null, null, revision, null, false, true);
     }
     
@@ -919,8 +918,8 @@ public class SVNLookClient extends SVNBasicClient {
      *                          </ul>
      */
     public String doGetRevisionProperty(File repositoryRoot, String propName, String transactionName) throws SVNException {
-        SVNProperties revProps = getProperties(repositoryRoot, propName, null, null, transactionName, true, true);
-        return revProps.getStringValue(propName);
+        Map revProps = getProperties(repositoryRoot, propName, null, null, transactionName, true, true);
+        return (String) revProps.get(propName);
     }
 
     /**
@@ -937,7 +936,7 @@ public class SVNLookClient extends SVNBasicClient {
      *                          </li>
      *                          </ul>
      */
-    public SVNProperties doGetRevisionProperties(File repositoryRoot, String transactionName) throws SVNException {
+    public Map doGetRevisionProperties(File repositoryRoot, String transactionName) throws SVNException {
         return getProperties(repositoryRoot, null, null, null, transactionName, false, true);
     }
     
@@ -981,12 +980,11 @@ public class SVNLookClient extends SVNBasicClient {
         for (Iterator names = entries.keySet().iterator(); names.hasNext();) {
             String name = (String) names.next();
             FSEntry entry = (FSEntry) entries.get(name);
-            getTree(fsfs, root, SVNPathUtil.getAbsolutePath(SVNPathUtil.append(path, entry.getName())),
-                    entry.getType(), includeIDs ? entry.getId() : null, includeIDs, depth + 1, handler);
+            getTree(fsfs, root, SVNPathUtil.concatToAbs(path, entry.getName()), entry.getType(), includeIDs ? entry.getId() : null, includeIDs, depth + 1, handler);
         }
     }
     
-    private SVNProperties getProperties(File repositoryRoot, String propName, String path, SVNRevision revision, String txnName, boolean singleProp, boolean revProps) throws SVNException {
+    private Map getProperties(File repositoryRoot, String propName, String path, SVNRevision revision, String txnName, boolean singleProp, boolean revProps) throws SVNException {
         if (propName == null && singleProp) {
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.CL_INSUFFICIENT_ARGS, "Missing propname argument");
             SVNErrorManager.error(err);
@@ -1009,7 +1007,7 @@ public class SVNLookClient extends SVNBasicClient {
             if (revProps) {
                 return fsfs.getTransactionProperties(txn.getTxnId());
             }
-            root = fsfs.createTransactionRoot(txn);
+            root = fsfs.createTransactionRoot(txn.getTxnId());
         }
 
         verifyPath(root, path);
@@ -1034,10 +1032,10 @@ public class SVNLookClient extends SVNBasicClient {
         }
 
         FSRevisionRoot root = fsfs.createRevisionRoot(end);
-        FSNodeHistory history = root.getNodeHistory(path);
+        FSNodeHistory history = FSNodeHistory.getNodeHistory(root, path);
 
         do {
-            history = history.getPreviousHistory(crossCopies);
+            history = history.fsHistoryPrev(crossCopies, fsfs);
             if (history == null) {
                 break;
             }
@@ -1079,13 +1077,13 @@ public class SVNLookClient extends SVNBasicClient {
             InputStream contents = null;
             try {
                 contents = root.getFileStreamForPath(new SVNDeltaCombiner(), path);
-                byte[] buffer = new byte[SVNFileUtil.STREAM_CHUNK_SIZE];
+                byte[] buffer = new byte[SVNAdminHelper.STREAM_CHUNK_SIZE];
                 int len = 0;
                 do {
                     checkCancelled();
                     len = contents.read(buffer);
                     out.write(buffer, 0, len);
-                } while (len == SVNFileUtil.STREAM_CHUNK_SIZE);
+                } while (len == SVNAdminHelper.STREAM_CHUNK_SIZE);
             } catch (IOException ioe) {
                 SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, ioe.getLocalizedMessage());
                 SVNErrorManager.error(err, ioe);
@@ -1109,7 +1107,9 @@ public class SVNLookClient extends SVNBasicClient {
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.CL_ARG_PARSING_ERROR, "Invalid revision number supplied");
             SVNErrorManager.error(err);
         }
-        return SVNAdminHelper.openRepository(repositoryRoot);
+
+        FSFS fsfs = SVNAdminHelper.openRepository(repositoryRoot);
+        return fsfs;
     }
 
     private FSFS open(File repositoryRoot, String transactionName) throws SVNException {

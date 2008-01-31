@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2008 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -19,28 +19,16 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 
-import org.tmatesoft.svn.core.SVNDepth;
 import org.tmatesoft.svn.core.SVNDirEntry;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNLock;
 import org.tmatesoft.svn.core.SVNLogEntry;
 import org.tmatesoft.svn.core.SVNLogEntryPath;
-import org.tmatesoft.svn.core.SVNMergeRange;
-import org.tmatesoft.svn.core.SVNMergeRangeList;
 import org.tmatesoft.svn.core.SVNNodeKind;
 import org.tmatesoft.svn.core.SVNProperty;
-import org.tmatesoft.svn.core.SVNURL;
-import org.tmatesoft.svn.core.internal.util.SVNDate;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
-import org.tmatesoft.svn.core.io.SVNLocationEntry;
 import org.tmatesoft.svn.core.javahl.SVNClientImpl;
 import org.tmatesoft.svn.core.wc.SVNCommitItem;
-import org.tmatesoft.svn.core.wc.SVNConflictAction;
-import org.tmatesoft.svn.core.wc.SVNConflictChoice;
-import org.tmatesoft.svn.core.wc.SVNConflictDescription;
-import org.tmatesoft.svn.core.wc.SVNConflictReason;
-import org.tmatesoft.svn.core.wc.SVNConflictResult;
-import org.tmatesoft.svn.core.wc.SVNDiffStatus;
 import org.tmatesoft.svn.core.wc.SVNEvent;
 import org.tmatesoft.svn.core.wc.SVNEventAction;
 import org.tmatesoft.svn.core.wc.SVNInfo;
@@ -58,7 +46,6 @@ public class JavaHLObjectFactory {
     private static final Map REVISION_KIND_CONVERSION_MAP = new HashMap();
     private static final Map ACTION_CONVERSION_MAP = new HashMap();
     private static final Map LOCK_CONVERSION_MAP = new HashMap();
-    private static final Map CONFLICT_REASON_CONVERSATION_MAP = new HashMap();
 
     static{
         STATUS_CONVERSION_MAP.put(SVNStatusType.STATUS_ADDED, new Integer(StatusKind.added));
@@ -125,20 +112,8 @@ public class JavaHLObjectFactory {
         ACTION_CONVERSION_MAP.put(SVNEventAction.UPDATE_EXTERNAL, new Integer(NotifyAction.update_external));
         ACTION_CONVERSION_MAP.put(SVNEventAction.UPDATE_UPDATE, new Integer(NotifyAction.update_update));
         ACTION_CONVERSION_MAP.put(SVNEventAction.UPDATE_NONE, new Integer(NotifyAction.update_update));
-        ACTION_CONVERSION_MAP.put(SVNEventAction.UPDATE_EXISTS, new Integer(NotifyAction.exists));
-        ACTION_CONVERSION_MAP.put(SVNEventAction.CHANGELIST_SET, new Integer(NotifyAction.changelist_set));
-        ACTION_CONVERSION_MAP.put(SVNEventAction.CHANGELIST_CLEAR, new Integer(NotifyAction.changelist_clear));
-        ACTION_CONVERSION_MAP.put(SVNEventAction.CHANGELIST_FAILED, new Integer(NotifyAction.changelist_failed));
-        ACTION_CONVERSION_MAP.put(SVNEventAction.MERGE_BEGIN, new Integer(NotifyAction.merge_begin));
-        
         // undocumented thing.
         ACTION_CONVERSION_MAP.put(SVNEventAction.COMMIT_COMPLETED, new Integer(-11));
-
-        CONFLICT_REASON_CONVERSATION_MAP.put(SVNConflictReason.DELETED, new Integer(ConflictDescriptor.Reason.deleted));
-        CONFLICT_REASON_CONVERSATION_MAP.put(SVNConflictReason.EDITED, new Integer(ConflictDescriptor.Reason.edited));
-        CONFLICT_REASON_CONVERSATION_MAP.put(SVNConflictReason.MISSING, new Integer(ConflictDescriptor.Reason.missing));
-        CONFLICT_REASON_CONVERSATION_MAP.put(SVNConflictReason.OBSTRUCTED, new Integer(ConflictDescriptor.Reason.obstructed));
-        CONFLICT_REASON_CONVERSATION_MAP.put(SVNConflictReason.UNVERSIONED, new Integer(ConflictDescriptor.Reason.unversioned));
     }
 
     public static Status createStatus(String path, SVNStatus status) {
@@ -213,7 +188,7 @@ public class JavaHLObjectFactory {
                 repositoryTextStatus, repositoryPropStatus, locked, copied, conflictOld, conflictNew, conflictWorking, urlCopiedFrom, revisionCopiedFrom,
                 switched, lockToken, lockOwner, lockComment, lockCreationDate, reposLock,
                 /* remote: rev, date, kind, author */
-                reposRev, reposDate, reposKind, reposAuthor, status.getChangelistName());
+                reposRev, reposDate, reposKind, reposAuthor);
         return st;
     }
 
@@ -230,114 +205,6 @@ public class JavaHLObjectFactory {
         return (SVNRevision)REVISION_KIND_CONVERSION_MAP.get(new Integer(r.getKind()));
     }
 
-    public static SVNDepth getSVNDepth(int depth) {
-        switch (depth) {
-            case Depth.empty:
-                return SVNDepth.EMPTY;
-            case Depth.exclude:
-                return SVNDepth.EXCLUDE;
-            case Depth.files:
-                return SVNDepth.FILES;
-            case Depth.immediates:
-                return SVNDepth.IMMEDIATES;
-            case Depth.infinity:
-                return SVNDepth.INFINITY;
-            default:
-                return SVNDepth.UNKNOWN;
-        }
-    }
-
-    public static ConflictDescriptor createConflictDescription(SVNConflictDescription conflictDescription) {
-        if (conflictDescription == null){
-            return null;
-        }
-        
-        String basePath = null;
-        String repositoryPath = null;
-        try {
-            basePath = conflictDescription.getMergeFiles().getBasePath();
-            repositoryPath = conflictDescription.getMergeFiles().getRepositoryPath();
-        } catch (SVNException e) {
-        }
-
-        return new ConflictDescriptor(conflictDescription.getMergeFiles().getLocalPath(),
-                getConflictKind(conflictDescription.isPropertyConflict()),
-                getNodeKind(conflictDescription.getNodeKind()),
-                conflictDescription.getPropertyName(),
-                conflictDescription.getMergeFiles().isBinary(),
-                conflictDescription.getMergeFiles().getMimeType(),
-                getConflictAction(conflictDescription.getConflictAction()),
-                getConflictReason(conflictDescription.getConflictReason()),
-                basePath,
-                repositoryPath,
-                conflictDescription.getMergeFiles().getWCPath(),
-                conflictDescription.getMergeFiles().getResultPath()
-                );
-    }
-
-    public static SVNConflictResult getSVNConflictResult(ConflictResult conflictResult) {
-        if (conflictResult == null){
-            return null;
-        }
-        return new SVNConflictResult(getSVNConflictChoice(conflictResult.getChoice()),
-                new File(conflictResult.getMergedPath()).getAbsoluteFile());
-    }
-
-    public static int getConflictAction(SVNConflictAction conflictAction){
-        if (conflictAction == SVNConflictAction.ADD){
-            return ConflictDescriptor.Action.add;
-        } else if (conflictAction == SVNConflictAction.DELETE) {
-            return ConflictDescriptor.Action.delete;
-        } else if (conflictAction == SVNConflictAction.EDIT) {
-            return ConflictDescriptor.Action.edit;            
-        }
-        return -1;
-    }
-
-    public static SVNConflictChoice getSVNConflictChoice(int conflictResult){
-        switch (conflictResult) {
-            case ConflictResult.chooseBase:
-                return SVNConflictChoice.BASE;
-            case ConflictResult.chooseMerged:
-                return SVNConflictChoice.MERGED;
-            case ConflictResult.chooseMine:
-                return SVNConflictChoice.MINE;
-            case ConflictResult.chooseTheirs:
-                return SVNConflictChoice.THEIRS;
-            case ConflictResult.postpone:
-                return SVNConflictChoice.POSTPONE;
-            default:
-                return null;
-        }
-    }
-
-    public static int getConflictReason(SVNConflictReason conflictReason){
-        Object reason = CONFLICT_REASON_CONVERSATION_MAP.get(conflictReason);
-        if (reason != null){
-            return ((Integer) reason).intValue();
-        }
-        return -1;
-    }
-
-    public static int getConflictKind(boolean isPropertyConflict){
-        return isPropertyConflict ? ConflictDescriptor.Kind.property : ConflictDescriptor.Kind.text;        
-    }
-
-    public static DiffSummary createDiffSummary(SVNDiffStatus status) {
-        int diffStatus = -1;
-        if (status.getModificationType() == SVNStatusType.STATUS_NORMAL || 
-                status.getModificationType() == SVNStatusType.STATUS_NONE) {
-            diffStatus = 0;
-        } else if (status.getModificationType() == SVNStatusType.STATUS_ADDED) {
-            diffStatus = 1;
-        } else if (status.getModificationType() == SVNStatusType.STATUS_MODIFIED) {
-            diffStatus = 2;
-        } else if (status.getModificationType() == SVNStatusType.STATUS_DELETED) {
-            diffStatus = 3;
-        }
-        return new DiffSummary(status.getPath(), diffStatus, status.isPropertiesModified(), getNodeKind(status.getKind()));
-    }
-    
     public static int getNodeKind(SVNNodeKind svnKind){
         if(svnKind == SVNNodeKind.DIR ){
             return NodeKind.dir;
@@ -377,9 +244,7 @@ public class JavaHLObjectFactory {
         if(dirEntry == null){
             return null;
         }
-        //TODO: what should we pass here in the 2nd parameter - a real abs path??? 
         return new DirEntry(
-                dirEntry.getRelativePath(),
                 dirEntry.getRelativePath(),
                 getNodeKind(dirEntry.getKind()),
                 dirEntry.getSize(),
@@ -409,78 +274,8 @@ public class JavaHLObjectFactory {
             }
             cp = (ChangePath[]) clientChangePaths.toArray(new ChangePath[clientChangePaths.size()]);
         }
-        long time = 0;
-        if (logEntry.getDate() != null) {
-            time = logEntry.getDate().getTime()*1000;
-            if (logEntry.getDate() instanceof SVNDate) {
-                time = ((SVNDate) logEntry.getDate()).getTimeInMicros();
-            }
-        }
-        return new LogMessage(cp, logEntry.getRevision(), logEntry.getAuthor(), time, logEntry.getMessage());
-    }
-
-    public static MergeInfo createMergeInfo(Map mergeInfo) {
-        if (mergeInfo == null) {
-            return null;
-        }
-        
-        MergeInfo result = new MergeInfo();
-        for (Iterator iterator = mergeInfo.entrySet().iterator(); iterator.hasNext();) {
-            Map.Entry entry = (Map.Entry) iterator.next();
-            SVNURL mergeSrcURL = (SVNURL) entry.getKey();
-            String url = mergeSrcURL.toString();
-            SVNMergeRangeList rangeList = (SVNMergeRangeList) entry.getValue();
-            SVNMergeRange[] ranges = rangeList.getRanges();
-            for (int i = 0; i < ranges.length; i++) {
-                SVNMergeRange range = ranges[i];
-                result.addRevisionRange(url, createRevisionRange(range));
-            }
-        }
-        return result;
-    }
-
-    public static RevisionRange createRevisionRange(SVNMergeRange range){
-        if (range == null){
-            return null;
-        }
-        return new RevisionRange(new Revision.Number(range.getStartRevision()), new Revision.Number(range.getEndRevision()));
-    }
-
-    public static RevisionRange[] createRevisionRanges(SVNMergeRangeList rangeList) {
-        if (rangeList == null) {
-            return null;
-        }
-        SVNMergeRange[] ranges = rangeList.getRanges();
-        RevisionRange[] result = new RevisionRange[ranges.length];
-        for (int i = 0; i < ranges.length; i++) {
-            result[i] = createRevisionRange(ranges[i]);
-        }
-        return result;
-    }
-
-    public static void handleLogMessage(SVNLogEntry logEntry, LogMessageCallback handler) {
-        if(logEntry == null || handler == null) {
-            return;
-        }
-        Map cpaths = logEntry.getChangedPaths();
-        ChangePath[] cp = null;
-        if (cpaths == null) {
-            cp = new ChangePath[]{};
-        } else {
-            Collection clientChangePaths = new ArrayList();
-            for (Iterator iter = cpaths.keySet().iterator(); iter.hasNext();) {
-                String path = (String) iter.next();
-                SVNLogEntryPath entryPath = (SVNLogEntryPath)cpaths.get(path);
-                if(entryPath != null){
-                    clientChangePaths.add(new ChangePath(path, entryPath.getCopyRevision(), entryPath.getCopyPath(), entryPath.getType()));
-                }
-            }
-            cp = (ChangePath[]) clientChangePaths.toArray(new ChangePath[clientChangePaths.size()]);
-        }
-        handler.singleMessage(cp, logEntry.getRevision(), logEntry.getAuthor(), 
-                              logEntry.getDate().getTime() * 1000, logEntry.getMessage(), 
-                              logEntry.hasChildren()
-        );
+        return new LogMessage(logEntry.getMessage(), logEntry.getDate(),
+                logEntry.getRevision(), logEntry.getAuthor(), cp);
     }
 
     public static CommitItem[] getCommitItems(SVNCommitItem[] commitables) {
@@ -509,8 +304,7 @@ public class JavaHLObjectFactory {
                 }
                 items[i] = new CommitItem(sc.getPath(), getNodeKind(sc.getKind()), stateFlag, 
                         sc.getURL() != null ? sc.getURL().toString() : null, 
-                        sc.getCopyFromURL() != null ? sc.getCopyFromURL().toString() : null, sc.getRevision().getNumber()
-                );
+                        sc.getCopyFromURL() != null ? sc.getCopyFromURL().toString() : null, sc.getRevision().getNumber());
             }
         }
         return items;
@@ -602,8 +396,7 @@ public class JavaHLObjectFactory {
                 info.getConflictOldFile() != null ? info.getConflictOldFile().getName() : null,
                 info.getConflictNewFile() != null ? info.getConflictNewFile().getName() : null,
                 info.getConflictWrkFile() != null ? info.getConflictWrkFile().getName() : null,
-                info.getPropConflictFile() != null ? info.getPropConflictFile().getName() : null,
-                info.getChangelistName(), info.getWorkingSize(), info.getRepositorySize()
+                info.getPropConflictFile() != null ? info.getPropConflictFile().getName() : null
                 );
     }
     
@@ -630,15 +423,8 @@ public class JavaHLObjectFactory {
                 JavaHLObjectFactory.getStatusValue(event.getContentsStatus()),
                 JavaHLObjectFactory.getStatusValue(event.getPropertiesStatus()),
                 JavaHLObjectFactory.getLockStatusValue(event.getLockStatus()),
-                event.getRevision(),
-                event.getChangelistName(),
-                null//TODO: FIXME
+                event.getRevision()
                 );
-    }
-    
-    public static CopySource createCopySource(SVNLocationEntry location) {
-        return new CopySource(location.getPath(), Revision.getInstance(location.getRevision()), 
-                              null);
     }
 
     public static void throwException(SVNException e, SVNClientImpl svnClient) throws ClientException {
@@ -647,28 +433,9 @@ public class JavaHLObjectFactory {
             code = e.getErrorMessage().getErrorCode().getCode();
         }
         ClientException ec = new ClientException(e.getMessage(), "", code);
+        ec.initCause(e);
         svnClient.getClientManager().getDebugLog().info(ec);
         svnClient.getClientManager().getDebugLog().info(e);
         throw ec;
-    }
-
-    public static final int infinityOrEmpty(boolean recurse) {
-        return Depth.infinityOrEmpty(recurse);
-    }
-
-    public static final int infinityOrFiles(boolean recurse) {
-        return Depth.infinityOrFiles(recurse);
-    }
-
-    public static final int infinityOrImmediates(boolean recurse) {
-        return Depth.infinityOrImmediates(recurse);
-    }
-
-    public static final int unknownOrFiles(boolean recurse) {
-        return Depth.unknownOrFiles(recurse);
-    }
-
-    public static final int unknownOrImmediates(boolean recurse) {
-        return Depth.unknownOrImmediates(recurse);
     }
 }

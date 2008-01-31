@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2008 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -45,8 +45,7 @@ public class SVNLookTreeCommand extends SVNCommand implements ISVNTreeHandler {
         myIsIncludeIDs = getCommandLine().hasArgument(SVNArgument.SHOW_IDS);
         myIsFullPaths = getCommandLine().hasArgument(SVNArgument.FULL_PATHS);
         File reposRoot = new File(getCommandLine().getPathAt(0));  
-        String path = getCommandLine().getPathCount() < 2 ? null : SVNPathUtil.canonicalizePath(getCommandLine().getPathAt(1));
-        path = SVNPathUtil.getAbsolutePath(path);        
+        String path = getCommandLine().getPathCount() < 2 ? null : SVNPathUtil.canonicalizeAbsPath(getCommandLine().getPathAt(1));
         SVNRevision revision = SVNRevision.HEAD;
         SVNLookClient lookClient = getClientManager().getLookClient();
         if (getCommandLine().hasArgument(SVNArgument.TRANSACTION)) {

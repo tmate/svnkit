@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2008 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -19,7 +19,6 @@ import java.util.Map;
 import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
-import org.tmatesoft.svn.core.SVNProperties;
 import org.tmatesoft.svn.core.internal.io.dav.handlers.DAVPropertiesHandler;
 import org.tmatesoft.svn.core.internal.io.dav.http.HTTPHeader;
 import org.tmatesoft.svn.core.internal.io.dav.http.HTTPStatus;
@@ -44,7 +43,7 @@ public class DAVUtil {
         } else if (depth == DEPTH_ONE) {
             header.setHeaderValue(HTTPHeader.DEPTH_HEADER, "1");
         } else if (depth == DEPTH_INFINITE) {
-            header.setHeaderValue(HTTPHeader.DEPTH_HEADER, "infinity");
+            header.setHeaderValue(HTTPHeader.DEPTH_HEADER, "infinite");
         } else {
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.RA_DAV_MALFORMED_DATA, "Invalid PROPFIND depth value: '{0}'", new Integer(depth));
             SVNErrorManager.error(err);
@@ -64,8 +63,14 @@ public class DAVUtil {
         if (status.getError() != null) {
             SVNErrorManager.error(status.getError());
         }
-        if (!resultMap.isEmpty()) {
-            return (DAVProperties) resultMap.values().iterator().next();
+        if (label != null || true) {
+            if (!resultMap.isEmpty()) {
+                return (DAVProperties) resultMap.values().iterator().next();
+            }
+        } else {
+            if (resultMap.containsKey(path)) {
+                return (DAVProperties) resultMap.get(path);
+            }
         }
         label = label == null ? "NULL" : label;
         SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.RA_DAV_REQUEST_FAILED, "Failed to find label ''{0}'' for URL ''{1}''", new Object[] {label, path});
@@ -214,9 +219,9 @@ public class DAVUtil {
         return properties;
     }
 
-    public static SVNProperties filterProperties(DAVProperties source, SVNProperties target) {
-        target = target == null ? new SVNProperties() : target;
-        for (Iterator props = source.getProperties().keySet().iterator(); props.hasNext();) {
+    public static Map filterProperties(DAVProperties source, Map target) {
+        target = target == null ? new HashMap() : target;
+        for(Iterator props = source.getProperties().keySet().iterator(); props.hasNext();) {
             DAVElement property = (DAVElement) props.next();
             String namespace = property.getNamespace();
             if (namespace.equals(DAVElement.SVN_CUSTOM_PROPERTY_NAMESPACE)) {

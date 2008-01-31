@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2008 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -56,7 +56,6 @@ public class SVNCommitItem {
     private String myPath;
     private SVNWCAccess myWCAccess;
     private SVNRevision myCopyFromRevision;
-    private String myMergeInfo; 
     
     /**
      * Constructs and initializes an <b>SVNCommitItem</b> object.
@@ -236,7 +235,6 @@ public class SVNCommitItem {
      * 
      * @return the item's relevant path
      */
-    // TODO get rid of this. always use getURL or getFile instead.
     public String getPath() {
         return myPath;
     }
@@ -248,15 +246,6 @@ public class SVNCommitItem {
      */
     public void setPath(String path) {
         myPath = path;
-    }
-    
-    public void setMergeInfoProp(String mergeInfo) {
-        myIsPropertiesModified = true;
-        myMergeInfo = mergeInfo;
-    }
-    
-    public String getMergeInfo() {
-        return myMergeInfo;
     }
     
     /**

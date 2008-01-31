@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2008 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.Properties;
 import java.util.StringTokenizer;
 
+import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 import org.tmatesoft.svn.util.SVNDebugLog;
 
 /**
@@ -46,10 +47,6 @@ public class PythonTests {
 
     public static void main(String[] args) {
 		String fileName = args[0];
-		String libPath = args[1];
-		if (libPath == null) {
-		    libPath = "";
-		}
 		ourPropertiesFile = new File(fileName);
         ourLoggers = new AbstractPythonTestLogger[] {new ConsoleLogger(), new XMLLogger()};
 
@@ -87,7 +84,7 @@ public class PythonTests {
                     ourLoggers[i].startServer("file", url);
                 }
                 started = true;
-                runPythonTests(properties, defaultTestSuite, url, libPath);
+                runPythonTests(properties, defaultTestSuite, url);
             } catch (Throwable th) {
                 th.printStackTrace();
             } finally {
@@ -109,7 +106,7 @@ public class PythonTests {
                     ourLoggers[i].startServer("svnserve", url);
                 }
                 started = true;
-				runPythonTests(properties, defaultTestSuite, url, libPath);
+				runPythonTests(properties, defaultTestSuite, url);
 			} catch (Throwable th) {
 				th.printStackTrace();
 			} finally {
@@ -133,7 +130,7 @@ public class PythonTests {
                     ourLoggers[i].startServer("apache", url);
                 }
                 started = true;
-				runPythonTests(properties, defaultTestSuite, url, libPath);
+				runPythonTests(properties, defaultTestSuite, url);
 			} catch (Throwable th) {
 				th.printStackTrace();
 			} finally {
@@ -154,8 +151,7 @@ public class PythonTests {
         }
 	}
 
-	private static void runPythonTests(Properties properties, String defaultTestSuite, String url, 
-	        String libPath) throws IOException {
+	private static void runPythonTests(Properties properties, String defaultTestSuite, String url) throws IOException {
 		System.out.println("RUNNING TESTS AGAINST '" + url + "'");
 		String pythonLauncher = properties.getProperty("python.launcher");
 		String testSuite = properties.getProperty("python.tests.suite", defaultTestSuite);
@@ -178,7 +174,7 @@ public class PythonTests {
 			System.out.println("PROCESSING " + testFile + " " + testCases);
 			for (Iterator it = testCases.iterator(); it.hasNext();) {
 				final Integer testCase = (Integer)it.next();
-				processTestCase(pythonLauncher, testFile, options, String.valueOf(testCase), url, libPath);
+				processTestCase(pythonLauncher, testFile, options, String.valueOf(testCase), url);
 			}
             for (int i = 0; i < ourLoggers.length; i++) {
                 ourLoggers[i].endSuite(suiteName);
@@ -186,15 +182,11 @@ public class PythonTests {
 		}
 	}
 
-	private static void processTestCase(String pythonLauncher, String testFile, String options, String testCase, 
-	        String url, String libPath) {
+	private static void processTestCase(String pythonLauncher, String testFile, String options, String testCase, String url) {
 	    Collection commandsList = new ArrayList();
         commandsList.add(pythonLauncher);
         commandsList.add(testFile);
         commandsList.add("--v");
-        commandsList.add("--cleanup");
-        commandsList.add("--use-jsvn");        
-        commandsList.add("--bin=" + libPath);        
         commandsList.add("--url=" + url);
         if (options != null && !"".equals(options.trim())) {
             commandsList.add(options);
@@ -202,8 +194,9 @@ public class PythonTests {
         commandsList.add(String.valueOf(testCase));
         String[] commands = (String[]) commandsList.toArray(new String[commandsList.size()]); 
 
+        Process process = null;
 		try {
-			Process process = Runtime.getRuntime().exec(commands, null, new File("python/cmdline"));
+            process = Runtime.getRuntime().exec(commands, null, new File("python/cmdline"));
 			new ReaderThread(process.getInputStream(), null).start();
 			new ReaderThread(process.getErrorStream(), null).start();
 			try {
@@ -211,10 +204,11 @@ public class PythonTests {
 			}
 			catch (InterruptedException e) {
 			}
-		}
-		catch (Throwable th) {
+		} catch (Throwable th) {
 			System.err.println("ERROR: " + th.getMessage());
 			th.printStackTrace(System.err);
+		} finally {
+		    SVNFileUtil.destroyProcess(process);
 		}
 	}
 
@@ -281,8 +275,9 @@ public class PythonTests {
 	private static List getAvailableTestCases(String pythonLauncher, String testFile) throws IOException {
 		final String[] commands = new String[]{pythonLauncher, testFile, "list"};
 		final ByteArrayOutputStream os = new ByteArrayOutputStream();
+        Process process = null;
 		try {
-			Process process = Runtime.getRuntime().exec(commands, null, new File("python/cmdline"));
+            process = Runtime.getRuntime().exec(commands, null, new File("python/cmdline"));
             Thread readerThread = new ReaderThread(process.getInputStream(), new PrintStream(os));
             readerThread.start();
 			new ReaderThread(process.getErrorStream(), null).start();
@@ -293,10 +288,11 @@ public class PythonTests {
 			catch (InterruptedException e) {
 			}
             os.close();
-		}
-		catch (Throwable th) {
+		} catch (Throwable th) {
 			System.err.println("ERROR: " + th.getMessage());
 			th.printStackTrace(System.err);
+		} finally {
+		    SVNFileUtil.destroyProcess(process);
 		}
 
 		final String listString = new String(os.toByteArray());
@@ -323,10 +319,10 @@ public class PythonTests {
 
 			try {
 				tests.add(new Integer(first));
-			} catch (NumberFormatException ex) {
-			    continue;
-//				System.err.println("ERROR: " + ex.getMessage());
-//				ex.printStackTrace(System.err);
+			}
+			catch (NumberFormatException ex) {
+				System.err.println("ERROR: " + ex.getMessage());
+				ex.printStackTrace(System.err);
 			}
 		}
 		return tests;
@@ -359,9 +355,8 @@ public class PythonTests {
 						myHelpStream.flush();
 					}
 				}
-			}
-			catch (IOException e) {
-				e.printStackTrace();
+			} catch (IOException e) {
+			    // we could expect exception here, when process is destroyed.
 			}
 		}
 	}
@@ -406,13 +401,13 @@ public class PythonTests {
         
         String svnserve = props.getProperty("svnserve.path");
         String[] command = {svnserve, "-d", "--foreground", "--listen-port", portNumber + "", "-r", path};
-        ourSVNServer = execCommand(command, false);
+        ourSVNServer = execCommand(command, false, false);
         return portNumber;
     }
     
     public static void stopSVNServe() {
         if (ourSVNServer != null) {
-            ourSVNServer.destroy();
+            SVNFileUtil.destroyProcess(ourSVNServer);
         }
     }
 
@@ -433,7 +428,7 @@ public class PythonTests {
 
         String apache = props.getProperty("apache.path");
         command = new String[] {apache, "-f", path, "-k", (start ? "start" : "stop")};
-        execCommand(command, start);
+        execCommand(command, start, false);
         return port;
     }
     
@@ -498,12 +493,14 @@ public class PythonTests {
         return path;
     }
     
-    private static Process execCommand(String[] command, boolean wait) throws IOException {
+    private static Process execCommand(String[] command, boolean wait, boolean readOutput) throws IOException {
         Process process = Runtime.getRuntime().exec(command);
         if (process != null) {
             try {
-                new ReaderThread(process.getInputStream(), null).start();
-                new ReaderThread(process.getErrorStream(), null).start();
+                if (readOutput || wait) {
+                    new ReaderThread(process.getInputStream(), null).start();
+                    new ReaderThread(process.getErrorStream(), null).start();
+                }
                 if (wait) {
                     int code = process.waitFor();
                     if (code != 0) {

@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2008 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -41,8 +41,6 @@ public class SVNProperty {
      */
     public static final String TXN_CHECK_OUT_OF_DATENESS = SVN_PREFIX + "check-ood";
 
-    public static final String TXN_CONTAINS_MERGEINFO = SVN_PREFIX + "contains-mergeinfo";
-
     /**
      * An <span class="javastring">"svn:entry:"</span> prefix.
      */
@@ -75,12 +73,6 @@ public class SVNProperty {
      * An <span class="javastring">"svn:special"</span> SVN special property.
      */
     public static final String SPECIAL = SVN_PREFIX + "special";
-    
-    /**
-     * @since SVN 1.5
-     */
-    public static final String MERGE_INFO = SVN_PREFIX + "mergeinfo";
-
     /**
      * An <span class="javastring">"svn:entry:revision"</span> SVN untweakable metaproperty.
      */
@@ -100,33 +92,25 @@ public class SVNProperty {
      * <span class="javastring">"has-props"</span> SVN untweakable metaproperty.
      * @since 1.1, new in Subversion 1.4
      */
-    public static final String HAS_PROPS = SVN_ENTRY_PREFIX + "has-props";
+    public static final String HAS_PROPS = "has-props";
 
     /**
      * <span class="javastring">"has-prop-mods"</span> SVN untweakable metaproperty.
      * @since 1.1, new in Subversion 1.4
      */
-    public static final String HAS_PROP_MODS = SVN_ENTRY_PREFIX + "has-prop-mods";
+    public static final String HAS_PROP_MODS = "has-prop-mods";
 
     /**
      * <span class="javastring">"cachable-props"</span> SVN untweakable metaproperty.
      * @since 1.1, new in Subversion 1.4
      */
-    public static final String CACHABLE_PROPS = SVN_ENTRY_PREFIX + "cachable-props";
+    public static final String CACHABLE_PROPS = "cachable-props";
 
     /**
      * <span class="javastring">"present-props"</span> SVN untweakable metaproperty.
      * @since 1.1, new in Subversion 1.4
      */
-    public static final String PRESENT_PROPS = SVN_ENTRY_PREFIX + "present-props";
-    
-    public static final String KEEP_LOCAL = SVN_ENTRY_PREFIX + "keep-local";
-
-    public static final String CHANGELIST = SVN_ENTRY_PREFIX + "changelist";
-
-    public static final String WORKING_SIZE = SVN_ENTRY_PREFIX + "working-size";
-
-    public static final String DEPTH = SVN_ENTRY_PREFIX + "depth";
+    public static final String PRESENT_PROPS = "present-props";
     
     /**
      * An <span class="javastring">"svn:entry:checksum"</span> SVN untweakable metaproperty.
@@ -285,10 +269,6 @@ public class SVNProperty {
      */
     public static final String SCHEDULE_REPLACE = "replace";
 
-    public static final long WORKING_SIZE_UNKNOWN = -1;
-
-    public static final SVNPropertyValue BOOLEAN_PROPERTY_VALUE = SVNPropertyValue.create("*");    
-    
     private static final byte[] EOL_LF_BYTES = { '\n' };
     private static final byte[] EOL_CRLF_BYTES = { '\r', '\n' };
     private static final byte[] EOL_CR_BYTES = { '\r' };
@@ -342,11 +322,11 @@ public class SVNProperty {
      *              <span class="javakeyword">false</span>
      */
     public static boolean isRegularProperty(String name){
-        if (name == null){
+        if(name == null){
             return false;
-        } else if (name.startsWith(SVN_WC_PREFIX) || name.startsWith(SVN_ENTRY_PREFIX)) {
+        }else if(name.startsWith(SVN_WC_PREFIX) || name.startsWith(SVN_ENTRY_PREFIX)){
             return false;
-        } else {
+        }else{
             return true;
         }
     }
@@ -374,6 +354,31 @@ public class SVNProperty {
      */
     public static boolean isBinaryMimeType(String mimeType) {
         return !isTextMimeType(mimeType);
+    }
+    
+    /**
+     * Returns eol-marker bytes according to the given eol type.
+     * 
+     * @param   eolType  a requested eol-marker type (platform specific)
+     * @return  <span class="javakeyword">null</span> if <code>eolType</code> is
+     *          <span class="javakeyword">null</span>, or an array of bytes 
+     *          for one of the four possible eol types
+     * @see     #EOL_STYLE_CR
+     * @see     #EOL_STYLE_CRLF
+     * @see     #EOL_STYLE_LF
+     * @see     #EOL_STYLE_NATIVE
+     */
+    public static byte[] getEOLBytes(String eolType) {
+        if (eolType == null) {
+            return null;
+        } else if (SVNProperty.EOL_STYLE_NATIVE.equals(eolType)) {
+            return EOL_NATIVE_BYTES;
+        } else if (SVNProperty.EOL_STYLE_CR.equals(eolType)) {
+            return EOL_CR_BYTES;
+        } else if (SVNProperty.EOL_STYLE_CRLF.equals(eolType)) {
+            return EOL_CRLF_BYTES;
+        }
+        return EOL_LF_BYTES;
     }
 
     /**
@@ -464,9 +469,9 @@ public class SVNProperty {
      * @see             #isBooleanProperty(String)
      * @since           1.1
      */
-    public static SVNPropertyValue getValueOfBooleanProperty(String propName) {
+    public static String getValueOfBooleanProperty(String propName) {
         if (SVNProperty.EXECUTABLE.equals(propName) || SVNProperty.NEEDS_LOCK.equals(propName) || SVNProperty.SPECIAL.equals(propName)) {
-            return BOOLEAN_PROPERTY_VALUE;
+            return "*";
         }
         return null;
     }

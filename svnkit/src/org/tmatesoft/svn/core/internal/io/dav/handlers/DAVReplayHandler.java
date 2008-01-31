@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2008 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -11,39 +11,23 @@
  */
 package org.tmatesoft.svn.core.internal.io.dav.handlers;
 
+import java.io.UnsupportedEncodingException;
+
 import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
-import org.tmatesoft.svn.core.SVNPropertyValue;
 import org.tmatesoft.svn.core.internal.io.dav.DAVElement;
 import org.tmatesoft.svn.core.internal.util.SVNBase64;
-import org.tmatesoft.svn.core.internal.util.SVNXMLUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.io.ISVNEditor;
-
 import org.xml.sax.Attributes;
 
 
 /**
- * @author TMate Software Ltd.
  * @version 1.1.1
+ * @author  TMate Software Ltd.
  */
 public class DAVReplayHandler extends DAVEditorHandler {
-
-    public static StringBuffer generateReplayRequest(long highRevision, long lowRevision, boolean sendDeltas) {
-        StringBuffer xmlBuffer = new StringBuffer();
-        SVNXMLUtil.addXMLHeader(xmlBuffer);
-        SVNXMLUtil.openNamespaceDeclarationTag(SVNXMLUtil.SVN_NAMESPACE_PREFIX, "replay-report", 
-                SVN_NAMESPACES_LIST, SVNXMLUtil.PREFIX_MAP, xmlBuffer);
-        SVNXMLUtil.openCDataTag(SVNXMLUtil.SVN_NAMESPACE_PREFIX, "revision", String.valueOf(highRevision), 
-                xmlBuffer);
-        SVNXMLUtil.openCDataTag(SVNXMLUtil.SVN_NAMESPACE_PREFIX, "low-water-mark", String.valueOf(lowRevision), 
-                xmlBuffer);
-        SVNXMLUtil.openCDataTag(SVNXMLUtil.SVN_NAMESPACE_PREFIX, "send-deltas", sendDeltas ? "1" : "0", 
-                xmlBuffer);
-        SVNXMLUtil.addXMLFooter(SVNXMLUtil.SVN_NAMESPACE_PREFIX, "replay-report", xmlBuffer);
-        return xmlBuffer;
-    }
 
     protected static final DAVElement EDITOR_REPORT = DAVElement.getElement(DAVElement.SVN_NAMESPACE, "editor-report");
     protected static final DAVElement OPEN_ROOT = DAVElement.getElement(DAVElement.SVN_NAMESPACE, "open-root");
@@ -59,7 +43,7 @@ public class DAVReplayHandler extends DAVEditorHandler {
     public DAVReplayHandler(ISVNEditor editor, boolean fetchContent) {
         super(editor, fetchContent);
     }
-
+    
     protected void startElement(DAVElement parent, DAVElement element, Attributes attrs) throws SVNException {
         if (element == TARGET_REVISION) {
             String rev = attrs.getValue(REVISION_ATTR);
@@ -78,7 +62,7 @@ public class DAVReplayHandler extends DAVEditorHandler {
                 myEditor.openRoot(Long.parseLong(rev));
                 myPath = "";
                 myIsDirectory = true;
-            }
+            }            
         } else if (element == DELETE_ENTRY) {
             String path = attrs.getValue(NAME_ATTR);
             String rev = attrs.getValue(REVISION_ATTR);
@@ -94,7 +78,7 @@ public class DAVReplayHandler extends DAVEditorHandler {
         } else if (element == OPEN_DIRECTORY || element == ADD_DIRECTORY) {
             String path = attrs.getValue(NAME_ATTR);
             String rev = attrs.getValue(REVISION_ATTR);
-
+            
             if (path == null) {
                 SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.RA_DAV_MALFORMED_DATA, "Missing name attr in " + (element == OPEN_DIRECTORY ? "open-directory" : "add-directory") + " element");
                 SVNErrorManager.error(err);
@@ -117,7 +101,7 @@ public class DAVReplayHandler extends DAVEditorHandler {
                 SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.RA_DAV_MALFORMED_DATA, "Missing name attr in " + (element == OPEN_FILE ? "open-file" : "add-file") + " element");
                 SVNErrorManager.error(err);
             }
-
+            
             if (element == ADD_FILE) {
                 String copyFromPath = attrs.getValue(COPYFROM_PATH_ATTR);
                 String cfRevision = attrs.getValue(COPYFROM_REV_ATTR);
@@ -135,7 +119,7 @@ public class DAVReplayHandler extends DAVEditorHandler {
                 SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.RA_DAV_MALFORMED_DATA, "Got apply-textdelta element without preceding add-file or open-file");
                 SVNErrorManager.error(err);
             }
-
+            
             String checksum = attrs.getValue(CHECKSUM_ATTR);
             try {
                 myEditor.applyTextDelta(myPath, checksum);
@@ -167,9 +151,9 @@ public class DAVReplayHandler extends DAVEditorHandler {
             } else {
                 if (attrs.getValue(DEL_ATTR) != null) {
                     if (element == CHANGE_FILE_PROPERTY) {
-                        myEditor.changeFileProperty(myPath, name, null);
+                        myEditor.changeFileProperty(myPath, myPropertyName, null);
                     } else {
-                        myEditor.changeDirProperty(name, null);
+                        myEditor.changeDirProperty(myPropertyName, null);
                     }
                     myPropertyName = null;
                 } else {
@@ -178,7 +162,7 @@ public class DAVReplayHandler extends DAVEditorHandler {
             }
         }
     }
-
+    
     protected void endElement(DAVElement parent, DAVElement element, StringBuffer cdata) throws SVNException {
         if (element == APPLY_TEXT_DELTA) {
             setDeltaProcessing(false);
@@ -188,16 +172,35 @@ public class DAVReplayHandler extends DAVEditorHandler {
                 SVNErrorManager.error(err);
             }
             if (myPropertyName != null) {
-                SVNPropertyValue property = null;
+                String value = cdata.toString();
                 byte[] buffer = allocateBuffer(cdata.length());
                 int length = SVNBase64.base64ToByteArray(new StringBuffer(cdata.toString().trim()), buffer);
-                property = SVNPropertyValue.create(myPropertyName, buffer, 0, length);
+                try {
+                    value = new String(buffer, 0, length, "UTF-8");
+                } catch (UnsupportedEncodingException e) {
+                    value = new String(buffer, 0, length);
+                }
                 if (element == CHANGE_FILE_PROPERTY) {
-                    myEditor.changeFileProperty(myPath, myPropertyName, property);
+                    myEditor.changeFileProperty(myPath, myPropertyName, value);
                 } else {
-                    myEditor.changeDirProperty(myPropertyName, property);
+                    myEditor.changeDirProperty(myPropertyName, value);
                 }
             }
         }
+    }
+
+    public static StringBuffer generateReplayRequest(long highRevision, long lowRevision, boolean sendDeltas) {
+        StringBuffer request = new StringBuffer();
+        request.append("<S:replay-report xmlns:S=\"svn:\">\n");
+        request.append("  <S:revision>");
+        request.append(highRevision);
+        request.append("</S:revision>\n");
+        request.append("  <S:low-water-mark>");
+        request.append(lowRevision);
+        request.append("</S:low-water-mark>\n");
+        request.append("  <S:send-deltas>");
+        request.append(sendDeltas ? "1" : "0");
+        request.append("</S:send-deltas>\n</S:replay-report>");
+        return request;
     }
 }

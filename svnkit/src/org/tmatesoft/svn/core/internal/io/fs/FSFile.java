@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2008 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -25,15 +25,11 @@ import java.security.NoSuchAlgorithmException;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.tmatesoft.svn.core.SVNDepth;
 import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
-import org.tmatesoft.svn.core.SVNProperties;
-import org.tmatesoft.svn.core.SVNPropertyValue;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
-import org.tmatesoft.svn.core.io.SVNRepository;
 
 
 /**
@@ -91,13 +87,19 @@ public class FSFile {
         return digest;
     }
     
-    public int readInt() throws SVNException, NumberFormatException {
+    public int readInt() throws SVNException {
         String line = readLine(80);
         if (line == null) {
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.BAD_VERSION_FILE_FORMAT, "First line of ''{0}'' contains non-digit", myFile);
             SVNErrorManager.error(err);
         }
-        return Integer.parseInt(line);
+        try {
+            return Integer.parseInt(line);
+        } catch (NumberFormatException nfe) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.BAD_VERSION_FILE_FORMAT, "First line of ''{0}'' contains non-digit", myFile);
+            SVNErrorManager.error(err);
+        }
+        return -1;
     }
     
     public String readLine(int limit) throws SVNException {
@@ -151,8 +153,8 @@ public class FSFile {
         return buffer.toString();
     }
 
-    public SVNProperties readProperties(boolean allowEOF) throws SVNException {
-        SVNProperties properties = new SVNProperties();
+    public Map readProperties(boolean allowEOF) throws SVNException {
+        Map map = new HashMap();
         String line = null;
         try {
             while(true) {
@@ -199,7 +201,7 @@ public class FSFile {
                     key = new String(myReadLineBuffer.array(), myReadLineBuffer.arrayOffset() + pos, limit - pos);
                 }
                 if (kind == 'D') {
-                    properties.put(key, (SVNPropertyValue) null);
+                    map.put(key, null);
                     continue;
                 }
                 line = readLine(160);
@@ -221,19 +223,21 @@ public class FSFile {
                 read(myReadLineBuffer);
                 myReadLineBuffer.flip();
                 myReadLineBuffer.limit(myReadLineBuffer.limit() - 1);
+                String value = null;
                 pos = myReadLineBuffer.position();
                 limit = myReadLineBuffer.limit();
                 try {
-                    properties.put(key, myDecoder.decode(myReadLineBuffer).toString());
+                    value = myDecoder.decode(myReadLineBuffer).toString();
                 } catch (MalformedInputException mfi) {
-                    properties.put(key, myReadLineBuffer.array());
+                    value = new String(myReadLineBuffer.array(), myReadLineBuffer.arrayOffset() + pos, limit - pos);
                 }
+                map.put(key, value);
             }
         } catch (IOException e) {
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.MALFORMED_FILE);
             SVNErrorManager.error(err, e);
         }
-        return properties;
+        return map;
     }
     
     public Map readHeader() throws SVNException {
@@ -243,6 +247,9 @@ public class FSFile {
             line = readLine(1024);
             if ("".equals(line)) {
                 break;
+            }
+            if (line == null) {
+                
             }
             int colonIndex = line.indexOf(':');
             if (colonIndex <= 0 || line.length() <= colonIndex + 2) {
@@ -365,7 +372,7 @@ public class FSFile {
         return myChannel;
     }
     
-    public PathInfo readPathInfoFromReportFile() throws IOException, SVNException {
+    public PathInfo readPathInfoFromReportFile() throws IOException {
         int firstByte = read();
         if (firstByte == -1 || firstByte == '-') {
             return null;
@@ -373,28 +380,9 @@ public class FSFile {
         String path = readStringFromReportFile();
         String linkPath = read() == '+' ? readStringFromReportFile() : null;
         long revision = readRevisionFromReportFile();
-        SVNDepth depth = SVNDepth.INFINITY;
-        if (read() == '+') {
-            int id = readNumberFromReportFile();
-            switch(id) {
-                case 0:
-                    depth = SVNDepth.EMPTY;
-                    break;
-                case 1:
-                    depth = SVNDepth.FILES;
-                    break;
-                case 2:
-                    depth = SVNDepth.IMMEDIATES;
-                    break;
-                default: {
-                    SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.REPOS_BAD_REVISION_REPORT, "Invalid depth ({0,number,integer}) for path ''{1}''", new Object[]{new Integer(id), path});
-                    SVNErrorManager.error(err);
-                }
-            }
-        }
-        boolean startEmpty = read() == '+';
+        boolean startEmpty = read() == '+' ? true : false;
         String lockToken = read() == '+' ? readStringFromReportFile() : null;
-        return new PathInfo(path, linkPath, lockToken, revision, depth, startEmpty);
+        return new PathInfo(path, linkPath, lockToken, revision, startEmpty);
     }
 
     private String readStringFromReportFile() throws IOException {
@@ -420,7 +408,7 @@ public class FSFile {
         if (read() == '+') {
             return readNumberFromReportFile();
         }
-        return SVNRepository.INVALID_REVISION;
+        return FSRepository.SVN_INVALID_REVNUM;
     }
     
 }

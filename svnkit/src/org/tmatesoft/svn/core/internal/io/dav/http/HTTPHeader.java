@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2008 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -46,8 +46,6 @@ public class HTTPHeader {
     public static final String DEPTH_HEADER = "Depth";
     public static final String LABEL_HEADER = "Label";
     public static final String DESTINATION_HEADER = "Destination";
-    public static final String TIMEOUT_HEADER = "Timeout";
-    public static final String DAV_HEADER = "DAV";
 
     private Map myHeaders;
 
