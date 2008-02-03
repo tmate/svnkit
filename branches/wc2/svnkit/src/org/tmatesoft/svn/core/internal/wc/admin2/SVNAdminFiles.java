@@ -49,22 +49,25 @@ public class SVNAdminFiles {
     private static final String ADM_DIR_PROP_REVERT = "dir-prop-revert";
     private static final String ADM_WCPROPS = "wcprops";
     private static final String ADM_DIR_WCPROPS = "dir-wcprops";
-    private static final String ADM_ALL_WCPROPS = "all-wcprops";
+    public static final String ADM_ALL_WCPROPS = "all-wcprops";
     private static final String ADM_LOG = "log";
     private static final String ADM_KILLME = "KILLME";
     private static final String ADM_README = "README.txt";
     private static final String ADM_EMPTY_FILE = "empty-file";
     
-    private static final int LATEST_WC_FORMAT = 9;
+    static final int MINIMUM_WC_FORMAT = 2;
+    static final int MAXIMUM_WC_FORMAT = 9;
     
     private static String composeAdminPath(String path, String name, String extension, boolean tmp) {
         path = SVNPathUtil.append(path, SVNFileUtil.getAdminDirectoryName());
         if (tmp) {
             path = SVNPathUtil.append(path, ADM_TMP);
         }
-        path = SVNPathUtil.append(path, name);
-        if (extension != null) {
-            path = SVNPathUtil.append(path, extension);
+        if (name != null) {
+            path = SVNPathUtil.append(path, name);
+            if (extension != null) {
+                path = SVNPathUtil.append(path, extension);
+            }
         }
         return path;
     }
@@ -139,22 +142,6 @@ public class SVNAdminFiles {
             SVNErrorManager.error(err);
         }
         return 0;
-    }
-    
-    public static void assertWCFormatIsSupported(int format, File path) throws SVNException {
-        if (format < 2) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_UNSUPPORTED_FORMAT, 
-                    "Working copy format of ''{0}'' is too old {1}; " +
-            		"please check out your working copy again", new Object[] {path, new Integer(format)});
-            SVNErrorManager.error(err);
-        } else if (format > LATEST_WC_FORMAT) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_UNSUPPORTED_FORMAT, 
-                    "This client is too old to work with working copy ''{0}''. You need \n" +
-                    "to get a newer Subversion client, or to downgrade this working copy.\n" +
-                    "See http://subversion.tigris.org/faq.html#working-copy-format-change\nfor details.",
-                    path);
-            SVNErrorManager.error(err);
-        }
     }
 }
 
