@@ -324,7 +324,7 @@ public class SVNEncodingUtil {
         return (ch >= 0x00 && ch <= 0x1f) || ch == 0x7f;
     }
 
-    private static int hexValue(char ch) {
+    public static int hexValue(char ch) {
         if (Character.isDigit(ch)) {
             return ch - '0';
         }
