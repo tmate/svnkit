@@ -263,4 +263,8 @@ public class SVNAdminLayout {
         return sb.toString();
     }
 
+    public String getRealLogPath(SVNWCAccess access, String logPath) {
+        return SVNPathUtil.append(access.getPath(), logPath);
+    }
+
 }

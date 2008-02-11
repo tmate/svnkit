@@ -21,6 +21,7 @@ import org.tmatesoft.svn.core.SVNNodeKind;
 import org.tmatesoft.svn.core.internal.util.SVNDate;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
+import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 
 
 /**
@@ -28,6 +29,12 @@ import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
  * @author  TMate Software Ltd.
  */
 public class SVNLogRunner {
+    
+    private static final int XFER_CP                    = 0;
+    private static final int XFER_MV                    = 1;
+    private static final int XFER_APPEND                = 2;
+    private static final int XFER_CP_AND_TRANSLATE      = 3;
+    private static final int XFER_CP_AND_DETRANSLATE    = 4;
     
     private SVNWCAccess myWCAccess;
     private boolean myIsEntriesModified;
@@ -64,17 +71,17 @@ public class SVNLogRunner {
             } else if (SVNLog.MERGE_TAG.equals(commandName)) {
                 
             } else if (SVNLog.MV_TAG.equals(commandName)) {
-                
+                xfer(name, attrs, XFER_MV);
             } else if (SVNLog.CP_TAG.equals(commandName)) {
-                
+                xfer(name, attrs, XFER_CP);
             } else if (SVNLog.CP_AND_TRANSALTE_TAG.equals(commandName)) {
-                
+                xfer(name, attrs, XFER_CP_AND_TRANSLATE);
             } else if (SVNLog.CP_AND_DETRANSLATE_TAG.equals(commandName)) {
-                
+                xfer(name, attrs, XFER_CP_AND_DETRANSLATE);
             } else if (SVNLog.APPEND_TAG.equals(commandName)) {
-                
+                xfer(name, attrs, XFER_APPEND);
             } else if (SVNLog.READONLY_TAG.equals(commandName)) {
-                
+                readonly(name);
             } else if (SVNLog.MAYBE_READONLY_TAG.equals(commandName)) {
                 
             } else if (SVNLog.MAYBE_EXECUTABLE_TAG.equals(commandName)) {
@@ -138,6 +145,49 @@ public class SVNLogRunner {
             SVNErrorManager.error(err, e.getErrorMessage());
         }
         myIsEntriesModified = true;
+    }
+    
+    protected void readonly(String name) {
+        String path = getRealPath(name);
+        SVNFileUtil.setReadonly(new File(path), true);
+    }
+    
+    protected void xfer(String name, Map attributes, int action) throws SVNException {
+        String dst = (String) attributes.get(SVNLog.DEST_ATTR);
+        if (dst == null) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_BAD_ADM_LOG, "Missing ''dest'' attribute in ''{0}''", new File(getWCAccess().getPath()));
+            SVNErrorManager.error(err);
+        }
+        boolean special = attributes.get(SVNLog.ARG1_ATTR) != null;
+        String versioned = (String) attributes.get(SVNLog.ARG2_ATTR);
+        xfer(name, dst, versioned, action, special);
+    }
+    
+    protected SVNWCAccess getWCAccess() {
+        return myWCAccess;
+    }
+    
+    protected String getRealPath(String logPath) {
+        return getWCAccess().getAdminArea().getLayout().getRealLogPath(getWCAccess(), logPath);
+    }
+    
+    private void xfer(String name, String dst, String versioned, int action, boolean specialOnly) throws SVNException {
+        String fullSrc = getRealPath(name);
+        String fullDst = getRealPath(dst);
+        String fullVersioned = versioned != null ? getRealPath(versioned) : null;
+        
+        switch (action) {
+            case XFER_MV:
+                SVNFileUtil.rename(new File(fullSrc), new File(fullDst));
+                break;
+
+            case XFER_CP:
+            case XFER_APPEND:
+            case XFER_CP_AND_TRANSLATE:
+            case XFER_CP_AND_DETRANSLATE:
+            default:
+                break;
+        }
     }
 
 }

@@ -11,7 +11,12 @@
  */
 package org.tmatesoft.svn.core.internal.wc.admin3;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -23,6 +28,7 @@ import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNNodeKind;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
+import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 
 
 /**
@@ -303,18 +309,19 @@ public class SVNWCAccess {
         Map allEntriesMap = getEntries(true);
         Map publicEntriesMap = getEntries(false);
         boolean wasDeleted = false;
+        String thisDirName = getAdminArea().getThisDirName(this);
         
         if (entryName == null) {
-            entryName = getAdminArea().getThisDirName(this);
+            entryName = thisDirName;
         }
         if ((flags & SVNEntry.FLAG_SCHEDULE) != 0) {
             SVNEntry before = (SVNEntry) allEntriesMap.get(entryName);
             String originalSchedule = src.getSchedule();
             long originalFlags = flags;
 
-            flags = SVNEntriesUtil.foldScheduling(allEntriesMap, entryName, src, originalSchedule, flags);
+            flags = SVNEntriesUtil.foldScheduling(thisDirName, allEntriesMap, entryName, src, originalSchedule, flags);
             if (allEntriesMap != publicEntriesMap) {
-                originalFlags = SVNEntriesUtil.foldScheduling(publicEntriesMap, entryName, src, originalSchedule, originalFlags);
+                originalFlags = SVNEntriesUtil.foldScheduling(thisDirName, publicEntriesMap, entryName, src, originalSchedule, originalFlags);
             }
             SVNEntry after = (SVNEntry) allEntriesMap.get(entryName);
             if (before != null && after == null) {
@@ -322,13 +329,79 @@ public class SVNWCAccess {
             }
         }
         if (!wasDeleted) {
-            SVNEntriesUtil.foldEntry(allEntriesMap, entryName, src, flags);
+            SVNEntriesUtil.foldEntry(thisDirName, allEntriesMap, entryName, src, flags);
             if (allEntriesMap != publicEntriesMap) {
-                SVNEntriesUtil.foldEntry(publicEntriesMap, entryName, src, flags);
+                SVNEntriesUtil.foldEntry(thisDirName, publicEntriesMap, entryName, src, flags);
             }
         }
         if (sync) {
-            // write entries file.
+            writeEntries();
+        }
+    }
+    
+    public void writeEntries() throws SVNException {
+        Map entriesMap = getEntries(true);
+        SVNEntry rootEntry = (SVNEntry) entriesMap.get(getAdminArea().getThisDirName(this));
+        if (rootEntry == null) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_NOT_FOUND, 
+                    "No default entry in directory ''{0}''", new File(getPath()));
+            SVNErrorManager.error(err);
+        }
+        
+        OutputStream os = null;
+        try {
+            os = getAdminArea().getLayout().write(this, null, SVNAdminLayout.FILE_ENTRIES, null, true);
+            if (getAdminArea().hasBinaryEntriesFile(this)) {
+                SVNEntriesUtil.writeEntries(os, getFormat(), rootEntry, entriesMap);
+            }
+            getAdminArea().getLayout().close(this, null, SVNAdminLayout.FILE_ENTRIES, null, os, true);
+            os = null;
+        } catch (SVNException e) {
+            SVNErrorMessage err = e.getErrorMessage().wrap("Error writing to ''{0}''", new File(getPath()));
+            SVNErrorManager.error(err, e);
+        } finally {
+            SVNFileUtil.closeFile(os);
+        }
+    }
+    
+    public void runLogs() throws SVNException {
+        ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+        byte[] internalBuffer = new byte[8192];
+        
+        int count = 0;
+        for (count = 0; ; count++) {
+            String extension = count == 0 ? null : "." + count;
+            if (!getAdminArea().getLayout().exists(this, null, SVNAdminLayout.FILE_LOG, extension, false)) {
+                break;
+            }
+            InputStream log = null;
+            try {
+                log = getAdminArea().getLayout().read(this, null, SVNAdminLayout.FILE_LOG, extension, false);
+                while(true) {
+                    int read = log.read(internalBuffer);
+                    if (read <= 0) {
+                        break;
+                    }
+                    buffer.write(internalBuffer, 0, read);
+                }
+            } catch (IOException e) {
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, "Error reading administrative log file in ''{0}''", new File(getPath()));
+                SVNErrorManager.error(err, e);
+            } finally {
+                SVNFileUtil.closeFile(log);
+            }
+        }
+        SVNLogRunner runner = new SVNLogRunner(this);
+        SVNLogUtil.run(new ByteArrayInputStream(buffer.toByteArray()), runner);
+        
+        if (runner.isEntriesModified()) {
+            writeEntries();
+        }
+        // TODO handle killme.
+        while(count >= 0) {
+            String extension = count == 0 ? null : "." + count;
+            getAdminArea().getLayout().delete(this, null, SVNAdminLayout.FILE_LOG, extension, false);
+            count--;
         }
     }
     
