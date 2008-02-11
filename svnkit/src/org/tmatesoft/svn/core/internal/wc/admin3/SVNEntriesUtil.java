@@ -39,6 +39,209 @@ import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
  */
 public class SVNEntriesUtil {
     
+    public static long foldScheduling(Map entries, String name, SVNEntry tmpEntry, String schedule, long flags) throws SVNException {
+        if ((flags & SVNEntry.FLAG_SCHEDULE) == 0) {
+            return flags;
+        }
+        if ((flags & SVNEntry.FLAG_FORCE) != 0) {
+            return flags;
+        }
+        SVNEntry entry = (SVNEntry) entries.get(name);
+        if (entry == null) {
+            if (SVNEntry.SCHEDULE_ADD.equals(schedule)) {
+                return flags;
+            }
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_SCHEDULE_CONFLICT, "''{0}'' is not under version control", name);
+            SVNErrorManager.error(err);
+        }
+        SVNEntry thisDirEntry = (SVNEntry) entries.get("");
+        if (entry != thisDirEntry && SVNEntry.SCHEDULE_DELETE.equals(thisDirEntry.getSchedule())) {
+            if (SVNEntry.SCHEDULE_ADD.equals(schedule)) {
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_SCHEDULE_CONFLICT, 
+                        "Can''t add ''{0}'' to deleted directory; try undeleting its parent directory first", name);
+                SVNErrorManager.error(err);
+            } else if (SVNEntry.SCHEDULE_REPLACE.equals(schedule)) {
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_SCHEDULE_CONFLICT, 
+                        "Can''t replace ''{0}'' in deleted directory; try undeleting its parent directory first", name);
+                SVNErrorManager.error(err);
+            }
+        }
+        if (entry.isAbsent() && SVNEntry.SCHEDULE_ADD.equals(schedule)) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_SCHEDULE_CONFLICT, 
+                    "''{0}'' is marked as absent, so it cannot be schedule for addition", name);
+            SVNErrorManager.error(err);
+        }
+        if (entry.getSchedule() == null) {
+            if (schedule == null) {
+                flags &= ~SVNEntry.FLAG_SCHEDULE;
+            } else if (SVNEntry.SCHEDULE_ADD.equals(schedule) && !entry.isDeleted()) {
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_SCHEDULE_CONFLICT, "''{0}'' is already under version control", name);
+                SVNErrorManager.error(err);
+            }
+            return flags;
+        } else if (SVNEntry.SCHEDULE_ADD.equals(entry.getSchedule())) {
+            if (SVNEntry.SCHEDULE_DELETE.equals(schedule)) {
+                if (!entry.isDeleted()) {
+                    entries.remove(name);
+                } else {
+                    tmpEntry.mySchedule = null;
+                }
+            } else {
+                flags &= ~SVNEntry.FLAG_SCHEDULE;
+            }
+            return flags;
+        } else if (SVNEntry.SCHEDULE_DELETE.equals(entry.getSchedule())) {
+            if (SVNEntry.SCHEDULE_DELETE.equals(schedule)) {
+                flags &= ~SVNEntry.FLAG_SCHEDULE;
+            } else if (SVNEntry.SCHEDULE_ADD.equals(schedule)) {
+                tmpEntry.mySchedule = SVNEntry.SCHEDULE_REPLACE;
+            }
+            return flags;
+        } else if (SVNEntry.SCHEDULE_REPLACE.equals(entry.getSchedule())) {
+            if (SVNEntry.SCHEDULE_DELETE.equals(schedule)) {
+                tmpEntry.mySchedule = SVNEntry.SCHEDULE_DELETE;
+            } else if (SVNEntry.SCHEDULE_REPLACE.equals(schedule)) {
+                flags &= ~SVNEntry.FLAG_SCHEDULE;
+            } else if (SVNEntry.SCHEDULE_ADD.equals(schedule)) {
+                flags &= ~SVNEntry.FLAG_SCHEDULE;
+            }
+            return flags;
+        } else {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_SCHEDULE_CONFLICT, 
+                    "Entry ''{0}'' has illegal schedule", name);
+            SVNErrorManager.error(err);
+        }
+        return flags;
+    }
+    
+    public static void foldEntry(Map entries, String name, SVNEntry src, long flags) {
+        SVNEntry entry = (SVNEntry) entries.get(name);
+        if (entry == null) {
+            entry = new SVNEntry();
+        }
+        if (entry.getName() == null) {
+            entry.myName = name;
+        }
+        if ((flags & SVNEntry.FLAG_REVISION) != 0) {
+          entry.myRevision = src.myRevision;
+        }
+        if ((flags & SVNEntry.FLAG_URL) != 0) {
+          entry.myURL = src.myURL;
+        }
+        if ((flags & SVNEntry.FLAG_REPOS) != 0) {
+          entry.myRepositoryURL = src.myRepositoryURL;
+        }
+        if ((flags & SVNEntry.FLAG_KIND) != 0) {
+          entry.myKind = src.myKind;
+        }
+        if ((flags & SVNEntry.FLAG_SCHEDULE) != 0) {
+          entry.mySchedule = src.mySchedule;
+        }
+        if ((flags & SVNEntry.FLAG_CHECKSUM) != 0) {
+          entry.myChecksum = src.myChecksum;
+        }
+        if ((flags & SVNEntry.FLAG_COPIED) != 0) {
+          entry.myIsCopied = src.myIsCopied;
+        }
+        if ((flags & SVNEntry.FLAG_COPYFROM_URL) != 0) {
+            entry.myCopyFromURL = src.myCopyFromURL;
+        }
+        if ((flags & SVNEntry.FLAG_COPYFROM_REV) != 0) {
+          entry.myCopyFromRevision = src.myCopyFromRevision;
+        }
+        if ((flags & SVNEntry.FLAG_DELETED) != 0) {
+            entry.myIsDeleted = src.myIsDeleted;
+        }
+        if ((flags & SVNEntry.FLAG_ABSENT) != 0) {
+            entry.myIsAbsent = src.myIsAbsent;
+        }
+        if ((flags & SVNEntry.FLAG_INCOMPLETE) != 0) {
+            entry.myIsIncomplete = src.myIsIncomplete;
+        }
+        if ((flags & SVNEntry.FLAG_TEXT_TIME) != 0) {
+            entry.myTextTime = src.myTextTime;
+        }
+        if ((flags & SVNEntry.FLAG_PROP_TIME) != 0) {
+            entry.myPropTime = src.myPropTime;
+        }
+        if ((flags & SVNEntry.FLAG_CONFLICT_OLD) != 0) {
+            entry.myConflictOld = src.myConflictOld;
+        }
+        if ((flags & SVNEntry.FLAG_CONFLICT_NEW) != 0) {
+            entry.myConflictNew = src.myConflictNew;
+        }
+        if ((flags & SVNEntry.FLAG_CONFLICT_WRK) != 0) {
+            entry.myConflictWorking = src.myConflictWorking;
+        }
+        if ((flags & SVNEntry.FLAG_PREJFILE) != 0) {
+            entry.myPropReject = src.myPropReject;
+        }
+        if ((flags & SVNEntry.FLAG_CMT_REV) != 0) {
+            entry.myCommitedRevision = src.myCommitedRevision;
+        }
+        if ((flags & SVNEntry.FLAG_CMT_DATE) != 0) {
+            entry.myCommittedDate = src.myCommittedDate;
+        }
+        if ((flags & SVNEntry.FLAG_CMT_AUTHOR) != 0) {
+            entry.myCommitAuthor = src.myCommitAuthor;
+        }
+        if ((flags & SVNEntry.FLAG_UUID) != 0) {
+            entry.myRepositoryUUID = src.myRepositoryUUID;
+        }
+        if ((flags & SVNEntry.FLAG_LOCK_TOKEN) != 0) {
+            entry.myLockToken = src.myLockToken;
+        }
+        if ((flags & SVNEntry.FLAG_LOCK_OWNER) != 0) {
+            entry.myLockOwner = src.myLockOwner;
+        }
+        if ((flags & SVNEntry.FLAG_LOCK_COMMENT) != 0) {
+            entry.myLockComment = src.myLockComment;
+        }
+        if ((flags & SVNEntry.FLAG_LOCK_CREATION_DATE) != 0) {
+            entry.myLockCreationDate = src.myLockCreationDate;
+        }
+        if ((flags & SVNEntry.FLAG_CHANGELIST) != 0) {
+            entry.myChangelist = src.myChangelist;
+        }
+        if ((flags & SVNEntry.FLAG_HAS_PROPS) != 0) {
+            entry.myHasProperties = src.myHasProperties;
+        }
+        if ((flags & SVNEntry.FLAG_HAS_PROP_MODS) != 0) {
+            entry.myIsPropertiesModified = src.myIsPropertiesModified;
+        }
+        if ((flags & SVNEntry.FLAG_CACHABLE_PROPS) != 0) {
+            entry.myCachableProperties = src.myCachableProperties;
+        }
+        if ((flags & SVNEntry.FLAG_PRESENT_PROPS) != 0) {
+            entry.myPresentProperties = src.myPresentProperties;
+        }
+        if ((flags & SVNEntry.FLAG_KEEP_LOCAL) != 0) {
+            entry.myIsKeepLocal = src.myIsKeepLocal;
+        }
+
+        if (entry.getKind() != SVNNodeKind.DIR) {
+            SVNEntry thisDir = (SVNEntry) entries.get("");
+            if (thisDir != null) {
+                entry.takeFrom(thisDir);
+            }
+        }
+        
+        if ((flags & SVNEntry.FLAG_SCHEDULE) != 0 && SVNEntry.SCHEDULE_DELETE.equals(src.mySchedule)) {          
+            entry.myIsCopied = false;
+            entry.myCopyFromRevision = -1;
+            entry.myCopyFromURL = null;
+        }
+
+        if ((flags & SVNEntry.FLAG_WORKING_SIZE) != 0) {
+            entry.myWorkingSize = src.myWorkingSize;
+        }
+        if ((flags & SVNEntry.FLAG_SCHEDULE) != 0 && !SVNEntry.SCHEDULE_DELETE.equals(src.mySchedule)) {
+            entry.myIsKeepLocal = false;
+        }
+
+        entries.put(entry.getName(), entry);
+    }
+    
     public static Map readEntries(InputStream is, String path, String thisDirName) throws SVNException {
         BufferedReader reader = null;
         Map entries = new HashMap();

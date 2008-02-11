@@ -15,10 +15,14 @@ import java.util.Map;
 import java.util.StringTokenizer;
 
 import org.tmatesoft.svn.core.SVNDepth;
+import org.tmatesoft.svn.core.SVNErrorCode;
+import org.tmatesoft.svn.core.SVNErrorMessage;
+import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNNodeKind;
 import org.tmatesoft.svn.core.internal.util.SVNDate;
 import org.tmatesoft.svn.core.internal.util.SVNEncodingUtil;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
+import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 
 
 /**
@@ -136,6 +140,217 @@ public class SVNEntry {
     protected long myWorkingSize;
     protected boolean myIsKeepLocal;
     protected SVNDepth myDepth;
+
+    public static long loadFromMap(SVNEntry entry, String thisDirName, Map attributes) throws SVNException {
+        long flags = 0;
+        String name = (String) attributes.get(SVNEntry.NAME);
+        entry.myName = name == null ? thisDirName : name;
+        //
+        String revisionStr = (String) attributes.get(SVNEntry.REVISION);
+        if (revisionStr != null) {
+            entry.myRevision = Long.parseLong(revisionStr);
+            flags |= FLAG_REVISION;
+        } else {
+            entry.myRevision = -1;
+        }
+        //
+        entry.myURL = (String) attributes.get(SVNEntry.URL);
+        if (entry.myURL != null) {
+            flags |= FLAG_URL;
+        }
+        //
+        entry.myRepositoryURL = (String) attributes.get(SVNEntry.REPOS);
+        if (entry.myRepositoryURL != null) {
+            if (entry.myURL != null && !SVNPathUtil.isAncestor(entry.myRepositoryURL, entry.myURL)) {
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_CORRUPT, "Entry for ''{0}'' has invalid repository root", entry.getName());
+                SVNErrorManager.error(err);
+            }
+            flags |= FLAG_REPOS;
+        }
+        //
+        String kind = (String) attributes.get(SVNEntry.KIND);
+        entry.myKind = SVNNodeKind.NONE;
+        if (kind != null) {
+            if (SVNNodeKind.FILE.toString().equals(kind)) {
+                entry.myKind = SVNNodeKind.FILE;
+            } else if (SVNNodeKind.DIR.toString().equals(kind)) {
+                entry.myKind = SVNNodeKind.DIR;
+            } else {
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_CORRUPT, "Entry for ''{0}'' has invalid node kind", entry.getName());
+                SVNErrorManager.error(err);
+            }
+            flags |= FLAG_KIND;
+        }
+        //
+        String schedule = (String) attributes.get(SVNEntry.SCHEDULE);
+        if (schedule != null) {
+            if (SVNEntry.SCHEDULE_ADD.equals(schedule)) {
+                entry.mySchedule = SVNEntry.SCHEDULE_ADD;                 
+            } else if (SVNEntry.SCHEDULE_DELETE.equals(schedule)) {
+                entry.mySchedule = SVNEntry.SCHEDULE_DELETE;                 
+            } else if (SVNEntry.SCHEDULE_REPLACE.equals(schedule)) {
+                entry.mySchedule = SVNEntry.SCHEDULE_REPLACE;                 
+            } else {
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_CORRUPT, "Entry for ''{0}'' has invalid ''{1}'' value", 
+                        new Object[] {entry.getName(), SVNEntry.SCHEDULE});
+                SVNErrorManager.error(err);
+            }
+            flags |= FLAG_SCHEDULE;
+        }
+        //
+        entry.myPropReject = (String) attributes.get(SVNEntry.PREJFILE);
+        if (attributes.containsKey(SVNEntry.PREJFILE)) {
+            flags |= FLAG_PREJFILE;
+        }
+        entry.myConflictOld = (String) attributes.get(SVNEntry.CONFLICT_OLD);
+        if (attributes.containsKey(SVNEntry.CONFLICT_OLD)) {
+            flags |= FLAG_CONFLICT_OLD;
+        }
+        entry.myConflictNew = (String) attributes.get(SVNEntry.CONFLICT_NEW);
+        if (attributes.containsKey(SVNEntry.CONFLICT_NEW)) {
+            flags |= FLAG_CONFLICT_NEW;
+        }
+        entry.myConflictWorking = (String) attributes.get(SVNEntry.CONFLICT_WRK);
+        if (attributes.containsKey(SVNEntry.CONFLICT_WRK)) {
+            flags |= FLAG_CONFLICT_WRK;
+        }
+        entry.myIsCopied = Boolean.TRUE.toString().equals(attributes.get(SVNEntry.COPIED));
+        if (attributes.containsKey(SVNEntry.COPIED)) {
+            flags |= FLAG_COPIED;
+        }
+        //
+        entry.myCopyFromURL = (String) attributes.get(SVNEntry.COPYFROM_URL);
+        if (entry.myCopyFromURL != null) {
+            flags |= SVNEntry.FLAG_COPYFROM_URL;
+        }
+        revisionStr = (String) attributes.get(SVNEntry.COPYFROM_REV);
+        if (revisionStr != null) {
+            entry.myCopyFromRevision = Long.parseLong(revisionStr);
+            flags |= SVNEntry.FLAG_COPIED;
+        }
+        //
+        entry.myIsDeleted = Boolean.TRUE.toString().equals(attributes.get(SVNEntry.DELETED));
+        if (attributes.containsKey(SVNEntry.DELETED)) {
+            flags |= FLAG_DELETED;
+        }
+        //
+        entry.myIsAbsent = Boolean.TRUE.toString().equals(attributes.get(SVNEntry.ABSENT));
+        if (attributes.containsKey(SVNEntry.ABSENT)) {
+            flags |= FLAG_ABSENT;
+        }
+        //
+        entry.myIsIncomplete = Boolean.TRUE.toString().equals(attributes.get(SVNEntry.INCOMPLETE));
+        if (attributes.containsKey(SVNEntry.INCOMPLETE)) {
+            flags |= FLAG_INCOMPLETE;
+        }
+        //
+        entry.myIsKeepLocal = Boolean.TRUE.toString().equals(attributes.get(SVNEntry.KEEP_LOCAL));
+        if (attributes.containsKey(SVNEntry.KEEP_LOCAL)) {
+            flags |= FLAG_KEEP_LOCAL;
+        }
+        //
+        String timeStr = (String) attributes.get(SVNEntry.TEXT_TIME);
+        if (timeStr != null) {
+            if (!timeStr.equals(SVNLog.WC_TIMESTAMP)) {
+                entry.myTextTime = SVNDate.parseDate(timeStr);                
+            }
+            flags |= SVNEntry.FLAG_TEXT_TIME;
+        }
+        timeStr = (String) attributes.get(SVNEntry.PROP_TIME);
+        if (timeStr != null) {
+            if (!timeStr.equals(SVNLog.WC_TIMESTAMP)) {
+                entry.myPropTime = SVNDate.parseDate(timeStr);                
+            }
+            flags |= SVNEntry.FLAG_PROP_TIME;
+        }
+        //
+        entry.myChecksum = (String) attributes.get(SVNEntry.CHECKSUM);
+        if (entry.myChecksum != null) {
+            flags |= SVNEntry.FLAG_CHECKSUM;
+        }
+        //
+        entry.myRepositoryUUID = (String) attributes.get(SVNEntry.UUID);
+        if (entry.myRepositoryUUID != null) {
+            flags |= SVNEntry.FLAG_UUID;
+        }
+        //
+        timeStr = (String) attributes.get(SVNEntry.CMT_DATE);
+        if (timeStr != null) {
+            entry.myCommittedDate = SVNDate.parseDate(timeStr);                
+            flags |= SVNEntry.FLAG_CMT_DATE;
+        } else {
+            entry.myCommittedDate = SVNDate.NULL;
+        }
+        revisionStr = (String) attributes.get(SVNEntry.CMT_REV);
+        if (revisionStr != null) {
+            entry.myCommitedRevision = Long.parseLong(revisionStr);
+            flags |= SVNEntry.FLAG_CMT_REV;
+        } else {
+            entry.myCommitedRevision = -1;
+        }
+        entry.myCommitAuthor = (String) attributes.get(SVNEntry.CMT_AUTHOR);
+        if (entry.myCommitAuthor != null) {
+            flags |= SVNEntry.FLAG_CMT_AUTHOR;
+        }
+        //
+        entry.myLockToken = (String) attributes.get(SVNEntry.LOCK_TOKEN);
+        if (entry.myLockToken != null) {
+            flags |= SVNEntry.FLAG_LOCK_TOKEN;
+        }
+        entry.myLockOwner = (String) attributes.get(SVNEntry.LOCK_OWNER);
+        if (entry.myLockOwner != null) {
+            flags |= SVNEntry.FLAG_LOCK_OWNER;
+        }
+        entry.myLockComment = (String) attributes.get(SVNEntry.LOCK_COMMENT);
+        if (entry.myLockComment != null) {
+            flags |= SVNEntry.FLAG_LOCK_COMMENT;
+        }
+        timeStr = (String) attributes.get(SVNEntry.LOCK_CREATION_DATE);
+        if (timeStr != null) {
+            entry.myLockCreationDate = SVNDate.parseDate(timeStr);                
+            flags |= SVNEntry.FLAG_LOCK_CREATION_DATE;
+        } 
+        //
+        entry.myChangelist = (String) attributes.get(SVNEntry.CHANGELIST);
+        if (entry.myChangelist != null) {
+            flags |= SVNEntry.FLAG_CHANGELIST;
+        }
+        //
+        entry.myHasProperties = Boolean.TRUE.toString().equals(attributes.get(SVNEntry.HAS_PROPS));
+        if (attributes.containsKey(SVNEntry.HAS_PROPS)) {
+            flags |= SVNEntry.FLAG_HAS_PROP_MODS;
+        }
+        String hasPropMods = (String) attributes.get(SVNEntry.HAS_PROP_MODS);
+        if (hasPropMods != null) {
+            if (Boolean.TRUE.toString().equals(hasPropMods)) {
+                entry.myIsPropertiesModified = true;
+            } else if (!Boolean.FALSE.toString().equals(hasPropMods)) {
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_CORRUPT, "Entry for ''{0}'' has invalid ''{1}'' value", 
+                        new Object[] {entry.getName(), SVNEntry.HAS_PROP_MODS});
+                SVNErrorManager.error(err);
+            }
+            flags |= SVNEntry.FLAG_HAS_PROP_MODS;
+        }
+        //
+        entry.myCachableProperties = (String) attributes.get(SVNEntry.CACHABLE_PROPS);
+        if (entry.myCachableProperties != null) {
+            flags |= SVNEntry.FLAG_CACHABLE_PROPS;
+        }
+        entry.myPresentProperties = (String) attributes.get(SVNEntry.PRESENT_PROPS);
+        if (entry.myPresentProperties != null) {
+            flags |= SVNEntry.FLAG_PRESENT_PROPS;
+        }
+        //
+        String size = (String) attributes.get(SVNEntry.WORKING_SIZE);
+        if (size != null) {
+            if (!SVNLog.WC_WORKING_SIZE.equals(size)) {
+                entry.myWorkingSize = Long.parseLong(size);
+            }
+            flags |= SVNEntry.FLAG_WORKING_SIZE;
+        }
+
+        return flags;
+    }
     
     protected SVNEntry() {
         myRevision = -1;
