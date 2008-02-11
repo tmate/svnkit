@@ -16,6 +16,9 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
+import java.io.Writer;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -27,6 +30,7 @@ import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNNodeKind;
 import org.tmatesoft.svn.core.internal.util.SVNDate;
 import org.tmatesoft.svn.core.internal.util.SVNEncodingUtil;
+import org.tmatesoft.svn.core.internal.util.SVNFormatUtil;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 
@@ -39,7 +43,7 @@ import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
  */
 public class SVNEntriesUtil {
     
-    public static long foldScheduling(Map entries, String name, SVNEntry tmpEntry, String schedule, long flags) throws SVNException {
+    public static long foldScheduling(String thisDirName, Map entries, String name, SVNEntry tmpEntry, String schedule, long flags) throws SVNException {
         if ((flags & SVNEntry.FLAG_SCHEDULE) == 0) {
             return flags;
         }
@@ -54,7 +58,7 @@ public class SVNEntriesUtil {
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_SCHEDULE_CONFLICT, "''{0}'' is not under version control", name);
             SVNErrorManager.error(err);
         }
-        SVNEntry thisDirEntry = (SVNEntry) entries.get("");
+        SVNEntry thisDirEntry = (SVNEntry) entries.get(thisDirName);
         if (entry != thisDirEntry && SVNEntry.SCHEDULE_DELETE.equals(thisDirEntry.getSchedule())) {
             if (SVNEntry.SCHEDULE_ADD.equals(schedule)) {
                 SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_SCHEDULE_CONFLICT, 
@@ -114,7 +118,7 @@ public class SVNEntriesUtil {
         return flags;
     }
     
-    public static void foldEntry(Map entries, String name, SVNEntry src, long flags) {
+    public static void foldEntry(String thisDirName, Map entries, String name, SVNEntry src, long flags) {
         SVNEntry entry = (SVNEntry) entries.get(name);
         if (entry == null) {
             entry = new SVNEntry();
@@ -220,7 +224,7 @@ public class SVNEntriesUtil {
         }
 
         if (entry.getKind() != SVNNodeKind.DIR) {
-            SVNEntry thisDir = (SVNEntry) entries.get("");
+            SVNEntry thisDir = (SVNEntry) entries.get(thisDirName);
             if (thisDir != null) {
                 entry.takeFrom(thisDir);
             }
@@ -511,6 +515,162 @@ public class SVNEntriesUtil {
         }
         return entry;
     }
+    
+    public static void writeEntries(OutputStream os, int format, SVNEntry rootEntry, Map entriesMap) throws SVNException {
+        OutputStreamWriter writer = null;
+        try {
+            writer = new OutputStreamWriter(os, "UTF-8");
+        
+            writer.write(Integer.toString(format));
+            writer.write('\n');
+            writeEntry(writer, rootEntry, rootEntry.getName(), rootEntry);
+            for (Iterator entries = entriesMap.values().iterator(); entries.hasNext();) {
+                SVNEntry entry = (SVNEntry) entries.next();
+                if (entry == rootEntry) {
+                    continue;
+                }
+                writeEntry(writer, rootEntry, entry.getName(), entry);
+            }
+            writer.flush();
+        } catch (IOException e) {
+            SVNErrorManager.error(SVNErrorMessage.create(SVNErrorCode.IO_ERROR), e);
+        } 
+        
+    }
+
+    private static void writeEntry(Writer writer, SVNEntry rootEntry, String name, SVNEntry entry) throws IOException {
+        boolean isThisDir = entry == rootEntry;
+        boolean isSubdir = !isThisDir && entry.isDirectory();
+        
+        StringBuffer buffer = new StringBuffer();
+        
+        writeString(buffer, entry.getName());
+        if (entry.getKind() == SVNNodeKind.DIR) {
+            writeValue(buffer, SVNNodeKind.DIR.toString());
+        } else if (entry.getKind() == SVNNodeKind.NONE) {
+            writeValue(buffer, null);
+        } else {
+            writeValue(buffer, SVNNodeKind.FILE.toString());
+        }
+        if (isThisDir || (!isSubdir && entry.getRevision() != rootEntry.getRevision())) {
+            writeRevision(buffer, entry.getRevision());
+        } else {
+            writeRevision(buffer, -1);
+        }
+        if (isThisDir || (!isSubdir && !SVNPathUtil.append(rootEntry.getURL(), name).equals(entry.getURL()))) {
+            writeString(buffer, entry.getURL());
+        } else {
+            writeValue(buffer, null);
+        }
+        if (!isSubdir && (isThisDir || (rootEntry.getRepositoryURL() == null || 
+                (entry.getRepositoryURL() != null && entry.getRepositoryURL().equals(rootEntry.getRepositoryURL()))))) {
+            writeString(buffer, entry.getRepositoryURL());
+        } else {
+            writeString(buffer, null);
+        }
+        writeValue(buffer, entry.getSchedule());
+        writeTime(buffer, entry.getTextTime());
+        writeValue(buffer, entry.getChecksum());
+        
+        writeTime(buffer, entry.getCommittedDate());
+        writeRevision(buffer, entry.getCommitedRevision());
+        writeString(buffer, entry.getCommitAuthor());
+        
+        writeBoolean(buffer, entry.hasProperties(), SVNEntry.HAS_PROPS);
+        writeBoolean(buffer, entry.isPropertiesModified(), SVNEntry.HAS_PROP_MODS);
+        
+        if (isThisDir || rootEntry.getCachableProperties() == null || entry.getCachableProperties() == null ||
+                !rootEntry.getCachableProperties().equals(entry.getCachableProperties())) {
+            writeValue(buffer, entry.getCachableProperties());
+        } else {
+            writeValue(buffer, null);
+        }
+        writeValue(buffer, entry.getPresentProperties());
+        
+        writeString(buffer, entry.getPropReject());
+        writeString(buffer, entry.getConflictOld());
+        writeString(buffer, entry.getConflictNew());
+        writeString(buffer, entry.getConflictWorking());
+        
+        writeBoolean(buffer, entry.isCopied(), SVNEntry.COPIED);
+        writeString(buffer, entry.getCopyFromURL());
+        writeRevision(buffer, entry.getCopyFromRevision());
+        
+        writeBoolean(buffer, entry.isDeleted(), SVNEntry.DELETED);
+        writeBoolean(buffer, entry.isAbsent(), SVNEntry.ABSENT);
+        writeBoolean(buffer, entry.isIncomplete(), SVNEntry.INCOMPLETE);
+        
+        if (isThisDir || rootEntry.getRepositoryUUID() == null || entry.getRepositoryUUID() == null ||
+                !rootEntry.getRepositoryUUID().equals(entry.getRepositoryUUID())) {
+            writeValue(buffer, entry.getRepositoryUUID());
+        } else {
+            writeValue(buffer, null);
+        }
+        
+        writeString(buffer, entry.getLockToken());
+        writeString(buffer, entry.getLockOwner());
+        writeString(buffer, entry.getLockComment());
+        writeTime(buffer, entry.getLockCreationDate());
+        writeString(buffer, entry.getChangelist());
+        writeBoolean(buffer, entry.isKeepLocal(), SVNEntry.KEEP_LOCAL);
+        
+        writeRevision(buffer, entry.getWorkingSize());
+        
+        if (isSubdir || entry.getDepth() == SVNDepth.INFINITY) {
+            writeValue(buffer, null);
+        } else {
+            writeValue(buffer, entry.getDepth() != null ? entry.getDepth().getName() : null);
+        }
+        while(buffer.length() > 1 && buffer.charAt(buffer.length() - 2) == '\n') {
+            buffer.delete(buffer.length() - 1, buffer.length());
+        }
+
+        writer.write(buffer.toString());
+        writer.write("\f\n");
+    }
+    
+    private static void writeString(StringBuffer buffer, String str) {
+        if (str != null && str.length() > 0) {
+            for (int i = 0; i < str.length(); i++) {
+                char ch = str.charAt(i);
+                if (SVNEncodingUtil.isASCIIControlChar(ch) || ch == '\\') {
+                    buffer.append("\\x");
+                    buffer.append(SVNFormatUtil.getHexNumberFromByte((byte)ch));
+                } else {
+                    buffer.append(ch);
+                }
+            }
+        }
+        buffer.append('\n');
+    }
+    
+    private static void writeValue(StringBuffer buffer, String value) {
+        if (value != null && value.length() > 0) {
+            buffer.append(value);
+        }
+        buffer.append('\n');
+    }
+    
+    private static void writeTime(StringBuffer buffer, SVNDate time) {
+        if (time != null) {
+            if (time.getTime() > 0 || time.getTimeInMicros() > 0) {
+                buffer.append(SVNDate.formatDate(time));
+            }
+        }
+        buffer.append('\n');
+    }
+
+    private static void writeRevision(StringBuffer buffer, long revision) {
+        if (revision >= 0) {
+            buffer.append(Long.toString(revision));
+        }
+        buffer.append('\n');
+    }
+
+    private static void writeBoolean(StringBuffer buffer, boolean flag, String flagName) {
+        writeValue(buffer, flag ? flagName : null);
+    }
+
     
     private static boolean isEntryFinished(String line) {
         return line != null && line.length() > 0 && line.charAt(0) == '\f';
