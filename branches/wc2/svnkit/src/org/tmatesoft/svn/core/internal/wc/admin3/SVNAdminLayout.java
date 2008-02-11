@@ -144,6 +144,12 @@ public class SVNAdminLayout {
         return new File(path).isDirectory();
     }
     
+    public long lastModified(SVNWCAccess wcAccess, String dir, String name, String extension, boolean tmp) {
+        String fullPath = composeAdminPath(wcAccess.getPath(), dir, name, extension, tmp);
+        File file = new File(fullPath);
+        return file.lastModified();
+    }
+    
     public int readVersion(String wcAccessPath) throws SVNException {
         SVNErrorMessage err = null;
         int wcFormat = 0;

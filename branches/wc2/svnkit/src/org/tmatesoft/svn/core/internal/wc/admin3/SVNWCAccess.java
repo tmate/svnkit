@@ -299,6 +299,39 @@ public class SVNWCAccess {
         src.setOwner(false);
     }
     
+    public void modifyEntry(String entryName, SVNEntry src, long flags, boolean sync) throws SVNException {
+        Map allEntriesMap = getEntries(true);
+        Map publicEntriesMap = getEntries(false);
+        boolean wasDeleted = false;
+        
+        if (entryName == null) {
+            entryName = getAdminArea().getThisDirName(this);
+        }
+        if ((flags & SVNEntry.FLAG_SCHEDULE) != 0) {
+            SVNEntry before = (SVNEntry) allEntriesMap.get(entryName);
+            String originalSchedule = src.getSchedule();
+            long originalFlags = flags;
+
+            flags = SVNEntriesUtil.foldScheduling(allEntriesMap, entryName, src, originalSchedule, flags);
+            if (allEntriesMap != publicEntriesMap) {
+                originalFlags = SVNEntriesUtil.foldScheduling(publicEntriesMap, entryName, src, originalSchedule, originalFlags);
+            }
+            SVNEntry after = (SVNEntry) allEntriesMap.get(entryName);
+            if (before != null && after == null) {
+                wasDeleted = true;
+            }
+        }
+        if (!wasDeleted) {
+            SVNEntriesUtil.foldEntry(allEntriesMap, entryName, src, flags);
+            if (allEntriesMap != publicEntriesMap) {
+                SVNEntriesUtil.foldEntry(publicEntriesMap, entryName, src, flags);
+            }
+        }
+        if (sync) {
+            // write entries file.
+        }
+    }
+    
     public void close() throws SVNException {
         SVNWCFactory.close(this, false, true);
     }

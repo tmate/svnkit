@@ -207,6 +207,13 @@ public class SVNAdminArea {
         return getLayout().getAbsolutePath(wcAccess, dir, name, extension, tmp);
     }
     
+    public long propertiesLastModified(SVNWCAccess wcAccess, String path, SVNNodeKind kind, int propType, boolean tmp) {
+        String dir = kind == SVNNodeKind.DIR ? null : FILE_PROPFILE_DIR[propType];
+        String name = kind == SVNNodeKind.DIR ? DIR_PROPFILE_NAME[propType] : SVNPathUtil.tail(path);
+        String extension = kind == SVNNodeKind.DIR ? null : FILE_PROPFILE_EXT[propType];
+        return getLayout().lastModified(wcAccess, dir, name, extension, tmp);
+    }
+    
     public void lock(SVNWCAccess wcAccess) throws SVNException {
         boolean exists = getLayout().exists(wcAccess, null, SVNAdminLayout.FILE_LOCK, null, false);
         if (exists) {

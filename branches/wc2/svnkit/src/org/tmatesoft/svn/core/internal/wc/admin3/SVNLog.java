@@ -74,8 +74,8 @@ public class SVNLog {
     
     private static final String[] COPY_COMMANDS = {CP_TAG, CP_AND_TRANSALTE_TAG, CP_AND_TRANSALTE_TAG, CP_AND_DETRANSLATE_TAG};
     
-    private static final String WC_TIMESTAMP = "working";
-    private static final String WC_WORKING_SIZE = "working";
+    public static final String WC_TIMESTAMP = "working";
+    public static final String WC_WORKING_SIZE = "working";
     
     private SVNAdminLayout myAdminLayout;
     private StringBuffer myBuffer;
