@@ -12,20 +12,13 @@
 package org.tmatesoft.svn.core.internal.wc.admin3;
 
 import java.io.File;
-import java.io.IOException;
-import java.io.OutputStream;
-import java.io.OutputStreamWriter;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.tmatesoft.svn.core.SVNErrorCode;
-import org.tmatesoft.svn.core.SVNErrorMessage;
-import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.internal.util.SVNDate;
+import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
 import org.tmatesoft.svn.core.internal.util.SVNXMLUtil;
-import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.internal.wc.SVNFileType;
-import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 
 
 /**
@@ -77,13 +70,11 @@ public class SVNLog {
     public static final String WC_TIMESTAMP = "working";
     public static final String WC_WORKING_SIZE = "working";
     
-    private SVNAdminLayout myAdminLayout;
     private StringBuffer myBuffer;
     private Map myAttributes;
     private SVNWCAccess myWCAccess;
 
     public SVNLog(SVNWCAccess wcAccess) {
-        myAdminLayout = wcAccess.getAdminArea().getLayout();
         myWCAccess = wcAccess;
         myBuffer = new StringBuffer();
         myAttributes = new HashMap();
@@ -254,7 +245,7 @@ public class SVNLog {
         myAttributes.put(FORMAT_ATTR, Integer.toString(format));
         writeCommand(UPGRADE_FORMAT_TAG);
     }
-    
+    /*
     public void save(int logNumber) throws SVNException {
         OutputStream os = null;
         String extension = logNumber > 0 ? "." + logNumber : null;
@@ -271,13 +262,13 @@ public class SVNLog {
         } finally {
             SVNFileUtil.closeFile(os);
         }
-    }
+    }*/
     
     public String toString() {
         return myBuffer.toString();
     }
 
-    private boolean copy(String commandName, String srcPath, String dstPath, boolean specialOnly, boolean removeDstIfNoSrc) {
+    protected boolean copy(String commandName, String srcPath, String dstPath, boolean specialOnly, boolean removeDstIfNoSrc) {
         File src = new File(srcPath);
         // src path could refer below admin area.
         // and its type should be fetched through layout.
@@ -299,12 +290,16 @@ public class SVNLog {
         return false;
     }
     
-    private void writeCommand(String name) {
-        SVNXMLUtil.openXMLTag(null, name, SVNXMLUtil.XML_STYLE_ATTRIBUTE_BREAKS_LINE | SVNXMLUtil.XML_STYLE_SELF_CLOSING, myAttributes, myBuffer);
+    protected String getLogPath(String path) {
+        String localPath = SVNPathUtil.getPathAsChild(myWCAccess.getPath(), path);
+        if (localPath == null && myWCAccess.equals(path)) {
+            return myWCAccess.getAdminArea().getThisDirName(myWCAccess);
+        }
+        return localPath;
     }
     
-    private String getLogPath(String path) {
-        return myAdminLayout.getLogPath(myWCAccess, path);
+    protected void writeCommand(String name) {
+        SVNXMLUtil.openXMLTag(null, name, SVNXMLUtil.XML_STYLE_ATTRIBUTE_BREAKS_LINE | SVNXMLUtil.XML_STYLE_SELF_CLOSING, myAttributes, myBuffer);
     }
 
 }

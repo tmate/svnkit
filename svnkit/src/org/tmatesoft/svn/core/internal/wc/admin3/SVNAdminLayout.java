@@ -218,19 +218,6 @@ public class SVNAdminLayout {
         }
         return version;
     }
-    
-    /**
-     * Given absolute path and administrative wcAccess,
-     * it returns the short path relative to the directory root
-     * 
-     */
-    public String getLogPath(SVNWCAccess wcAccess, String absolutePath) {
-        String localPath = SVNPathUtil.getPathAsChild(wcAccess.getPath(), absolutePath);
-        if (localPath == null || wcAccess.equals(absolutePath)) {
-            return wcAccess.getAdminArea().getThisDirName(wcAccess);
-        }
-        return localPath;
-    }
 
     /**
      * Returns absolute path of admin file to write to the log file.

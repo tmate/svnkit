@@ -412,4 +412,6 @@ public interface ISVNOptions extends ISVNTunnelProvider {
     
     public boolean isAllowAllForwardMergesFromSelf();
 
+    public byte[] getNativeEOLBytes();
+
 }

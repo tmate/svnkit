@@ -502,4 +502,8 @@ public class DefaultSVNOptions implements ISVNOptions, ISVNMergerFactory {
     public boolean isAllowAllForwardMergesFromSelf() {
         return false;
     }
+
+    public byte[] getNativeEOLBytes() {
+        return System.getProperty("line.separator").getBytes();
+    }
 }
