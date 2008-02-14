@@ -11,12 +11,7 @@
  */
 package org.tmatesoft.svn.core.internal.wc.admin3;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -26,9 +21,9 @@ import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNNodeKind;
+import org.tmatesoft.svn.core.SVNProperty;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
-import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 
 
 /**
@@ -130,6 +125,30 @@ public class SVNWCAccess {
         }
     }
     
+    public byte[] getPropertyValue(String path, String propertyName) throws SVNException {
+        SVNEntry entry = getEntry(path, true);
+        if (entry == null) {
+            return null;
+        }
+        if (entry.getCachableProperties() != null && entry.isCachableProperty(propertyName)) {
+            if (!entry.isPresentProperty(propertyName)) {
+                return null;
+            }
+            if (SVNProperty.isBooleanProperty(propertyName)) {
+                return Boolean.TRUE.toString().getBytes();//.getBytes("UTF-8");
+            }
+        }
+        if (SVNProperty.isWorkingCopyProperty(propertyName)) {
+            return null;
+        } else if (SVNProperty.isEntryProperty(propertyName)) {
+            // error
+            return null;
+        } 
+        Map working = new HashMap();
+        loadProperties(path, null, working, null);
+        return (byte[]) working.get(propertyName);
+    }
+    
     public void lock() throws SVNException {
         getAdminArea().lock(this);
         myIsLocked = true;
@@ -197,7 +216,7 @@ public class SVNWCAccess {
             kind = SVNNodeKind.FILE;
         }
         Map diff = SVNHashUtil.computeDiff(working, base);
-        log = log != null ? log : new SVNLog(wcAccess);
+        log = log != null ? log : getAdminArea().createLog(wcAccess);
         SVNEntry tmpEntry = new SVNEntry();
         tmpEntry.myIsPropertiesModified = !diff.isEmpty();
         tmpEntry.myHasProperties = !working.isEmpty();
@@ -347,62 +366,15 @@ public class SVNWCAccess {
                     "No default entry in directory ''{0}''", new File(getPath()));
             SVNErrorManager.error(err);
         }
-        
-        OutputStream os = null;
-        try {
-            os = getAdminArea().getLayout().write(this, null, SVNAdminLayout.FILE_ENTRIES, null, true);
-            if (getAdminArea().hasBinaryEntriesFile(this)) {
-                SVNEntriesUtil.writeEntries(os, getFormat(), rootEntry, entriesMap);
-            }
-            getAdminArea().getLayout().close(this, null, SVNAdminLayout.FILE_ENTRIES, null, os, true);
-            os = null;
-        } catch (SVNException e) {
-            SVNErrorMessage err = e.getErrorMessage().wrap("Error writing to ''{0}''", new File(getPath()));
-            SVNErrorManager.error(err, e);
-        } finally {
-            SVNFileUtil.closeFile(os);
-        }
+        getAdminArea().writeEntries(this, rootEntry, entriesMap);
+    }
+    
+    public void saveLog(SVNLog log, int logNumber) throws SVNException {
+        getAdminArea().writeLog(this, log, logNumber);
     }
     
     public void runLogs() throws SVNException {
-        ByteArrayOutputStream buffer = new ByteArrayOutputStream();
-        byte[] internalBuffer = new byte[8192];
-        
-        int count = 0;
-        for (count = 0; ; count++) {
-            String extension = count == 0 ? null : "." + count;
-            if (!getAdminArea().getLayout().exists(this, null, SVNAdminLayout.FILE_LOG, extension, false)) {
-                break;
-            }
-            InputStream log = null;
-            try {
-                log = getAdminArea().getLayout().read(this, null, SVNAdminLayout.FILE_LOG, extension, false);
-                while(true) {
-                    int read = log.read(internalBuffer);
-                    if (read <= 0) {
-                        break;
-                    }
-                    buffer.write(internalBuffer, 0, read);
-                }
-            } catch (IOException e) {
-                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, "Error reading administrative log file in ''{0}''", new File(getPath()));
-                SVNErrorManager.error(err, e);
-            } finally {
-                SVNFileUtil.closeFile(log);
-            }
-        }
-        SVNLogRunner runner = new SVNLogRunner(this);
-        SVNLogUtil.run(new ByteArrayInputStream(buffer.toByteArray()), runner);
-        
-        if (runner.isEntriesModified()) {
-            writeEntries();
-        }
-        // TODO handle killme.
-        while(count >= 0) {
-            String extension = count == 0 ? null : "." + count;
-            getAdminArea().getLayout().delete(this, null, SVNAdminLayout.FILE_LOG, extension, false);
-            count--;
-        }
+        getAdminArea().runLogs(this);
     }
     
     public void close() throws SVNException {

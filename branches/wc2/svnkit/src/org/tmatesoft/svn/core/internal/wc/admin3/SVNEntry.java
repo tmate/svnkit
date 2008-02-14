@@ -544,4 +544,25 @@ public class SVNEntry {
         }
         myPresentProperties = present.toString();
     }
+
+    public boolean isCachableProperty(String propertyName) {
+        return contains(myCachableProperties, propertyName);
+    }
+
+    public boolean isPresentProperty(String propertyName) {
+        return contains(myCachableProperties, propertyName);
+    }
+    
+    private static boolean contains(String properties, String name) {
+        if (properties == null) {
+            return false;
+        }
+        for(StringTokenizer props = new StringTokenizer(properties, " "); props.hasMoreTokens();) {
+            String propName = props.nextToken();
+            if (propName.equals(name)) {
+                return true;
+            }
+        }
+        return false;
+    }
 }

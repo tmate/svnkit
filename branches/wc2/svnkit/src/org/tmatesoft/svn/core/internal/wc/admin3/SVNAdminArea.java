@@ -11,10 +11,13 @@
  */
 package org.tmatesoft.svn.core.internal.wc.admin3;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.OutputStreamWriter;
 import java.util.Collections;
 import java.util.Map;
 
@@ -146,6 +149,25 @@ public class SVNAdminArea {
         }
     }
     
+    public void writeEntries(SVNWCAccess wcAccess, SVNEntry rootEntry, Map entriesMap) throws SVNException {
+        OutputStream os = null;
+        try {
+            os = getLayout().write(wcAccess, null, SVNAdminLayout.FILE_ENTRIES, null, true);
+            if (hasBinaryEntriesFile(wcAccess)) {
+                SVNEntriesUtil.writeEntries(os, wcAccess.getFormat(), rootEntry, entriesMap);
+            } else {
+                // TODO write XML entries
+            }
+            getLayout().close(wcAccess, null, SVNAdminLayout.FILE_ENTRIES, null, os, true);
+            os = null;
+        } catch (SVNException e) {
+            SVNErrorMessage err = e.getErrorMessage().wrap("Error writing to ''{0}''", new File(wcAccess.getPath()));
+            SVNErrorManager.error(err, e);
+        } finally {
+            SVNFileUtil.closeFile(os);
+        }
+    }
+    
     public Map readProperties(SVNWCAccess wcAccess, String path, SVNNodeKind kind, int propType, boolean tmp, Map map) throws SVNException {
         InputStream is = null;
         // TODO check for different formats, especially for wcprops.
@@ -233,10 +255,72 @@ public class SVNAdminArea {
             throw e;
         }
     }
-
-    // write entries.
     
-    protected SVNAdminLayout getLayout() {
+    public SVNLog createLog(SVNWCAccess wcAccess) {
+        return new SVNLog(wcAccess);
+    }
+    
+    public void writeLog(SVNWCAccess wcAccess, SVNLog log, int logNumber) throws SVNException {
+        OutputStream os = null;
+        String extension = logNumber > 0 ? "." + logNumber : null;
+        try {
+            os = getLayout().write(wcAccess, null, SVNAdminLayout.FILE_LOG, extension, true);
+            OutputStreamWriter writer = new OutputStreamWriter(os, "UTF-8");
+            writer.write(log.toString());
+            writer.flush();
+            getLayout().close(wcAccess, null, SVNAdminLayout.FILE_LOG, extension, os, true);
+            os = null;
+        } catch (IOException e) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR);
+            SVNErrorManager.error(err, e);
+        } finally {
+            SVNFileUtil.closeFile(os);
+        }
+    }
+    
+    public void runLogs(SVNWCAccess wcAccess) throws SVNException {
+        ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+        byte[] internalBuffer = new byte[8192];
+        
+        int count = 0;
+        for (count = 0; ; count++) {
+            String extension = count == 0 ? null : "." + count;
+            if (!getLayout().exists(wcAccess, null, SVNAdminLayout.FILE_LOG, extension, false)) {
+                break;
+            }
+            InputStream log = null;
+            try {
+                log = getLayout().read(wcAccess, null, SVNAdminLayout.FILE_LOG, extension, false);
+                while(true) {
+                    int read = log.read(internalBuffer);
+                    if (read <= 0) {
+                        break;
+                    }
+                    buffer.write(internalBuffer, 0, read);
+                }
+            } catch (IOException e) {
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, "Error reading administrative log file in ''{0}''", new File(wcAccess.getPath()));
+                SVNErrorManager.error(err, e);
+            } finally {
+                SVNFileUtil.closeFile(log);
+            }
+        }
+        
+        SVNLogRunner runner = new SVNLogRunner(wcAccess);
+        runner.run(new ByteArrayInputStream(buffer.toByteArray()));
+        
+        if (runner.isEntriesModified()) {
+            wcAccess.writeEntries();
+        }
+        // TODO handle killme.
+        while(count >= 0) {
+            String extension = count == 0 ? null : "." + count;
+            getLayout().delete(wcAccess, null, SVNAdminLayout.FILE_LOG, extension, false);
+            count--;
+        }
+    }
+    
+    private SVNAdminLayout getLayout() {
         return SVNAdminLayout.getInstance();
     }
 }
