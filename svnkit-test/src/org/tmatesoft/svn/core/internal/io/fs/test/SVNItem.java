@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2008 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -11,9 +11,10 @@
  */
 package org.tmatesoft.svn.core.internal.io.fs.test;
 
+import java.util.HashMap;
+import java.util.Map;
+
 import org.tmatesoft.svn.core.SVNNodeKind;
-import org.tmatesoft.svn.core.SVNProperties;
-import org.tmatesoft.svn.core.SVNPropertyValue;
 
 /**
  * @version 1.1.1
@@ -23,7 +24,7 @@ public class SVNItem {
 
     private String myRepositoryPath;
     private SVNNodeKind myKind;
-    private SVNProperties myProperties;
+    private Map myProperties;
     private String myChecksum;
     private int myNumberOfDeltaChunks;
 
@@ -49,26 +50,16 @@ public class SVNItem {
         myKind = kind;
     }
 
-    public SVNProperties getProperties() {
+    public Map getProperties() {
         return myProperties;
     }
 
-    public void changeProperty(String propName, SVNPropertyValue propVal) {
+    public void changeProperty(String propName, String propVal) {
         if (propVal == null) {
             return;
         }
         if (myProperties == null) {
-            myProperties = new SVNProperties();
-        }
-        myProperties.put(propName, propVal);
-    }
-
-     public void changeProperty(String propName, String propVal) {
-        if (propVal == null) {
-            return;
-        }
-        if (myProperties == null) {
-            myProperties = new SVNProperties();
+            myProperties = new HashMap();
         }
         myProperties.put(propName, propVal);
     }

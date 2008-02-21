@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2008 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -15,7 +15,6 @@ import java.io.OutputStream;
 
 import org.tmatesoft.svn.core.SVNCommitInfo;
 import org.tmatesoft.svn.core.SVNException;
-import org.tmatesoft.svn.core.SVNPropertyValue;
 import org.tmatesoft.svn.core.io.ISVNEditor;
 import org.tmatesoft.svn.core.io.diff.SVNDiffWindow;
 import org.tmatesoft.svn.core.wc.ISVNEventHandler;
@@ -88,9 +87,9 @@ public class SVNCancellableEditor implements ISVNEditor {
         myDelegate.openDir(path, revision);
     }
 
-    public void changeDirProperty(String name, SVNPropertyValue value) throws SVNException {
+    public void changeDirProperty(String name, String value) throws SVNException {
         myCancel.checkCancelled();
-        myLog.info("change dir prop " + name + " = " + SVNPropertyValue.getPropertyAsString(value));
+        myLog.info("change dir prop " + name + " = " + value);
         myDelegate.changeDirProperty(name, value);
     }
 
@@ -128,9 +127,9 @@ public class SVNCancellableEditor implements ISVNEditor {
         myDelegate.textDeltaEnd(path);
     }
 
-    public void changeFileProperty(String path, String name, SVNPropertyValue value) throws SVNException {
+    public void changeFileProperty(String path, String name, String value) throws SVNException {
         myCancel.checkCancelled();
-        myLog.info("change file prop " + name + " = " + SVNPropertyValue.getPropertyAsString(value));
+        myLog.info("change file prop " + name + " = " + value);
         myDelegate.changeFileProperty(path, name, value);
     }
 

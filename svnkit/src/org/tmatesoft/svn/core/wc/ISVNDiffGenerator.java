@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2008 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -16,7 +16,6 @@ import java.io.OutputStream;
 import java.util.Map;
 
 import org.tmatesoft.svn.core.SVNException;
-import org.tmatesoft.svn.core.SVNProperties;
 
 /**
  * The <b>ISVNDiffGenerator</b> should be implemented by drivers generating
@@ -83,10 +82,6 @@ public interface ISVNDiffGenerator {
      * @return the name of the charset being in use
      */
     public String getEncoding();
-
-    public void setEOL(byte[] eol);
-
-    public byte[] getEOL();
     
     /**
      * Enables or disables generating differences for deleted
@@ -223,7 +218,7 @@ public interface ISVNDiffGenerator {
      *                        the differences will be written to
      * @throws SVNException   if can not save diff data
      */
-    public void displayPropDiff(String path, SVNProperties baseProps, SVNProperties diff, OutputStream result) throws SVNException;
+    public void displayPropDiff(String path, Map baseProps, Map diff, OutputStream result) throws SVNException;
     
     /**
      * Generates and writes differences between two files to the specified 

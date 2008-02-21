@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2008 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -12,9 +12,10 @@
 
 package org.tmatesoft.svn.core.internal.io.dav;
 
+import java.util.HashMap;
+import java.util.Map;
+
 import org.tmatesoft.svn.core.SVNException;
-import org.tmatesoft.svn.core.SVNProperties;
-import org.tmatesoft.svn.core.SVNPropertyValue;
 import org.tmatesoft.svn.core.internal.util.SVNEncodingUtil;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
 import org.tmatesoft.svn.core.io.ISVNWorkspaceMediator;
@@ -34,7 +35,7 @@ class DAVResource {
     private boolean myIsCopy;
     
     private DAVConnection myConnection;
-    private SVNProperties myProperties;
+    private Map myProperties;
     private boolean myIsAdded;
 
     public DAVResource(ISVNWorkspaceMediator mediator, DAVConnection connection, String path, long revision) {
@@ -80,8 +81,7 @@ class DAVResource {
             return;
         }
         if (!force && myMediator != null) {
-            SVNPropertyValue value = myMediator.getWorkspaceProperty(SVNEncodingUtil.uriDecode(myPath), "svn:wc:ra_dav:version-url");
-            myVURL = value == null ? null : value.getString();
+            myVURL = myMediator.getWorkspaceProperty(SVNEncodingUtil.uriDecode(myPath), "svn:wc:ra_dav:version-url");
             if (myVURL != null) {
                 return;
             }
@@ -113,19 +113,12 @@ class DAVResource {
     
     public void putProperty(String name, String value) {
         if (myProperties == null) {
-            myProperties = new SVNProperties();
+            myProperties = new HashMap();
         }
         myProperties.put(name, value);       
     }
-
-    public void putProperty(String name, SVNPropertyValue value) {
-        if (myProperties == null) {
-            myProperties = new SVNProperties();
-        }
-        myProperties.put(name, value);
-    }
     
-    public SVNProperties getProperties() {
+    public Map getProperties() {
         return myProperties;
     }
     

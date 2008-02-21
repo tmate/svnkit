@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2008 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -12,132 +12,95 @@
 
 package org.tmatesoft.svn.core.internal.io.dav.handlers;
 
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
-import java.util.LinkedList;
 import java.util.Map;
 
 import org.tmatesoft.svn.core.SVNException;
-import org.tmatesoft.svn.core.SVNProperties;
-import org.tmatesoft.svn.core.SVNProperty;
-import org.tmatesoft.svn.core.SVNPropertyValue;
 import org.tmatesoft.svn.core.internal.io.dav.DAVElement;
 import org.tmatesoft.svn.core.internal.util.SVNBase64;
-import org.tmatesoft.svn.core.internal.util.SVNXMLUtil;
+import org.tmatesoft.svn.core.internal.util.SVNEncodingUtil;
 import org.xml.sax.Attributes;
 
 
 /**
- * @author TMate Software Ltd.
  * @version 1.1.1
+ * @author  TMate Software Ltd.
  */
 public class DAVProppatchHandler extends BasicDAVHandler {
-
-    private static final Collection NAMESPACES = new LinkedList();
-
-    static {
-        NAMESPACES.add(DAVElement.DAV_NAMESPACE);
-        NAMESPACES.add(DAVElement.SVN_DAV_PROPERTY_NAMESPACE);
-        NAMESPACES.add(DAVElement.SVN_SVN_PROPERTY_NAMESPACE);
-        NAMESPACES.add(DAVElement.SVN_CUSTOM_PROPERTY_NAMESPACE);
+    
+    public static StringBuffer generatePropertyRequest(StringBuffer buffer, String name, String value) {
+        Map map = new HashMap();
+        map.put(name, value);
+        return generatePropertyRequest(buffer, map);
     }
 
-    public static StringBuffer generatePropertyRequest(StringBuffer buffer, String name, SVNPropertyValue value) {
-        SVNProperties props = new SVNProperties();
-        props.put(name, value);
-        return generatePropertyRequest(buffer, props);
-    }
-
-    public static StringBuffer generatePropertyRequest(StringBuffer buffer, String name, byte[] value) {
-        SVNProperties props = new SVNProperties();
-        props.put(name, value);
-        return generatePropertyRequest(buffer, props);
-    }
-
-    public static StringBuffer generatePropertyRequest(StringBuffer xmlBuffer, SVNProperties properties) {
-        xmlBuffer = xmlBuffer == null ? new StringBuffer() : xmlBuffer;
-        SVNXMLUtil.addXMLHeader(xmlBuffer);
-        SVNXMLUtil.openNamespaceDeclarationTag(SVNXMLUtil.DAV_NAMESPACE_PREFIX, "propertyupdate", NAMESPACES,
-                SVNXMLUtil.PREFIX_MAP, xmlBuffer);
-
+    public static StringBuffer generatePropertyRequest(StringBuffer buffer, Map properties) {
+        buffer = buffer == null ? new StringBuffer() : buffer;
+        buffer.append("<?xml version=\"1.0\" encoding=\"utf-8\" ?>\n");
+        buffer.append("<D:propertyupdate xmlns:D=\"DAV:\" xmlns:V=\"");
+        buffer.append(DAVElement.SVN_DAV_PROPERTY_NAMESPACE);
+        buffer.append("\" xmlns:C=\"");
+        buffer.append(DAVElement.SVN_CUSTOM_PROPERTY_NAMESPACE);
+        buffer.append("\" xmlns:S=\"");
+        buffer.append(DAVElement.SVN_SVN_PROPERTY_NAMESPACE);
+        buffer.append("\" >\n");
+        
         // if there are non-null values
         if (hasNotNullValues(properties)) {
-            SVNXMLUtil.openXMLTag(SVNXMLUtil.DAV_NAMESPACE_PREFIX, "set", SVNXMLUtil.XML_STYLE_NORMAL, null,
-                    xmlBuffer);
-            SVNXMLUtil.openXMLTag(SVNXMLUtil.DAV_NAMESPACE_PREFIX, "prop", SVNXMLUtil.XML_STYLE_NORMAL, null,
-                    xmlBuffer);
-            for (Iterator names = properties.nameSet().iterator(); names.hasNext();) {
+            buffer.append("<D:set><D:prop>\n");
+            for(Iterator names = properties.keySet().iterator(); names.hasNext();) {
                 String name = (String) names.next();
-                SVNPropertyValue value = properties.getSVNPropertyValue(name);
+                String value = (String) properties.get(name);
                 if (value != null) {
-                    xmlBuffer = appendProperty(xmlBuffer, name, value);
+                    buffer = appendProperty(buffer, name, value);
                 }
             }
-            SVNXMLUtil.closeXMLTag(SVNXMLUtil.DAV_NAMESPACE_PREFIX, "prop", xmlBuffer);
-            SVNXMLUtil.closeXMLTag(SVNXMLUtil.DAV_NAMESPACE_PREFIX, "set", xmlBuffer);
+            buffer.append("\n</D:prop></D:set>");
         }
-
+        
         // if there are null values
         if (hasNullValues(properties)) {
-            SVNXMLUtil.openXMLTag(SVNXMLUtil.DAV_NAMESPACE_PREFIX, "remove", SVNXMLUtil.XML_STYLE_NORMAL, null,
-                    xmlBuffer);
-            SVNXMLUtil.openXMLTag(SVNXMLUtil.DAV_NAMESPACE_PREFIX, "prop", SVNXMLUtil.XML_STYLE_NORMAL, null,
-                    xmlBuffer);
-            for (Iterator names = properties.nameSet().iterator(); names.hasNext();) {
+            buffer.append("<D:remove><D:prop>\n");
+            for(Iterator names = properties.keySet().iterator(); names.hasNext();) {
                 String name = (String) names.next();
-                SVNPropertyValue value = properties.getSVNPropertyValue(name);
+                String value = (String) properties.get(name);
                 if (value == null) {
-                    xmlBuffer = appendProperty(xmlBuffer, name, value);
+                    buffer = appendProperty(buffer, name, value);
                 }
             }
-            SVNXMLUtil.closeXMLTag(SVNXMLUtil.DAV_NAMESPACE_PREFIX, "prop", xmlBuffer);
-            SVNXMLUtil.closeXMLTag(SVNXMLUtil.DAV_NAMESPACE_PREFIX, "remove", xmlBuffer);
+            buffer.append("\n</D:prop></D:remove>");
         }
-
-        SVNXMLUtil.addXMLFooter(SVNXMLUtil.DAV_NAMESPACE_PREFIX, "propertyupdate", xmlBuffer);
-        return xmlBuffer;
+        
+        buffer.append("\n</D:propertyupdate>");
+        return buffer;
     }
-
-    private static StringBuffer appendProperty(StringBuffer xmlBuffer, String name, SVNPropertyValue value) {
-        String prefix = SVNProperty.isSVNProperty(name) ? SVNXMLUtil.SVN_SVN_PROPERTY_PREFIX : SVNXMLUtil.SVN_CUSTOM_PROPERTY_PREFIX;
-        String tagName = SVNProperty.shortPropertyName(name);
-        Map attrs = null;
-        String str = null;
-        if (!value.isXMLSafe()) {
-            attrs = new HashMap(1);
-            String attrPrefix = (String) SVNXMLUtil.PREFIX_MAP.get(DAVElement.SVN_DAV_PROPERTY_NAMESPACE);
-            attrs.put(attrPrefix + ":encoding", "base64");            
-            str = SVNBase64.byteArrayToBase64(SVNPropertyValue.getPropertyAsBytes(value));
+    
+    private static StringBuffer appendProperty(StringBuffer buffer, String name, String value) {
+        buffer.append("<");
+        int index = buffer.length();
+        if (name.startsWith("svn:")) {
+            buffer.append("S:");
+            buffer.append(name.substring("svn:".length()));
         } else {
-            str = value.getString();
+            buffer.append("C:");
+            buffer.append(name);
         }
-        return SVNXMLUtil.openCDataTag(prefix, tagName, str, attrs, xmlBuffer);
-    }
-
-
-
-    private static boolean hasNullValues(SVNProperties props) {
-        if (props.isEmpty()) {
-            return false;
+        int index2 = buffer.length();
+        if (value == null) {
+            return buffer.append(" />");
         }
-        return props.containsValue(null);
-    }
-
-    private static boolean hasNotNullValues(SVNProperties props) {
-        if (props.isEmpty()) {
-            return false;
+        if (SVNEncodingUtil.isXMLSafe(value)) {
+            value = SVNEncodingUtil.xmlEncodeCDATA(value);            
+        } else {
+            value = SVNBase64.byteArrayToBase64(value.getBytes());
+            buffer.append(" V:encoding=\"base64\"");
         }
-        if (!hasNullValues(props)) {
-            return true;
-        }
-        for (Iterator entries = props.nameSet().iterator(); entries.hasNext();) {
-            String propName = (String) entries.next();
-            if (props.getSVNPropertyValue(propName) != null) {
-                return true;
-            }
-        }
-        return false;
+        buffer.append(">");
+        buffer.append(value);
+        buffer.append("</");
+        buffer.append(buffer.substring(index, index2));
+        return buffer.append(">");        
     }
 
     protected void startElement(DAVElement parent, DAVElement element, Attributes attrs) throws SVNException {
@@ -145,4 +108,28 @@ public class DAVProppatchHandler extends BasicDAVHandler {
 
     protected void endElement(DAVElement parent, DAVElement element, StringBuffer cdata) throws SVNException {
     }
+    
+    private static boolean hasNullValues(Map map) {
+        if (map.isEmpty()) {
+            return false;
+        }
+        return map.containsValue(null);
+    }
+
+    private static boolean hasNotNullValues(Map map) {
+        if (map.isEmpty()) {
+            return false;
+        }
+        if (!hasNullValues(map)) {
+            return true;
+        }        
+        for(Iterator entries = map.entrySet().iterator(); entries.hasNext();) {
+            Map.Entry entry = (Map.Entry) entries.next();
+            if (entry.getValue() != null) {
+                return true;
+            }
+        }
+        return false;
+    }
+
 }

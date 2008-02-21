@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2008 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -12,13 +12,12 @@
 
 package org.tmatesoft.svn.core.internal.io.svn;
 
+import org.tmatesoft.svn.core.auth.SVNPasswordAuthentication;
+
 import java.io.IOException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
-
-import org.tmatesoft.svn.core.auth.SVNPasswordAuthentication;
-import org.tmatesoft.svn.core.internal.util.SVNFormatUtil;
 
 /**
  * @version 1.1.1
@@ -57,7 +56,10 @@ public class CramMD5 {
         result = digest.digest();
         String hexDigest = "";
         for (int i = 0; i < result.length; i++) {
-            hexDigest += SVNFormatUtil.getHexNumberFromByte(result[i]);            
+            byte b = result[i];
+            int lo = b & 0xf;
+            int hi = (b >> 4) & 0xf;
+            hexDigest += Integer.toHexString(hi) + Integer.toHexString(lo);
         }
         String response = myCredentials.getUserName() + " " + hexDigest;
         response = response.getBytes("UTF-8").length + ":" + response + " ";

@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2008 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -40,7 +40,7 @@ public class SVNSSHConnector implements ISVNConnector {
 
     private static final String SVNSERVE_COMMAND = "svnserve -t";
     private static final String SVNSERVE_COMMAND_WITH_USER_NAME = "svnserve -t --tunnel-user ";
-
+    
     private Session mySession;
     private InputStream myInputStream;
     private OutputStream myOutputStream;
@@ -148,12 +148,14 @@ public class SVNSSHConnector implements ISVNConnector {
             SVNSSHSession.lock(Thread.currentThread());
             SVNDebugLog.getDefaultLog().info(Thread.currentThread() + ": ABOUT TO CLOSE SESSION IN : " + myConnection);
             try {
-                if (myConnection.closeSession(mySession)) {
-                    // no sessions left in connection, close it.
-                    // SVNSSHSession will make sure that connection is disposed if necessary.
-                    SVNDebugLog.getDefaultLog().info(Thread.currentThread() + ": ABOUT TO CLOSE CONNECTION: " + myConnection);
-                    SVNSSHSession.closeConnection(myConnection);
-                    myConnection = null;
+                if (myConnection != null) {
+                    if (myConnection.closeSession(mySession)) {
+                        // no sessions left in connection, close it.
+                        //  SVNSSHSession will make sure that connection is disposed if necessary.
+                        SVNDebugLog.getDefaultLog().info(Thread.currentThread() + ": ABOUT TO CLOSE CONNECTION: " + myConnection);
+                        SVNSSHSession.closeConnection(myConnection);
+                        myConnection = null;
+                    }
                 }
             } finally {
                 SVNSSHSession.unlock();

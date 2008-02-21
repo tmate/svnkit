@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2008 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -13,8 +13,8 @@ package org.tmatesoft.svn.core.internal.util;
 
 import java.io.ByteArrayOutputStream;
 import java.io.UnsupportedEncodingException;
-import java.util.HashMap;
 import java.util.Map;
+import java.util.HashMap;
 
 import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
@@ -300,16 +300,11 @@ public class SVNEncodingUtil {
         byte[] bytes = str.getBytes(); // native encoding
         StringBuffer result = createStringBuffer(str, 0);
         for (int i = 0; i < bytes.length; i++) {
-            if (!isASCIIControlChar((char) bytes[i]) || bytes[i] == '\r' 
-                || bytes[i] == '\n' || bytes[i] == '\t') {
+            if (bytes[i] >= 0) {
                 result.append((char) bytes[i]);
             } else {
                 result.append("?\\");
-                int code = bytes[i] & 0xFF;
-                if (code < 100) {
-                    result.append('0');
-                }
-                result.append(code);
+                result.append((256 - (-bytes[i]))); // get positive code (256 - b).
             }
         }
         return result.toString();

@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2008 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -10,8 +10,6 @@
  * ====================================================================
  */
 package org.tmatesoft.svn.core.internal.io.fs;
-
-import org.tmatesoft.svn.core.io.SVNRepository;
 
 /**
  * @version 1.1.1
@@ -48,7 +46,7 @@ public class FSRepresentation {
     }
 
     public FSRepresentation() {
-        myRevision = SVNRepository.INVALID_REVISION;
+        myRevision = FSRepository.SVN_INVALID_REVNUM;
         myOffset = -1;
         mySize = -1;
         myExpandedSize = -1;

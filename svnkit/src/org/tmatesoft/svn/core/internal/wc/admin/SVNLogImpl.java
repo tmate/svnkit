@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2008 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -11,6 +11,13 @@
  */
 package org.tmatesoft.svn.core.internal.wc.admin;
 
+import org.tmatesoft.svn.core.SVNErrorCode;
+import org.tmatesoft.svn.core.SVNErrorMessage;
+import org.tmatesoft.svn.core.SVNException;
+import org.tmatesoft.svn.core.internal.util.SVNEncodingUtil;
+import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
+import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
+
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
@@ -19,16 +26,9 @@ import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.Iterator;
-
-import org.tmatesoft.svn.core.SVNErrorCode;
-import org.tmatesoft.svn.core.SVNErrorMessage;
-import org.tmatesoft.svn.core.SVNException;
-import org.tmatesoft.svn.core.SVNProperties;
-import org.tmatesoft.svn.core.SVNPropertyValue;
-import org.tmatesoft.svn.core.internal.util.SVNEncodingUtil;
-import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
-import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
+import java.util.Map;
 
 
 /**
@@ -55,24 +55,21 @@ public class SVNLogImpl extends SVNLog {
         try {
             os = new OutputStreamWriter(SVNFileUtil.openFileForWriting(myTmpFile), "UTF-8");
             for (Iterator commands = myCache.iterator(); commands.hasNext();) {
-                SVNProperties command = (SVNProperties) commands.next();
-                SVNPropertyValue name = command.remove("");
+                Map command = (Map) commands.next();
+                String name = (String) command.remove("");
                 os.write("<");
-                os.write(name.getString());
-                for (Iterator attrs = command.nameSet().iterator(); attrs.hasNext();) {
+                os.write(name);
+                for (Iterator attrs = command.keySet().iterator(); attrs.hasNext();) {
                     String attr = (String) attrs.next();
-                    SVNPropertyValue value = command.getSVNPropertyValue(attr);
-                    String str = null;
+                    String value = (String) command.get(attr);
                     if (value == null) {
-                        str = "";
-                    } else {
-                        str = SVNPropertyValue.getPropertyAsString(value);
+                        value = "";
                     }
-                    str = SVNEncodingUtil.xmlEncodeAttr(str);
+                    value = SVNEncodingUtil.xmlEncodeAttr(value);
                     os.write("\n   ");
                     os.write(attr);
                     os.write("=\"");
-                    os.write(str);
+                    os.write(value);
                     os.write("\"");
                 }
                 os.write("/>\n");
@@ -97,7 +94,7 @@ public class SVNLogImpl extends SVNLog {
         try {
             reader = new BufferedReader(new InputStreamReader(SVNFileUtil.openFileForReading(myFile), "UTF-8"));
             String line;
-            SVNProperties attrs = new SVNProperties();
+            Map attrs = new HashMap();
             String name = null;
             while ((line = reader.readLine()) != null) {
                 line = line.trim();
@@ -128,7 +125,7 @@ public class SVNLogImpl extends SVNLog {
                     // run command
                     attrs.put("", name);
                     commands.add(attrs);
-                    attrs = new SVNProperties();
+                    attrs = new HashMap();
                     name = null;
                 }
             }

@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2008 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -16,19 +16,15 @@ import java.util.Collection;
 import java.util.Iterator;
 import java.util.TreeSet;
 
-import org.tmatesoft.svn.core.SVNDepth;
 import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
-import org.tmatesoft.svn.core.SVNNodeKind;
 import org.tmatesoft.svn.core.SVNURL;
-import org.tmatesoft.svn.core.io.SVNRepository;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.internal.wc.SVNEventFactory;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 import org.tmatesoft.svn.core.wc.ISVNEventHandler;
 import org.tmatesoft.svn.core.wc.SVNEvent;
-import org.tmatesoft.svn.core.wc.SVNEventAction;
 
 
 /**
@@ -37,13 +33,15 @@ import org.tmatesoft.svn.core.wc.SVNEventAction;
  */
 public abstract class SVNAdminAreaFactory implements Comparable {
     
+    public static final int WC_FORMAT_14 = SVNAdminArea14Factory.WC_FORMAT;
+    public static final int WC_FORMAT_13 = SVNXMLAdminAreaFactory.WC_FORMAT;
+    
     private static final Collection ourFactories = new TreeSet();
     private static boolean ourIsUpgradeEnabled = Boolean.valueOf(System.getProperty("svnkit.upgradeWC", System.getProperty("javasvn.upgradeWC", "true"))).booleanValue();
     private static ISVNAdminAreaFactorySelector ourSelector;
     private static ISVNAdminAreaFactorySelector ourDefaultSelector = new DefaultSelector();
     
     static {
-        SVNAdminAreaFactory.registerFactory(new SVNAdminArea15Factory());
         SVNAdminAreaFactory.registerFactory(new SVNAdminArea14Factory());
         SVNAdminAreaFactory.registerFactory(new SVNXMLAdminAreaFactory());
     }
@@ -142,7 +140,7 @@ public abstract class SVNAdminAreaFactory implements Comparable {
                 SVNAdminAreaFactory newestFactory = (SVNAdminAreaFactory) enabledFactories.iterator().next();
                 SVNAdminArea newArea = newestFactory.doUpgrade(area);
                 if (newArea != null && newArea != area && newArea.getWCAccess() != null) {
-                    SVNEvent event = SVNEventFactory.createSVNEvent(newArea.getRoot(), SVNNodeKind.DIR, null, SVNRepository.INVALID_REVISION, SVNEventAction.UPGRADE, null, null, null);
+                    SVNEvent event = SVNEventFactory.createUpgradeEvent(newArea);
                     newArea.getWCAccess().handleEvent(event, ISVNEventHandler.UNKNOWN);
                 }
                 area = newArea;
@@ -174,20 +172,20 @@ public abstract class SVNAdminAreaFactory implements Comparable {
         return -1;
     }
 
-    public static void createVersionedDirectory(File path, String url, String rootURL, String uuid, long revNumber, SVNDepth depth) throws SVNException {
+    public static void createVersionedDirectory(File path, String url, String rootURL, String uuid, long revNumber) throws SVNException {
         if (!ourFactories.isEmpty()) {
             if (!checkAdminAreaExists(path, url, revNumber)) {
                 Collection enabledFactories = getSelector().getEnabledFactories(path, ourFactories, true);
                 if (!enabledFactories.isEmpty()) {
                     SVNAdminAreaFactory newestFactory = (SVNAdminAreaFactory) enabledFactories.iterator().next();
-                    newestFactory.doCreateVersionedDirectory(path, url, rootURL, uuid, revNumber, depth);
+                    newestFactory.doCreateVersionedDirectory(path, url, rootURL, uuid, revNumber);
                 }
             }
         }
     }
 
-    public static void createVersionedDirectory(File path, SVNURL url, SVNURL rootURL, String uuid, long revNumber, SVNDepth depth) throws SVNException {
-        createVersionedDirectory(path, url != null ? url.toString() : null, rootURL != null ? rootURL.toString() : null, uuid, revNumber, depth);
+    public static void createVersionedDirectory(File path, SVNURL url, SVNURL rootURL, String uuid, long revNumber) throws SVNException {
+        createVersionedDirectory(path, url != null ? url.toString() : null, rootURL != null ? rootURL.toString() : null, uuid, revNumber);
     }
         
     private static boolean checkAdminAreaExists(File dir, String url, long revision) throws SVNException {
@@ -209,13 +207,12 @@ public abstract class SVNAdminAreaFactory implements Comparable {
         
         if (wcExists) {
             SVNWCAccess wcAccess = SVNWCAccess.newInstance(null);
-            SVNAdminArea adminArea = null;
-            SVNEntry entry = null;
-            try {
-                adminArea = wcAccess.open(dir, false, 0);
-                entry = adminArea.getVersionedEntry(adminArea.getThisDirName(), false);
-            } finally {
-                wcAccess.closeAdminArea(dir);
+            SVNAdminArea adminArea = wcAccess.open(dir, false, 0);
+            SVNEntry entry = adminArea.getEntry(adminArea.getThisDirName(), false);
+            wcAccess.closeAdminArea(dir);
+            if (entry == null) {
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_NOT_FOUND, "No entry for ''{0}''", dir);
+                SVNErrorManager.error(err);
             }
             if (!entry.isScheduledForDeletion()) {
                 if (entry.getRevision() != revision) {
@@ -239,8 +236,8 @@ public abstract class SVNAdminAreaFactory implements Comparable {
 
     protected abstract SVNAdminArea doUpgrade(SVNAdminArea area) throws SVNException;
 
-    protected abstract void doCreateVersionedDirectory(File path, String url, String rootURL, String uuid, long revNumber, SVNDepth depth) throws SVNException;
-
+    protected abstract void doCreateVersionedDirectory(File path, String url, String rootURL, String uuid, long revNumber) throws SVNException;
+    
     protected abstract int doCheckWC(File path) throws SVNException;
 
     protected static void registerFactory(SVNAdminAreaFactory factory) {

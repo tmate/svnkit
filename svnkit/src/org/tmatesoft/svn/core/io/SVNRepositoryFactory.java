@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2008 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -31,14 +31,13 @@ import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNRevisionProperty;
 import org.tmatesoft.svn.core.SVNURL;
-import org.tmatesoft.svn.core.internal.io.fs.FSFS;
+import org.tmatesoft.svn.core.internal.util.SVNTimeUtil;
 import org.tmatesoft.svn.core.internal.util.SVNUUIDGenerator;
-import org.tmatesoft.svn.core.internal.util.SVNDate;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.internal.wc.SVNFileListUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNFileType;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
-import org.tmatesoft.svn.core.internal.wc.SVNWCProperties;
+import org.tmatesoft.svn.core.internal.wc.SVNProperties;
 import org.tmatesoft.svn.core.internal.wc.admin.SVNTranslator;
 
 /**
@@ -298,10 +297,6 @@ public abstract class SVNRepositoryFactory {
      * @since                               1.1.1
      */
     public static SVNURL createLocalRepository(File path, String uuid, boolean enableRevisionProperties, boolean force, boolean pre14Compatible) throws SVNException {
-        return createLocalRepository(path, uuid, enableRevisionProperties, force, pre14Compatible, false);
-    }
-    
-    public static SVNURL createLocalRepository(File path, String uuid, boolean enableRevisionProperties, boolean force, boolean pre14Compatible, boolean pre15Compatible) throws SVNException {
         SVNFileType fType = SVNFileType.getType(path);
         if (fType != SVNFileType.NONE) {
             if (fType == SVNFileType.DIRECTORY) {
@@ -337,11 +332,9 @@ public abstract class SVNRepositoryFactory {
         OutputStream uuidOS = null; 
         OutputStream reposFormatOS = null;
         OutputStream fsFormatOS = null;
-        OutputStream txnCurrentOS = null;
         try {
             copyToFile(is, jarFile);
             extract(jarFile, path);
-            SVNFileUtil.deleteFile(jarFile);
             // translate eols.
             if (!SVNFileUtil.isWindows) {
                 translateFiles(path);
@@ -385,94 +378,36 @@ public abstract class SVNRepositoryFactory {
                 SVNErrorManager.error(err);
             }
             
-            int fsFormat = FSFS.DB_FORMAT;
             if (pre14Compatible) {
                 File reposFormatFile = new File(path, "format");
                 try {
                     reposFormatOS = SVNFileUtil.openFileForWriting(reposFormatFile);
-                    String format = String.valueOf(FSFS.REPOSITORY_FORMAT_LEGACY);
-                    format += '\n';
-                    reposFormatOS.write(format.getBytes("US-ASCII"));
+                    reposFormatOS.write("3\n".getBytes("US-ASCII"));
                 } catch (IOException e) {
                     SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, "Error writing repository format to ''{0}''", reposFormatFile);
                     err.setChildErrorMessage(SVNErrorMessage.create(SVNErrorCode.IO_ERROR, e.getLocalizedMessage()));
                     SVNErrorManager.error(err);
                 }
-            }
                 
-            if (pre14Compatible || pre15Compatible) {
-                fsFormat = pre14Compatible ? 1 : 2; 
                 File fsFormatFile = new File(path, "db/format");
                 try {
                     fsFormatOS = SVNFileUtil.openFileForWriting(fsFormatFile);
-                    String format = String.valueOf(fsFormat);
-                    format += '\n';
-                    fsFormatOS.write(format.getBytes("US-ASCII"));
+                    fsFormatOS.write("1\n".getBytes("US-ASCII"));
                 } catch (IOException e) {
                     SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, "Error writing fs format to ''{0}''", fsFormatFile);
                     err.setChildErrorMessage(SVNErrorMessage.create(SVNErrorCode.IO_ERROR, e.getLocalizedMessage()));
                     SVNErrorManager.error(err);
                 }
             }
-            
-            long maxFilesPerDir = 0;
-            if (fsFormat >= FSFS.LAYOUT_FORMAT_OPTION_MINIMAL_FORMAT) {
-                maxFilesPerDir = FSFS.getDefaultMaxFilesPerDirectory();
-                File fsFormatFile = new File(path, "db/format");
-                try {
-                    fsFormatOS = SVNFileUtil.openFileForWriting(fsFormatFile);
-                    String format = String.valueOf(fsFormat) + "\n";
-                    if (maxFilesPerDir > 0) {
-                        File revFileBefore = new File(path, "db/revs/0");
-                        File tmpFile = SVNFileUtil.createUniqueFile(new File(path, "db/revs"), "0", "tmp");
-                        SVNFileUtil.rename(revFileBefore, tmpFile);
-                        File shardRevDir = new File(path, "db/revs/0");
-                        shardRevDir.mkdirs();
-                        File revFileAfter = new File(shardRevDir, "0");
-                        SVNFileUtil.rename(tmpFile, revFileAfter);
-
-                        File revPropFileBefore = new File(path, "db/revprops/0");
-                        tmpFile = SVNFileUtil.createUniqueFile(new File(path, "db/revprops"), "0", "tmp");
-                        SVNFileUtil.rename(revPropFileBefore, tmpFile);
-                        File shardRevPropDir = new File(path, "db/revprops/0");
-                        shardRevPropDir.mkdirs();
-                        File revPropFileAfter = new File(shardRevPropDir, "0");
-                        SVNFileUtil.rename(tmpFile, revPropFileAfter);
-
-                        format += "layout sharded " + String.valueOf(maxFilesPerDir) + "\n";
-                    } else {
-                        format += "layout linear\n";
-                    }
-                    fsFormatOS.write(format.getBytes("US-ASCII"));
-                } catch (IOException e) {
-                    SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, "Error writing fs format to ''{0}''", fsFormatFile);
-                    err.setChildErrorMessage(SVNErrorMessage.create(SVNErrorCode.IO_ERROR, e.getLocalizedMessage()));
-                    SVNErrorManager.error(err);
-                }
-            }
-            
-            if (fsFormat >= FSFS.MIN_CURRENT_TXN_FORMAT) {
-                File txnCurrentFile = new File(path, "db/" + FSFS.TXN_CURRENT_FILE);
-                SVNFileUtil.createEmptyFile(txnCurrentFile);
-                txnCurrentOS = SVNFileUtil.openFileForWriting(txnCurrentFile);
-                try {
-                    txnCurrentOS.write("0\n".getBytes("US-ASCII"));
-                } catch (IOException e) {
-                    SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, e.getLocalizedMessage());
-                    SVNErrorManager.error(err);
-                }
-            }
-
             // set creation date.
-            File rev0File = new File(path, maxFilesPerDir > 0 ? "db/revprops/0/0" : "db/revprops/0");
-            SVNWCProperties props = new SVNWCProperties(rev0File, null);
-            String date = SVNDate.formatDate(new Date(System.currentTimeMillis()), true);
+            File rev0File = new File(path, "db/revprops/0");
+            SVNProperties props = new SVNProperties(rev0File, null);
+            String date = SVNTimeUtil.formatDate(new Date(System.currentTimeMillis()), true);
             props.setPropertyValue(SVNRevisionProperty.DATE, date);
         } finally {
             SVNFileUtil.closeFile(uuidOS);
             SVNFileUtil.closeFile(reposFormatOS);
             SVNFileUtil.closeFile(fsFormatOS);
-            SVNFileUtil.closeFile(txnCurrentOS);
             SVNFileUtil.deleteFile(jarFile);
         }
         return SVNURL.fromFile(path);
@@ -566,7 +501,7 @@ public abstract class SVNRepositoryFactory {
             if (child.isFile()) {
                 try {
                     tmpChild = SVNFileUtil.createUniqueFile(directory, ".repos", ".tmp");
-                    SVNTranslator.translate(child, tmpChild, null, eol, null, false, true);
+                        SVNTranslator.translate(child, tmpChild, eol, null, false, true);
                     SVNFileUtil.deleteFile(child);
                     SVNFileUtil.rename(tmpChild, child);
                 } finally {

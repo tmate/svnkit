@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2008 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -15,12 +15,11 @@ import java.io.File;
 import java.io.InputStream;
 import java.io.PrintStream;
 import java.util.Iterator;
+import java.util.Map;
 
 import org.tmatesoft.svn.cli.SVNArgument;
 import org.tmatesoft.svn.cli.SVNCommand;
 import org.tmatesoft.svn.core.SVNException;
-import org.tmatesoft.svn.core.SVNProperties;
-import org.tmatesoft.svn.core.SVNPropertyValue;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
 import org.tmatesoft.svn.core.wc.SVNRevision;
 import org.tmatesoft.svn.core.wc.admin.SVNLookClient;
@@ -47,12 +46,11 @@ public class SVNLookProplistCommand extends SVNCommand {
         
         if (getCommandLine().hasArgument(SVNArgument.TRANSACTION)) {
             String transactionName = (String) getCommandLine().getArgumentValue(SVNArgument.TRANSACTION);
-            SVNProperties props = null;
+            Map props = null;
             if (isRevProp) {
                 props = lookClient.doGetRevisionProperties(reposRoot, transactionName);
             } else {
-                String path = getCommandLine().getPathCount() < 2 ? null : SVNPathUtil.canonicalizePath(getCommandLine().getPathAt(2));
-                path = SVNPathUtil.getAbsolutePath(path);
+                String path = getCommandLine().getPathCount() < 2 ? null : SVNPathUtil.canonicalizeAbsPath(getCommandLine().getPathAt(2));
                 props = lookClient.doGetProperties(reposRoot, path, transactionName);
             }
             printProps(out, props, isVerbose);
@@ -61,12 +59,11 @@ public class SVNLookProplistCommand extends SVNCommand {
             revision = SVNRevision.parse((String) getCommandLine().getArgumentValue(SVNArgument.REVISION));
         } 
 
-        SVNProperties props = null;
+        Map props = null;
         if (isRevProp) {
             props = lookClient.doGetRevisionProperties(reposRoot, revision);
         } else {
-            String path = getCommandLine().getPathCount() < 2 ? null : SVNPathUtil.canonicalizePath(getCommandLine().getPathAt(2));
-            path = SVNPathUtil.getAbsolutePath(path);
+            String path = getCommandLine().getPathCount() < 2 ? null : SVNPathUtil.canonicalizeAbsPath(getCommandLine().getPathAt(2));
             props = lookClient.doGetProperties(reposRoot, path, revision);
         }
         printProps(out, props, isVerbose);
@@ -76,12 +73,12 @@ public class SVNLookProplistCommand extends SVNCommand {
         run(out, err);
     }
     
-    public void printProps(PrintStream out, SVNProperties props, boolean isVerbose) {
+    public void printProps(PrintStream out, Map props, boolean isVerbose) {
         if (props != null) {
-            for (Iterator propNames = props.nameSet().iterator(); propNames.hasNext(); ) {
+            for (Iterator propNames = props.keySet().iterator(); propNames.hasNext(); ) {
                 String propName = (String) propNames.next();
                 if (isVerbose) {
-                    SVNPropertyValue propVal = props.getSVNPropertyValue(propName);
+                    String propVal = (String) props.get(propName);
                     SVNCommand.println(out, "  " + propName + " : " + propVal);    
                 } else {
                     SVNCommand.println(out, "  " + propName);    

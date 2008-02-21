@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2008 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -21,11 +21,11 @@ import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNLock;
-import org.tmatesoft.svn.core.SVNPropertyValue;
 import org.tmatesoft.svn.core.SVNRevisionProperty;
 import org.tmatesoft.svn.core.SVNURL;
 import org.tmatesoft.svn.core.internal.io.fs.FSRepository;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
+import org.tmatesoft.svn.core.internal.wc.admin.SVNTranslator;
 import org.tmatesoft.svn.core.io.SVNRepository;
 import org.tmatesoft.svn.core.io.SVNRepositoryFactory;
 import org.tmatesoft.svn.core.javahl.SVNClientImpl;
@@ -46,8 +46,6 @@ public class SVNAdmin {
     protected long cppAddr;
     private SVNClientImpl myDelegate;
     private SVNAdminClient mySVNAdminClient;
-
-    private static final byte[] NATIVE_EOL = System.getProperty("line.separator").getBytes();
 
     /**
      * Filesystem in a Berkeley DB
@@ -132,7 +130,7 @@ public class SVNAdmin {
                     if (errorOut != null && event.getAction() == SVNAdminEventAction.REVISION_DUMPED) {
                         try {
                             errorOut.write(event.getMessage().getBytes());
-                            errorOut.write(NATIVE_EOL);
+                            errorOut.write(SVNTranslator.NATIVE);
                         } catch (IOException e) {
                         }
                     }
@@ -143,7 +141,7 @@ public class SVNAdmin {
             try {
                 if (errorOut != null) {
                     errorOut.write(e.getErrorMessage().getFullMessage().getBytes("UTF-8"));
-                    errorOut.write(NATIVE_EOL);
+                    errorOut.write(SVNTranslator.NATIVE);
                 }
             } catch (IOException e1) {
                 //
@@ -236,16 +234,16 @@ public class SVNAdmin {
                     StringBuffer message = new StringBuffer();
                     if (event.getAction() != SVNAdminEventAction.REVISION_LOAD && myIsNodeOpened) {
                         message.append(" done.");
-                        message.append(NATIVE_EOL);
+                        message.append(SVNTranslator.NATIVE);
                         myIsNodeOpened = false;
                     }
                     if (event.getAction() == SVNAdminEventAction.REVISION_LOADED) {
-                        message.append(NATIVE_EOL);
+                        message.append(SVNTranslator.NATIVE);
                     }
                     message.append(event.getMessage());
-                    message.append(NATIVE_EOL);
+                    message.append(SVNTranslator.NATIVE);
                     if (event.getAction() == SVNAdminEventAction.REVISION_LOADED) {
-                        message.append(NATIVE_EOL);
+                        message.append(SVNTranslator.NATIVE);
                     }
                     myIsNodeOpened = event.getAction() != SVNAdminEventAction.REVISION_LOAD;
                     return message.toString();
@@ -256,7 +254,7 @@ public class SVNAdmin {
             if (messageOutput != null) {
                 try {
                     messageOutput.write(e.getErrorMessage().getFullMessage().getBytes("UTF-8"));
-                    messageOutput.write(NATIVE_EOL);
+                    messageOutput.write(SVNTranslator.NATIVE);
                 } catch (IOException e1) {
                 }
             }
@@ -326,7 +324,7 @@ public class SVNAdmin {
     public void setLog(String path, Revision rev, String message, boolean bypassHooks) throws ClientException {
         try {
             SVNRepository repository = SVNRepositoryFactory.create(SVNURL.fromFile(new File(path).getAbsoluteFile()));
-            ((FSRepository) repository).setRevisionPropertyValue(JavaHLObjectFactory.getSVNRevision(rev).getNumber(), SVNRevisionProperty.LOG, SVNPropertyValue.create(message), bypassHooks);
+            ((FSRepository) repository).setRevisionPropertyValue(JavaHLObjectFactory.getSVNRevision(rev).getNumber(), SVNRevisionProperty.LOG, message, bypassHooks);
         } catch (SVNException e) {
             JavaHLObjectFactory.throwException(e, myDelegate);
         } 
@@ -347,7 +345,7 @@ public class SVNAdmin {
                     if (messageOut != null && event.getAction() == SVNAdminEventAction.REVISION_DUMPED) {
                         try {
                             messageOut.write(event.getMessage().getBytes());
-                            messageOut.write(NATIVE_EOL);
+                            messageOut.write(SVNTranslator.NATIVE);
                         } catch (IOException e) {
                         }
                     }
@@ -358,7 +356,7 @@ public class SVNAdmin {
             try {
                 if (messageOut != null) {
                     messageOut.write(e.getErrorMessage().getFullMessage().getBytes("UTF-8"));
-                    messageOut.write(NATIVE_EOL);
+                    messageOut.write(SVNTranslator.NATIVE);
                 }
             } catch (IOException e1) {
                 //

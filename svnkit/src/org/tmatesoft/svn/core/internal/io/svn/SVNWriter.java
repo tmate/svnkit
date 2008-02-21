@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2008 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -22,7 +22,7 @@ import java.util.Map;
 import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
-import org.tmatesoft.svn.core.internal.util.SVNDate;
+import org.tmatesoft.svn.core.internal.util.SVNTimeUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 
 /**
@@ -51,15 +51,13 @@ public class SVNWriter {
                     os.write(' ');
                     continue;
                 }
+
                 Object item = src[offset++];
                 if (item == null) {
-                    if (ch == '*' || ch == '?') {
-                        i++;
-                    }
                     continue;
                 }
                 if (item instanceof Date) {
-                    item = SVNDate.formatDate((Date) item, true);
+                    item = SVNTimeUtil.formatDate((Date) item, true);
                 }
                 if (ch == 'i') {
 
@@ -119,16 +117,21 @@ public class SVNWriter {
                         }
                     } else if (item instanceof Map && ch == 'l') {
                         Map map = (Map) item;
-                        for (Iterator paths = map.keySet().iterator(); paths.hasNext();) {
+                        for (Iterator paths = map.keySet().iterator(); paths
+                                .hasNext();) {
                             String path = (String) paths.next();
                             String token = (String) map.get(path);
                             os.write('(');
                             os.write(' ');
-                            os.write(Integer.toString(path.getBytes("UTF-8").length).getBytes("UTF-8"));
+                            os.write(Integer.toString(
+                                    path.getBytes("UTF-8").length).getBytes(
+                                    "UTF-8"));
                             os.write(':');
                             os.write(path.getBytes("UTF-8"));
                             os.write(' ');
-                            os.write(Integer.toString(token.getBytes("UTF-8").length).getBytes("UTF-8"));
+                            os.write(Integer.toString(
+                                    token.getBytes("UTF-8").length).getBytes(
+                                    "UTF-8"));
                             os.write(':');
                             os.write(token.getBytes("UTF-8"));
                             os.write(' ');

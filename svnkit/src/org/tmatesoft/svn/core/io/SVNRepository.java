@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2008 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -12,36 +12,25 @@
 package org.tmatesoft.svn.core.io;
 
 import java.io.OutputStream;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
-import java.util.List;
 import java.util.Map;
 
 import org.tmatesoft.svn.core.ISVNCanceller;
 import org.tmatesoft.svn.core.ISVNDirEntryHandler;
 import org.tmatesoft.svn.core.ISVNLogEntryHandler;
-import org.tmatesoft.svn.core.SVNDepth;
 import org.tmatesoft.svn.core.SVNDirEntry;
 import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNLock;
 import org.tmatesoft.svn.core.SVNLogEntry;
-import org.tmatesoft.svn.core.SVNMergeInfoInheritance;
 import org.tmatesoft.svn.core.SVNNodeKind;
-import org.tmatesoft.svn.core.SVNProperty;
-import org.tmatesoft.svn.core.SVNRevisionProperty;
 import org.tmatesoft.svn.core.SVNURL;
-import org.tmatesoft.svn.core.SVNProperties;
-import org.tmatesoft.svn.core.SVNPropertyValue;
 import org.tmatesoft.svn.core.auth.ISVNAuthenticationManager;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
@@ -138,7 +127,6 @@ import org.tmatesoft.svn.util.SVNDebugLog;
  * @see         <a target="_top" href="http://svnkit.com/kb/examples/">Examples</a>
  */
 public abstract class SVNRepository {
-    public static final long INVALID_REVISION = -1;
         
     protected String myRepositoryUUID;
     protected SVNURL myRepositoryRoot;
@@ -451,7 +439,7 @@ public abstract class SVNRepository {
      *                      </ul>
      * @see                 org.tmatesoft.svn.core.SVNRevisionProperty
      */
-    public abstract SVNProperties getRevisionProperties(long revision, SVNProperties properties) throws SVNException;
+    public abstract Map getRevisionProperties(long revision, Map properties) throws SVNException;
     
     /**
      * Sets a revision property with the specified name to a new value. 
@@ -477,8 +465,8 @@ public abstract class SVNRepository {
      *                          </ul>
      * @see                     org.tmatesoft.svn.core.SVNRevisionProperty
      */
-
-    public abstract void setRevisionPropertyValue(long revision, String propertyName, SVNPropertyValue propertyValue) throws SVNException;
+    public abstract void setRevisionPropertyValue(long revision, String propertyName, String propertyValue) throws SVNException;
+    
     /**
      * Gets the value of an unversioned property. 
      * 
@@ -496,13 +484,7 @@ public abstract class SVNRepository {
      *                          (see {@link org.tmatesoft.svn.core.SVNAuthenticationException})
      *                          </ul>
      */
-
-    public String getRevisionStringPropertyValue(long revision, String propertyName) throws SVNException {
-        SVNPropertyValue value = getRevisionPropertyValue(revision, propertyName);
-        return value != null ? value.getString() : null;
-    }
-
-    public abstract SVNPropertyValue getRevisionPropertyValue(long revision, String propertyName) throws SVNException;
+    public abstract String getRevisionPropertyValue(long revision, String propertyName) throws SVNException;
     
     /**
 	 * Returns the kind of an item located at the specified path in
@@ -559,7 +541,7 @@ public abstract class SVNRepository {
      *                          (see {@link org.tmatesoft.svn.core.SVNAuthenticationException})
      *                          </ul>
      */
-    public abstract long getFile(String path, long revision, SVNProperties properties, OutputStream contents) throws SVNException; 
+    public abstract long getFile(String path, long revision, Map properties, OutputStream contents) throws SVNException; 
 
     /**
      * Fetches the contents and/or properties of a directory located at the specified path
@@ -604,9 +586,7 @@ public abstract class SVNRepository {
      * @see                 #getDir(String, long, boolean, Collection)
      * @see                 org.tmatesoft.svn.core.SVNDirEntry
      */
-    public abstract long getDir(String path, long revision, SVNProperties properties, ISVNDirEntryHandler handler) throws SVNException;
-
-    public abstract long getDir(String path, long revision, SVNProperties properties, int entryFields, ISVNDirEntryHandler handler) throws SVNException; 
+    public abstract long getDir(String path, long revision, Map properties, ISVNDirEntryHandler handler) throws SVNException; 
 
     /**
      * Retrieves interesting file revisions for the specified file. 
@@ -651,10 +631,7 @@ public abstract class SVNRepository {
 	 * @since					SVN 1.1
 	 */    
     public abstract int getFileRevisions(String path, long startRevision, long endRevision, ISVNFileRevisionHandler handler) throws SVNException;
-
-    public abstract int getFileRevisions(String path, long startRevision, long endRevision, 
-                                         boolean includeMergedRevisions, ISVNFileRevisionHandler handler) throws SVNException;
-
+    
     /**
 	 * Traverses revisions history. In other words, collects per revision
      * information that includes the revision number, author, datestamp, 
@@ -748,7 +725,7 @@ public abstract class SVNRepository {
      * If <code>targetPaths</code> has one or more elements, then
      * only those revisions are processed in which at least one of <code>targetPaths</code> was
      * changed (i.e., if a file text or properties changed; if dir properties
-     * changed or an entry was added or deleted). Each path can be either absolute or relative 
+     * changed or an entry was added or deleted). Each path is relative 
      * to the repository location that this object is set to.
      * 
      * <p>
@@ -797,15 +774,9 @@ public abstract class SVNRepository {
      * @see                     org.tmatesoft.svn.core.SVNLogEntry
      * @see                     org.tmatesoft.svn.core.SVNLogEntryPath
      */
-    public long log(String[] targetPaths, long startRevision, long endRevision, boolean changedPath, boolean strictNode, long limit,
-            ISVNLogEntryHandler handler) throws SVNException {
-        return log(targetPaths, startRevision, endRevision, changedPath, strictNode, limit, false, null, handler);
-    }
+    public abstract long log(String[] targetPaths, long startRevision, long endRevision, boolean changedPath, boolean strictNode, long limit,
+            ISVNLogEntryHandler handler) throws SVNException;
     
-    public abstract long log(String[] targetPaths, long startRevision, long endRevision, 
-            boolean changedPath, boolean strictNode, long limit, boolean includeMergedRevisions, 
-            String[] revisionProperties, ISVNLogEntryHandler handler) throws SVNException;
-
     /**
 	 * Gets entry locations in time. The location of an entry in a repository
      * may change from revision to revision. This method allows to trace entry locations 
@@ -854,48 +825,7 @@ public abstract class SVNRepository {
      * @since               SVN 1.1
      */
     public abstract int getLocations(String path, long pegRevision, long[] revisions, ISVNLocationEntryHandler handler) throws SVNException;
-
-    /**
-     * @since 1.2, SVN 1.5
-     */
-    public abstract long getLocationSegments(String path, long pegRevision, long startRevision, long endRevision, 
-            ISVNLocationSegmentHandler handler) throws SVNException;
-
-    public Collection getLocationSegments(String path, long pegRevision, long startRevision, 
-            long endRevision) throws SVNException {
-        
-        final List result = new LinkedList();
-        getLocationSegments(path, pegRevision, startRevision, endRevision, new ISVNLocationSegmentHandler() {
-            public void handleLocationSegment(SVNLocationSegment locationSegment) throws SVNException {
-                result.add(locationSegment);
-                getCanceller().checkCancelled();
-            }
-        });
-        
-        Collections.sort(result, new Comparator() {
-            public int compare(Object o1, Object o2) {
-                if (o1 == o2) {
-                    return 0;
-                } else if (o1 == null) {
-                    return -1;
-                } else if (o2 == null) {
-                    return 1;
-                } else if (o1.getClass() != SVNLocationSegment.class || 
-                        o2.getClass() != SVNLocationSegment.class) {
-                    return o1.getClass() == o2.getClass() ? 0 : o1.getClass() == SVNLocationSegment.class ? 1 : -1;
-                }
-                SVNLocationSegment segment1 = (SVNLocationSegment) o1;
-                SVNLocationSegment segment2 = (SVNLocationSegment) o2;
-                if (segment1.getStartRevision() == segment2.getStartRevision()) {
-                    return 0;
-                }
-                return segment1.getStartRevision() < segment2.getStartRevision() ? -1 : 1;
-            }
-        });
-        
-        return result; 
-    }
-
+    
     /**
      * Retrieves and returns interesting file revisions for the specified file. 
      * 
@@ -975,11 +905,7 @@ public abstract class SVNRepository {
      * @see                 #getDir(String, long, boolean, Collection)
      * @see                 org.tmatesoft.svn.core.SVNDirEntry
      */
-    public Collection getDir(String path, long revision, SVNProperties properties, Collection dirEntries) throws SVNException {
-        return getDir(path, revision, properties, SVNDirEntry.DIRENT_ALL, dirEntries);
-    }
-
-    public Collection getDir(String path, long revision, SVNProperties properties, int entryFields, Collection dirEntries) throws SVNException {
+    public Collection getDir(String path, long revision, Map properties, Collection dirEntries) throws SVNException {
         final Collection result = dirEntries != null ? dirEntries : new LinkedList();
         ISVNDirEntryHandler handler;
         handler = new ISVNDirEntryHandler() {
@@ -987,7 +913,7 @@ public abstract class SVNRepository {
                 result.add(dirEntry);
             }
         };
-        getDir(path, revision, properties, entryFields, handler);
+        getDir(path, revision, properties, handler);
         return result;
     }
     
@@ -1257,7 +1183,7 @@ public abstract class SVNRepository {
      *                          ignored, otherwise not 
      * @param  recursive        if <span class="javakeyword">true</span> and the diff scope
      *                          is a directory, descends recursively, otherwise not 
-     * @param  getContents      if <span class="javakeyword">false</span> contents (diff windows) will not be sent to 
+     * @param  getContents      if <span class="javakeyword">false</span> contents (diff windows) will not be sent ot 
      *                          the editor. 
      * @param  reporter 		a caller's reporter
      * @param  editor 			a caller's editor
@@ -1273,18 +1199,12 @@ public abstract class SVNRepository {
      * @see 					ISVNReporter
      * @see 					ISVNEditor
 	 */
-    public void diff(SVNURL url, long targetRevision, long revision, String target, boolean ignoreAncestry, boolean recursive, boolean getContents, ISVNReporterBaton reporter, ISVNEditor editor) throws SVNException {
-        diff(url, targetRevision, revision, target, ignoreAncestry, SVNDepth.fromRecurse(recursive), getContents, reporter, editor);
-    }
-
-    public abstract void diff(SVNURL url, long targetRevision, long revision, String target, boolean ignoreAncestry, SVNDepth depth, boolean getContents, ISVNReporterBaton reporter, ISVNEditor editor) throws SVNException;
+    public abstract void diff(SVNURL url, long targetRevision, long revision, String target, boolean ignoreAncestry, boolean recursive, boolean getContents, ISVNReporterBaton reporter, ISVNEditor editor) throws SVNException;
 
     /**
      * @deprecated
      */
-    public void diff(SVNURL url, long targetRevision, long revision, String target, boolean ignoreAncestry, boolean recursive, ISVNReporterBaton reporter, ISVNEditor editor) throws SVNException {
-        diff(url, targetRevision, revision, target, ignoreAncestry, recursive, true, reporter, editor);
-    }
+    public abstract void diff(SVNURL url, long targetRevision, long revision, String target, boolean ignoreAncestry, boolean recursive, ISVNReporterBaton reporter, ISVNEditor editor) throws SVNException;
 
     
     /**
@@ -1355,47 +1275,7 @@ public abstract class SVNRepository {
      * @see                     ISVNReporter
      * @see                     ISVNEditor
      */
-    public void diff(SVNURL url, long revision, String target, boolean ignoreAncestry, boolean recursive, ISVNReporterBaton reporter, ISVNEditor editor) throws SVNException {
-        diff(url, revision, revision, target, ignoreAncestry, recursive, reporter, editor);
-    }
-    
-    /**
-     * Updates a path switching it to a new repository location.  
-     * 
-     * <p>
-     * Updates a path as it's described for the {@link #update(long, String, boolean, ISVNReporterBaton, ISVNEditor) update()}
-     * method using the provided <code>reporter</code> and <code>editor</code>, and switching
-     * it to a new repository location. 
-     * 
-     * <p>
-     * <b>NOTE:</b> you may not invoke methods of this <b>SVNRepository</b>
-     * object from within the provided <code>reporter</code> and <code>editor</code>.
-     * 
-     * @param  url              a new location in the repository to switch to
-     * @param  revision         a desired revision to make update to; defaults
-     *                          to the latest revision (HEAD)
-     * @param  target           an entry name (optional)  
-     * @param  recursive        if <span class="javakeyword">true</span> and the switch scope
-     *                          is a directory, descends recursively, otherwise not 
-     * @param  reporter         a caller's reporter
-     * @param  editor           a caller's editor
-     * @throws SVNException     in the following cases:
-     *                          <ul>
-     *                          <li>a failure occured while connecting to a repository 
-     *                          <li>the user authentication failed 
-     *                          (see {@link org.tmatesoft.svn.core.SVNAuthenticationException})
-     *                          </ul>
-     * @see                     #update(long, String, boolean, ISVNReporterBaton, ISVNEditor)
-     * @see                     ISVNReporterBaton
-     * @see                     ISVNReporter
-     * @see                     ISVNEditor
-     * @see                     <a href="http://svnkit.com/kb/dev-guide-update-operation.html">Using ISVNReporter/ISVNEditor in update-related operations</a>
-     */
-    public void update(SVNURL url, long revision, String target, boolean recursive, ISVNReporterBaton reporter, ISVNEditor editor) throws SVNException {
-        update(url, revision, target, SVNDepth.fromRecurse(recursive), reporter, editor);
-    }
-
-    public abstract void update(SVNURL url, long revision, String target, SVNDepth depth, ISVNReporterBaton reporter, ISVNEditor editor) throws SVNException;
+    public abstract void diff(SVNURL url, long revision, String target, boolean ignoreAncestry, boolean recursive, ISVNReporterBaton reporter, ISVNEditor editor) throws SVNException;
     
     /**
      * Updates a path receiving changes from a repository.
@@ -1448,12 +1328,7 @@ public abstract class SVNRepository {
      * @see 					ISVNEditor
      * @see                     <a href="http://svnkit.com/kb/dev-guide-update-operation.html">Using ISVNReporter/ISVNEditor in update-related operations</a>
      */
-    public void update(long revision, String target, boolean recursive, ISVNReporterBaton reporter, ISVNEditor editor) throws SVNException {
-        update(revision, target, SVNDepth.fromRecurse(recursive), false, reporter, editor);
-    }
-
-    public abstract void update(long revision, String target, SVNDepth depth, 
-            boolean sendCopyFromArgs, ISVNReporterBaton reporter, ISVNEditor editor) throws SVNException;
+    public abstract void update(long revision, String target, boolean recursive, ISVNReporterBaton reporter, ISVNEditor editor) throws SVNException;
     
     /**
      * Gets status of a path.
@@ -1503,11 +1378,41 @@ public abstract class SVNRepository {
      * @see 					ISVNReporterBaton
      * @see 					ISVNEditor
      */
-    public void status(long revision, String target, boolean recursive, ISVNReporterBaton reporter, ISVNEditor editor) throws SVNException {
-        status(revision, target, SVNDepth.fromRecurse(recursive), reporter, editor);
-    }
+    public abstract void status(long revision, String target, boolean recursive, ISVNReporterBaton reporter, ISVNEditor editor) throws SVNException;
     
-    public abstract void status(long revision, String target, SVNDepth depth, ISVNReporterBaton reporter, ISVNEditor editor) throws SVNException;
+    /**
+     * Updates a path switching it to a new repository location.  
+     * 
+     * <p>
+     * Updates a path as it's described for the {@link #update(long, String, boolean, ISVNReporterBaton, ISVNEditor) update()}
+     * method using the provided <code>reporter</code> and <code>editor</code>, and switching
+     * it to a new repository location. 
+     * 
+     * <p>
+     * <b>NOTE:</b> you may not invoke methods of this <b>SVNRepository</b>
+     * object from within the provided <code>reporter</code> and <code>editor</code>.
+     * 
+     * @param  url 				a new location in the repository to switch to
+     * @param  revision         a desired revision to make update to; defaults
+     *                          to the latest revision (HEAD)
+     * @param  target           an entry name (optional)  
+     * @param  recursive        if <span class="javakeyword">true</span> and the switch scope
+     *                          is a directory, descends recursively, otherwise not 
+     * @param  reporter         a caller's reporter
+     * @param  editor           a caller's editor
+     * @throws SVNException     in the following cases:
+     *                          <ul>
+     *                          <li>a failure occured while connecting to a repository 
+     *                          <li>the user authentication failed 
+     *                          (see {@link org.tmatesoft.svn.core.SVNAuthenticationException})
+     *                          </ul>
+     * @see                     #update(long, String, boolean, ISVNReporterBaton, ISVNEditor)
+     * @see 					ISVNReporterBaton
+     * @see 					ISVNReporter
+     * @see 					ISVNEditor
+     * @see                     <a href="http://svnkit.com/kb/dev-guide-update-operation.html">Using ISVNReporter/ISVNEditor in update-related operations</a>
+     */
+    public abstract void update(SVNURL url, long revision, String target, boolean recursive, ISVNReporterBaton reporter, ISVNEditor editor) throws SVNException;
     
     /**
      * Checks out a directory from a repository .
@@ -1552,10 +1457,6 @@ public abstract class SVNRepository {
      * 
      */
     public void checkout(long revision, String target, boolean recursive, ISVNEditor editor) throws SVNException {
-        checkout(revision, target, SVNDepth.fromRecurse(recursive), editor);
-    }
-    
-    public void checkout(long revision, String target, SVNDepth depth, ISVNEditor editor) throws SVNException {
         final long lastRev = revision >= 0 ? revision : getLatestRevision();
         // check path?
         SVNNodeKind nodeKind = checkPath("", revision);
@@ -1566,30 +1467,12 @@ public abstract class SVNRepository {
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.RA_ILLEGAL_URL, "URL ''{0}'' doesn't exist", getLocation());
             SVNErrorManager.error(err);
         }
-        final SVNDepth reporterDepth = depth;
-        update(revision, target, depth, false, new ISVNReporterBaton() {
+        update(revision, target, recursive, new ISVNReporterBaton() {
                     public void report(ISVNReporter reporter) throws SVNException {
-                        reporter.setPath("", null, lastRev, reporterDepth, true);
+                        reporter.setPath("", null, lastRev, true);
                         reporter.finishReport();
                     }            
                 }, editor);
-    }
-    
-    public void checkoutFiles(long revision, String[] paths, ISVNFileCheckoutTarget target) throws SVNException {
-        final long lastRev = revision >= 0 ? revision : getLatestRevision();
-        final List pathsList = new ArrayList(Arrays.asList(paths));
-        Collections.sort(pathsList, SVNPathUtil.PATH_COMPARATOR);
-        ISVNReporterBaton reporterBaton = new ISVNReporterBaton() {
-            public void report(ISVNReporter reporter) throws SVNException {
-                reporter.setPath("", null, lastRev, false);
-                for (Iterator ps = pathsList.iterator(); ps.hasNext();) {
-                    String path = (String) ps.next();
-                    reporter.deletePath(path);
-                }
-                reporter.finishReport();
-            }
-        };
-        update(lastRev, null, SVNDepth.INFINITY, false, reporterBaton, new SVNFileCheckoutEditor(target));
     }
     
     /**
@@ -1605,7 +1488,7 @@ public abstract class SVNRepository {
      * version.
      * 
      * <p>
-     * If <code>sendDeltas</code> is <span class="javakeyword">true</span>, the actual text 
+     * If <code>sendDeltas</code> is <span class="javakeyword">null</span>, the actual text 
      * and property changes in the revision will be sent, otherwise no text deltas and 
      * <span class="javakeyword">null</span> property changes will be sent instead.
      * 
@@ -1745,20 +1628,6 @@ public abstract class SVNRepository {
      */    
     public abstract ISVNEditor getCommitEditor(String logMessage, Map locks, boolean keepLocks, final ISVNWorkspaceMediator mediator) throws SVNException;
     
-    public ISVNEditor getCommitEditor(String logMessage, Map locks, boolean keepLocks, SVNProperties revProps, final ISVNWorkspaceMediator mediator) throws SVNException {
-        if (hasSVNProperties(revProps)) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.CLIENT_PROPERTY_NAME, "Standard properties can't be set explicitly as revision properties");
-            SVNErrorManager.error(err);
-        }
-        revProps = revProps == null ? new SVNProperties() : revProps;
-        if (logMessage != null) {
-            revProps.put(SVNRevisionProperty.LOG, logMessage);
-        }
-        return getCommitEditorInternal(locks, keepLocks, revProps, mediator);
-    }
-    
-    protected abstract ISVNEditor getCommitEditorInternal(Map locks, boolean keepLocks, SVNProperties revProps, final ISVNWorkspaceMediator mediator) throws SVNException;
-    
     /**
      * Gets the lock for the file located at the specified path.
      * If the file has no lock the method returns <span class="javakeyword">null</span>.
@@ -1809,15 +1678,6 @@ public abstract class SVNRepository {
      */
     public abstract SVNLock[] getLocks(String path) throws SVNException;
     
-    public Map getMergeInfo(String[] paths, long revision, SVNMergeInfoInheritance inherit, 
-            boolean includeDescendants) throws SVNException {
-        boolean isMergeInfoCapable = hasCapability(SVNCapability.MERGE_INFO);
-        if (!isMergeInfoCapable) {
-            return null;
-        }
-        return getMergeInfoImpl(paths, revision, inherit, includeDescendants);
-    }
-
     /**
 	 * Locks path(s) at definite revision(s).
 	 * 
@@ -1937,8 +1797,6 @@ public abstract class SVNRepository {
      */
     public abstract void closeSession();
     
-    public abstract boolean hasCapability(SVNCapability capability) throws SVNException;
-
     /**
      * Returns the session options object this driver is using.
      * If no options object was provided to create this driver then 
@@ -1961,9 +1819,6 @@ public abstract class SVNRepository {
         myConnectionListeners.remove(listener);
     }
     
-    protected abstract Map getMergeInfoImpl(String[] paths, long revision, SVNMergeInfoInheritance inherit, 
-            boolean includeDescendants) throws SVNException;
-
     protected void fireConnectionOpened() {
         for (Iterator listeners = myConnectionListeners.iterator(); listeners.hasNext();) {
             ISVNConnectionListener listener = (ISVNConnectionListener) listeners.next();
@@ -2028,23 +1883,9 @@ public abstract class SVNRepository {
     
     protected static void assertValidRevision(long revision) throws SVNException {
         if (!isValidRevision(revision)) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.CLIENT_BAD_REVISION, 
-                    "Invalid revision number ''{0}''", new Long(revision));
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.CLIENT_BAD_REVISION, "Invalid revision number ''{0}''", new Long(revision));
             SVNErrorManager.error(err);
         }
-    }
-    
-    protected static boolean hasSVNProperties(SVNProperties props) {
-        if (props == null) {
-            return false;
-        }
-        for (Iterator names = props.nameSet().iterator(); names.hasNext();) {
-            String propName = (String) names.next();
-            if (SVNProperty.isSVNProperty(propName)) {
-                return true;
-            }
-        }
-        return false;
     }
 
     // all paths are uri-decoded.
@@ -2128,5 +1969,4 @@ public abstract class SVNRepository {
         }
         return myDebugLog;
     }
-    
 }

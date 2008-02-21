@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2008 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -19,7 +19,6 @@ import org.tmatesoft.svn.cli.SVNArgument;
 import org.tmatesoft.svn.cli.SVNCommand;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNLogEntry;
-import org.tmatesoft.svn.core.internal.util.SVNDate;
 import org.tmatesoft.svn.core.wc.SVNRevision;
 import org.tmatesoft.svn.core.wc.admin.SVNLookClient;
 
@@ -59,7 +58,7 @@ public class SVNLookInfoCommand extends SVNCommand {
 
     private void printInfo(SVNLogEntry entry, PrintStream out) {
         String author = entry.getAuthor() != null ? entry.getAuthor() : "";
-        String date = entry.getDate() != null ? SVNDate.formatCustomDate(entry.getDate()) : "";
+        String date = entry.getDate() != null ? SVNLookDateCommand.formatDate(entry.getDate()) : ""; 
         String log = entry.getMessage() != null ? entry.getMessage() : ""; 
         SVNCommand.println(out, author);
         SVNCommand.println(out, date);

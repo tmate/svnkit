@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2008 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -15,6 +15,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -24,17 +25,10 @@ import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNNodeKind;
-import org.tmatesoft.svn.core.SVNProperties;
-import org.tmatesoft.svn.core.SVNPropertyValue;
-import org.tmatesoft.svn.core.internal.delta.SVNDeltaCombiner;
-import org.tmatesoft.svn.core.internal.wc.IOExceptionWrapper;
 import org.tmatesoft.svn.core.internal.wc.ISVNCommitPathHandler;
 import org.tmatesoft.svn.core.internal.wc.SVNCommitUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
-import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 import org.tmatesoft.svn.core.io.ISVNEditor;
-import org.tmatesoft.svn.core.io.diff.SVNDeltaGenerator;
-import org.tmatesoft.svn.core.io.diff.SVNDiffWindow;
 
 
 /**
@@ -97,8 +91,6 @@ public class FSRepositoryUtil {
                     break;
                 }
             }
-        } catch (IOExceptionWrapper ioew) {
-            throw ioew.getOriginalException();
         } catch (IOException ioe) {
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, ioe.getLocalizedMessage());
             SVNErrorManager.error(err, ioe);
@@ -129,34 +121,33 @@ public class FSRepositoryUtil {
         return !areRepresentationsEqual(revNode1, revNode2, false);
     }
 
-    public static SVNProperties getPropsDiffs(SVNProperties sourceProps, SVNProperties targetProps){
-        SVNProperties result = new SVNProperties();
+    public static Map getPropsDiffs(Map sourceProps, Map targetProps){
+        Map result = new HashMap();
         
         if(sourceProps == null){
-            sourceProps = SVNProperties.EMPTY_PROPERTIES;
+            sourceProps = Collections.EMPTY_MAP;
         }
         
         if(targetProps == null){
-            targetProps = SVNProperties.EMPTY_PROPERTIES;
+            targetProps = Collections.EMPTY_MAP;
         }
     
-        for(Iterator names = sourceProps.nameSet().iterator(); names.hasNext();){
-            String propName = (String) names.next();
-            SVNPropertyValue srcPropVal = sourceProps.getSVNPropertyValue(propName);
-            SVNPropertyValue targetPropVal = targetProps.getSVNPropertyValue(propName);
-
-            if (targetPropVal == null) {
-                result.put(propName, targetPropVal);
-            } else if (!targetPropVal.equals(srcPropVal)) {
+        for(Iterator names = sourceProps.keySet().iterator(); names.hasNext();){
+            String propName = (String)names.next();
+            String srcPropVal = (String)sourceProps.get(propName);
+            String targetPropVal = (String)targetProps.get(propName);
+    
+            if(targetPropVal == null){
+                result.put(propName, null);
+            }else if(!targetPropVal.equals(srcPropVal)){
                 result.put(propName, targetPropVal);
             }
         }
-
-        for(Iterator names = targetProps.nameSet().iterator(); names.hasNext();){
+    
+        for(Iterator names = targetProps.keySet().iterator(); names.hasNext();){
             String propName = (String)names.next();
-            SVNPropertyValue targetPropVal = targetProps.getSVNPropertyValue(propName);
-            SVNPropertyValue sourceValue = sourceProps.getSVNPropertyValue(propName);
-            if (sourceValue == null){
+            String targetPropVal = (String)targetProps.get(propName);
+            if(sourceProps.get(propName) == null){
                 result.put(propName, targetPropVal);
             }
         }        
@@ -164,78 +155,6 @@ public class FSRepositoryUtil {
         return result;
     }
 
-    public static boolean checkFilesDifferent(FSRoot root1, String path1, FSRoot root2, 
-            String path2, SVNDeltaCombiner deltaCombiner) throws SVNException {
-        boolean changed = FSRepositoryUtil.areFileContentsChanged(root1, path1, root2, path2);
-        if (!changed) {
-            return false;
-        }
-
-        FSRevisionNode revNode1 = root1.getRevisionNode(path1);
-        FSRevisionNode revNode2 = root2.getRevisionNode(path2);
-        if (revNode1.getFileLength() != revNode2.getFileLength()) {
-            return true;
-        }
-
-        if (!revNode1.getFileChecksum().equals(revNode2.getFileChecksum())) {
-            return true;
-        }
-
-        InputStream file1IS = null;
-        InputStream file2IS = null;
-        try {
-            file1IS = root1.getFileStreamForPath(deltaCombiner, path1);
-            file2IS = root2.getFileStreamForPath(deltaCombiner, path2);
-
-            int r1 = -1;
-            int r2 = -1;
-            while (true) {
-                r1 = file1IS.read();
-                r2 = file2IS.read();
-                if (r1 != r2) {
-                    return true;
-                }
-                if (r1 == -1) {// we've finished - files do not differ
-                    break;
-                }
-            }
-        } catch (IOException ioe) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, ioe.getLocalizedMessage());
-            SVNErrorManager.error(err, ioe);
-        } finally {
-            SVNFileUtil.closeFile(file1IS);
-            SVNFileUtil.closeFile(file2IS);
-        }
-        return false;
-    }
-
-    public static void sendTextDelta(ISVNEditor editor, String editPath, String sourcePath, 
-            String hexDigest, FSRevisionRoot sourceRoot, String targetPath, 
-            FSRevisionRoot targetRoot, boolean sendDeltas, SVNDeltaCombiner deltaCombiner, 
-            SVNDeltaGenerator deltaGenerator, FSFS fsfs) throws SVNException {
-        editor.applyTextDelta(editPath, hexDigest);
-
-        if (sendDeltas) {
-            InputStream sourceStream = null;
-            InputStream targetStream = null;
-            try {
-                if (sourceRoot != null && sourcePath != null) {
-                    sourceStream = sourceRoot.getFileStreamForPath(deltaCombiner, sourcePath);
-                } else {
-                    sourceStream = FSInputStream.createDeltaStream(deltaCombiner, (FSRevisionNode) null, fsfs);
-                }
-                targetStream = targetRoot.getFileStreamForPath(deltaCombiner, targetPath);
-                deltaGenerator.sendDelta(editPath, sourceStream, 0, targetStream, editor, false);
-            } finally {
-                SVNFileUtil.closeFile(sourceStream);
-                SVNFileUtil.closeFile(targetStream);
-            }
-        } else {
-            editor.textDeltaChunk(editPath, SVNDiffWindow.EMPTY);
-            editor.textDeltaEnd(editPath);
-        }
-    }
-    
     private static boolean areRepresentationsEqual(FSRevisionNode revNode1, FSRevisionNode revNode2, boolean forProperties) {
         if(revNode1 == revNode2){
             return true;
