@@ -32,7 +32,7 @@ public class SVNMap implements Map {
     private static final int INITIAL_CAPACITY = 15;
     private static final double LOAD_FACTOR = 0.75;
     
-    private Entry[] myTable;
+    private TableEntry[] myTable;
     private int myEntryCount;
     private int myLimit;
     private int myModCount;
@@ -40,17 +40,13 @@ public class SVNMap implements Map {
     private Set myKeySet;
     private Set myEntrySet;
     private Collection myValueCollection;
-    
-    public static Map createMap() {
-        return new SVNMap(null);
-    }
 
-    public static Map createMap(Map map) {
-        return new SVNMap(map);
+    public SVNMap() {
+        this(null);
     }
     
-    private SVNMap(Map map) {
-        myTable = new Entry[INITIAL_CAPACITY];
+    public SVNMap(Map map) {
+        myTable = new TableEntry[INITIAL_CAPACITY];
         myEntryCount = 0;
         myLimit = (int) (myTable.length * LOAD_FACTOR);
         putAll(map);
@@ -59,7 +55,7 @@ public class SVNMap implements Map {
     public void clear() {
         Arrays.fill(myTable, null);
         myEntryCount = 0;
-        myModCount = 0;
+        myModCount++;
     }
 
     public boolean isEmpty() {
@@ -74,7 +70,7 @@ public class SVNMap implements Map {
 
         int hash = hashCode(key);
         int index = indexForHash(hash);
-        Entry entry = myTable[index];
+        TableEntry entry = myTable[index];
         while (entry != null) {
             if (entry.hash == hash && eq(key, entry.key)) {
                 return true;
@@ -92,7 +88,7 @@ public class SVNMap implements Map {
             return containsNullValue();
         }
         for (int i = 0; i < myTable.length; i++) {
-            Entry entry = myTable[i];
+            TableEntry entry = myTable[i];
             while (entry != null) {
                 if (value.equals(entry.value)) {
                     return true;
@@ -105,7 +101,7 @@ public class SVNMap implements Map {
     
     private boolean containsNullValue() {
         for (int i = 0; i < myTable.length; i++) {
-            Entry entry = myTable[i];
+            TableEntry entry = myTable[i];
             while (entry != null) {
                 if (entry.value == null) {
                     return true;
@@ -121,7 +117,7 @@ public class SVNMap implements Map {
 
         int hash = hashCode(key); 
         int index = indexForHash(hash);
-        Entry entry = myTable[index];
+        TableEntry entry = myTable[index];
         
         while (entry != null) {
             if (hash == entry.hash && eq(key, entry.key)) {
@@ -142,8 +138,8 @@ public class SVNMap implements Map {
         int hash = hashCode(key);
         int index = indexForHash(hash);
         
-        Entry entry = myTable[index];
-        Entry previousEntry = null;
+        TableEntry entry = myTable[index];
+        TableEntry previousEntry = null;
         
         while (entry != null) {
             if (entry.hash == hash && entry.key.equals(key)) {
@@ -153,7 +149,7 @@ public class SVNMap implements Map {
             previousEntry = entry;
             entry = entry.next;
         }
-        Entry newEntry = new Entry(key, value, hash);
+        TableEntry newEntry = new TableEntry(key, value, hash);
         
         if (previousEntry != null) {
             previousEntry.next = newEntry;
@@ -172,16 +168,20 @@ public class SVNMap implements Map {
         if (isEmpty()) {
             return null;
         }
+        key = key == null ? NULL_KEY : key;
+
         int hash = hashCode(key);
         int index = indexForHash(hash);
         
-        Entry entry = myTable[index];
-        Entry previousEntry = null;
+        TableEntry entry = myTable[index];
+        TableEntry previousEntry = null;
         
         while (entry != null) {
             if (entry.hash == hash && entry.key.equals(key)) {
                 if (previousEntry != null) {
                     previousEntry.next = entry.next;
+                } else {
+                    myTable[index] = entry.next;
                 }
                 myEntryCount--;
                 myModCount++;
@@ -227,6 +227,82 @@ public class SVNMap implements Map {
         return myValueCollection;
     }
     
+    public boolean equals(Object o) {
+        if (o == this) {
+            return true;
+        }
+        if (!(o instanceof Map)) {
+            return false;
+        }
+        Map t = (Map) o;
+        if (t.size() != size()) {
+            return false;
+        }
+        try {
+            Iterator i = entrySet().iterator();
+            while (i.hasNext()) {
+                Map.Entry e = (Map.Entry) i.next();
+                Object key = e.getKey();
+                Object value = e.getValue();
+                if (value == null) {
+                    if (!(t.get(key) == null && t.containsKey(key))) {
+                        return false;
+                    }
+                } else {
+                    if (!value.equals(t.get(key))) {
+                        return false;
+                    }
+                }
+            }
+        } catch(ClassCastException unused)   {
+            return false;
+        } catch(NullPointerException unused) {
+            return false;
+        }
+        return true;
+    }
+
+    public int hashCode() {
+        int h = 0;
+        Iterator i = entrySet().iterator();
+        while (i.hasNext()) {
+            h += i.next().hashCode();
+        }
+        return h;
+    }
+
+    protected Object clone() throws CloneNotSupportedException {
+        SVNMap result = new SVNMap();
+        result.myTable = new TableEntry[myTable.length];
+        result.myEntryCount = myEntryCount;
+        result.myModCount = myModCount;
+        result.myLimit = myLimit;
+        result.putAll(this);
+        return result;
+    }
+
+    public String toString() {
+        StringBuffer buf = new StringBuffer();
+        buf.append("{");
+
+        Iterator i = entrySet().iterator();
+        boolean hasNext = i.hasNext();
+        while (hasNext) {
+            Map.Entry e = (Map.Entry) (i.next());
+            Object key = e.getKey();
+            Object value = e.getValue();
+            buf.append((key == this ?  "(this Map)" : key) + "=" + 
+                           (value == this ? "(this Map)": value));
+
+            hasNext = i.hasNext();
+            if (hasNext) {
+                buf.append(", ");
+            }
+        }
+        buf.append("}");
+        return buf.toString();
+    }
+
     private int indexForHash(int hash) {
         return (myTable.length - 1) & hash;
     }
@@ -244,14 +320,14 @@ public class SVNMap implements Map {
     }
     
     private void resize(int newSize) {
-        Entry[] oldTable = myTable;
-        myTable = new Entry[newSize];
+        TableEntry[] oldTable = myTable;
+        myTable = new TableEntry[newSize];
 
         for (int i = 0; i < oldTable.length; i++) {
-            Entry oldEntry = oldTable[i];
+            TableEntry oldEntry = oldTable[i];
             while (oldEntry != null) {
                 int index = indexForHash(oldEntry.hash);
-                Entry newEntry = myTable[index];
+                TableEntry newEntry = myTable[index];
                 if (newEntry == null) {
                     myTable[index] = oldEntry;
                 } else {
@@ -260,7 +336,7 @@ public class SVNMap implements Map {
                     }
                     newEntry.next = oldEntry;                    
                 }
-                Entry nextEntry = oldEntry.next;
+                TableEntry nextEntry = oldEntry.next;
                 oldEntry.next = null;
                 oldEntry = nextEntry;
             }
@@ -294,12 +370,14 @@ public class SVNMap implements Map {
         public Iterator iterator() {
             return new TableIterator();
         }
+        
         public int size() {
             return myEntryCount;
         }
+        
         public boolean contains(Object o) {
             if (o instanceof Map.Entry) {
-                Map.Entry entry = (Entry) o;
+                Map.Entry entry = (Map.Entry) o;
                 if (SVNMap.this.containsKey(entry.getKey())) {
                     Object value = SVNMap.this.get(entry.getKey());
                     if (value == null) {
@@ -312,8 +390,8 @@ public class SVNMap implements Map {
         }
         
         public boolean remove(Object o) {
-            if (o instanceof Map.Entry) {
-                Map.Entry entry = (Entry) o;
+            if (contains(o)) {
+                Map.Entry entry = (Map.Entry) o;
                 return SVNMap.this.remove(entry.getKey()) != null;
             }
             return false;
@@ -341,8 +419,8 @@ public class SVNMap implements Map {
     private class TableIterator implements Iterator {
         
         private int index;
-        private Entry entry;
-        private Entry previous;
+        private TableEntry entry;
+        private TableEntry previous;
         private int modCount;
         
         public TableIterator() {
@@ -380,8 +458,9 @@ public class SVNMap implements Map {
                 throw new ConcurrentModificationException();
             }
             if (previous != null) {
-                SVNMap.this.remove(entry.getKey());
+                SVNMap.this.remove(previous.getKey());
                 previous = null;
+                modCount = myModCount;
             } else {
                 throw new IllegalStateException();
             }
@@ -391,7 +470,7 @@ public class SVNMap implements Map {
     private class KeyIterator extends TableIterator {
 
         public Object next() {
-            Entry next = (Entry) super.next();
+            TableEntry next = (TableEntry) super.next();
             return next.getKey();
         }
     }
@@ -399,19 +478,19 @@ public class SVNMap implements Map {
     private class ValueIterator extends TableIterator {
 
         public Object next() {
-            Entry next = (Entry) super.next();
+            TableEntry next = (TableEntry) super.next();
             return next.getValue();
         }
     }
     
-    private static class Entry implements Map.Entry {
+    private static class TableEntry implements Map.Entry {
         
-        public Entry next;
+        public TableEntry next;
         public Object key;
         public Object value;
         public int hash;
         
-        public Entry(Object key, Object value, int hash) {
+        public TableEntry(Object key, Object value, int hash) {
             this.key = key;
             this.value = value;
             this.hash = hash;
@@ -439,7 +518,7 @@ public class SVNMap implements Map {
             if (!(o instanceof Map.Entry)) {
                 return false;
             }
-            Map.Entry e = (Map.Entry)o;
+            Map.Entry e = (Map.Entry) o;
             Object k1 = getKey();
             Object k2 = e.getKey();
             

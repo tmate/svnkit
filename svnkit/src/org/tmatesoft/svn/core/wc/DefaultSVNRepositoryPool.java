@@ -11,7 +11,7 @@
  */
 package org.tmatesoft.svn.core.wc;
 
-import java.util.HashMap;
+import org.tmatesoft.svn.core.internal.util.SVNMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Timer;
@@ -96,7 +96,7 @@ public class DefaultSVNRepositoryPool implements ISVNRepositoryPool, ISVNSession
     private ISVNDebugLog myDebugLog;
     private Map myPool;
     private long myTimeout;
-    private Map myInactiveRepositories = new HashMap();
+    private Map myInactiveRepositories = new SVNMap();
     private Timer myTimer;
 
     private boolean myIsKeepConnection;
@@ -297,7 +297,7 @@ public class DefaultSVNRepositoryPool implements ISVNRepositoryPool, ISVNSession
     
     private Map getPool() {
         if (myPool == null) {
-            myPool = new HashMap();
+            myPool = new SVNMap();
         }
         return myPool;
     }

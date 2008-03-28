@@ -15,7 +15,7 @@ import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.HashMap;
+import org.tmatesoft.svn.core.internal.util.SVNMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -86,9 +86,9 @@ public class SVNReplicationEditor implements ISVNEditor {
     public SVNReplicationEditor(SVNRepository repository, ISVNEditor commitEditor, SVNLogEntry revision) {
         myRepos = repository;
         myCommitEditor = commitEditor;
-        myPathsToFileBatons = new HashMap();
+        myPathsToFileBatons = new SVNMap();
         myDirsStack = new Stack();
-        myCopiedPaths = new HashMap();
+        myCopiedPaths = new SVNMap();
         myChangedPaths = revision.getChangedPaths();
 
         for(Iterator paths = myChangedPaths.keySet().iterator(); paths.hasNext();){

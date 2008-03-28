@@ -16,7 +16,6 @@ import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.Map;
@@ -31,6 +30,7 @@ import org.tmatesoft.svn.core.SVNProperties;
 import org.tmatesoft.svn.core.SVNProperty;
 import org.tmatesoft.svn.core.SVNPropertyValue;
 import org.tmatesoft.svn.core.internal.delta.SVNDeltaCombiner;
+import org.tmatesoft.svn.core.internal.util.SVNMap;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
@@ -309,11 +309,11 @@ public class FSUpdateContext {
             if (sourcePath != null && !startEmpty) {
                 FSRevisionRoot sourceRoot = getSourceRoot(sourceRevision);
                 FSRevisionNode sourceNode = sourceRoot.getRevisionNode(sourcePath);
-                sourceEntries = new HashMap(sourceNode.getDirEntries(myFSFS));
+                sourceEntries = new SVNMap(sourceNode.getDirEntries(myFSFS));
             }
             FSRevisionNode targetNode = getTargetRoot().getRevisionNode(targetPath);
 
-            Map targetEntries = new HashMap(targetNode.getDirEntries(myFSFS));
+            Map targetEntries = new SVNMap(targetNode.getDirEntries(myFSFS));
 
             while (true) {
                 Object[] nextInfo = fetchPathInfo(editPath);
