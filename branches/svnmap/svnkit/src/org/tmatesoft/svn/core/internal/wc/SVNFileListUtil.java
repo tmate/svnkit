@@ -84,7 +84,7 @@ public class SVNFileListUtil {
     }
     
     private static File[] sort(File[] files) {
-        Map map = SVNMap.createMap();
+        Map map = new SVNMap();
         for (int i = 0; i < files.length; i++) {
             map.put(files[i].getName(), files[i]);
         }
