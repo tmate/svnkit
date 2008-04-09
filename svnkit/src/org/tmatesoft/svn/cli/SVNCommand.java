@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2008 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -19,18 +19,18 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintStream;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
+import java.util.StringTokenizer;
 
-import org.tmatesoft.svn.cli2.SVNConsoleAuthenticationProvider;
 import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNURL;
 import org.tmatesoft.svn.core.auth.ISVNAuthenticationManager;
-import org.tmatesoft.svn.core.internal.util.SVNHashMap;
 import org.tmatesoft.svn.core.wc.ISVNOptions;
 import org.tmatesoft.svn.core.wc.SVNClientManager;
 import org.tmatesoft.svn.core.wc.SVNRevision;
@@ -86,9 +86,6 @@ public abstract class SVNCommand {
                 authManager.setAuthenticationProvider(new SVNConsoleAuthenticationProvider());
             }
             myClientManager = SVNClientManager.newInstance(getOptions(), authManager);
-            if (getCommandLine().hasArgument(SVNArgument.IGNORE_EXTERNALS)) {
-                myClientManager.setIgnoreExternals(true);
-            }
         }
         return myClientManager;
     }
@@ -129,6 +126,23 @@ public abstract class SVNCommand {
             return new String(bos.toByteArray());
         }
         return (String) getCommandLine().getArgumentValue(SVNArgument.MESSAGE);
+    }
+
+    public static String formatString(String str, int chars, boolean left) {
+        if (str.length() > chars) {
+            return str.substring(0, chars);
+        }
+        StringBuffer formatted = new StringBuffer();
+        if (left) {
+            formatted.append(str);
+        }
+        for(int i = 0; i < chars - str.length(); i++) {
+            formatted.append(' ');
+        }
+        if (!left) {
+            formatted.append(str);
+        }
+        return formatted.toString();
     }
 
     public static SVNCommand getCommand(String name) {
@@ -240,10 +254,40 @@ public abstract class SVNCommand {
     }
 
     static {
-        ourCommands = new SVNHashMap();
+//        Locale.setDefault(Locale.ENGLISH);
+
+        ourCommands = new HashMap();
+        ourCommands.put(new String[] { "status", "st", "stat" }, "org.tmatesoft.svn.cli.command.SVNStatusCommand");
+        ourCommands.put(new String[] { "import" }, "org.tmatesoft.svn.cli.command.SVNImportCommand");
+        ourCommands.put(new String[] { "checkout", "co" }, "org.tmatesoft.svn.cli.command.SVNCheckoutCommand");
+        ourCommands.put(new String[] { "add" }, "org.tmatesoft.svn.cli.command.SVNAddCommand");
+        ourCommands.put(new String[] { "commit", "ci" }, "org.tmatesoft.svn.cli.command.SVNCommitCommand");
+        ourCommands.put(new String[] { "update", "up" }, "org.tmatesoft.svn.cli.command.SVNUpdateCommand");
+        ourCommands.put(new String[] { "delete", "rm", "remove", "del" }, "org.tmatesoft.svn.cli.command.SVNDeleteCommand");
+        ourCommands.put(new String[] { "move", "mv", "rename", "ren" }, "org.tmatesoft.svn.cli.command.SVNMoveCommand");
+        ourCommands.put(new String[] { "copy", "cp" }, "org.tmatesoft.svn.cli.command.SVNCopyCommand");
+        ourCommands.put(new String[] { "revert" }, "org.tmatesoft.svn.cli.command.SVNRevertCommand");
+        ourCommands.put(new String[] { "mkdir" }, "org.tmatesoft.svn.cli.command.SVNMkDirCommand");
+        ourCommands.put(new String[] { "propset", "pset", "ps" }, "org.tmatesoft.svn.cli.command.SVNPropsetCommand");
+        ourCommands.put(new String[] { "propdel", "pdel", "pd" }, "org.tmatesoft.svn.cli.command.SVNPropdelCommand");
+        ourCommands.put(new String[] { "propget", "pget", "pg" }, "org.tmatesoft.svn.cli.command.SVNPropgetCommand");
+        ourCommands.put(new String[] { "proplist", "plist", "pl" }, "org.tmatesoft.svn.cli.command.SVNProplistCommand");
+        ourCommands.put(new String[] { "info" }, "org.tmatesoft.svn.cli.command.SVNInfoCommand");
+        ourCommands.put(new String[] { "resolved" }, "org.tmatesoft.svn.cli.command.SVNResolvedCommand");
+        ourCommands.put(new String[] { "cat" }, "org.tmatesoft.svn.cli.command.SVNCatCommand");
+        ourCommands.put(new String[] { "ls", "list" }, "org.tmatesoft.svn.cli.command.SVNLsCommand");
+        ourCommands.put(new String[] { "log" }, "org.tmatesoft.svn.cli.command.SVNLogCommand");
+        ourCommands.put(new String[] { "switch", "sw" }, "org.tmatesoft.svn.cli.command.SVNSwitchCommand");
+        ourCommands.put(new String[] { "diff", "di" }, "org.tmatesoft.svn.cli.command.SVNDiffCommand");
+        ourCommands.put(new String[] { "merge" }, "org.tmatesoft.svn.cli.command.SVNMergeCommand");
+        ourCommands.put(new String[] { "export" }, "org.tmatesoft.svn.cli.command.SVNExportCommand");
+        ourCommands.put(new String[] { "cleanup" }, "org.tmatesoft.svn.cli.command.SVNCleanupCommand");
+        ourCommands.put(new String[] { "lock" }, "org.tmatesoft.svn.cli.command.SVNLockCommand");
+        ourCommands.put(new String[] { "unlock" }, "org.tmatesoft.svn.cli.command.SVNUnlockCommand");
+        ourCommands.put(new String[] { "annotate", "blame", "praise", "ann" }, "org.tmatesoft.svn.cli.command.SVNAnnotateCommand");
         
         ourPegCommands = new HashSet();
-        ourPegCommands.addAll(Arrays.asList(new String[] {"cat", "annotate", "checkout", "diff", "export", "info", "ls", "merge", "propget", "proplist", "log", "copy"}));
+        ourPegCommands.addAll(Arrays.asList(new String[] {"cat", "annotate", "checkout", "diff", "export", "info", "ls", "merge", "propget", "proplist", "log"}));
 
         ourForceLogCommands = new HashSet();
         ourForceLogCommands.addAll(Arrays.asList(new String[] {"commit", "copy", "delete", "import", "mkdir", "move", "lock"}));
@@ -253,18 +297,9 @@ public abstract class SVNCommand {
         if ("".equals(str)) {
             return 1;
         }
-        int count = 1;
-        for (int i = 0; i < str.length(); i++) {
-            if (str.charAt(i) == '\r') {
-                count++;
-                if (i < str.length() - 1 && str.charAt(i + 1) == '\n') {
-                    i++;
-                }
-            } else if (str.charAt(i) == '\n') {
-                count++;
-            }
-        }
-        if (count == 0) {
+        int count = 0;
+        for(StringTokenizer lines = new StringTokenizer(str, "\r\n"); lines.hasMoreTokens();) {
+            lines.nextToken();
             count++;
         }
         return count;
@@ -284,23 +319,6 @@ public abstract class SVNCommand {
             startRevision = SVNRevision.parse(revStr);
         }
         return new SVNRevision[] {startRevision, endRevision};
-    }
-    
-    protected boolean handleWarning(SVNErrorMessage err, SVNErrorCode[] warningCodes, PrintStream errStream) throws SVNException {
-        if (err == null) {
-            return true; 
-        }
-        SVNErrorCode code = err.getErrorCode();
-        for (int i = 0; i < warningCodes.length; i++) {
-            if (code == warningCodes[i]) {
-                if (!getCommandLine().hasArgument(SVNArgument.QUIET)) {
-                    err.setType(SVNErrorMessage.TYPE_WARNING);
-                    errStream.println(err.getMessage());
-                } 
-                return false;
-            }
-        }
-        throw new SVNException(err);
     }
 
 }

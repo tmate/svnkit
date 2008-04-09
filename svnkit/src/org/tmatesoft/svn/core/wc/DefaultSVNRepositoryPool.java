@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2008 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -11,7 +11,7 @@
  */
 package org.tmatesoft.svn.core.wc;
 
-import org.tmatesoft.svn.core.internal.util.SVNHashMap;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Timer;
@@ -96,7 +96,7 @@ public class DefaultSVNRepositoryPool implements ISVNRepositoryPool, ISVNSession
     private ISVNDebugLog myDebugLog;
     private Map myPool;
     private long myTimeout;
-    private Map myInactiveRepositories = new SVNHashMap();
+    private Map myInactiveRepositories = new HashMap();
     private Timer myTimer;
 
     private boolean myIsKeepConnection;
@@ -297,7 +297,7 @@ public class DefaultSVNRepositoryPool implements ISVNRepositoryPool, ISVNSession
     
     private Map getPool() {
         if (myPool == null) {
-            myPool = new SVNHashMap();
+            myPool = new HashMap();
         }
         return myPool;
     }

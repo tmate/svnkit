@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2008 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -12,8 +12,6 @@
 package org.tmatesoft.svn.core.internal.util.jna;
 
 import java.io.File;
-
-import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 
 import com.sun.jna.NativeLong;
 import com.sun.jna.WString;
@@ -73,14 +71,15 @@ class SVNWin32Util {
             return false;
         }
         if (dst.isFile() && !dst.canWrite()) {
-            SVNFileUtil.setReadonly(dst, false);
-            SVNFileUtil.setReadonly(src, true);
+            setWritable(dst);
+            src.setReadOnly();
         }
         synchronized (library) {
             try {
-                int rc = library.MoveFileExW(new WString(src.getAbsoluteFile().getAbsolutePath()), new WString(dst.getAbsoluteFile().getAbsolutePath()), new NativeLong(3));
+                int rc = library.MoveFileExW(new WString(src.getAbsoluteFile().getAbsolutePath()), new WString(dst.getAbsoluteFile().getAbsolutePath()), new NativeLong(1));
                 return rc != 0;
             } catch (Throwable th) {
+                th.printStackTrace();
             }
         }
         return false;

@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2008 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -20,8 +20,6 @@ import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNNodeKind;
-import org.tmatesoft.svn.core.SVNProperties;
-import org.tmatesoft.svn.core.SVNPropertyValue;
 import org.tmatesoft.svn.core.internal.delta.SVNDeltaCombiner;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
 import org.tmatesoft.svn.core.internal.wc.ISVNCommitPathHandler;
@@ -32,8 +30,8 @@ import org.tmatesoft.svn.core.io.diff.SVNDeltaGenerator;
 
 
 /**
- * @author TMate Software Ltd.
  * @version 1.1.1
+ * @author  TMate Software Ltd.
  */
 public class FSReplayPathHandler implements ISVNCommitPathHandler {
 
@@ -58,20 +56,20 @@ public class FSReplayPathHandler implements ISVNCommitPathHandler {
         myDeltaGenerator = new SVNDeltaGenerator();
         myDeltaCombiner = new SVNDeltaCombiner();
     }
-
+    
     public boolean handleCommitPath(String path, ISVNEditor editor) throws SVNException {
         String absPath = !path.startsWith("/") ? "/" + path : path;
-        while (myCopies.size() > 0) {
+        while(myCopies.size() > 0) {
             CopyInfo info = (CopyInfo) myCopies.getLast();
             if (SVNPathUtil.isAncestor(info.myPath, path)) {
                 break;
             }
             myCopies.removeLast();
         }
-
+        
         boolean isAdd = false;
         boolean isDelete = false;
-
+        
         FSPathChange change = (FSPathChange) myChangedPaths.get(path);
         if (change.getChangeKind() == FSPathChangeKind.FS_PATH_CHANGE_ADD) {
             isAdd = true;
@@ -81,23 +79,22 @@ public class FSReplayPathHandler implements ISVNCommitPathHandler {
             isAdd = true;
             isDelete = true;
         }
-
+        
         boolean closeDir = false;
         if (isDelete) {
             editor.deleteEntry(path, -1);
-            return false;
         }
-
+        
         SVNNodeKind kind = null;
         if (!isDelete || isAdd) {
             kind = myRoot.checkNodeKind(absPath);
             if (kind != SVNNodeKind.DIR && kind != SVNNodeKind.FILE) {
                 SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_NOT_FOUND, 
-                		"Filesystem path ''{0}'' is neither a file nor a directory", path);
+                        "Filesystem path ''{0}'' is neither a file nor a directory", path);
                 SVNErrorManager.error(err);
             }
         }
-
+        
         String copyFromPath = null;
         String realCopyFromPath = null;
         FSRoot srcRoot = myCompareRoot;
@@ -111,7 +108,7 @@ public class FSReplayPathHandler implements ISVNCommitPathHandler {
             if (copyFromPath != null && FSRepository.isValidRevision(copyFromRevision)) {
                 copyFromRoot = myOwner.createRevisionRoot(copyFromRevision);
             }
-
+            
             realCopyFromPath = copyFromPath;
 
             if (copyFromPath != null) {
@@ -122,7 +119,7 @@ public class FSReplayPathHandler implements ISVNCommitPathHandler {
                     copyFromRevision = -1;
                 }
             }
-
+            
             if (kind == SVNNodeKind.DIR) {
                 if (realCopyFromPath != null && copyFromPath == null) {
                     addSubdirectory(copyFromRoot, myRoot, editor, realCopyFromPath, path);
@@ -134,7 +131,7 @@ public class FSReplayPathHandler implements ISVNCommitPathHandler {
                 editor.addFile(path, copyFromPath, copyFromRevision);
                 closeFile = true;
             }
-
+            
             if (copyFromPath != null) {
                 if (kind == SVNNodeKind.DIR) {
                     CopyInfo info = new CopyInfo(path, copyFromPath, copyFromRevision);
@@ -162,34 +159,34 @@ public class FSReplayPathHandler implements ISVNCommitPathHandler {
                 editor.openFile(path, -1);
                 closeFile = true;
             }
-
+            
             if (myCopies.size() > 0) {
                 CopyInfo info = (CopyInfo) myCopies.getLast();
                 if (info.myCopyFromPath != null) {
                     srcRoot = myOwner.createRevisionRoot(info.myCopyFromRevision);
-                    srcPath = SVNPathUtil.append(info.myCopyFromPath, SVNPathUtil.getPathAsChild(info.myPath, path));
+                    srcPath = SVNPathUtil.append(info.myCopyFromPath, SVNPathUtil.pathIsChild(info.myPath, path));
                 } else {
                     srcRoot = null;
                     srcPath = null;
                 }
-            }
+            } 
         }
-
+        
         if (!isDelete || isAdd) {
             if (change.arePropertiesModified()) {
                 if (myCompareRoot != null) {
-                    SVNProperties oldProps = null;
+                    Map oldProps = null;
                     if (srcRoot != null) {
                         FSRevisionNode srcNode = srcRoot.getRevisionNode(srcPath);
                         oldProps = srcNode.getProperties(myOwner);
                     }
-
+                    
                     FSRevisionNode node = myRoot.getRevisionNode(absPath);
-                    SVNProperties newProps = node.getProperties(myOwner);
-                    SVNProperties propDiff = FSRepositoryUtil.getPropsDiffs(oldProps, newProps);
-                    for (Iterator propNames = propDiff.nameSet().iterator(); propNames.hasNext();) {
+                    Map newProps = node.getProperties(myOwner);
+                    Map propDiff = FSRepositoryUtil.getPropsDiffs(oldProps, newProps);
+                    for (Iterator propNames = propDiff.keySet().iterator(); propNames.hasNext();) {
                         String propName = (String) propNames.next();
-                        SVNPropertyValue propValue = propDiff.getSVNPropertyValue(propName);
+                        String propValue = (String) propDiff.get(propName);
                         if (kind == SVNNodeKind.DIR) {
                             editor.changeDirProperty(propName, propValue);
                         } else if (kind == SVNNodeKind.FILE) {
@@ -204,14 +201,14 @@ public class FSReplayPathHandler implements ISVNCommitPathHandler {
                     }
                 }
             }
-
+            
             if (kind == SVNNodeKind.FILE && (change.isTextModified() || (realCopyFromPath != null && copyFromPath == null))) {
                 String checksum = null;
                 if (myCompareRoot != null && srcRoot != null && srcPath != null) {
                     FSRevisionNode node = srcRoot.getRevisionNode(srcPath);
                     checksum = node.getFileChecksum();
                 }
-
+                
                 editor.applyTextDelta(path, checksum);
                 if (myCompareRoot != null) {
                     InputStream sourceStream = null;
@@ -231,7 +228,7 @@ public class FSReplayPathHandler implements ISVNCommitPathHandler {
                 }
             }
         }
-
+        
         if (closeFile) {
             FSRevisionNode node = myRoot.getRevisionNode(absPath);
             editor.closeFile(path, node.getFileChecksum());
@@ -242,20 +239,20 @@ public class FSReplayPathHandler implements ISVNCommitPathHandler {
     private void addSubdirectory(FSRoot srcRoot, FSRoot tgtRoot, ISVNEditor editor, String srcPath, String path) throws SVNException {
         editor.addDir(path, null, -1);
         FSRevisionNode node = srcRoot.getRevisionNode(srcPath);
-
-        SVNProperties props = node.getProperties(myOwner);
-        for (Iterator names = props.nameSet().iterator(); names.hasNext();) {
-            String propName = (String) names.next();
-            SVNPropertyValue propValue = props.getSVNPropertyValue(propName);
+        
+        Map props = node.getProperties(myOwner);
+        for (Iterator propNames = props.keySet().iterator(); propNames.hasNext();) {
+            String propName = (String) propNames.next();
+            String propValue = (String) props.get(propName);
             editor.changeDirProperty(propName, propValue);
         }
-
+        
         Map entries = node.getDirEntries(myOwner);
         for (Iterator entryNames = entries.keySet().iterator(); entryNames.hasNext();) {
             String entryName = (String) entryNames.next();
             FSEntry entry = (FSEntry) entries.get(entryName);
             String newPath = SVNPathUtil.append(path, entry.getName());
-
+            
             if (entry.getType() == SVNNodeKind.DIR) {
                 addSubdirectory(srcRoot, tgtRoot, editor, SVNPathUtil.append(srcPath, entry.getName()), newPath);
                 editor.closeDir();
@@ -263,16 +260,16 @@ public class FSReplayPathHandler implements ISVNCommitPathHandler {
                 editor.addFile(SVNPathUtil.append(path, entry.getName()), null, -1);
                 String newSrcPath = SVNPathUtil.append(srcPath, entry.getName());
                 FSRevisionNode srcNode = srcRoot.getRevisionNode(newSrcPath);
-
+                
                 props = srcNode.getProperties(myOwner);
-                for (Iterator names = props.nameSet().iterator(); names.hasNext();) {
-                    String propName = (String) names.next();
-                    SVNPropertyValue propValue = props.getSVNPropertyValue(propName);
+                for (Iterator propNames = props.keySet().iterator(); propNames.hasNext();) {
+                    String propName = (String) propNames.next();
+                    String propValue = (String) props.get(propName);
                     editor.changeFileProperty(newPath, propName, propValue);
-                }
-
+                }                
+                
                 editor.applyTextDelta(newPath, null);
-
+                
                 InputStream targetStream = null;
                 try {
                     targetStream = srcRoot.getFileStreamForPath(myDeltaCombiner, newSrcPath);
@@ -283,15 +280,15 @@ public class FSReplayPathHandler implements ISVNCommitPathHandler {
                 String checksum = srcNode.getFileChecksum();
                 editor.closeFile(newPath, checksum);
             }
-
+            
         }
     }
-
+    
     private class CopyInfo {
         String myCopyFromPath;
         long myCopyFromRevision;
         String myPath;
-
+        
         public CopyInfo(String path, String copyFromPath, long copyFromRevision) {
             myPath = path;
             myCopyFromPath = copyFromPath;

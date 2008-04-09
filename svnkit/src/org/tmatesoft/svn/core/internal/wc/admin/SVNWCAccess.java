@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2008 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -12,13 +12,15 @@
 package org.tmatesoft.svn.core.internal.wc.admin;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.Collection;
-import org.tmatesoft.svn.core.internal.util.SVNHashMap;
+import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
+import java.util.StringTokenizer;
 
 import org.tmatesoft.svn.core.SVNCancelException;
-import org.tmatesoft.svn.core.SVNDepth;
 import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
@@ -28,6 +30,7 @@ import org.tmatesoft.svn.core.internal.util.SVNEncodingUtil;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
 import org.tmatesoft.svn.core.internal.wc.DefaultSVNOptions;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
+import org.tmatesoft.svn.core.internal.wc.SVNExternalInfo;
 import org.tmatesoft.svn.core.internal.wc.SVNFileType;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 import org.tmatesoft.svn.core.wc.ISVNEventHandler;
@@ -82,7 +85,7 @@ public class SVNWCAccess implements ISVNEventHandler {
             return;
         }
         if (myCleanupHandlers == null) {
-            myCleanupHandlers = new SVNHashMap();
+            myCleanupHandlers = new HashMap();
         }
         myCleanupHandlers.put(area, handler);
     }
@@ -121,7 +124,7 @@ public class SVNWCAccess implements ISVNEventHandler {
 
     public SVNAdminAreaInfo openAnchor(File path, boolean writeLock, int depth) throws SVNException {
         File parent = path.getParentFile();
-        if (parent == null || "..".equals(path.getName())) {
+        if (parent == null) {
             SVNAdminArea anchor = open(path, writeLock, depth);
             return new SVNAdminAreaInfo(this, anchor, anchor, "");
         }
@@ -252,7 +255,7 @@ public class SVNWCAccess implements ISVNEventHandler {
     }
     
     public SVNAdminArea open(File path, boolean writeLock, boolean stealLock, int depth) throws SVNException {
-        Map tmp = new SVNHashMap();
+        Map tmp = new HashMap();
         SVNAdminArea area;
         try {
             area = doOpen(path, writeLock, stealLock, depth, tmp);
@@ -332,7 +335,7 @@ public class SVNWCAccess implements ISVNEventHandler {
     
     private SVNAdminArea doOpen(File path, boolean writeLock, boolean stealLock, int depth, Map tmp) throws SVNException {
         // no support for 'under consturction here' - it will go to adminAreaFactory.
-        tmp = tmp == null ? new SVNHashMap() : tmp; 
+        tmp = tmp == null ? new HashMap() : tmp; 
         if (myAdminAreas != null) {
             SVNAdminArea existing = (SVNAdminArea) myAdminAreas.get(path);
             if (myAdminAreas.containsKey(path) && existing != null) {
@@ -340,7 +343,7 @@ public class SVNWCAccess implements ISVNEventHandler {
                 SVNErrorManager.error(error);
             }
         } else {
-            myAdminAreas = new SVNHashMap();
+            myAdminAreas = new HashMap();
         }
         
         SVNAdminArea area = SVNAdminAreaFactory.open(path);
@@ -439,62 +442,45 @@ public class SVNWCAccess implements ISVNEventHandler {
         } else if (SVNFileType.getType(lockFile) == SVNFileType.NONE) {
             return false;
         }
-        SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_LOCKED, 
-                "Lock file ''{0}'' is not a regular file", lockFile);
+        SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_LOCKED, "Lock file ''{0}'' is not a regular file", lockFile);
         SVNErrorManager.error(err);
         return false;
     }
     
     public boolean isWCRoot(File path) throws SVNException {
         SVNEntry entry = getEntry(path, false);
-        File parent = path.getParentFile(); 
-        if (parent == null && entry != null) {
+        if (path.getParentFile() == null && entry != null) {
             return true;
         }
-        SVNAdminArea parentArea = getAdminArea(parent);
-        SVNWCAccess tmpAccess = null;
-        SVNWCAccess access = this;
-        try {
-            if (parentArea == null) {
-                tmpAccess = new SVNWCAccess(null);
-                try {
-                    parentArea = tmpAccess.probeOpen(parent, false, 0);
-                } catch (SVNException svne) {
-                    return true;
-                }
-                access = tmpAccess;
-            }
-            
-            SVNEntry parentEntry = access.getEntry(parent, false);
-            if (parentEntry == null) {
+        SVNAdminArea parentArea = getAdminArea(path.getParentFile());
+        if (parentArea == null) {
+            try {
+                parentArea = probeOpen(path.getParentFile(), false, 0);
+            } catch (SVNException svne) {
                 return true;
             }
-            
-            if (parentEntry.getURL() == null) {
-                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_MISSING_URL, 
-                        "''{0}'' has no ancestry information", parent);
-                SVNErrorManager.error(err);
-            }
-            
-            // what about switched paths?
-            /*
-            if (entry != null && entry.getURL() != null) {
-                if (!entry.getURL().equals(SVNPathUtil.append(parentEntry.getURL(), SVNEncodingUtil.uriEncode(path.getName())))) {
-                    return true;
-                }
-            }*/
-            entry = parentArea.getEntry(path.getName(), false);
-            if (entry == null) {
+        }
+        
+        SVNEntry parentEntry = getEntry(path.getParentFile(), false);
+        if (parentEntry == null) {
+            return true;
+        }
+        
+        if (parentEntry.getURL() == null) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_MISSING_URL, "''{0}'' has no ancestry information", path.getParentFile());
+            SVNErrorManager.error(err);
+        }
+        
+        // what about switched paths?
+        /*
+        if (entry != null && entry.getURL() != null) {
+            if (!entry.getURL().equals(SVNPathUtil.append(parentEntry.getURL(), SVNEncodingUtil.uriEncode(path.getName())))) {
                 return true;
             }
-        } finally {
-            if (tmpAccess != null) {
-                try {
-                    tmpAccess.close();
-                } catch (SVNException svne) {
-                    //
-                }
-            }
+        }*/
+        entry = parentArea.getEntry(path.getName(), false);
+        if (entry == null) {
+            return true;
         }
         return false;
     }
@@ -513,16 +499,6 @@ public class SVNWCAccess implements ISVNEventHandler {
             return adminArea.getEntry(entryName, showHidden);
         }
         return null;
-    }
-    
-    public SVNEntry getVersionedEntry(File path, boolean showHidden) throws SVNException {
-        SVNEntry entry = getEntry(path, showHidden);
-        if (entry == null) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_NOT_FOUND, "''{0}'' is not under version control", path);
-            SVNErrorManager.error(err);
-        }
-        return entry;
-
     }
     
     public void setRepositoryRoot(File path, SVNURL reposRoot) throws SVNException {
@@ -581,9 +557,7 @@ public class SVNWCAccess implements ISVNEventHandler {
             SVNFileType wcType = SVNFileType.getType(adminDir);
             
             if (type == SVNFileType.NONE) {
-                SVNErrorMessage childErr = SVNErrorMessage.create(SVNErrorCode.WC_PATH_NOT_FOUND, "Directory ''{0}'' is missing", path);
                 SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_NOT_LOCKED, "Directory ''{0}'' is missing", path);
-                err.setChildErrorMessage(childErr);
                 SVNErrorManager.error(err);
             } else if (type == SVNFileType.DIRECTORY && wcType == SVNFileType.NONE) {
                 SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_NOT_LOCKED, "Directory ''{0}'' containing working copy admin area is missing", adminDir);
@@ -598,6 +572,78 @@ public class SVNWCAccess implements ISVNEventHandler {
         return adminArea;
     }
 
+    public static SVNExternalInfo[] parseExternals(String rootPath, String externals) {
+        Collection result = new ArrayList();
+        if (externals == null) {
+            return (SVNExternalInfo[]) result.toArray(new SVNExternalInfo[result.size()]);
+        }
+
+        for (StringTokenizer lines = new StringTokenizer(externals, "\n\r"); lines.hasMoreTokens();) {
+            String line = lines.nextToken().trim();
+            if (line.length() == 0 || line.startsWith("#")) {
+                continue;
+            }
+            String url = null;
+            String path;
+            long rev = -1;
+            List parts = new ArrayList(4);
+            for (StringTokenizer tokens = new StringTokenizer(line, " \t"); tokens
+                    .hasMoreTokens();) {
+                String token = tokens.nextToken().trim();
+                parts.add(token);
+            }
+            if (parts.size() < 2) {
+                continue;
+            }
+            path = SVNPathUtil.append(rootPath, (String) parts.get(0));
+            if (path.endsWith("/")) {
+                path = path.substring(0, path.length() - 1);
+            }
+            if (parts.size() == 2) {
+                url = (String) parts.get(1);
+            } else if (parts.size() == 3 && parts.get(1).toString().startsWith("-r")) {
+                String revStr = parts.get(1).toString();
+                revStr = revStr.substring("-r".length());
+                if (!"HEAD".equals(revStr)) {
+                    try {
+                        rev = Long.parseLong(revStr);
+                    } catch (NumberFormatException nfe) {
+                        continue;
+                    }
+                }
+                url = (String) parts.get(2);
+            } else if (parts.size() == 4 && "-r".equals(parts.get(1))) {
+                String revStr = parts.get(2).toString();
+                if (!"HEAD".equals(revStr)) {
+                    try {
+                        rev = Long.parseLong(revStr);
+                    } catch (NumberFormatException nfe) {
+                        continue;
+                    }
+                }
+                url = (String) parts.get(3);
+            }
+            if (path != null && url != null) {
+                if ("".equals(rootPath) && ((String) parts.get(0)).startsWith("/")) {
+                    path = "/" + path;
+                }
+                try {
+                    url = SVNURL.parseURIEncoded(url).toString();
+                } catch (SVNException e) {
+                    continue;
+                }
+                
+                try {
+                    SVNExternalInfo info = new SVNExternalInfo("", null, path, SVNURL.parseURIEncoded(url), rev);
+                    result.add(info);
+                } catch (SVNException e) {
+                }
+            }
+        }
+        return (SVNExternalInfo[]) result.toArray(new SVNExternalInfo[result.size()]);
+    }
+
+
     //analogous to retrieve_internal
     public SVNAdminArea getAdminArea(File path) {
         //internal retrieve
@@ -608,33 +654,6 @@ public class SVNWCAccess implements ISVNEventHandler {
         return adminArea;
     }
     
-    public void walkEntries(File path, ISVNEntryHandler handler, boolean showHidden, SVNDepth depth) throws SVNException {
-        SVNEntry entry = getEntry(path, showHidden);
-        if (entry == null) {
-            handler.handleError(path, SVNErrorMessage.create(SVNErrorCode.UNVERSIONED_RESOURCE, 
-                    "''{0}'' is not under version control", path));
-            return;
-        }
-        
-        if (entry.isFile()) {
-            try {
-                handler.handleEntry(path, entry);
-            } catch (SVNException svne) {
-                handler.handleError(path, svne.getErrorMessage());
-            }
-        } else if (entry.isDirectory()) {
-            SVNAdminArea adminArea = entry.getAdminArea();
-            try {
-                adminArea.walkThisDirectory(handler, showHidden, depth);
-            } catch (SVNException svne) {
-                handler.handleError(path, svne.getErrorMessage());
-            }
-        } else {
-           handler.handleError(path, SVNErrorMessage.create(SVNErrorCode.NODE_UNKNOWN_KIND, 
-                   "''{0}'' has an unrecognized node kind", path));
-        }
-    }
-
     private File probe(File path) throws SVNException {
         int wcFormat = -1;
         SVNFileType type = SVNFileType.getType(path);
@@ -654,10 +673,4 @@ public class SVNWCAccess implements ISVNEventHandler {
         } 
         return path;
     }
-
-    public static boolean matchesChangeList(Collection changeLists, SVNEntry entry) {
-        return changeLists == null || changeLists.isEmpty() || 
-        (entry != null && entry.getChangelistName() != null && changeLists.contains(entry.getChangelistName()));
-    }
-    
 }

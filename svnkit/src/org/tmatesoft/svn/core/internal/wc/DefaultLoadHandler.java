@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2008 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -14,22 +14,15 @@ package org.tmatesoft.svn.core.internal.wc;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.CharsetDecoder;
-import java.util.Arrays;
-import org.tmatesoft.svn.core.internal.util.SVNHashMap;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
-import java.util.TreeMap;
 
 import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
-import org.tmatesoft.svn.core.SVNMergeRange;
-import org.tmatesoft.svn.core.SVNMergeRangeList;
 import org.tmatesoft.svn.core.SVNNodeKind;
-import org.tmatesoft.svn.core.SVNProperties;
-import org.tmatesoft.svn.core.SVNProperty;
 import org.tmatesoft.svn.core.SVNRevisionProperty;
-import org.tmatesoft.svn.core.SVNPropertyValue;
 import org.tmatesoft.svn.core.internal.delta.SVNDeltaReader;
 import org.tmatesoft.svn.core.internal.io.fs.FSCommitter;
 import org.tmatesoft.svn.core.internal.io.fs.FSDeltaConsumer;
@@ -39,7 +32,6 @@ import org.tmatesoft.svn.core.internal.io.fs.FSRevisionNode;
 import org.tmatesoft.svn.core.internal.io.fs.FSRevisionRoot;
 import org.tmatesoft.svn.core.internal.io.fs.FSTransactionInfo;
 import org.tmatesoft.svn.core.internal.io.fs.FSTransactionRoot;
-import org.tmatesoft.svn.core.internal.util.SVNMergeInfoUtil;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
 import org.tmatesoft.svn.core.io.diff.SVNDeltaGenerator;
 import org.tmatesoft.svn.core.wc.ISVNEventHandler;
@@ -49,6 +41,7 @@ import org.tmatesoft.svn.core.wc.admin.SVNAdminEvent;
 import org.tmatesoft.svn.core.wc.admin.SVNAdminEventAction;
 import org.tmatesoft.svn.core.wc.admin.SVNUUIDAction;
 import org.tmatesoft.svn.util.SVNDebugLog;
+
 
 
 /**
@@ -70,14 +63,13 @@ public class DefaultLoadHandler implements ISVNLoadHandler {
     private ISVNAdminEventHandler myProgressHandler;
     private CharsetDecoder myDecoder;
     
-    public DefaultLoadHandler(boolean usePreCommitHook, boolean usePostCommitHook, SVNUUIDAction uuidAction, 
-            String parentDir, ISVNAdminEventHandler progressHandler, CharsetDecoder decoder) {
+    public DefaultLoadHandler(boolean usePreCommitHook, boolean usePostCommitHook, SVNUUIDAction uuidAction, String parentDir, ISVNAdminEventHandler progressHandler, CharsetDecoder decoder) {
         myProgressHandler = progressHandler;
         myIsUsePreCommitHook = usePreCommitHook;
         myIsUsePostCommitHook = usePostCommitHook;
         myUUIDAction = uuidAction;
-        myParentDir = SVNPathUtil.canonicalizePath(parentDir);
-        myRevisionsMap = new SVNHashMap();
+        myParentDir = SVNPathUtil.canonicalizeAbsPath(parentDir);
+        myRevisionsMap = new HashMap();
         myDecoder = decoder;
     }
     
@@ -168,7 +160,7 @@ public class DefaultLoadHandler implements ISVNLoadHandler {
         
         if (revision > 0) {
             myCurrentRevisionBaton.myTxn = FSTransactionRoot.beginTransaction(headRevision, 0, myFSFS);
-            myCurrentRevisionBaton.myTxnRoot = myFSFS.createTransactionRoot(myCurrentRevisionBaton.myTxn);
+            myCurrentRevisionBaton.myTxnRoot = myFSFS.createTransactionRoot(myCurrentRevisionBaton.myTxn.getTxnId());
             String message = "<<< Started new transaction, based on original revision " + revision;
             if (myProgressHandler != null) {
                 SVNAdminEvent event = new SVNAdminEvent(revision, SVNAdminEventAction.REVISION_LOAD, message); 
@@ -268,10 +260,10 @@ public class DefaultLoadHandler implements ISVNLoadHandler {
             if (contentLength == 0) {
                 getDeltaGenerator().sendDelta(myCurrentNodeBaton.myPath, SVNFileUtil.DUMMY_IN, fsConsumer, false);
             } else {
-                buffer = new byte[SVNFileUtil.STREAM_CHUNK_SIZE];
+                buffer = new byte[SVNAdminHelper.STREAM_CHUNK_SIZE];
                 try {
                     while (contentLength > 0) {
-                        int numToRead = contentLength > SVNFileUtil.STREAM_CHUNK_SIZE ? SVNFileUtil.STREAM_CHUNK_SIZE : contentLength;
+                        int numToRead = contentLength > SVNAdminHelper.STREAM_CHUNK_SIZE ? SVNAdminHelper.STREAM_CHUNK_SIZE : contentLength;
                         int read = 0;
                         while(numToRead > 0) {
                             int numRead = dumpStream.read(buffer, read, numToRead);
@@ -291,9 +283,10 @@ public class DefaultLoadHandler implements ISVNLoadHandler {
                         contentLength -= read;
                     }
                 } catch (IOException ioe) {
-                    SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, ioe.getMessage());
+                    SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, ioe.getLocalizedMessage());
                     SVNErrorManager.error(err, ioe);
                 }
+
                 fsConsumer.textDeltaEnd(myCurrentNodeBaton.myPath);
             }
         } catch (SVNException svne) {
@@ -351,7 +344,7 @@ public class DefaultLoadHandler implements ISVNLoadHandler {
     
                         buff = new byte[len + 1];
                         actualLength += SVNAdminHelper.readKeyOrValue(dumpStream, buff, len + 1);
-                        SVNPropertyValue propValue = SVNPropertyValue.create(propName, buff, 0, len);
+                        String propValue = new String(buff, 0, len, "UTF-8");
                         if (isNode) {
                             setNodeProperty(propName, propValue);
                         } else {
@@ -377,7 +370,7 @@ public class DefaultLoadHandler implements ISVNLoadHandler {
                     }
                     
                     String propName = new String(buff, 0, len, "UTF-8");
-                    deleteNodeProperty(propName);
+                    setNodeProperty(propName, null);
                 } else {
                     SVNAdminHelper.generateStreamMalformedError();
                 }
@@ -393,15 +386,19 @@ public class DefaultLoadHandler implements ISVNLoadHandler {
     public void removeNodeProperties() throws SVNException {
         FSTransactionRoot txnRoot = myCurrentRevisionBaton.myTxnRoot;
         FSRevisionNode node = txnRoot.getRevisionNode(myCurrentNodeBaton.myPath);
-        SVNProperties props = node.getProperties(myFSFS);
+        Map props = node.getProperties(myFSFS);
         
-        for (Iterator propNames = props.nameSet().iterator(); propNames.hasNext();) {
+        for (Iterator propNames = props.keySet().iterator(); propNames.hasNext();) {
             String propName = (String) propNames.next();
             myCurrentRevisionBaton.getCommitter().changeNodeProperty(myCurrentNodeBaton.myPath, propName, null);
         }
     }
 
-    public void setRevisionProperty(String propertyName, SVNPropertyValue propertyValue) throws SVNException {
+    public void setNodeProperty(String propertyName, String propertyValue) throws SVNException {
+        myCurrentRevisionBaton.getCommitter().changeNodeProperty(myCurrentNodeBaton.myPath, propertyName, propertyValue);
+    }
+
+    public void setRevisionProperty(String propertyName, String propertyValue) throws SVNException {
         if (myCurrentRevisionBaton.myRevision > 0) {
             myFSFS.setTransactionProperty(myCurrentRevisionBaton.myTxn.getTxnId(), propertyName, propertyValue);
             if (SVNRevisionProperty.DATE.equals(propertyName)) {
@@ -438,23 +435,6 @@ public class DefaultLoadHandler implements ISVNLoadHandler {
         return myDeltaReader;
     }
 
-    private void deleteNodeProperty(String propertyName) throws SVNException {
-        myCurrentRevisionBaton.getCommitter().changeNodeProperty(myCurrentNodeBaton.myPath, propertyName, null);
-    }
-    
-    private void setNodeProperty(String propertyName, SVNPropertyValue propertyValue) throws SVNException {
-        if (SVNProperty.MERGE_INFO.equals(propertyName)) {
-            Map mergeInfo = renumberMergeInfoRevisions(propertyValue);
-            if (myParentDir != null) {
-                mergeInfo = prefixMergeInfoPaths(mergeInfo);
-            }
-            String mergeInfoString = SVNMergeInfoUtil.formatMergeInfoToString(mergeInfo);
-            propertyValue = SVNPropertyValue.create(mergeInfoString);
-        }
-        myCurrentRevisionBaton.getCommitter().changeNodeProperty(myCurrentNodeBaton.myPath, propertyName, 
-                propertyValue);
-    }
-
     private SVNDeltaGenerator getDeltaGenerator() {
         if (myDeltaGenerator == null) {
             myDeltaGenerator = new SVNDeltaGenerator();
@@ -479,7 +459,7 @@ public class DefaultLoadHandler implements ISVNLoadHandler {
             }
             
             if (!SVNRevision.isValidRevisionNumber(srcRevision)) {
-                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_NO_SUCH_REVISION, "Relative source revision {0} is not available in current repository", new Long(srcRevision));
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_NO_SUCH_REVISION, "Relative source revision {0,number,integer} is not available in current repository", new Long(srcRevision));
                 SVNErrorManager.error(err);
             }
             
@@ -495,9 +475,9 @@ public class DefaultLoadHandler implements ISVNLoadHandler {
         if (headers.containsKey(SVNAdminHelper.DUMPFILE_NODE_PATH)) {
             String nodePath = (String) headers.get(SVNAdminHelper.DUMPFILE_NODE_PATH); 
             if (myParentDir != null) {
-                baton.myPath = SVNPathUtil.getAbsolutePath(SVNPathUtil.append(myParentDir, nodePath));
+                baton.myPath = SVNPathUtil.concatToAbs(myParentDir, nodePath.startsWith("/") ? nodePath.substring(1) : nodePath);
             } else {
-                baton.myPath = SVNPathUtil.getAbsolutePath(SVNPathUtil.canonicalizePath(nodePath));
+                baton.myPath = SVNPathUtil.canonicalizeAbsPath(nodePath);
             }
         }
         
@@ -532,11 +512,10 @@ public class DefaultLoadHandler implements ISVNLoadHandler {
         if (headers.containsKey(SVNAdminHelper.DUMPFILE_NODE_COPYFROM_PATH)) {
             String copyFromPath = (String) headers.get(SVNAdminHelper.DUMPFILE_NODE_COPYFROM_PATH);
             if (myParentDir != null) {
-                baton.myCopyFromPath = SVNPathUtil.append(myParentDir, copyFromPath);
+                baton.myCopyFromPath = SVNPathUtil.concatToAbs(myParentDir, copyFromPath.startsWith("/") ? copyFromPath.substring(1) : copyFromPath);
             } else {
-                baton.myCopyFromPath = SVNPathUtil.canonicalizePath(copyFromPath);
+                baton.myCopyFromPath = SVNPathUtil.canonicalizeAbsPath(copyFromPath);
             }
-            baton.myCopyFromPath = SVNPathUtil.getAbsolutePath(baton.myCopyFromPath);
         }
         
         if (headers.containsKey(SVNAdminHelper.DUMPFILE_TEXT_CONTENT_LENGTH)) {
@@ -545,47 +524,12 @@ public class DefaultLoadHandler implements ISVNLoadHandler {
         return baton;
     }
     
-    private Map renumberMergeInfoRevisions(SVNPropertyValue mergeInfoProp) throws SVNException {
-        String mergeInfoString = SVNPropertyValue.getPropertyAsString(mergeInfoProp);
-        Map mergeInfo = SVNMergeInfoUtil.parseMergeInfo(new StringBuffer(mergeInfoString), null);
-        for (Iterator mergeInfoIter = mergeInfo.keySet().iterator(); mergeInfoIter.hasNext();) {
-            String mergeSource = (String) mergeInfoIter.next();
-            SVNMergeRangeList rangeList = (SVNMergeRangeList) mergeInfo.get(mergeSource);
-            SVNMergeRange[] ranges = rangeList.getRanges();
-            for (int i = 0; i < ranges.length; i++) {
-                SVNMergeRange range = ranges[i];
-                Long revFromMap = (Long) myRevisionsMap.get(new Long(range.getStartRevision()));
-                if (revFromMap != null && SVNRevision.isValidRevisionNumber(revFromMap.longValue())) {
-                    range.setStartRevision(revFromMap.longValue());
-                }
-                revFromMap = (Long) myRevisionsMap.get(new Long(range.getEndRevision()));
-                if (revFromMap != null && SVNRevision.isValidRevisionNumber(revFromMap.longValue())) {
-                    range.setEndRevision(revFromMap.longValue());
-                }
-            }
-            Arrays.sort(ranges);
-        }
-        return mergeInfo;
-    }
-    
-    private Map prefixMergeInfoPaths(Map mergeInfo) {
-        Map prefixedMergeInfo = new TreeMap();
-        for (Iterator mergeInfoIter = mergeInfo.keySet().iterator(); mergeInfoIter.hasNext();) {
-            String mergeSource = (String) mergeInfoIter.next();
-            SVNMergeRangeList rangeList = (SVNMergeRangeList) mergeInfo.get(mergeSource);
-            mergeSource = mergeSource.startsWith("/") ? mergeSource.substring(1) : mergeSource;
-            String prefixedMergeSource = SVNPathUtil.getAbsolutePath(SVNPathUtil.append(myParentDir, mergeSource));
-            prefixedMergeInfo.put(prefixedMergeSource, rangeList);
-        }
-        return prefixedMergeInfo;
-    }
-    
     private class RevisionBaton {
         FSTransactionInfo myTxn;
         FSTransactionRoot myTxnRoot;
         long myRevision;
         long myRevisionOffset;
-        SVNPropertyValue myDatestamp;
+        String myDatestamp;
         
         private FSCommitter myCommitter;
         private FSDeltaConsumer myDeltaConsumer;

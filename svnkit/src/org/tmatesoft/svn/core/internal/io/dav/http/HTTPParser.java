@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2008 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -11,6 +11,7 @@
  */
 package org.tmatesoft.svn.core.internal.io.dav.http;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.text.ParseException;
@@ -20,8 +21,6 @@ import java.text.ParseException;
  * @author  TMate Software Ltd.
  */
 class HTTPParser {
-    
-    private static byte[] ourReadBuffer = new byte[8192];
     
     public static HTTPStatus parseStatus(InputStream is, String charset) throws IOException, ParseException {
         String line = null;
@@ -42,31 +41,34 @@ class HTTPParser {
         return HTTPStatus.createHTTPStatus(line);
     }
     
-    public static synchronized String readLine(InputStream is, String charset) throws IOException {
-        int length = readPlainLine(is);
-        if (length <= 0) {
+    public static String readLine(InputStream is, String charset) throws IOException {
+        byte[] bytes = readPlainLine(is);
+        if (bytes == null) {
             return null;
         }
-        if (length > 0 && ourReadBuffer[length - 1] == '\n') {
+        int length = bytes.length;
+        if (length > 0 && bytes[length - 1] == '\n') {
             length--;
-            if (length > 0 && ourReadBuffer[length - 1] == '\r') {
+            if (length > 0 && bytes[length - 1] == '\r') {
                 length--;
             }
         }
-        return new String(ourReadBuffer, 0, length, charset);
+        return new String(bytes, 0, length, charset);
     }
     
-    private static int readPlainLine(InputStream is) throws IOException {
+    public static byte[] readPlainLine(InputStream is) throws IOException {
+        ByteArrayOutputStream buf = new ByteArrayOutputStream();
         int ch;
-        int i = 0;
-        while (i < ourReadBuffer.length && (ch = is.read()) >= 0) {
-            ourReadBuffer[i] = (byte) (ch & 0xFF);
+        while ((ch = is.read()) >= 0) {
+            buf.write(ch);
             if (ch == '\n') {
                 break;
             }
-            i++;
         }
-        return i;
+        if (buf.size() == 0) {
+            return null;
+        }
+        return buf.toByteArray();
     }
 
     public static StringBuffer getCanonicalPath(String path, StringBuffer target) {

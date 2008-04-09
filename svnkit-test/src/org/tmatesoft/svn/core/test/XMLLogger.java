@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2008 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -11,19 +11,18 @@
  */
 package org.tmatesoft.svn.core.test;
 
+import java.util.Properties;
 import java.io.File;
+import java.io.PrintWriter;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.io.PrintWriter;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.LinkedList;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
-import java.util.Calendar;
 import java.util.Date;
-import java.util.LinkedList;
-import java.util.Map;
-import java.util.Properties;
-
-import org.tmatesoft.svn.core.internal.util.SVNHashMap;
+import java.util.Calendar;
 
 /**
  * @version 1.1.1
@@ -56,8 +55,8 @@ public class XMLLogger extends AbstractPythonTestLogger {
 
 	    myWriter = new PrintWriter(new FileWriter(resultsFile));
 	    myResults = new LinkedList();
-	    myServers = new SVNHashMap();
-        myServersToURLs = new SVNHashMap();
+	    myServers = new HashMap();
+        myServersToURLs = new HashMap();
         
 	    String resultString = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>";
 	    myResults.addFirst(resultString);   
@@ -72,7 +71,7 @@ public class XMLLogger extends AbstractPythonTestLogger {
         curServer = name;
 	    String resultString = "server" + name;
         myResults.addFirst(resultString);   
-        mySuitesStat = new SVNHashMap();
+        mySuitesStat = new HashMap();
     
     }
 

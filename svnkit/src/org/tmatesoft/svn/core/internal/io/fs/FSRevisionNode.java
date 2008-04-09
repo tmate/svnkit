@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2008 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -18,11 +18,9 @@ import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNNodeKind;
-import org.tmatesoft.svn.core.SVNProperties;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
-import org.tmatesoft.svn.core.io.SVNRepository;
 
 /**
  * @version 1.1.1
@@ -41,8 +39,6 @@ public class FSRevisionNode {
     public static final String HEADER_COPYFROM = "copyfrom";
     public static final String HEADER_COPYROOT = "copyroot";
     public static final String HEADER_IS_FRESH_TXN_ROOT = "is-fresh-txn-root";
-    public static final String HEADER_MERGE_INFO_COUNT = "minfo-cnt";
-    public static final String HEADER_MERGE_INFO_HERE = "minfo-here";
 
     // id: a.b.r<revID>/offset
     private FSID myId;
@@ -82,10 +78,10 @@ public class FSRevisionNode {
     //changed yet (fresh) or was
     private boolean myIsFreshTxnRoot;
     private FSID myFreshRootPredecessorId;
-    
-    private long myMergeInfoCount;
-    private boolean myHasMergeInfo;
-    
+
+    public FSRevisionNode() {
+    }
+
     public void setId(FSID revNodeID) {
         myId = revNodeID;
     }
@@ -130,14 +126,6 @@ public class FSRevisionNode {
         myCopyRootPath = copyRootPath;
     }
 
-    public void setMergeInfoCount(long mergeInfoCount) {
-        myMergeInfoCount = mergeInfoCount;
-    }
-    
-    public void setHasMergeInfo(boolean hasMergeInfo) {
-        myHasMergeInfo = hasMergeInfo;
-    }
-    
     public FSID getId() {
         return myId;
     }
@@ -174,7 +162,7 @@ public class FSRevisionNode {
         }
         return myId.getRevision();
     }
-    
+
     public long getCopyFromRevision() {
         return myCopyFromRevision;
     }
@@ -210,8 +198,6 @@ public class FSRevisionNode {
         if (revNode.getTextRepresentation() != null) {
             clone.setTextRepresentation(new FSRepresentation(revNode.getTextRepresentation()));
         }
-        clone.setMergeInfoCount(revNode.getMergeInfoCount());
-        clone.setHasMergeInfo(revNode.hasMergeInfo());
         return clone;
     }
 
@@ -223,55 +209,19 @@ public class FSRevisionNode {
         myDirContents = dirContents;
     }
 
-    public boolean hasMergeInfo() {
-        return myHasMergeInfo;
-    }
-    
-    public long getMergeInfoCount() {
-        return myMergeInfoCount;
-    }
-    
-    public boolean hasDescendantsWithMergeInfo() {
-        if (myType != SVNNodeKind.DIR) {
-            return false;
-        }
-        
-        if (myMergeInfoCount > 1) {
-            return true;
-        } else if (myMergeInfoCount == 1 && !myHasMergeInfo) {
-            return true;
-        }
-        return false;
-    }
-
-    public String toString() {
-        StringBuffer buffer = new StringBuffer();
-        buffer.append("{[");
-        buffer.append("ID:");
-        buffer.append(myId);
-        buffer.append("][");
-        buffer.append("text representation:");
-        buffer.append(myTextRepresentation);
-        buffer.append("][");
-        buffer.append("Node kind:");
-        buffer.append(myType);
-        buffer.append("]}");
-        return buffer.toString();
-    }
-
     public static FSRevisionNode fromMap(Map headers) throws SVNException {
         FSRevisionNode revNode = new FSRevisionNode();
 
         // Read the rev-node id.
         String revNodeId = (String) headers.get(FSRevisionNode.HEADER_ID);
         if (revNodeId == null) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_CORRUPT, "Missing id field in node-rev");
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_CORRUPT, "Missing node-id in node-rev");
             SVNErrorManager.error(err);
         }
 
         FSID revnodeID = FSID.fromString(revNodeId);
         if (revnodeID == null) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_CORRUPT, "Corrupted node-id in node-rev");
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_CORRUPT, "Corrupt node-id in node-rev");
             SVNErrorManager.error(err);
         }
         revNode.setId(revnodeID);
@@ -293,8 +243,7 @@ public class FSRevisionNode {
             try {
                 cnt = Long.parseLong(countString);
             } catch (NumberFormatException nfe) {
-                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_CORRUPT, 
-                        "Corrupted count field in node-rev");
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_CORRUPT, "Corrupt count field in node-rev");
                 SVNErrorManager.error(err);
             }
             revNode.setCount(cnt);
@@ -303,13 +252,13 @@ public class FSRevisionNode {
         // Get the properties location (if any).
         String propsRepr = (String) headers.get(FSRevisionNode.HEADER_PROPS);
         if (propsRepr != null) {
-            parseRepresentationHeader(propsRepr, revNode, revnodeID.getTxnID(), false, true);
+            parseRepresentationHeader(propsRepr, revNode, revnodeID.getTxnID(), false);
         }
 
         // Get the data location (if any).
         String textRepr = (String) headers.get(FSRevisionNode.HEADER_TEXT);
         if (textRepr != null) {
-            parseRepresentationHeader(textRepr, revNode, revnodeID.getTxnID(), true, nodeKind == SVNNodeKind.DIR);
+            parseRepresentationHeader(textRepr, revNode, revnodeID.getTxnID(), true);
         }
 
         // Get the created path.
@@ -325,8 +274,7 @@ public class FSRevisionNode {
         if (predId != null) {
             FSID predRevNodeId = FSID.fromString(predId);
             if (predRevNodeId == null) {
-                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_CORRUPT, 
-                        "Corrupted predecessor node-id in node-rev");
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_CORRUPT, "Corrupt predecessor node-id in node-rev");
                 SVNErrorManager.error(err);
             }
             revNode.setPredecessorId(predRevNodeId);
@@ -345,32 +293,67 @@ public class FSRevisionNode {
         String copyfrom = (String) headers.get(FSRevisionNode.HEADER_COPYFROM);
         if (copyfrom == null) {
             revNode.setCopyFromPath(null);
-            revNode.setCopyFromRevision(SVNRepository.INVALID_REVISION);
+            revNode.setCopyFromRevision(FSRepository.SVN_INVALID_REVNUM);
         } else {
             parseCopyFrom(copyfrom, revNode);
         }
-        
         revNode.myIsFreshTxnRoot = headers.containsKey(HEADER_IS_FRESH_TXN_ROOT);
-        
-        String mergeInfoCountStr = (String) headers.get(HEADER_MERGE_INFO_COUNT);
-        if (mergeInfoCountStr == null) {
-            revNode.myMergeInfoCount = 0;
-        } else {
-            try {
-                revNode.myMergeInfoCount = Long.parseLong(mergeInfoCountStr);
-            } catch (NumberFormatException e) {
-                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_CORRUPT, 
-                        "Corrupted mergeinfo count in node-rev");
-                SVNErrorManager.error(err, e);
-            }
-        }
-
-        revNode.myHasMergeInfo = headers.containsKey(HEADER_MERGE_INFO_HERE);
         return revNode;
     }
 
-    public static void parseRepresentationHeader(String representation, FSRevisionNode revNode, String txnId, 
-            boolean isData, boolean mutableRepTuncated) throws SVNException {
+    private static void parseCopyFrom(String copyfrom, FSRevisionNode revNode) throws SVNException {
+        if (copyfrom == null || copyfrom.length() == 0) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_CORRUPT, "Malformed copyfrom line in node-rev");
+            SVNErrorManager.error(err);
+        }
+
+        int delimiterInd = copyfrom.indexOf(' ');
+        if (delimiterInd == -1) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_CORRUPT, "Malformed copyfrom line in node-rev");
+            SVNErrorManager.error(err);
+        }
+
+        String copyfromRev = copyfrom.substring(0, delimiterInd);
+        String copyfromPath = copyfrom.substring(delimiterInd + 1);
+
+        long rev = -1;
+        try {
+            rev = Long.parseLong(copyfromRev);
+        } catch (NumberFormatException nfe) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_CORRUPT, "Malformed copyfrom line in node-rev");
+            SVNErrorManager.error(err);
+        }
+        revNode.setCopyFromRevision(rev);
+        revNode.setCopyFromPath(copyfromPath);
+    }
+
+    private static void parseCopyRoot(String copyroot, FSRevisionNode revNode) throws SVNException {
+        if (copyroot == null || copyroot.length() == 0) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_CORRUPT, "Malformed copyroot line in node-rev");
+            SVNErrorManager.error(err);
+        }
+
+        int delimiterInd = copyroot.indexOf(' ');
+        if (delimiterInd == -1) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_CORRUPT, "Malformed copyroot line in node-rev");
+            SVNErrorManager.error(err);
+        }
+
+        String copyrootRev = copyroot.substring(0, delimiterInd);
+        String copyrootPath = copyroot.substring(delimiterInd + 1);
+
+        long rev = -1;
+        try {
+            rev = Long.parseLong(copyrootRev);
+        } catch (NumberFormatException nfe) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_CORRUPT, "Malformed copyroot line in node-rev");
+            SVNErrorManager.error(err);
+        }
+        revNode.setCopyRootRevision(rev);
+        revNode.setCopyRootPath(copyrootPath);
+    }
+
+    private static void parseRepresentationHeader(String representation, FSRevisionNode revNode, String txnId, boolean isData) throws SVNException {
         if (revNode == null) {
             return;
         }
@@ -389,11 +372,9 @@ public class FSRevisionNode {
         try {
             rev = Long.parseLong(revision);
         } catch (NumberFormatException nfe) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_CORRUPT, 
-                    "Malformed text rep offset line in node-rev");
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_CORRUPT, "Malformed text rep offset line in node-rev");
             SVNErrorManager.error(err);
         }
-        
         rep.setRevision(rev);
 
         if (FSRepository.isInvalidRevision(rep.getRevision())) {
@@ -403,7 +384,8 @@ public class FSRevisionNode {
             } else {
                 revNode.setPropsRepresentation(rep);
             }
-            if (mutableRepTuncated) {
+            // is it a mutable representation?
+            if (!isData || revNode.getType() == SVNNodeKind.DIR) {
                 return;
             }
         }
@@ -482,61 +464,6 @@ public class FSRevisionNode {
         }
     }
 
-    private static void parseCopyFrom(String copyfrom, FSRevisionNode revNode) throws SVNException {
-        if (copyfrom == null || copyfrom.length() == 0) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_CORRUPT, 
-                    "Malformed copyfrom line in node-rev");
-            SVNErrorManager.error(err);
-        }
-
-        int delimiterInd = copyfrom.indexOf(' ');
-        if (delimiterInd == -1) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_CORRUPT, 
-                    "Malformed copyfrom line in node-rev");
-            SVNErrorManager.error(err);
-        }
-
-        String copyfromRev = copyfrom.substring(0, delimiterInd);
-        String copyfromPath = copyfrom.substring(delimiterInd + 1);
-
-        long rev = -1;
-        try {
-            rev = Long.parseLong(copyfromRev);
-        } catch (NumberFormatException nfe) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_CORRUPT, 
-                    "Malformed copyfrom line in node-rev");
-            SVNErrorManager.error(err);
-        }
-        revNode.setCopyFromRevision(rev);
-        revNode.setCopyFromPath(copyfromPath);
-    }
-
-    private static void parseCopyRoot(String copyroot, FSRevisionNode revNode) throws SVNException {
-        if (copyroot == null || copyroot.length() == 0) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_CORRUPT, "Malformed copyroot line in node-rev");
-            SVNErrorManager.error(err);
-        }
-
-        int delimiterInd = copyroot.indexOf(' ');
-        if (delimiterInd == -1) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_CORRUPT, "Malformed copyroot line in node-rev");
-            SVNErrorManager.error(err);
-        }
-
-        String copyrootRev = copyroot.substring(0, delimiterInd);
-        String copyrootPath = copyroot.substring(delimiterInd + 1);
-
-        long rev = -1;
-        try {
-            rev = Long.parseLong(copyrootRev);
-        } catch (NumberFormatException nfe) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_CORRUPT, "Malformed copyroot line in node-rev");
-            SVNErrorManager.error(err);
-        }
-        revNode.setCopyRootRevision(rev);
-        revNode.setCopyRootPath(copyrootPath);
-    }
-
     public FSRevisionNode getChildDirNode(String childName, FSFS fsfsOwner) throws SVNException {
         if (!SVNPathUtil.isSinglePathComponent(childName)) {
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_NOT_SINGLE_PATH_COMPONENT, "Attempted to open node with an illegal name ''{0}''", childName);
@@ -568,7 +495,7 @@ public class FSRevisionNode {
         return Collections.unmodifiableMap(dirContents);
     }
 
-    public SVNProperties getProperties(FSFS fsfsOwner) throws SVNException {
+    public Map getProperties(FSFS fsfsOwner) throws SVNException {
         return fsfsOwner.getProperties(this);
     }
 
@@ -613,4 +540,5 @@ public class FSRevisionNode {
     public void setFreshRootPredecessorId(FSID freshRootPredecessorId) {
         myFreshRootPredecessorId = freshRootPredecessorId;
     }
+
 }

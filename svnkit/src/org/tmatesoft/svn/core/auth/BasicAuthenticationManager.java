@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2008 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -14,8 +14,6 @@ package org.tmatesoft.svn.core.auth;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
-
-import javax.net.ssl.TrustManager;
 
 import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
@@ -194,12 +192,19 @@ public class BasicAuthenticationManager implements ISVNAuthenticationManager, IS
     public ISVNProxyManager getProxyManager(SVNURL url) throws SVNException {
         return this;
     }
-
-	public TrustManager getTrustManager(SVNURL url) throws SVNException {
-		return null;
-	}
-
-	/**
+    
+    /**
+     * Returns <span class="javakeyword">null</span>.
+     * 
+     * @param  url
+     * @return <span class="javakeyword">null</span>
+     * @throws SVNException
+     */
+    public ISVNSSLManager getSSLManager(SVNURL url) throws SVNException {
+        return null;
+    }
+    
+    /**
      * Does nothing.
      * 
      * @param accepted
@@ -252,20 +257,8 @@ public class BasicAuthenticationManager implements ISVNAuthenticationManager, IS
     public void acknowledgeProxyContext(boolean accepted, SVNErrorMessage errorMessage) {
     }
 
-    public int getReadTimeout(SVNRepository repository) {
-        String protocol = repository.getLocation().getProtocol();
-        if ("http".equals(protocol) || "https".equals(protocol)) {
-            return 3600*1000;
-        }
-        return 0;
-    }
-
-    public int getConnectTimeout(SVNRepository repository) {
-        String protocol = repository.getLocation().getProtocol();
-        if ("http".equals(protocol) || "https".equals(protocol)) {
-            return 60*1000;
-        }
-        return 0; 
+    public long getHTTPTimeout(SVNRepository repository) {
+        return 3600*1000;
     }
 
 }

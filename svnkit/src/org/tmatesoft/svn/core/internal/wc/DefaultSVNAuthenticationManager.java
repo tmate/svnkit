@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2008 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -14,27 +14,24 @@ package org.tmatesoft.svn.core.internal.wc;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Collection;
-import org.tmatesoft.svn.core.internal.util.SVNHashMap;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.StringTokenizer;
 
-import javax.net.ssl.TrustManager;
-
 import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNURL;
-import org.tmatesoft.svn.core.SVNProperties;
-import org.tmatesoft.svn.core.SVNPropertyValue;
 import org.tmatesoft.svn.core.auth.ISVNAuthenticationManager;
 import org.tmatesoft.svn.core.auth.ISVNAuthenticationProvider;
 import org.tmatesoft.svn.core.auth.ISVNAuthenticationStorage;
 import org.tmatesoft.svn.core.auth.ISVNProxyManager;
+import org.tmatesoft.svn.core.auth.ISVNSSLManager;
 import org.tmatesoft.svn.core.auth.SVNAuthentication;
 import org.tmatesoft.svn.core.auth.SVNPasswordAuthentication;
 import org.tmatesoft.svn.core.auth.SVNSSHAuthentication;
-import org.tmatesoft.svn.core.auth.SVNSSLAuthentication;
 import org.tmatesoft.svn.core.auth.SVNUserNameAuthentication;
+import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
 import org.tmatesoft.svn.core.io.SVNRepository;
 import org.tmatesoft.svn.core.wc.SVNWCUtil;
 
@@ -109,25 +106,30 @@ public class DefaultSVNAuthenticationManager implements ISVNAuthenticationManage
         return new SimpleProxyManager(proxyHost, proxyPort, proxyUser, proxyPassword);
     }
 
-	public TrustManager getTrustManager(SVNURL url) throws SVNException {
-		String host = url.getHost();
-
-		Map properties = getHostProperties(host);
-		boolean trustAll = !"no".equalsIgnoreCase((String) properties.get("ssl-trust-default-ca")); // jdk keystore
-		String sslAuthorityFiles = (String) properties.get("ssl-authority-files"); // "pem" files
-		Collection trustStorages = new ArrayList();
-		if (sslAuthorityFiles != null) {
-		    for(StringTokenizer files = new StringTokenizer(sslAuthorityFiles, ","); files.hasMoreTokens();) {
-		        String fileName = files.nextToken();
-		        if (fileName != null && !"".equals(fileName.trim())) {
-		            trustStorages.add(new File(fileName));
-		        }
-		    }
-		}
-		File[] serverCertFiles = (File[]) trustStorages.toArray(new File[trustStorages.size()]);
-		File authDir = new File(myConfigDirectory, "auth/svn.ssl.server");
-		return new DefaultSVNSSLTrustManager(authDir, url, serverCertFiles, trustAll, this);
-	}
+    public ISVNSSLManager getSSLManager(SVNURL url) throws SVNException {
+        String host = url.getHost();
+        
+        Map properties = getHostProperties(host);
+        boolean trustAll = !"no".equalsIgnoreCase((String) properties.get("ssl-trust-default-ca")); // jdk keystore
+        String sslAuthorityFiles = (String) properties.get("ssl-authority-files"); // "pem" files
+        String sslClientCert = (String) properties.get("ssl-client-cert-file"); // PKCS#12
+        String sslClientCertPassword = (String) properties.get("ssl-client-cert-password");
+        boolean promptForClientCert = "yes".equalsIgnoreCase((String) properties.get("ssl-client-cert-prompt"));
+        
+        File clientCertFile = sslClientCert != null ? new File(sslClientCert) : null;
+        Collection trustStorages = new ArrayList();
+        if (sslAuthorityFiles != null) {
+            for(StringTokenizer files = new StringTokenizer(sslAuthorityFiles, ";"); files.hasMoreTokens();) {
+                String fileName = files.nextToken();
+                if (fileName != null && !"".equals(fileName.trim())) {
+                    trustStorages.add(new File(fileName));
+                }
+            }
+        }
+        File[] serverCertFiles = (File[]) trustStorages.toArray(new File[trustStorages.size()]);
+        File authDir = new File(myConfigDirectory, "auth/svn.ssl.server");
+        return new DefaultSVNSSLManager(authDir, url, serverCertFiles, trustAll, clientCertFile, sslClientCertPassword, promptForClientCert, this);
+    }
 
     private Map getHostProperties(String host) {
         Map globalProps = getServersFile().getProperties("global");
@@ -255,7 +257,7 @@ public class DefaultSVNAuthenticationManager implements ISVNAuthenticationManage
     protected ISVNAuthenticationStorage getRuntimeAuthStorage() {
         if (myRuntimeAuthStorage == null) {
             myRuntimeAuthStorage = new ISVNAuthenticationStorage() {
-                private Map myData = new SVNHashMap(); 
+                private Map myData = new HashMap(); 
 
                 public void putData(String kind, String realm, Object data) {
                     myData.put(kind + "$" + realm, data);
@@ -300,7 +302,7 @@ public class DefaultSVNAuthenticationManager implements ISVNAuthenticationManage
     protected SVNSSHAuthentication getDefaultSSHAuthentication() {
         Map tunnels = getConfigFile().getProperties("tunnels");
         if (tunnels == null || !tunnels.containsKey("ssh")) {
-            tunnels = new SVNHashMap();
+            tunnels = new HashMap();
         }
         
         String sshProgram = (String) tunnels.get("ssh");
@@ -456,15 +458,6 @@ public class DefaultSVNAuthenticationManager implements ISVNAuthenticationManage
         }
 
         public SVNAuthentication requestClientAuthentication(String kind, SVNURL url, String realm, SVNErrorMessage errorMessage, SVNAuthentication previousAuth, boolean authMayBeStored) {
-	        if (ISVNAuthenticationManager.SSL.equals(kind)) {
-		        String host = url.getHost();
-		        Map properties = getHostProperties(host);
-		        String sslClientCert = (String) properties.get("ssl-client-cert-file"); // PKCS#12
-		        String sslClientCertPassword = (String) properties.get("ssl-client-cert-password");
-		        File clientCertFile = sslClientCert != null ? new File(sslClientCert) : null;
-		        return new SVNSSLAuthentication(clientCertFile, sslClientCertPassword, authMayBeStored);
-	        }
-
             File dir = new File(myDirectory, kind);
             if (!dir.isDirectory()) {
                 return null;
@@ -472,11 +465,11 @@ public class DefaultSVNAuthenticationManager implements ISVNAuthenticationManage
             String fileName = SVNFileUtil.computeChecksum(realm);
             File authFile = new File(dir, fileName);
             if (authFile.exists()) {
-                SVNWCProperties props = new SVNWCProperties(authFile, "");
+                SVNProperties props = new SVNProperties(authFile, "");
                 try {
-                    SVNProperties values = props.asMap();
-                    String storedRealm = values.getStringValue("svn:realmstring");
-                    String cipherType = SVNPropertyValue.getPropertyAsString(values.getSVNPropertyValue("passtype"));
+                    Map values = props.asMap();
+                    String storedRealm = (String) values.get("svn:realmstring");
+                    String cipherType = (String) values.get("passtype");
                     if (cipherType != null && !SVNPasswordCipher.hasCipher(cipherType)) {
                         return null;
                     }
@@ -484,17 +477,17 @@ public class DefaultSVNAuthenticationManager implements ISVNAuthenticationManage
                     if (storedRealm == null || !storedRealm.equals(realm)) {
                         return null;
                     }
-                    String userName = SVNPropertyValue.getPropertyAsString(values.getSVNPropertyValue("username"));
+                    String userName = (String) values.get("username");
                     if (userName == null || "".equals(userName.trim())) {
                         return null;
                     }
-                    String password = SVNPropertyValue.getPropertyAsString(values.getSVNPropertyValue("password"));
+                    String password = (String) values.get("password");
                     password = cipher.decrypt(password);
 
-                    String path = SVNPropertyValue.getPropertyAsString(values.getSVNPropertyValue("key"));
-                    String passphrase = SVNPropertyValue.getPropertyAsString(values.getSVNPropertyValue("passphrase"));
+                    String path = (String) values.get("key");
+                    String passphrase = (String) values.get("passphrase");
                     passphrase = cipher.decrypt(passphrase);
-                    String port = SVNPropertyValue.getPropertyAsString(values.getSVNPropertyValue("port"));
+                    String port = (String) values.get("port");
                     port = port == null ? ("" + getDefaultSSHPortNumber()) : port;
                     if (ISVNAuthenticationManager.PASSWORD.equals(kind)) {
                         return new SVNPasswordAuthentication(userName, password, authMayBeStored);
@@ -532,7 +525,7 @@ public class DefaultSVNAuthenticationManager implements ISVNAuthenticationManage
             if ("".equals(auth.getUserName()) || auth.getUserName() == null) {
                 return;
             }
-            Map values = new SVNHashMap();
+            Map values = new HashMap();
             values.put("svn:realmstring", realm);
             values.put("username", auth.getUserName());
             String cipherType = SVNPasswordCipher.getDefaultCipherType();
@@ -546,23 +539,29 @@ public class DefaultSVNAuthenticationManager implements ISVNAuthenticationManage
                 values.put("password", cipher.encrypt(passwordAuth.getPassword()));
             } else if (ISVNAuthenticationManager.SSH.equals(kind)) {
                 SVNSSHAuthentication sshAuth = (SVNSSHAuthentication) auth;
-                values.put("password", cipher.encrypt(sshAuth.getPassword()));
+                if (sshAuth.getPassword() != null) {
+                    values.put("password", cipher.encrypt(sshAuth.getPassword()));
+                }
                 int port = sshAuth.getPortNumber();
                 if (sshAuth.getPortNumber() < 0) {
                     port = getDefaultSSHPortNumber() ;
                 }
                 values.put("port", Integer.toString(port));
                 if (sshAuth.getPrivateKeyFile() != null) { 
-                    String path = sshAuth.getPrivateKeyFile().getAbsolutePath();
-                    values.put("passphrase", cipher.encrypt(sshAuth.getPassphrase()));
-                    values.put("key", path);
+                    String path = SVNPathUtil.validateFilePath(sshAuth.getPrivateKeyFile().getAbsolutePath());
+                    if (sshAuth.getPassphrase() != null) {
+                        values.put("passphrase", cipher.encrypt(sshAuth.getPassphrase()));
+                    }
+                    if (path != null) {
+                        values.put("key", path);
+                    }
                 }
             }
             // get file name for auth and store password.
             String fileName = SVNFileUtil.computeChecksum(realm);
             File authFile = new File(dir, fileName);
             
-            SVNWCProperties props = new SVNWCProperties(authFile, "");
+            SVNProperties props = new SVNProperties(authFile, "");
             try {
                 if (values.equals(props.asMap())) {
                     return;
@@ -574,7 +573,7 @@ public class DefaultSVNAuthenticationManager implements ISVNAuthenticationManage
             try {
                 for (Iterator names = values.keySet().iterator(); names.hasNext();) {
                     String name = (String) names.next();
-                    props.setPropertyValue( name, SVNPropertyValue.create((String) values.get(name)));
+                    props.setPropertyValue(name, (String) values.get(name));
                 } 
                 SVNFileUtil.setReadonly(props.getFile(), false);
             } catch (SVNException e) {
@@ -636,28 +635,17 @@ public class DefaultSVNAuthenticationManager implements ISVNAuthenticationManage
         myIsAuthenticationForced = forced;
     }
 
-    public int getReadTimeout(SVNRepository repository) {
-        String protocol = repository.getLocation().getProtocol();
-        if ("http".equals(protocol) || "https".equals(protocol)) {
-            String host = repository.getLocation().getHost();
-            Map properties = getHostProperties(host);
-            String timeout = (String) properties.get("http-timeout");
-            if (timeout != null) {
-                try {
-                    return Integer.parseInt(timeout)*1000;
-                } catch (NumberFormatException nfe) {
-                }
+    public long getHTTPTimeout(SVNRepository repository) {
+        String host = repository.getLocation().getHost();
+        Map properties = getHostProperties(host);
+        String timeout = (String) properties.get("http-timeout");
+        long value = -1;
+        if (timeout != null) {
+            try {
+                value = Integer.parseInt(timeout)*1000;
+            } catch (NumberFormatException nfe) {
             }
-            return 3600*1000;
         }
-        return 0;
-    }
-
-    public int getConnectTimeout(SVNRepository repository) {
-        String protocol = repository.getLocation().getProtocol();
-        if ("http".equals(protocol) || "https".equals(protocol)) {
-            return 60*1000;
-        }
-        return 0; 
+        return value;
     }
 }

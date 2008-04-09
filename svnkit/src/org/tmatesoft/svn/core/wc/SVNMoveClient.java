@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2008 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -192,8 +192,7 @@ public class SVNMoveClient extends SVNBasicClient {
                     if (srcEntry.getKind() == dstEntry.getKind() && srcEntry.getSchedule() == null && srcEntry.isFile()) {
                         // make normal move to keep history (R+).
                         SVNCopyClient copyClient = new SVNCopyClient((ISVNAuthenticationManager) null, null);
-                        // TODO restore that.
-//                        copyClient.doCopy(src, SVNRevision.WORKING, dst, true, true);
+                        copyClient.doCopy(src, SVNRevision.WORKING, dst, true, true);
                         return;
                     }
                     // attempt replace.

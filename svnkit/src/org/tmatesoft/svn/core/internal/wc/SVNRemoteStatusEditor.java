@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2008 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -19,16 +19,14 @@ import java.util.Map;
 import java.util.TreeMap;
 
 import org.tmatesoft.svn.core.SVNCommitInfo;
-import org.tmatesoft.svn.core.SVNDepth;
 import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNLock;
 import org.tmatesoft.svn.core.SVNNodeKind;
 import org.tmatesoft.svn.core.SVNProperty;
 import org.tmatesoft.svn.core.SVNURL;
-import org.tmatesoft.svn.core.SVNPropertyValue;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
-import org.tmatesoft.svn.core.internal.util.SVNDate;
+import org.tmatesoft.svn.core.internal.util.SVNTimeUtil;
 import org.tmatesoft.svn.core.internal.wc.admin.SVNAdminArea;
 import org.tmatesoft.svn.core.internal.wc.admin.SVNAdminAreaInfo;
 import org.tmatesoft.svn.core.internal.wc.admin.SVNEntry;
@@ -55,8 +53,8 @@ public class SVNRemoteStatusEditor extends SVNStatusEditor implements ISVNEditor
     private DirectoryInfo myDirectoryInfo;
     private FileInfo myFileInfo;
 
-    public SVNRemoteStatusEditor(ISVNOptions options, SVNWCAccess wcAccess, SVNAdminAreaInfo info, boolean noIgnore, boolean reportAll, SVNDepth depth, ISVNStatusHandler handler) throws SVNException {
-        super(options, wcAccess, info, noIgnore, reportAll, depth, handler);
+    public SVNRemoteStatusEditor(ISVNOptions options, SVNWCAccess wcAccess, SVNAdminAreaInfo info, boolean noIgnore, boolean reportAll, boolean descend, ISVNStatusHandler handler) throws SVNException {
+        super(options, wcAccess, info, noIgnore, reportAll, descend, handler);
         myAnchorStatus = createStatus(info.getAnchor().getRoot());
     }
 
@@ -67,11 +65,10 @@ public class SVNRemoteStatusEditor extends SVNStatusEditor implements ISVNEditor
 
     public void deleteEntry(String path, long revision) throws SVNException {
         File file = getAnchor().getFile(path);
-        SVNEntry entry = getWCAccess().getVersionedEntry(file, false);
-
+        SVNFileType type = SVNFileType.getType(file);
         File dirPath;
         String name;
-        if (entry.getKind() == SVNNodeKind.DIR) {
+        if (type == SVNFileType.DIRECTORY) {
             dirPath = file;
             name = "";
         } else {
@@ -82,14 +79,13 @@ public class SVNRemoteStatusEditor extends SVNStatusEditor implements ISVNEditor
         try {
             dir = getWCAccess().retrieve(dirPath);
         } catch (SVNException e) {
-            SVNFileType type = SVNFileType.getType(file);
             if (type == SVNFileType.NONE && e.getErrorMessage().getErrorCode() == SVNErrorCode.WC_NOT_LOCKED) {
                 return;
             }
             throw e;
         }
-        
-        if (dir.getEntry(name, false) != null) {
+        SVNEntry entry = dir.getEntry(name, false);
+        if (entry != null) {
             tweakStatusHash(myDirectoryInfo, null, file, SVNStatusType.STATUS_DELETED, SVNStatusType.STATUS_NONE, null);
         }
         if (myDirectoryInfo.myParent != null && !hasTarget()) {
@@ -109,22 +105,22 @@ public class SVNRemoteStatusEditor extends SVNStatusEditor implements ISVNEditor
         myDirectoryInfo = new DirectoryInfo(path, myDirectoryInfo);
     }
 
-    public void changeDirProperty(String name, SVNPropertyValue value) throws SVNException {
-        if (!name.startsWith(SVNProperty.SVN_ENTRY_PREFIX)
+    public void changeDirProperty(String name, String value) throws SVNException {
+        if (name != null && !name.startsWith(SVNProperty.SVN_ENTRY_PREFIX)
                 && !name.startsWith(SVNProperty.SVN_WC_PREFIX)) {
             myDirectoryInfo.myIsPropertiesChanged = true;
         }
         if (SVNProperty.COMMITTED_REVISION.equals(name) && value != null) {
             try {
-                long number = Long.parseLong(value.getString());
+                long number = Long.parseLong(value);
                 myDirectoryInfo.myRemoteRevision = SVNRevision.create(number);
             } catch (NumberFormatException nfe) {
                 myDirectoryInfo.myRemoteRevision = SVNRevision.UNDEFINED;
             }
         } else if (SVNProperty.COMMITTED_DATE.equals(name) && value != null) {
-            myDirectoryInfo.myRemoteDate = SVNDate.parseDate(value.getString());
-        } else if (SVNProperty.LAST_AUTHOR.equals(name) && value != null) {
-            myDirectoryInfo.myRemoteAuthor = value.getString();
+            myDirectoryInfo.myRemoteDate = SVNTimeUtil.parseDate(value);
+        } else if (SVNProperty.LAST_AUTHOR.equals(name)) {
+            myDirectoryInfo.myRemoteAuthor = value;
         }
     }
 
@@ -144,7 +140,7 @@ public class SVNRemoteStatusEditor extends SVNStatusEditor implements ISVNEditor
                 tweakStatusHash(parent, myDirectoryInfo, myDirectoryInfo.myPath, contentsStatus, propertiesStatus, null);
             }
         }
-        if (parent != null && myDirectoryInfo.myDepth != SVNDepth.EXCLUDE) {
+        if (parent != null && isDescend()) {
             boolean wasDeleted = false;
             SVNStatus dirStatus = (SVNStatus) parent.myChildrenStatuses.get(myDirectoryInfo.myPath);
             if (dirStatus != null && 
@@ -152,7 +148,7 @@ public class SVNRemoteStatusEditor extends SVNStatusEditor implements ISVNEditor
                     dirStatus.getRemoteContentsStatus() == SVNStatusType.STATUS_REPLACED)) {
                 wasDeleted = true;
             }
-            handleStatusHash(dirStatus != null ? dirStatus.getEntry() : null, myDirectoryInfo.myChildrenStatuses, wasDeleted, myDirectoryInfo.myDepth);
+            handleStatusHash(dirStatus != null ? dirStatus.getEntry() : null, myDirectoryInfo.myChildrenStatuses, wasDeleted, true);
             if (isSendableStatus(dirStatus)) {
                 getDefaultHandler().handleStatus(dirStatus);
             }
@@ -164,14 +160,14 @@ public class SVNRemoteStatusEditor extends SVNStatusEditor implements ISVNEditor
                 if (tgtStatus != null) {
                     if (tgtStatus.getKind() == SVNNodeKind.DIR) {
                         SVNAdminArea dir = getWCAccess().retrieve(targetPath);
-                        getDirStatus(null, dir, null, getDepth(), isReportAll(), isNoIgnore(), null, true, getDefaultHandler());
+                        getDirStatus(null, dir, null, isDescend(), isReportAll(), isNoIgnore(), null, true, getDefaultHandler());
                     } 
                     if (isSendableStatus(tgtStatus)) {
                         getDefaultHandler().handleStatus(tgtStatus);
                     }
                 }
             } else {
-                handleStatusHash(myAnchorStatus.getEntry(), myDirectoryInfo.myChildrenStatuses, false, getDepth());
+                handleStatusHash(myAnchorStatus.getEntry(), myDirectoryInfo.myChildrenStatuses, false, isDescend());
                 if (myDirectoryInfo != null && myDirectoryInfo.myParent == null) {
                     tweakAnchorStatus(myDirectoryInfo);
                 }
@@ -192,22 +188,22 @@ public class SVNRemoteStatusEditor extends SVNStatusEditor implements ISVNEditor
         myFileInfo = new FileInfo(myDirectoryInfo, path, false);
     }
 
-    public void changeFileProperty(String path, String name, SVNPropertyValue value) throws SVNException {
-        if (!name.startsWith(SVNProperty.SVN_ENTRY_PREFIX)
+    public void changeFileProperty(String path, String name, String value) throws SVNException {
+        if (name != null && !name.startsWith(SVNProperty.SVN_ENTRY_PREFIX)
                 && !name.startsWith(SVNProperty.SVN_WC_PREFIX)) {
             myFileInfo.myIsPropertiesChanged = true;
         }
         if (SVNProperty.COMMITTED_REVISION.equals(name) && value != null) {
             try {
-                long number = Long.parseLong(value.getString());
+                long number = Long.parseLong(value);
                 myFileInfo.myRemoteRevision = SVNRevision.create(number);
             } catch (NumberFormatException nfe) {
                 myFileInfo.myRemoteRevision = SVNRevision.UNDEFINED;
             }
         } else if (SVNProperty.COMMITTED_DATE.equals(name) && value != null) {
-            myFileInfo.myRemoteDate = SVNDate.parseDate(value.getString());
+            myFileInfo.myRemoteDate = SVNTimeUtil.parseDate(value);
         } else if (SVNProperty.LAST_AUTHOR.equals(name)) {
-            myFileInfo.myRemoteAuthor = value.getString();
+            myFileInfo.myRemoteAuthor = value;
         }
     }
 
@@ -260,23 +256,17 @@ public class SVNRemoteStatusEditor extends SVNStatusEditor implements ISVNEditor
     public void absentFile(String path) throws SVNException {
     }
     
-    private void handleStatusHash(SVNEntry dirEntry, Map hash, boolean deleted, SVNDepth depth) throws SVNException {
+    private void handleStatusHash(SVNEntry dirEntry, Map hash, boolean deleted, boolean descend) throws SVNException {
         ISVNStatusHandler handler = deleted ? this : getDefaultHandler();
         for(Iterator paths = hash.keySet().iterator(); paths.hasNext();) {
             File path = (File) paths.next();
             SVNStatus status = (SVNStatus) hash.get(path);
             
-            if (status.getContentsStatus() != SVNStatusType.STATUS_OBSTRUCTED &&
-                status.getContentsStatus() != SVNStatusType.STATUS_MISSING &&
-                status.getEntry() != null && status.getKind() == SVNNodeKind.DIR && 
-                (depth == SVNDepth.UNKNOWN || depth == SVNDepth.IMMEDIATES || 
-                 depth == SVNDepth.INFINITY)) {
+            if (getWCAccess().isMissing(path)) {
+                status.setContentsStatus(SVNStatusType.STATUS_MISSING);
+            } else if (descend && status.getEntry() != null && status.getKind() == SVNNodeKind.DIR) {
                 SVNAdminArea dir = getWCAccess().retrieve(path);
-                SVNDepth depthMinusOne = depth;
-                if (depthMinusOne == SVNDepth.IMMEDIATES) {
-                    depthMinusOne = SVNDepth.EMPTY;
-                }
-                getDirStatus(dirEntry, dir, null, depthMinusOne, isReportAll(), isNoIgnore(), null, true, handler);
+                getDirStatus(dirEntry, dir, null, true, isReportAll(), isNoIgnore(), null, true, handler);
             }
             if (deleted) {
                 status.setRemoteStatus(SVNStatusType.STATUS_DELETED, null, null, null);
@@ -363,8 +353,7 @@ public class SVNRemoteStatusEditor extends SVNStatusEditor implements ISVNEditor
         if (status.getPropertiesStatus() != SVNStatusType.STATUS_NONE && status.getPropertiesStatus() != SVNStatusType.STATUS_NORMAL) {
             return true;
         }
-        return status.isLocked() || status.isSwitched() || 
-        status.getLocalLock() != null || status.getChangelistName() != null;
+        return status.isLocked() || status.isSwitched() || status.getLocalLock() != null;
     }
     
     private SVNStatus createStatus(File path) throws SVNException {
@@ -399,19 +388,6 @@ public class SVNRemoteStatusEditor extends SVNStatusEditor implements ISVNEditor
             myRemoteRevision = SVNRevision.UNDEFINED;
             myRemoteKind = SVNNodeKind.DIR;
 
-            if (myParent != null) {
-                if (myParent.myDepth == SVNDepth.IMMEDIATES) {
-                    myDepth = SVNDepth.EMPTY;
-                } else if (myParent.myDepth == SVNDepth.FILES || myParent.myDepth == SVNDepth.EMPTY) {
-                    myDepth = SVNDepth.EXCLUDE;
-                } else if (myParent.myDepth == SVNDepth.UNKNOWN) {
-                    myDepth = SVNDepth.UNKNOWN;
-                } else {
-                    myDepth = SVNDepth.INFINITY;
-                }
-            } else {
-                myDepth = getDepth();
-            }
             // this dir's status in parent.
             SVNStatus parentStatus = null;
             if (myParent != null) {
@@ -422,23 +398,15 @@ public class SVNRemoteStatusEditor extends SVNStatusEditor implements ISVNEditor
             if (parentStatus != null) {
                 SVNStatusType textStatus = parentStatus.getContentsStatus();
                 if (textStatus != SVNStatusType.STATUS_UNVERSIONED &&
+                        textStatus != SVNStatusType.STATUS_DELETED &&
                         textStatus != SVNStatusType.STATUS_MISSING &&
                         textStatus != SVNStatusType.STATUS_OBSTRUCTED &&
                         textStatus != SVNStatusType.STATUS_EXTERNAL &&
                         textStatus != SVNStatusType.STATUS_IGNORED &&
                         parentStatus.getKind() == SVNNodeKind.DIR && 
-                        (myDepth == SVNDepth.UNKNOWN || 
-                         myDepth == SVNDepth.FILES || 
-                         myDepth == SVNDepth.IMMEDIATES || 
-                         myDepth == SVNDepth.INFINITY)) {
+                        (isDescend() || myParent == null)) {
                     SVNAdminArea dir = getWCAccess().retrieve(myPath);
-                    getDirStatus(null, dir, null, SVNDepth.IMMEDIATES, true, true, null, true, this);
-                    SVNStatus thisDirStatus = (SVNStatus)myChildrenStatuses.get(myPath);
-                    if (thisDirStatus != null && thisDirStatus.getEntry() != null && (
-                            myDepth == SVNDepth.UNKNOWN || 
-                            myDepth.compareTo(parentStatus.getEntry().getDepth()) > 0)) {
-                        myDepth = thisDirStatus.getEntry().getDepth();
-                    }
+                    getDirStatus(null, dir, null, false, true, true, null, true, this);
                 }
             }       
         }
@@ -466,7 +434,7 @@ public class SVNRemoteStatusEditor extends SVNStatusEditor implements ISVNEditor
         public String myName;
         public SVNURL myURL;
         public DirectoryInfo myParent;
-        public SVNDepth myDepth;
+        
         public SVNRevision myRemoteRevision;
         public Date myRemoteDate;
         public String myRemoteAuthor;

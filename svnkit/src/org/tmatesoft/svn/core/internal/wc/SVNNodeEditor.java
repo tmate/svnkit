@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2008 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -15,7 +15,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import org.tmatesoft.svn.core.internal.util.SVNHashMap;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.Map;
@@ -26,8 +26,6 @@ import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNNodeKind;
 import org.tmatesoft.svn.core.SVNProperty;
-import org.tmatesoft.svn.core.SVNProperties;
-import org.tmatesoft.svn.core.SVNPropertyValue;
 import org.tmatesoft.svn.core.internal.delta.SVNDeltaCombiner;
 import org.tmatesoft.svn.core.internal.io.fs.FSFS;
 import org.tmatesoft.svn.core.internal.io.fs.FSRepositoryUtil;
@@ -68,7 +66,7 @@ public class SVNNodeEditor implements ISVNEditor {
         myBaseRoot = baseRoot;
         myFSFS = fsfs;
         myCancelHandler = handler;
-        myFiles = new SVNHashMap();
+        myFiles = new HashMap();
     }
 
     public void abortEdit() throws SVNException {
@@ -89,11 +87,11 @@ public class SVNNodeEditor implements ISVNEditor {
         myFiles.put(path, node);
     }
 
-    public void changeDirProperty(String name, SVNPropertyValue value) throws SVNException {
+    public void changeDirProperty(String name, String value) throws SVNException {
         myCurrentNode.myHasPropModifications = true;
     }
 
-    public void changeFileProperty(String path, String name, SVNPropertyValue value) throws SVNException {
+    public void changeFileProperty(String path, String name, String value) throws SVNException {
         Node fileNode = (Node) myFiles.get(path);
         fileNode.myHasPropModifications = true;
     }
@@ -289,13 +287,13 @@ public class SVNNodeEditor implements ISVNEditor {
         
         if (node.myHasPropModifications && node.myAction != SVNChangeEntry.TYPE_DELETED) {
             FSRevisionNode localNode = root.getRevisionNode(path);
-            SVNProperties props = localNode.getProperties(root.getOwner());
-            SVNProperties baseProps = null;
+            Map props = localNode.getProperties(root.getOwner());
+            Map baseProps = null;
             if (node.myAction != SVNChangeEntry.TYPE_ADDED) {
                 FSRevisionNode baseNode = baseRoot.getRevisionNode(basePath);
                 baseProps = baseNode.getProperties(baseRoot.getOwner());
             }
-            SVNProperties propsDiff = FSRepositoryUtil.getPropsDiffs(baseProps, props);
+            Map propsDiff = FSRepositoryUtil.getPropsDiffs(baseProps, props);
             if (propsDiff.size() > 0) {
                 String displayPath = path.startsWith("/") ? path.substring(1) : path;
                 generator.displayPropDiff(displayPath, baseProps, propsDiff, os);
@@ -308,8 +306,8 @@ public class SVNNodeEditor implements ISVNEditor {
         
         for (Iterator children = node.myChildren.iterator(); children.hasNext();) {
             Node childNode = (Node) children.next();
-            String childPath = SVNPathUtil.getAbsolutePath(SVNPathUtil.append(path, childNode.myName));
-            String childBasePath = SVNPathUtil.getAbsolutePath(SVNPathUtil.append(basePath, childNode.myName));
+            String childPath = SVNPathUtil.concatToAbs(path, childNode.myName);
+            String childBasePath = SVNPathUtil.concatToAbs(basePath, childNode.myName);
             diffImpl(root, baseRoot, childPath, childBasePath, childNode, generator, os);
         }
     }
@@ -318,8 +316,8 @@ public class SVNNodeEditor implements ISVNEditor {
         String mimeType = null; 
         if (root != null) {
             FSRevisionNode node = root.getRevisionNode(path);
-            SVNProperties nodeProps = node.getProperties(root.getOwner());
-            mimeType = nodeProps.getStringValue(SVNProperty.MIME_TYPE);
+            Map nodeProps = node.getProperties(root.getOwner());
+            mimeType = (String) nodeProps.get(SVNProperty.MIME_TYPE);
             if (SVNProperty.isBinaryMimeType(mimeType) && !generator.isForcedBinaryDiff()) {
                 return new DiffItem(mimeType, null);
             }
@@ -395,7 +393,7 @@ public class SVNNodeEditor implements ISVNEditor {
         
         for (Iterator children = node.myChildren.iterator(); children.hasNext();) {
             Node childNode = (Node) children.next();
-            String fullPath = SVNPathUtil.getAbsolutePath(SVNPathUtil.append(path, childNode.myName));
+            String fullPath = SVNPathUtil.concatToAbs(path, childNode.myName);
             traverseChangedDirsImpl(childNode, fullPath, handler);
         }
     }
@@ -432,7 +430,7 @@ public class SVNNodeEditor implements ISVNEditor {
         
         for (Iterator children = node.myChildren.iterator(); children.hasNext();) {
             Node childNode = (Node) children.next();
-            String fullPath = SVNPathUtil.getAbsolutePath(SVNPathUtil.append(path, childNode.myName));
+            String fullPath = SVNPathUtil.concatToAbs(path, childNode.myName);
             traverseChangedTreeImpl(childNode, fullPath, includeCopyInfo, handler);
         }
     }
@@ -444,7 +442,7 @@ public class SVNNodeEditor implements ISVNEditor {
         
         if (node.myParent != null) {
             SVNLocationEntry location = findRealBaseLocation(node.myParent);
-            return new SVNLocationEntry(location.getRevision(), SVNPathUtil.getAbsolutePath(SVNPathUtil.append(location.getPath(), node.myName)));
+            return new SVNLocationEntry(location.getRevision(), SVNPathUtil.concatToAbs(location.getPath(), node.myName));
         }
 
         return new SVNLocationEntry(-1, "/");

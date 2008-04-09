@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2008 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -181,6 +181,7 @@ class HTTPRequest {
         } 
         
         boolean notExpected = false;        
+        int expectedCode = "PROPFIND".equals(request) ? 207 : 200;
         if (ok1 >= 0) {
             if (ok1 == 0) {
                 ok1 = "PROPFIND".equals(request) ? 207 : 200;
@@ -197,7 +198,7 @@ class HTTPRequest {
             myErrorMessage = readError(request, path, context);
         } else if (myStatus.getCode() == HttpURLConnection.HTTP_NO_CONTENT) {
             myConnection.skipData(this);
-        } else if (myStatus.getCode() >= 300) {
+        } else if (myStatus.getCode() >= 300 || myStatus.getCode() != expectedCode) {
             SVNErrorMessage error = readError(request, path, context);
             myStatus.setError(error);
         } else if (myResponseStream != null) {

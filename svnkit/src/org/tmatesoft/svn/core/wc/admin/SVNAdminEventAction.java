@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2008 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -97,8 +97,4 @@ public class SVNAdminEventAction {
     public static final SVNAdminEventAction NOT_LOCKED = new SVNAdminEventAction(11);
 
     public static final SVNAdminEventAction LOCK_LISTED = new SVNAdminEventAction(12);
-    
-    public static final SVNAdminEventAction RECOVERY_STARTED = new SVNAdminEventAction(13);
-    
-    public static final SVNAdminEventAction UPGRADE = new SVNAdminEventAction(14);
 }

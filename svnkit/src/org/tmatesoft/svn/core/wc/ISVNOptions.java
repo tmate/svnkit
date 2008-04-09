@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2008 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -395,25 +395,4 @@ public interface ISVNOptions extends ISVNTunnelProvider {
     public void setPropertyValue(String propertyName, String propertyValue);
 
     public DateFormat getKeywordDateFormat();
-    
-    public String[] getPreservedConflictFileExtensions();
-    
-    public String getEditor();
-
-    public String getMergeTool();
-    
-    public boolean isKeepLocks();
-    
-    public void setKeepLocks(boolean keep);
-    
-    public boolean isInteractiveConflictResolution();
-    
-    public void setConflictHandler(ISVNConflictHandler resolver);
-    
-    public boolean isAllowAllForwardMergesFromSelf();
-
-    public byte[] getNativeEOL();
-
-    public String getNativeCharset();
-
 }

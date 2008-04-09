@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2008 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -11,7 +11,12 @@
  */
 package org.tmatesoft.svn.core.internal.io.dav.http;
 
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -99,19 +104,12 @@ public class SpoolFile {
             return read;
         }
 
-        private void openNextFile() throws IOException {
+        private void openNextFile() throws FileNotFoundException {
             myCurrentFile = (File) myFiles.removeFirst();
             SVNDebugLog.getDefaultLog().info("READING SPOOLED FILE: " + myCurrentFile);
             myCurrentSize = myCurrentFile.length();
             SVNDebugLog.getDefaultLog().info("ABOUT TO READ: " + myCurrentSize);
-            try {
-                myCurrentInput = SVNFileUtil.openFileForReading(myCurrentFile);
-            } catch (SVNException e) {
-                if (e.getCause() instanceof IOException) {
-                    throw (IOException) e.getCause();
-                }
-                throw new IOException(e.getMessage());
-            }
+            myCurrentInput = new BufferedInputStream(new FileInputStream(myCurrentFile));
         }
 
         public long skip(long n) throws IOException {
@@ -177,14 +175,7 @@ public class SpoolFile {
                 File file = createNextFile();
                 SVNDebugLog.getDefaultLog().info("SPOOLING RESPONSE TO FILE: " + file);
                 myFiles.add(file);
-                try {
-                    myCurrentOutput = SVNFileUtil.openFileForWriting(file);
-                } catch (SVNException e) {
-                    if (e.getCause() instanceof IOException) {
-                        throw (IOException) e.getCause();
-                    }
-                    throw new IOException(e.getMessage());
-                }
+                myCurrentOutput = new BufferedOutputStream(new FileOutputStream(file));
             }
             myCurrentOutput.write(b, off, len);
             myCurrentSize += len;

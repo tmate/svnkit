@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2008 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -11,10 +11,10 @@
  */
 package org.tmatesoft.svn.core.internal.wc.admin;
 
+import java.util.Map;
+
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNProperty;
-import org.tmatesoft.svn.core.SVNProperties;
-import org.tmatesoft.svn.core.SVNPropertyValue;
 
 
 /**
@@ -26,15 +26,15 @@ public abstract class SVNProperties14 extends SVNVersionedProperties {
     private SVNAdminArea14 myAdminArea;
     private String myEntryName;
     
-    public SVNProperties14(SVNProperties props, SVNAdminArea14 adminArea, String entryName) {
+    public SVNProperties14(Map props, SVNAdminArea14 adminArea, String entryName) {
         super(props);
         myAdminArea = adminArea;
         myEntryName = entryName;
     }
 
     public boolean containsProperty(String name) throws SVNException {
-        SVNProperties propsMap = getProperties();
-        if (propsMap != null && propsMap.containsName(name)) {
+        Map propsMap = getPropertiesMap();
+        if (propsMap != null && propsMap.containsKey(name)) {
             return true;
         }
 
@@ -51,15 +51,15 @@ public abstract class SVNProperties14 extends SVNVersionedProperties {
             return true;
         }
         if (!isEmpty()) {
-            SVNProperties props = loadProperties();
-            return props.containsName(name);
+            Map props = loadProperties();
+            return props.containsKey(name);
         }
         return false;
     }
 
-    public SVNPropertyValue getPropertyValue(String name) throws SVNException {
-        if (getProperties() != null && getProperties().containsName(name)) {
-            return getProperties().getSVNPropertyValue(name);
+    public String getPropertyValue(String name) throws SVNException {
+        if (getPropertiesMap() != null && getPropertiesMap().containsKey(name)) {
+            return (String) getPropertiesMap().get(name);
         }
 
         SVNEntry entry = myAdminArea.getEntry(myEntryName, true);
@@ -76,9 +76,9 @@ public abstract class SVNProperties14 extends SVNVersionedProperties {
             }
         }
         
-        SVNProperties props = loadProperties();
+        Map props = loadProperties();
         if (!isEmpty()) {
-            return props.getSVNPropertyValue(name); 
+            return (String)props.get(name); 
         }
         return null;
     }
@@ -100,7 +100,7 @@ public abstract class SVNProperties14 extends SVNVersionedProperties {
         return -1;
     }
 
-    protected SVNVersionedProperties wrap(SVNProperties properties) {
+    protected SVNVersionedProperties wrap(Map properties) {
         return new SVNProperties13(properties);
     }
 

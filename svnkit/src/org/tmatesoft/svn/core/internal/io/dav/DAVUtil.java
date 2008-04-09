@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2008 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -12,19 +12,17 @@
 
 package org.tmatesoft.svn.core.internal.io.dav;
 
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 
 import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
-import org.tmatesoft.svn.core.SVNProperties;
-import org.tmatesoft.svn.core.SVNPropertyValue;
 import org.tmatesoft.svn.core.internal.io.dav.handlers.DAVPropertiesHandler;
 import org.tmatesoft.svn.core.internal.io.dav.http.HTTPHeader;
 import org.tmatesoft.svn.core.internal.io.dav.http.HTTPStatus;
 import org.tmatesoft.svn.core.internal.util.SVNEncodingUtil;
-import org.tmatesoft.svn.core.internal.util.SVNHashMap;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 
@@ -45,7 +43,7 @@ public class DAVUtil {
         } else if (depth == DEPTH_ONE) {
             header.setHeaderValue(HTTPHeader.DEPTH_HEADER, "1");
         } else if (depth == DEPTH_INFINITE) {
-            header.setHeaderValue(HTTPHeader.DEPTH_HEADER, "infinity");
+            header.setHeaderValue(HTTPHeader.DEPTH_HEADER, "infinite");
         } else {
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.RA_DAV_MALFORMED_DATA, "Invalid PROPFIND depth value: '{0}'", new Integer(depth));
             SVNErrorManager.error(err);
@@ -60,13 +58,19 @@ public class DAVUtil {
     }
     
     public static DAVProperties getResourceProperties(DAVConnection connection, String path, String label, DAVElement[] properties) throws SVNException {
-        Map resultMap = new SVNHashMap();
+        Map resultMap = new HashMap();
         HTTPStatus status = getProperties(connection, path, DEPTH_ZERO, label, properties, resultMap);
         if (status.getError() != null) {
             SVNErrorManager.error(status.getError());
         }
-        if (!resultMap.isEmpty()) {
-            return (DAVProperties) resultMap.values().iterator().next();
+        if (label != null || true) {
+            if (!resultMap.isEmpty()) {
+                return (DAVProperties) resultMap.values().iterator().next();
+            }
+        } else {
+            if (resultMap.containsKey(path)) {
+                return (DAVProperties) resultMap.get(path);
+            }
         }
         label = label == null ? "NULL" : label;
         SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.RA_DAV_REQUEST_FAILED, "Failed to find label ''{0}'' for URL ''{1}''", new Object[] {label, path});
@@ -76,12 +80,12 @@ public class DAVUtil {
     
     public static String getPropertyValue(DAVConnection connection, String path, String label, DAVElement property) throws SVNException {
         DAVProperties props = getResourceProperties(connection, path, label, new DAVElement[] {property});
-        SVNPropertyValue value = props.getPropertyValue(property);
+        Object value = props.getProperties().get(property);
         if (value == null) {
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.RA_DAV_PROPS_NOT_FOUND, "''{0}'' was not present on the resource", property.toString());
             SVNErrorManager.error(err);
         }
-        return value.getString();
+        return (String) value;
     }
     
     public static DAVProperties getStartingProperties(DAVConnection connection, String path, String label) throws SVNException {
@@ -96,7 +100,7 @@ public class DAVUtil {
             props = getStartingProperties(connection, fullPath, null);
             if (props != null) {
                 if (props.getPropertyValue(DAVElement.REPOSITORY_UUID) != null && repos != null) {
-                    repos.setRepositoryUUID(props.getPropertyValue(DAVElement.REPOSITORY_UUID).getString());
+                    repos.setRepositoryUUID(props.getPropertyValue(DAVElement.REPOSITORY_UUID));
                 }
                 props.setLoppedPath(loppedPath);
             }
@@ -113,12 +117,13 @@ public class DAVUtil {
                     throw e;
                 }
                 err = e.getErrorMessage();
+                nested = e;
             }            
             if (err == null) {
                 break;
             }
             if (err.getErrorCode() != SVNErrorCode.RA_DAV_PATH_NOT_FOUND) {
-                SVNErrorManager.error(err);
+                SVNErrorManager.error(err,nested);
             }
             loppedPath = SVNPathUtil.append(SVNPathUtil.tail(fullPath), loppedPath);
             int length = fullPath.length();
@@ -134,7 +139,7 @@ public class DAVUtil {
         }
         if (props != null) {
             if (props.getPropertyValue(DAVElement.REPOSITORY_UUID) != null && repos != null) {
-                repos.setRepositoryUUID(props.getPropertyValue(DAVElement.REPOSITORY_UUID).getString());
+                repos.setRepositoryUUID(props.getPropertyValue(DAVElement.REPOSITORY_UUID));
             }
             props.setLoppedPath(loppedPath);
         } 
@@ -143,12 +148,12 @@ public class DAVUtil {
     
     public static String getVCCPath(DAVConnection connection, DAVRepository repository, String path) throws SVNException {
         DAVProperties properties = findStartingProperties(connection, repository, path);
-        SVNPropertyValue vcc = properties.getPropertyValue(DAVElement.VERSION_CONTROLLED_CONFIGURATION);
+        String vcc = properties.getPropertyValue(DAVElement.VERSION_CONTROLLED_CONFIGURATION);
         if (vcc == null) {
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.RA_DAV_REQUEST_FAILED, "The VCC property was not found on the resource");
             SVNErrorManager.error(err);
         }
-        return vcc.getString();
+        return vcc;
     }
 
     public static DAVBaselineInfo getBaselineInfo(DAVConnection connection, DAVRepository repos, String path, long revision,
@@ -158,8 +163,7 @@ public class DAVUtil {
 
         info = info == null ? new DAVBaselineInfo() : info;
         info.baselinePath = baselineProperties.getURL();
-        SVNPropertyValue baseValue = baselineProperties.getPropertyValue(DAVElement.BASELINE_COLLECTION);
-        info.baselineBase = baseValue == null ? null : baseValue.getString();
+        info.baselineBase = baselineProperties.getPropertyValue(DAVElement.BASELINE_COLLECTION);
         info.baseline = baselineProperties.getOriginalURL();
         if (info.baselineBase == null) {
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.RA_DAV_REQUEST_FAILED, "'DAV:baseline-collection' not present on the baseline resource");
@@ -167,15 +171,15 @@ public class DAVUtil {
         }
 //        info.baselineBase = SVNEncodingUtil.uriEncode(info.baselineBase);
         if (includeRevision) {
-            SVNPropertyValue version = baselineProperties.getPropertyValue(DAVElement.VERSION_NAME);
+            String version = baselineProperties.getPropertyValue(DAVElement.VERSION_NAME);
             if (version == null) {
                 SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.RA_DAV_REQUEST_FAILED, "'DAV:version-name' not present on the baseline resource");
                 SVNErrorManager.error(err);
             }
-            info.revision = Long.parseLong(version.getString());
+            info.revision = Long.parseLong(version);
         }
         if (includeType) {
-            Map propsMap = new SVNHashMap();
+            Map propsMap = new HashMap();
             path = SVNPathUtil.append(info.baselineBase, info.baselinePath);
             HTTPStatus status = getProperties(connection, path, 0, null, new DAVElement[] {DAVElement.RESOURCE_TYPE}, propsMap);
             if (status.getError() != null) {
@@ -193,21 +197,20 @@ public class DAVUtil {
         DAVProperties properties = null;
         String loppedPath = "";
         properties = findStartingProperties(connection, repos, path);
-        SVNPropertyValue vccValue = properties.getPropertyValue(DAVElement.VERSION_CONTROLLED_CONFIGURATION);
-        if (vccValue == null) {
+        String vcc = properties.getPropertyValue(DAVElement.VERSION_CONTROLLED_CONFIGURATION);
+        if (vcc == null) {
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.RA_DAV_REQUEST_FAILED, "The VCC property was not found on the resource");
             SVNErrorManager.error(err);
         }
         loppedPath = properties.getLoppedPath();
-        SVNPropertyValue baselineRelativePathValue = properties.getPropertyValue(DAVElement.BASELINE_RELATIVE_PATH);
-        if (baselineRelativePathValue == null) {
+        String baselineRelativePath = properties.getPropertyValue(DAVElement.BASELINE_RELATIVE_PATH);
+        if (baselineRelativePath == null) {
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.RA_DAV_REQUEST_FAILED, "The relative-path property was not found on the resource");
             SVNErrorManager.error(err);
         }
-        String baselineRelativePath = SVNEncodingUtil.uriEncode(baselineRelativePathValue.getString());
+        baselineRelativePath = SVNEncodingUtil.uriEncode(baselineRelativePath);
         baselineRelativePath = SVNPathUtil.append(baselineRelativePath, loppedPath);
         String label = null;
-        String vcc = vccValue.getString();
         if (revision < 0) {
             vcc = getPropertyValue(connection, vcc, null, DAVElement.CHECKED_IN);
         } else {
@@ -218,9 +221,9 @@ public class DAVUtil {
         return properties;
     }
 
-    public static SVNProperties filterProperties(DAVProperties source, SVNProperties target) {
-        target = target == null ? new SVNProperties() : target;
-        for (Iterator props = source.getProperties().keySet().iterator(); props.hasNext();) {
+    public static Map filterProperties(DAVProperties source, Map target) {
+        target = target == null ? new HashMap() : target;
+        for(Iterator props = source.getProperties().keySet().iterator(); props.hasNext();) {
             DAVElement property = (DAVElement) props.next();
             String namespace = property.getNamespace();
             if (namespace.equals(DAVElement.SVN_CUSTOM_PROPERTY_NAMESPACE)) {

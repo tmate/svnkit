@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2008 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -15,9 +15,6 @@ import java.io.BufferedOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.net.ConnectException;
-import java.net.SocketTimeoutException;
-import java.net.UnknownHostException;
 
 import org.tmatesoft.svn.core.SVNAuthenticationException;
 import org.tmatesoft.svn.core.SVNErrorCode;
@@ -74,7 +71,7 @@ public class SVNSSHConnector implements ISVNConnector {
             try {
                 while (authentication != null) {
                     try {
-                        connection = SVNSSHSession.getConnection(repository.getLocation(), authentication, authManager.getConnectTimeout(repository));
+                        connection = SVNSSHSession.getConnection(repository.getLocation(), authentication);
                         if (connection == null) {
                             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.RA_SVN_CONNECTION_CLOSED, "Cannot connect to ''{0}''", repository.getLocation().setPath("", false));
                             SVNErrorManager.error(err);
@@ -124,15 +121,6 @@ public class SVNSSHConnector implements ISVNConnector {
                     new StreamGobbler(mySession.getStderr());
                     myConnection = connection;
                     return;
-                } catch (SocketTimeoutException e) {
-	                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.RA_SVN_IO_ERROR, "timed out waiting for server", null, SVNErrorMessage.TYPE_ERROR, e);
-                    SVNErrorManager.error(err, e);
-                } catch (UnknownHostException e) {
-	                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.RA_SVN_IO_ERROR, "Unknown host " + e.getMessage(), null, SVNErrorMessage.TYPE_ERROR, e);
-                    SVNErrorManager.error(err, e);
-                } catch (ConnectException e) {
-	                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.RA_SVN_IO_ERROR, "connection refused by the server", null, SVNErrorMessage.TYPE_ERROR, e);
-                    SVNErrorManager.error(err, e);
                 } catch (IOException e) {
                     reconnect--;
                     if (reconnect >= 0) {
