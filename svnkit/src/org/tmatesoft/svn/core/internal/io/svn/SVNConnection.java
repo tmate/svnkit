@@ -14,13 +14,28 @@ package org.tmatesoft.svn.core.internal.io.svn;
 
 import java.io.BufferedInputStream;
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.FilterInputStream;
+import java.io.FilterOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+
+import javax.security.auth.callback.Callback;
+import javax.security.auth.callback.CallbackHandler;
+import javax.security.auth.callback.NameCallback;
+import javax.security.auth.callback.PasswordCallback;
+import javax.security.auth.callback.UnsupportedCallbackException;
+import javax.security.sasl.RealmCallback;
+import javax.security.sasl.Sasl;
+import javax.security.sasl.SaslClient;
+import javax.security.sasl.SaslException;
 
 import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
@@ -28,13 +43,17 @@ import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNURL;
 import org.tmatesoft.svn.core.auth.ISVNAuthenticationManager;
 import org.tmatesoft.svn.core.auth.SVNPasswordAuthentication;
+import org.tmatesoft.svn.core.internal.io.svn.sasl.SaslInputStream;
+import org.tmatesoft.svn.core.internal.io.svn.sasl.SaslOutputStream;
+import org.tmatesoft.svn.core.internal.util.SVNBase64;
+import org.tmatesoft.svn.core.internal.util.SVNHashMap;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 
 /**
  * @version 1.1.1
  * @author  TMate Software Ltd.
  */
-class SVNConnection {
+public class SVNConnection {
 
     private final ISVNConnector myConnector;
     private String myRealm;
@@ -157,10 +176,22 @@ class SVNConnection {
         SVNErrorMessage failureReason = null;
         List items = read("ls", null, true);
         List mechs = SVNReader.getList(items, 0);
-        myRealm = SVNReader.getString(items, 1);
         if (mechs == null || mechs.size() == 0) {
             return;
         }
+//        SVNAuthenticator authenticator = new SVNPlainAuthenticator(this);
+        myRealm = SVNReader.getString(items, 1);
+//        authenticator.authenticate(mechs, myRealm, repository);
+//        receiveRepositoryCredentials(repository);
+//        if (true) {
+//            return;
+//        }
+        if (saslAuth((String[]) mechs.toArray(new String[mechs.size()]))) {
+            receiveRepositoryCredentials(repository);
+            return;
+        }
+        
+        
         ISVNAuthenticationManager authManager = myRepository.getAuthenticationManager();
         if (authManager != null && authManager.isAuthenticationForced() && mechs.contains("ANONYMOUS") && mechs.contains("CRAM-MD5")) {
             mechs.remove("ANONYMOUS");
@@ -175,7 +206,7 @@ class SVNConnection {
             failureReason = readAuthResponse();
         } else if (mechs.contains("CRAM-MD5")) {
             while (true) {
-                CramMD5 authenticator = new CramMD5();
+                CramMD5 cramMD5 = new CramMD5();
                 String realm = getRealm();
                 if (location != null) {
                     realm = "<" + location.getProtocol() + "://"
@@ -194,7 +225,7 @@ class SVNConnection {
                 }
                 write("(w())", new Object[]{"CRAM-MD5"});
                 while (true) {
-                    authenticator.setUserCredentials(auth);
+                    cramMD5.setUserCredentials(auth);
                     items = readTuple("w(?s)", true);
                     String status = SVNReader.getString(items, 0);
                     if (SUCCESS.equals(status)) {
@@ -206,7 +237,7 @@ class SVNConnection {
                         break;
                     } else if (STEP.equals(status)) {
                         try {
-                            byte[] response = authenticator.buildChallengeResponse(SVNReader.getBytes(items, 1));
+                            byte[] response = cramMD5.buildChallengeResponse(SVNReader.getBytes(items, 1));
                             getOutputStream().write(response);
                             getOutputStream().flush();
                         } catch (IOException e) {
@@ -223,6 +254,93 @@ class SVNConnection {
             return;
         }
         SVNErrorManager.error(failureReason);
+    }
+    
+    private boolean saslAuth(String[] mechs) throws SVNException {
+        Map props = new SVNHashMap();
+        props.put(Sasl.POLICY_NOPLAINTEXT, "true");
+        props.put(Sasl.QOP, "auth-conf,auth-int,auth");
+        props.put(Sasl.MAX_BUFFER, "8192");
+        try {
+            for (int i = 0; i < mechs.length; i++) {
+                System.out.println("mech: " + mechs[i]);
+            }
+            final SaslClient client = Sasl.createSaslClient(mechs, null, "svn", myRepository.getLocation().getHost(), props, new CallbackHandler() {
+                public void handle(Callback[] callbacks) throws IOException, UnsupportedCallbackException {
+                    for (int i = 0; i < callbacks.length; i++) {
+                        Callback callback = callbacks[i];
+                        System.out.println("callback: " + callback);
+                        if (callback instanceof NameCallback) {
+                            ((NameCallback) callback).setName("alex");
+                        } else if (callback instanceof PasswordCallback) {
+                            ((PasswordCallback) callback).setPassword("alex".toCharArray());
+                        } else if (callback instanceof RealmCallback) {
+                            ((RealmCallback) callback).setText(myRealm);
+                        } else {
+                            throw new UnsupportedCallbackException(callback);
+                        }
+                    }
+                }
+            });
+            System.out.println("props: " + props);
+            if (client == null) {
+                return false;
+            }
+            String mech = client.getMechanismName();
+            System.out.println("initial response: " + client.hasInitialResponse());
+            // send message with mech.
+            write("(w())", new Object[]{client.getMechanismName()});
+            // read response (challenge)
+            while(true) {
+                List items = readTuple("w(?s)", true);
+                String status = (String) items.get(0);
+                if ("success".equals(status)) {
+                    System.out.println("success");
+                    String response = (String) items.get(1);
+                    byte[] buffer = new byte[response.length()];
+                    System.out.println("response: " + response);
+                    int len = SVNBase64.base64ToByteArray(new StringBuffer(response), buffer);
+                    System.out.println(new String(buffer, 0, len));
+                    for (int i = 0; i < len; i++) {
+                        System.out.println("resonse[" + i + "]=" + buffer[i]);
+                    }
+                    System.out.println("complete: " + client.isComplete());
+                    client.evaluateChallenge(new String(buffer, 0, len - 3).getBytes());
+                    System.out.println("complete: " + client.isComplete());
+                    System.out.println("qop: " + client.getNegotiatedProperty(Sasl.QOP));
+                    System.out.println("bufsize: " + client.getNegotiatedProperty(Sasl.MAX_BUFFER));
+                    // replace streams (only if auth-conf or auth-int, was negotiated)!
+                    myOutputStream = new SaslOutputStream(client, 4096, myOutputStream); 
+                    myInputStream = new SaslInputStream(client, 8192, myInputStream);
+                    return true;
+                } else if ("failure".equals(status)) {
+                    System.out.println("failure");
+                    SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.RA_NOT_AUTHORIZED, (String) items.get(1));
+                    SVNErrorManager.error(err);
+                }
+                //  compute response.
+                String challengeString = (String) items.get(1);
+                ByteArrayOutputStream bos = new ByteArrayOutputStream();
+                for (int i = 0; i < challengeString.length(); i++) {
+                    char ch = challengeString.charAt(i);
+                    if (ch != '\n' && ch != '\r') {
+                        bos.write((byte) ch & 0xFF);
+                    }                    
+                }
+                byte[] cbytes = new byte[challengeString.length()]; 
+                int clength = SVNBase64.base64ToByteArray(new StringBuffer(new String(bos.toByteArray())), cbytes);
+                System.out.println("challenge: " + new String(cbytes, 0, clength));
+                byte[] response = client.evaluateChallenge(new String(cbytes, 0, clength).getBytes());
+//                byte[] response = client.evaluateChallenge(challengeString.getBytes());
+//                System.out.println("bufsize: " + client.getNegotiatedProperty(Sasl.MAX_BUFFER));
+                String responseString = SVNBase64.byteArrayToBase64(response);
+                write("s", new Object[] {responseString});
+            }
+        } catch (SaslException e) {
+            e.printStackTrace();
+            return false;
+        }
+//        return false;        
     }
 
     private void addCapabilities(List capabilities) throws SVNException {
@@ -248,6 +366,7 @@ class SVNConnection {
             return;
         }
         List creds = read("s?s?l", null, true);
+        System.out.println("READ: " + creds);
         myIsCredentialsReceived = true;
         if (creds != null && creds.size() >= 2 && creds.get(0) != null && creds.get(1) != null) {
             SVNURL rootURL = creds.get(1) != null ? SVNURL.parseURIEncoded(SVNReader.getString(creds, 1)) : null;
@@ -362,7 +481,9 @@ class SVNConnection {
     }
     
     public boolean isConnectionStale() {
-        return myConnector.isStale();
+        boolean stale = myConnector.isStale();
+        System.out.println("STALE: " + stale);
+        return stale;
     }
 
     private void checkConnection() throws SVNException {
@@ -404,7 +525,7 @@ class SVNConnection {
         };
     }
 
-    private OutputStream getOutputStream() throws SVNException {
+    OutputStream getOutputStream() throws SVNException {
         if (myOutputStream == null) {
             try {
                 myOutputStream = myRepository.getDebugLog().createLogStream(myConnector.getOutputStream());
@@ -415,7 +536,7 @@ class SVNConnection {
         return myOutputStream;
     }
 
-    private InputStream getInputStream() throws SVNException {
+    InputStream getInputStream() throws SVNException {
         if (myInputStream == null) {
             try {
                 myInputStream = myRepository.getDebugLog().createLogStream(new BufferedInputStream(myConnector.getInputStream()));
@@ -425,5 +546,13 @@ class SVNConnection {
             }
         }
         return myInputStream;
+    }
+    
+    void setOutputStream(OutputStream os) {
+        myOutputStream = os;
+    }
+
+    void setInputStream(InputStream is) {
+        myInputStream = is;
     }
 }
