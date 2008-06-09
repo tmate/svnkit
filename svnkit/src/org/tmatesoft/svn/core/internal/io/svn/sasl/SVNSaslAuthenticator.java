@@ -61,6 +61,7 @@ public class SVNSaslAuthenticator extends SVNAuthenticator {
         SVNCallbackHandler callback = new SVNCallbackHandler(realm, repository.getLocation(), repository.getAuthenticationManager());
         try {
             while(true) {
+                dispose();
                 myClient = createSaslClient(mechs, repository.getLocation(), callback);
                 if (myClient == null) {
                     SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.RA_NOT_AUTHORIZED, "Cannot create suitable SASL client");
@@ -268,7 +269,6 @@ public class SVNSaslAuthenticator extends SVNAuthenticator {
                         String userName = myAuthentication.getUserName();
                         ((NameCallback) callback).setName(userName != null ? userName : "");
                     } else {
-                        setLastError(myError);
                         SVNException svne = myError.getErrorCode() == SVNErrorCode.CANCELLED ? new SVNCancelException(myError) : new SVNAuthenticationException(myError);
                         throw (IOException) new IOException().initCause(svne);
                     }
@@ -278,7 +278,6 @@ public class SVNSaslAuthenticator extends SVNAuthenticator {
                         String password = ((SVNPasswordAuthentication) myAuthentication).getPassword();
                         ((PasswordCallback) callback).setPassword(password != null ? password.toCharArray() : new char[0]);
                     } else {
-                        setLastError(myError);
                         SVNException svne = myError.getErrorCode() == SVNErrorCode.CANCELLED ? new SVNCancelException(myError) : new SVNAuthenticationException(myError);
                         throw (IOException) new IOException().initCause(svne);
                     }
@@ -304,6 +303,7 @@ public class SVNSaslAuthenticator extends SVNAuthenticator {
                 }
                 if (myAuthentication == null) {
                     myError = SVNErrorMessage.create(SVNErrorCode.CANCELLED, "Authentication cancelled");
+                    setLastError(myError);
                 }
             } catch (SVNException e) {
                 myError = e.getErrorMessage();
