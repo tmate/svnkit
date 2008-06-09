@@ -45,18 +45,15 @@ public class SaslOutputStream extends OutputStream {
 
     public void write(byte[] b, int off, int len) throws IOException {
         // write to buffer, then flush if necessary.
-        System.out.println("write: " + len + " " + new String(b, off ,len));
         while(len > 0) {
             int toPut = Math.min(myBuffer.remaining(), len);
             myBuffer.put(b, off, toPut);
             off += toPut;
             len -= toPut;
             if (myBuffer.remaining() == 0) {
-                // flush, clear buffer and continue.
                 flush();
             }
         }
-//        flush();
     }
 
     public void close() throws IOException {
@@ -65,16 +62,12 @@ public class SaslOutputStream extends OutputStream {
     }
 
     public void flush() throws IOException {
-        System.out.println("flush!");
-        // write buffer contents.
         byte[] bytes = myBuffer.array();
         int off = myBuffer.arrayOffset();
         int len = myBuffer.position();
         if (len == 0) {
             return;
         }
-        // encode and flush.
-        System.out.println("sending: " + len + " " + new String(bytes, off, len));
         byte[] encoded = myClient.wrap(bytes, off, len);
         myLengthBuffer[0] = (byte) ((encoded.length & 0xFF000000) >> 24);
         myLengthBuffer[1] = (byte) ((encoded.length & 0x00FF0000) >> 16);
