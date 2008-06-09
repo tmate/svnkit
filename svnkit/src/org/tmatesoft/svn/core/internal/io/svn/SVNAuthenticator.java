@@ -34,6 +34,8 @@ public abstract class SVNAuthenticator {
     private SVNConnection myConnection;
     private OutputStream myConnectionOutputStream;
     private InputStream myConnectionInputStream;
+    private boolean myHasTried;
+    private SVNErrorMessage myLastError;
 
     protected SVNAuthenticator(SVNConnection connection) throws SVNException {
         myConnection = connection;
@@ -59,6 +61,25 @@ public abstract class SVNAuthenticator {
     
     protected SVNConnection getConnection() {
         return myConnection;
+    }
+    
+    protected void onAuthAttempt() {
+        myHasTried = true;
+    }
+    
+    public boolean hasTried() {
+        return myHasTried;
+    }
+    
+    protected SVNErrorMessage getLastError() {
+        return myLastError;
+    }
+    
+    public void dispose() {
+    }
+    
+    protected void setLastError(SVNErrorMessage err) {
+        myLastError = err;
     }
 
     public abstract void authenticate(List mechs, String realm, SVNRepositoryImpl repository) throws SVNException;

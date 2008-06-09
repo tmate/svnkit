@@ -43,6 +43,7 @@ import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNURL;
 import org.tmatesoft.svn.core.auth.ISVNAuthenticationManager;
 import org.tmatesoft.svn.core.auth.SVNPasswordAuthentication;
+import org.tmatesoft.svn.core.internal.io.svn.sasl.SVNSaslAuthenticator;
 import org.tmatesoft.svn.core.internal.io.svn.sasl.SaslInputStream;
 import org.tmatesoft.svn.core.internal.io.svn.sasl.SaslOutputStream;
 import org.tmatesoft.svn.core.internal.util.SVNBase64;
@@ -80,6 +81,7 @@ public class SVNConnection {
     private static final String DEPTH = "depth";
     private static final String LOG_REVPROPS = "log-revprops";
 //    private static final String PARTIAL_REPLAY = "partial-replay";
+    private SVNAuthenticator myAuthenticator;
 
     public SVNConnection(ISVNConnector connector, SVNRepositoryImpl repository) {
         myConnector = connector;
@@ -173,176 +175,45 @@ public class SVNConnection {
     }
     
     public void authenticate(SVNRepositoryImpl repository) throws SVNException {
-        SVNErrorMessage failureReason = null;
         List items = read("ls", null, true);
         List mechs = SVNReader.getList(items, 0);
         if (mechs == null || mechs.size() == 0) {
             return;
         }
-//        SVNAuthenticator authenticator = new SVNPlainAuthenticator(this);
-        myRealm = SVNReader.getString(items, 1);
-//        authenticator.authenticate(mechs, myRealm, repository);
-//        receiveRepositoryCredentials(repository);
-//        if (true) {
-//            return;
-//        }
-        if (saslAuth((String[]) mechs.toArray(new String[mechs.size()]))) {
-            receiveRepositoryCredentials(repository);
-            return;
+        if (myAuthenticator != null) {
+            myAuthenticator.dispose();
+            myAuthenticator = null;
         }
-        
+
+        myRealm = SVNReader.getString(items, 1);
         
         ISVNAuthenticationManager authManager = myRepository.getAuthenticationManager();
         if (authManager != null && authManager.isAuthenticationForced() && mechs.contains("ANONYMOUS") && mechs.contains("CRAM-MD5")) {
             mechs.remove("ANONYMOUS");
         }
-        SVNURL location = myRepository.getLocation();
-        SVNPasswordAuthentication auth = null;
-        if (repository.getExternalUserName() != null && mechs.contains("EXTERNAL")) {
-            write("(w(s))", new Object[]{"EXTERNAL", repository.getExternalUserName()});
-            failureReason = readAuthResponse();
-        } else if (mechs.contains("ANONYMOUS")) {
-            write("(w())", new Object[]{"ANONYMOUS"});
-            failureReason = readAuthResponse();
-        } else if (mechs.contains("CRAM-MD5")) {
-            while (true) {
-                CramMD5 cramMD5 = new CramMD5();
-                String realm = getRealm();
-                if (location != null) {
-                    realm = "<" + location.getProtocol() + "://"
-                            + location.getHost() + ":"
-                            + location.getPort() + "> " + realm;
-                }
-                if (auth == null && authManager != null) {
-                    auth = (SVNPasswordAuthentication) authManager.getFirstAuthentication(ISVNAuthenticationManager.PASSWORD, realm, location);
-                } else if (authManager != null) {
-                    authManager.acknowledgeAuthentication(false, ISVNAuthenticationManager.PASSWORD, realm, failureReason, auth);
-                    auth = (SVNPasswordAuthentication) authManager.getNextAuthentication(ISVNAuthenticationManager.PASSWORD, realm, location);
-                }
-                if (auth == null || auth.getUserName() == null || auth.getPassword() == null) {
-                    failureReason = SVNErrorMessage.create(SVNErrorCode.RA_NOT_AUTHORIZED, "Can't get password. Authentication is required for ''{0}''", realm);
-                    break;
-                }
-                write("(w())", new Object[]{"CRAM-MD5"});
-                while (true) {
-                    cramMD5.setUserCredentials(auth);
-                    items = readTuple("w(?s)", true);
-                    String status = SVNReader.getString(items, 0);
-                    if (SUCCESS.equals(status)) {
-                        authManager.acknowledgeAuthentication(true, ISVNAuthenticationManager.PASSWORD, realm, null, auth);
-                        receiveRepositoryCredentials(repository);
-                        return;
-                    } else if (FAILURE.equals(status)) {
-                        failureReason = SVNErrorMessage.create(SVNErrorCode.RA_NOT_AUTHORIZED, "Authentication error from server: {0}", SVNReader.getString(items, 1));
-                        break;
-                    } else if (STEP.equals(status)) {
-                        try {
-                            byte[] response = cramMD5.buildChallengeResponse(SVNReader.getBytes(items, 1));
-                            getOutputStream().write(response);
-                            getOutputStream().flush();
-                        } catch (IOException e) {
-                            SVNErrorManager.error(SVNErrorMessage.create(SVNErrorCode.RA_SVN_IO_ERROR, e.getMessage()), e);
-                        }
-                    }
-                }
-            }
+        
+        myAuthenticator = null;
+        if (mechs.contains("ANONYMOUS") || mechs.contains("EXTERNAL")) {
+            myAuthenticator = new SVNPlainAuthenticator(this);
+            myAuthenticator.authenticate(mechs, myRealm, repository);
         } else {
-            SVNErrorManager.error(SVNErrorMessage.create(SVNErrorCode.RA_NOT_AUTHORIZED, "Cannot negotiate authentication mechanism"));
+            myAuthenticator = new SVNSaslAuthenticator(this);
+            try {
+                myAuthenticator.authenticate(mechs, myRealm, repository);
+            } catch (SVNException e) {
+                if (!myAuthenticator.hasTried()) {
+                    // SASL error on initialization, could retry.
+                    myAuthenticator = new SVNPlainAuthenticator(this);
+                    myAuthenticator.authenticate(mechs, myRealm, repository);
+                } else {
+                    throw e;
+                }
+                
+            }
         }
-        if (failureReason == null) {
-            receiveRepositoryCredentials(repository);
-            return;
-        }
-        SVNErrorManager.error(failureReason);
+        receiveRepositoryCredentials(repository);
     }
     
-    private boolean saslAuth(String[] mechs) throws SVNException {
-        Map props = new SVNHashMap();
-        props.put(Sasl.POLICY_NOPLAINTEXT, "true");
-        props.put(Sasl.QOP, "auth-conf,auth-int,auth");
-        props.put(Sasl.MAX_BUFFER, "8192");
-        try {
-            for (int i = 0; i < mechs.length; i++) {
-                System.out.println("mech: " + mechs[i]);
-            }
-            final SaslClient client = Sasl.createSaslClient(mechs, null, "svn", myRepository.getLocation().getHost(), props, new CallbackHandler() {
-                public void handle(Callback[] callbacks) throws IOException, UnsupportedCallbackException {
-                    for (int i = 0; i < callbacks.length; i++) {
-                        Callback callback = callbacks[i];
-                        System.out.println("callback: " + callback);
-                        if (callback instanceof NameCallback) {
-                            ((NameCallback) callback).setName("alex");
-                        } else if (callback instanceof PasswordCallback) {
-                            ((PasswordCallback) callback).setPassword("alex".toCharArray());
-                        } else if (callback instanceof RealmCallback) {
-                            ((RealmCallback) callback).setText(myRealm);
-                        } else {
-                            throw new UnsupportedCallbackException(callback);
-                        }
-                    }
-                }
-            });
-            System.out.println("props: " + props);
-            if (client == null) {
-                return false;
-            }
-            String mech = client.getMechanismName();
-            System.out.println("initial response: " + client.hasInitialResponse());
-            // send message with mech.
-            write("(w())", new Object[]{client.getMechanismName()});
-            // read response (challenge)
-            while(true) {
-                List items = readTuple("w(?s)", true);
-                String status = (String) items.get(0);
-                if ("success".equals(status)) {
-                    System.out.println("success");
-                    String response = (String) items.get(1);
-                    byte[] buffer = new byte[response.length()];
-                    System.out.println("response: " + response);
-                    int len = SVNBase64.base64ToByteArray(new StringBuffer(response), buffer);
-                    System.out.println(new String(buffer, 0, len));
-                    for (int i = 0; i < len; i++) {
-                        System.out.println("resonse[" + i + "]=" + buffer[i]);
-                    }
-                    System.out.println("complete: " + client.isComplete());
-                    client.evaluateChallenge(new String(buffer, 0, len - 3).getBytes());
-                    System.out.println("complete: " + client.isComplete());
-                    System.out.println("qop: " + client.getNegotiatedProperty(Sasl.QOP));
-                    System.out.println("bufsize: " + client.getNegotiatedProperty(Sasl.MAX_BUFFER));
-                    // replace streams (only if auth-conf or auth-int, was negotiated)!
-                    myOutputStream = new SaslOutputStream(client, 4096, myOutputStream); 
-                    myInputStream = new SaslInputStream(client, 8192, myInputStream);
-                    return true;
-                } else if ("failure".equals(status)) {
-                    System.out.println("failure");
-                    SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.RA_NOT_AUTHORIZED, (String) items.get(1));
-                    SVNErrorManager.error(err);
-                }
-                //  compute response.
-                String challengeString = (String) items.get(1);
-                ByteArrayOutputStream bos = new ByteArrayOutputStream();
-                for (int i = 0; i < challengeString.length(); i++) {
-                    char ch = challengeString.charAt(i);
-                    if (ch != '\n' && ch != '\r') {
-                        bos.write((byte) ch & 0xFF);
-                    }                    
-                }
-                byte[] cbytes = new byte[challengeString.length()]; 
-                int clength = SVNBase64.base64ToByteArray(new StringBuffer(new String(bos.toByteArray())), cbytes);
-                System.out.println("challenge: " + new String(cbytes, 0, clength));
-                byte[] response = client.evaluateChallenge(new String(cbytes, 0, clength).getBytes());
-//                byte[] response = client.evaluateChallenge(challengeString.getBytes());
-//                System.out.println("bufsize: " + client.getNegotiatedProperty(Sasl.MAX_BUFFER));
-                String responseString = SVNBase64.byteArrayToBase64(response);
-                write("s", new Object[] {responseString});
-            }
-        } catch (SaslException e) {
-            e.printStackTrace();
-            return false;
-        }
-//        return false;        
-    }
-
     private void addCapabilities(List capabilities) throws SVNException {
         if (myCapabilities == null) {
             myCapabilities = new HashSet();
@@ -366,7 +237,6 @@ public class SVNConnection {
             return;
         }
         List creds = read("s?s?l", null, true);
-        System.out.println("READ: " + creds);
         myIsCredentialsReceived = true;
         if (creds != null && creds.size() >= 2 && creds.get(0) != null && creds.get(1) != null) {
             SVNURL rootURL = creds.get(1) != null ? SVNURL.parseURIEncoded(SVNReader.getString(creds, 1)) : null;
@@ -400,6 +270,10 @@ public class SVNConnection {
     }
 
     public void close() throws SVNException {
+        if (myAuthenticator != null) {
+            myAuthenticator.dispose();
+            myAuthenticator = null;
+        }
         myInputStream = null;
         myLoggingInputStream = null;
         myOutputStream = null;
@@ -481,9 +355,7 @@ public class SVNConnection {
     }
     
     public boolean isConnectionStale() {
-        boolean stale = myConnector.isStale();
-        System.out.println("STALE: " + stale);
-        return stale;
+        return myConnector.isStale();
     }
 
     private void checkConnection() throws SVNException {

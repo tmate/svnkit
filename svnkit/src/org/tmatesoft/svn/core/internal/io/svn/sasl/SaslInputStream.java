@@ -84,8 +84,10 @@ public class SaslInputStream extends InputStream {
         if (r != 4) {
             throw new IOException("Cannot read encoded buffer header");
         }
-        int encodedLength = (myLengthBuffer[0] << 24) | (myLengthBuffer[1] & 0xFF) << 16 | (myLengthBuffer[2] & 0xFF) << 8 | (myLengthBuffer[3] & 0xFF);
-        // read until all data is read.
+        int encodedLength = (myLengthBuffer[0] << 24) | 
+                            (myLengthBuffer[1] & 0xFF) << 16 | 
+                            (myLengthBuffer[2] & 0xFF) << 8 | 
+                            (myLengthBuffer[3] & 0xFF);
         r = 0;
         while(encodedLength > 0) {
             int read = mySource.read(myReadBuffer, r, encodedLength);
