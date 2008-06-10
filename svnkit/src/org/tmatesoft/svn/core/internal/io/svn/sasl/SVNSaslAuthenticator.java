@@ -97,7 +97,6 @@ public class SVNSaslAuthenticator extends SVNAuthenticator {
     
     protected boolean tryAuthentication() throws SVNException {
         onAuthAttempt();
-        setLastError(null);
         
         String initialChallenge = null;
         if (myClient.hasInitialResponse()) {
