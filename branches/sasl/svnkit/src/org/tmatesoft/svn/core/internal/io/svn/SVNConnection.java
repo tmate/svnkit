@@ -14,40 +14,20 @@ package org.tmatesoft.svn.core.internal.io.svn;
 
 import java.io.BufferedInputStream;
 import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.FilterInputStream;
-import java.io.FilterOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.util.HashMap;
+import java.lang.reflect.Constructor;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
-
-import javax.security.auth.callback.Callback;
-import javax.security.auth.callback.CallbackHandler;
-import javax.security.auth.callback.NameCallback;
-import javax.security.auth.callback.PasswordCallback;
-import javax.security.auth.callback.UnsupportedCallbackException;
-import javax.security.sasl.RealmCallback;
-import javax.security.sasl.Sasl;
-import javax.security.sasl.SaslClient;
-import javax.security.sasl.SaslException;
 
 import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNURL;
 import org.tmatesoft.svn.core.auth.ISVNAuthenticationManager;
-import org.tmatesoft.svn.core.auth.SVNPasswordAuthentication;
-import org.tmatesoft.svn.core.internal.io.svn.sasl.SVNSaslAuthenticator;
-import org.tmatesoft.svn.core.internal.io.svn.sasl.SaslInputStream;
-import org.tmatesoft.svn.core.internal.io.svn.sasl.SaslOutputStream;
-import org.tmatesoft.svn.core.internal.util.SVNBase64;
-import org.tmatesoft.svn.core.internal.util.SVNHashMap;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 
 /**
@@ -197,7 +177,7 @@ public class SVNConnection {
             myAuthenticator = new SVNPlainAuthenticator(this);
             myAuthenticator.authenticate(mechs, myRealm, repository);
         } else {
-            myAuthenticator = new SVNSaslAuthenticator(this);
+            myAuthenticator = createSASLAuthenticator();
             try {
                 myAuthenticator.authenticate(mechs, myRealm, repository);
             } catch (SVNException e) {
@@ -212,6 +192,17 @@ public class SVNConnection {
             }
         }
         receiveRepositoryCredentials(repository);
+    }
+    
+    private SVNAuthenticator createSASLAuthenticator() throws SVNException {
+        try {
+            Class saslClass = 
+                SVNConnection.class.getClassLoader().loadClass("org.tmatesoft.svn.core.internal.io.svn.sasl.SVNSaslAuthenticator");
+            Constructor constructor = saslClass.getConstructor(new Class[] {SVNConnection.class});
+            return (SVNAuthenticator) constructor.newInstance(new Object[] {this});
+        } catch (Throwable th) {
+            return new SVNPlainAuthenticator(this);
+        }
     }
     
     private void addCapabilities(List capabilities) throws SVNException {

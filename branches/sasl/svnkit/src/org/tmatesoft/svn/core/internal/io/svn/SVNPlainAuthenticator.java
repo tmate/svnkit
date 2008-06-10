@@ -42,6 +42,7 @@ public class SVNPlainAuthenticator extends SVNAuthenticator {
         if (authManager != null && authManager.isAuthenticationForced() && mechs.contains("ANONYMOUS") && mechs.contains("CRAM-MD5")) {
             mechs.remove("ANONYMOUS");
         }
+        onAuthAttempt();
         SVNURL location = repos.getLocation();
         SVNPasswordAuthentication auth = null;
         if (repos.getExternalUserName() != null && mechs.contains("EXTERNAL")) {
