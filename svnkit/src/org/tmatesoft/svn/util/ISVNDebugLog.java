@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2008 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -21,28 +21,16 @@ import java.io.OutputStream;
  */
 public interface ISVNDebugLog {
     
-    public void logError(String message);
+    public void info(String message);
 
-    public void logError(Throwable th);
+    public void error(String message);
+    
+    public void info(Throwable th);
 
-    public void logSevere(Throwable th);
-
-    public void logSevere(String message);
-
-    public void logFine(Throwable th);
-
-    public void logFine(String message);
-
-    public void logFiner(Throwable th);
-
-    public void logFiner(String message);
-
-    public void logFinest(Throwable th);
-
-    public void logFinest(String message);
+    public void error(Throwable th);
     
     public void log(String message, byte[] data);
-
+    
     public void flushStream(Object stream);
     
     public InputStream createLogStream(InputStream is);

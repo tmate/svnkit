@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2008 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -19,7 +19,6 @@ import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNNodeKind;
 import org.tmatesoft.svn.core.SVNProperty;
 import org.tmatesoft.svn.core.SVNURL;
-import org.tmatesoft.svn.core.SVNPropertyValue;
 import org.tmatesoft.svn.core.io.ISVNEditor;
 import org.tmatesoft.svn.core.io.SVNRepository;
 import org.tmatesoft.svn.core.io.diff.SVNDiffWindow;
@@ -74,7 +73,7 @@ public class SVNDiffStatusEditor implements ISVNEditor {
         myCurrentDirSummarize.myType = SVNStatusType.STATUS_ADDED;
     }
 
-    public void changeDirProperty(String name, SVNPropertyValue value) throws SVNException {
+    public void changeDirProperty(String name, String value) throws SVNException {
         if (SVNProperty.isRegularProperty(name)) {
             myCurrentDirSummarize.myPropChanged = true;
         }
@@ -94,7 +93,7 @@ public class SVNDiffStatusEditor implements ISVNEditor {
         myCurrentFileSummarize.myType = SVNStatusType.STATUS_ADDED;
     }
 
-    public void changeFileProperty(String path, String name, SVNPropertyValue value) throws SVNException {
+    public void changeFileProperty(String path, String name, String value) throws SVNException {
         if (SVNProperty.isRegularProperty(name)) {
             myCurrentFileSummarize.myPropChanged = true;
         }

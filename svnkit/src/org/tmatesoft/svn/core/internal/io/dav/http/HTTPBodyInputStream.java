@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2008 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -11,12 +11,12 @@
  */
 package org.tmatesoft.svn.core.internal.io.dav.http;
 
+import java.io.BufferedInputStream;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
-
-import org.tmatesoft.svn.core.SVNException;
-import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 
 
 /**
@@ -59,16 +59,10 @@ public class HTTPBodyInputStream extends InputStream {
         close();
     }
     
-    private InputStream getDelegate() throws IOException {
+    private InputStream getDelegate() throws FileNotFoundException {
         if (myDelegate == null) {
-            try {
-                myDelegate = SVNFileUtil.openFileForReading(myFile);
-            } catch (SVNException e) {
-                if (e.getCause() instanceof IOException) {
-                    throw (IOException) e.getCause();
-                }
-                throw new IOException(e.getMessage());
-            }
+            myDelegate = new FileInputStream(myFile);
+            myDelegate = new BufferedInputStream(myDelegate);
         }
         return myDelegate;
     }

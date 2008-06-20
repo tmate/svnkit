@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2008 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -67,25 +67,25 @@ public class SVNKitLog extends SVNDebugLogAdapter {
 		return new Status(severity, myPluginID, IStatus.OK, message == null ? "" : message, th);
 	}
 
-    public void logError(String message) {
+    public void info(String message) {
         if (isInfoEnabled()) {
             myLog.log(createStatus(IStatus.INFO, message, null));
         }
     }
 
-    public void logError(Throwable th) {
+    public void info(Throwable th) {
         if (isInfoEnabled()) {
             myLog.log(createStatus(IStatus.INFO, th != null ? th.getMessage() : "", th));
         }
     }
 
-    public void logSevere(String message) {
+    public void error(String message) {
         if (isErrorEnabled()) {
             myLog.log(createStatus(IStatus.ERROR, message, null));
         }
     }
 
-    public void logSevere(Throwable th) {
+    public void error(Throwable th) {
         if (isErrorEnabled()) {
             myLog.log(createStatus(IStatus.ERROR, th != null ? th.getMessage() : "", th));
         }
@@ -113,23 +113,5 @@ public class SVNKitLog extends SVNDebugLogAdapter {
             return super.createLogStream(os);
         }
         return os;
-    }
-
-    public void logFine(Throwable th) {
-    }
-
-    public void logFine(String message) {
-    }
-
-    public void logFiner(Throwable th) {
-    }
-
-    public void logFiner(String message) {
-    }
-
-    public void logFinest(Throwable th) {
-    }
-
-    public void logFinest(String message) {
     }
 }

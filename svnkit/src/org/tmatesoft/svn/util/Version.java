@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2008 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -11,11 +11,11 @@
  */
 package org.tmatesoft.svn.util;
 
+import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Properties;
-
-import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 
 /**
  * @version 1.1.1
@@ -31,10 +31,10 @@ public class Version {
     private static final String VERSION_MICRO_PROPERTY = "svnkit.version.micro";
     private static final String VERSION_REVISION_PROPERTY = "svnkit.version.revision";
 
-    private static final String VERSION_STRING_DEFAULT = "SVN/1.5.0 SVNKit/1.2.1 (http://svnkit.com/) rSNAPSHOT";
-    private static final String VERSION_MAJOR_DEFAULT = "1";
-    private static final String VERSION_MINOR_DEFAULT = "2";
-    private static final String VERSION_MICRO_DEFAULT = "1";
+    private static final String VERSION_STRING_DEFAULT = "SVNKit (http://svnkit.com/) rSNAPSHOT";
+    private static final String VERSION_MAJOR_DEFAULT = "0";
+    private static final String VERSION_MINOR_DEFAULT = "0";
+    private static final String VERSION_MICRO_DEFAULT = "0";
     private static final String VERSION_REVISION_DEFAULT = "SNAPSHOT";
     private static String ourUserAgent;
 
@@ -68,7 +68,7 @@ public class Version {
         } catch (NumberFormatException nfe) {
             //
         }
-        return Integer.parseInt(VERSION_MAJOR_DEFAULT);
+        return 0;
     }
 
     public static int getMinorVersion() {
@@ -79,7 +79,7 @@ public class Version {
         } catch (NumberFormatException nfe) {
             //
         }
-        return Integer.parseInt(VERSION_MINOR_DEFAULT);
+        return 0;
     }
 
     public static int getMicroVersion() {
@@ -90,7 +90,7 @@ public class Version {
         } catch (NumberFormatException nfe) {
             //
         }
-        return Integer.parseInt(VERSION_MICRO_DEFAULT);
+        return 0;
     }
 
     public static long getRevisionNumber() {
@@ -98,11 +98,6 @@ public class Version {
         try {
             return Long.parseLong(ourProperties.getProperty(
                     VERSION_REVISION_PROPERTY, VERSION_REVISION_DEFAULT));
-        } catch (NumberFormatException nfe) {
-            //
-        }
-        try {
-            return Long.parseLong(VERSION_REVISION_DEFAULT);
         } catch (NumberFormatException nfe) {
             //
         }

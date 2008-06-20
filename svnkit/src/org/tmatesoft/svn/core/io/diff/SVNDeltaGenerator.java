@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2008 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -23,7 +23,6 @@ import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.internal.delta.SVNDeltaAlgorithm;
 import org.tmatesoft.svn.core.internal.delta.SVNVDeltaAlgorithm;
 import org.tmatesoft.svn.core.internal.delta.SVNXDeltaAlgorithm;
-import org.tmatesoft.svn.core.internal.wc.IOExceptionWrapper;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 import org.tmatesoft.svn.core.io.ISVNDeltaConsumer;
@@ -50,7 +49,6 @@ public class SVNDeltaGenerator {
     
     private byte[] mySourceBuffer;
     private byte[] myTargetBuffer;
-    private int myMaximumBufferSize;
     
     /**
      * Creates a generator that will produce diff windows of 
@@ -72,10 +70,8 @@ public class SVNDeltaGenerator {
      *                              window would produce
      */
     public SVNDeltaGenerator(int maximumDiffWindowSize) {
-        myMaximumBufferSize = maximumDiffWindowSize;
-        int initialSize = Math.min(8192, myMaximumBufferSize);
-        mySourceBuffer = new byte[initialSize];
-        myTargetBuffer = new byte[initialSize];
+        mySourceBuffer = new byte[maximumDiffWindowSize];
+        myTargetBuffer = new byte[maximumDiffWindowSize];
     }
     
     /**
@@ -153,9 +149,7 @@ public class SVNDeltaGenerator {
             int targetLength;
             int sourceLength;
             try {
-                targetLength = readToBuffer(target, myTargetBuffer);
-            } catch (IOExceptionWrapper ioew) {
-                throw ioew.getOriginalException();
+                targetLength = target.read(myTargetBuffer, 0, myTargetBuffer.length);
             } catch (IOException e) {
                 SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, e.getLocalizedMessage());
                 SVNErrorManager.error(err, e);
@@ -170,9 +164,7 @@ public class SVNDeltaGenerator {
                 break;
             } 
             try {
-                sourceLength = readToBuffer(source, mySourceBuffer);
-            } catch (IOExceptionWrapper ioew) {
-                throw ioew.getOriginalException();
+                sourceLength = source.read(mySourceBuffer, 0, mySourceBuffer.length);
             } catch (IOException e) {
                 SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, e.getLocalizedMessage());
                 SVNErrorManager.error(err, e);
@@ -235,28 +227,5 @@ public class SVNDeltaGenerator {
         OutputStream os = consumer.textDeltaChunk(path, window);
         SVNFileUtil.closeFile(os);
         algorithm.reset();
-    }
-    
-    private int readToBuffer(InputStream is, byte[] buffer) throws IOException {
-        int read = is.read(buffer, 0, buffer.length);
-        if (read <= 0) {
-            return read;
-        }
-        if (read == buffer.length && read < myMaximumBufferSize) {
-            byte[] expanded = new byte[myMaximumBufferSize];
-            System.arraycopy(buffer, 0, expanded, 0, read);
-            if (buffer == myTargetBuffer) {
-                myTargetBuffer = expanded;
-            } else {
-                mySourceBuffer = expanded;
-            }
-            buffer = expanded;
-            int anotherRead = is.read(buffer, read, buffer.length - read);
-            if (anotherRead <= 0) {
-                return read;
-            }
-            read += anotherRead;
-        }
-        return read;
     }
 }

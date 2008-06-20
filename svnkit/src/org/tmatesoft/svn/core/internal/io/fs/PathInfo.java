@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2008 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -10,8 +10,6 @@
  * ====================================================================
  */
 package org.tmatesoft.svn.core.internal.io.fs;
-
-import org.tmatesoft.svn.core.SVNDepth;
 
 /**
  * @version 1.1.1
@@ -24,15 +22,13 @@ public class PathInfo {
     String myLockToken;
     long myRevision;
     boolean startEmpty;
-    SVNDepth myDepth;
-    
-    public PathInfo(String path, String linkPath, String lockToken, long revision, SVNDepth depth, boolean empty) {
+
+    public PathInfo(String path, String linkPath, String lockToken, long revision, boolean empty) {
         myPath = path;
         myLinkPath = linkPath;
         myLockToken = lockToken;
         myRevision = revision;
         startEmpty = empty;
-        myDepth = depth;
     }
 
     public String getLinkPath() {
@@ -58,10 +54,6 @@ public class PathInfo {
     public static boolean isRelevant(PathInfo pathInfo, String prefix) {
         /* Return true if pathInfo's path is a child of prefix. */
         return pathInfo != null && pathInfo.getPath().startsWith(prefix) && ("".equals(prefix) || pathInfo.getPath().charAt(prefix.length()) == '/');
-    }
-
-    public SVNDepth getDepth() {
-        return myDepth;
     }
 
 }

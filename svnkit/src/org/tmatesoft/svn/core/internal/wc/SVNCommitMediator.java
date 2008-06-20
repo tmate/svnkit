@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2008 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -13,13 +13,11 @@ package org.tmatesoft.svn.core.internal.wc;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import org.tmatesoft.svn.core.internal.util.SVNHashMap;
+import java.util.HashMap;
 import java.util.Map;
 
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNNodeKind;
-import org.tmatesoft.svn.core.SVNPropertyValue;
-import org.tmatesoft.svn.core.SVNProperties;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
 import org.tmatesoft.svn.core.internal.wc.admin.SVNAdminArea;
 import org.tmatesoft.svn.core.internal.wc.admin.SVNVersionedProperties;
@@ -40,19 +38,19 @@ public class SVNCommitMediator implements ISVNWorkspaceMediator {
 
     public SVNCommitMediator(Map commitItems) {
         myTmpFiles = new ArrayList();
-        myWCPropsMap = new SVNHashMap();
+        myWCPropsMap = new HashMap();
         myCommitItems = commitItems;
     }
 
-    public SVNProperties getWCProperties(SVNCommitItem item) {
-        return (SVNProperties) myWCPropsMap.get(item);
+    public Map getWCProperties(SVNCommitItem item) {
+        return (Map) myWCPropsMap.get(item);
     }
 
     public Collection getTmpFiles() {
         return myTmpFiles;
     }
 
-    public SVNPropertyValue getWorkspaceProperty(String path, String name) throws SVNException {
+    public String getWorkspaceProperty(String path, String name) throws SVNException {
         SVNCommitItem item = (SVNCommitItem) myCommitItems.get(path);
         if (item == null) {
             return null;
@@ -71,16 +69,16 @@ public class SVNCommitMediator implements ISVNWorkspaceMediator {
         return wcProps.getPropertyValue(name);
     }
 
-    public void setWorkspaceProperty(String path, String name, SVNPropertyValue value)
+    public void setWorkspaceProperty(String path, String name, String value)
             throws SVNException {
         if (name == null) {
             return;
         }
         SVNCommitItem item = (SVNCommitItem) myCommitItems.get(path);
         if (!myWCPropsMap.containsKey(item)) {
-            myWCPropsMap.put(item, new SVNProperties());
+            myWCPropsMap.put(item, new HashMap());
         }
 
-        ((SVNProperties) myWCPropsMap.get(item)).put(name, value);
+        ((Map) myWCPropsMap.get(item)).put(name, value);
     }
 }

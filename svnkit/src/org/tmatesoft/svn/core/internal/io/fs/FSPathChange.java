@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2008 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -16,7 +16,6 @@ import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNLogEntryPath;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
-import org.tmatesoft.svn.core.io.SVNRepository;
 
 /**
  * @version 1.1.1
@@ -151,7 +150,7 @@ public class FSPathChange extends SVNLogEntryPath {
         String pathStr = changeLine.substring(delimiterInd + 1);
         
         String copyfromPath = null;
-        long copyfromRevision = SVNRepository.INVALID_REVISION;
+        long copyfromRevision = FSRepository.SVN_INVALID_REVNUM;
         
         if (copyfromLine != null && copyfromLine.length() != 0) {
             delimiterInd = copyfromLine.indexOf(' ');

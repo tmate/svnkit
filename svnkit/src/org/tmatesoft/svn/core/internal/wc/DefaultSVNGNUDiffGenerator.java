@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2008 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -14,19 +14,19 @@ package org.tmatesoft.svn.core.internal.wc;
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.Map;
 
 import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
-import org.tmatesoft.svn.core.SVNProperties;
 import org.tmatesoft.svn.core.SVNRevisionProperty;
-import org.tmatesoft.svn.core.internal.io.fs.CountingStream;
 import org.tmatesoft.svn.core.internal.io.fs.FSFS;
 import org.tmatesoft.svn.core.internal.io.fs.FSRevisionRoot;
 import org.tmatesoft.svn.core.internal.io.fs.FSRoot;
 import org.tmatesoft.svn.core.internal.io.fs.FSTransactionRoot;
 import org.tmatesoft.svn.core.wc.DefaultSVNDiffGenerator;
 import org.tmatesoft.svn.core.wc.admin.ISVNGNUDiffGenerator;
+
 
 
 /**
@@ -48,18 +48,21 @@ public class DefaultSVNGNUDiffGenerator extends DefaultSVNDiffGenerator implemen
                 if (!myIsHeaderWritten) {
                     path = path.startsWith("/") ? path.substring(1) : path;
                     myHeader = "Added: " + path;
+                    writeHeader(result);
                 }
                 break;
             case DELETED:
                 if (!myIsHeaderWritten) {
                     path = path.startsWith("/") ? path.substring(1) : path;
                     myHeader = "Deleted: " + path;
+                    writeHeader(result);
                 }
                 break;
             case MODIFIED:
                 if (!myIsHeaderWritten) {
                     path = path.startsWith("/") ? path.substring(1) : path;
                     myHeader = "Modified: " + path;
+                    writeHeader(result);
                 }
                 break;
             case COPIED:
@@ -67,11 +70,12 @@ public class DefaultSVNGNUDiffGenerator extends DefaultSVNDiffGenerator implemen
                     path = path.startsWith("/") ? path.substring(1) : path;
                     copyFromPath = copyFromPath.startsWith("/") ? copyFromPath.substring(1) : copyFromPath;
                     myHeader = "Copied: " + path + " (from rev " + copyFromRevision + ", " + copyFromPath + ")";
+                    writeHeader(result);
                 }
                 break;
             case NO_DIFF:
                 try {
-                    result.write(getEOL());
+                    result.write(EOL);
                 } catch (IOException e) {
                     SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, e.getLocalizedMessage());
                     SVNErrorManager.error(err, e);
@@ -82,46 +86,34 @@ public class DefaultSVNGNUDiffGenerator extends DefaultSVNDiffGenerator implemen
 
     public void displayFileDiff(String path, File file1, File file2,
             String rev1, String rev2, String mimeType1, String mimeType2, OutputStream result) throws SVNException {
-        CountingStream counitngStream = new CountingStream(result, 0);
-        super.displayFileDiff(path, file1, file2, rev1, rev2, mimeType1, mimeType2, counitngStream);
-        if (counitngStream.getPosition() > 0) {
-            try {
-                result.write(getEOL());
-            } catch (IOException e) {
-                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, e.getLocalizedMessage());
-                SVNErrorManager.error(err, e);
-            }
+        super.displayFileDiff(path, file1, file2, rev1, rev2, mimeType1, mimeType2, result);
+        try {
+            result.write(EOL);
+        } catch (IOException e) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, e.getLocalizedMessage());
+            SVNErrorManager.error(err, e);
         }
     }
 
-    public void setHeaderWritten(boolean written) {
-        myIsHeaderWritten = written;
-    }
-    
     protected boolean displayHeader(OutputStream os, String path, boolean deleted) throws IOException {
-        if (myHeader != null) {
-            os.write(myHeader.getBytes(getEncoding())); 
-            os.write(getEOL());
-            myHeader = null;
-            myIsHeaderWritten = true;
-        } else if (!myIsHeaderWritten) {
+        if (!myIsHeaderWritten) {
             path = path.startsWith("/") ? path.substring(1) : path;
-            String header = "Index: " + path;
-            os.write(header.getBytes(getEncoding())); 
-            os.write(getEOL());
+            myHeader = "Index: " + path;
+            os.write(myHeader.getBytes(getEncoding())); 
+            os.write(EOL);
             myIsHeaderWritten = true;
         }
         os.write(HEADER_SEPARATOR);
-        os.write(getEOL());
+        os.write(EOL);
         return false;
     }
     
     protected void displayBinary(OutputStream os, String mimeType1, String mimeType2) throws IOException {
         os.write("(Binary files differ)".getBytes(getEncoding()));
-        os.write(getEOL());
+        os.write(EOL);
     }
 
-    protected void displayHeaderFields(OutputStream os, String label1, String label2) throws IOException {
+    protected void displayHeaderFields(OutputStream os, String path1, String rev1, String path2, String rev2) throws IOException {
         os.write("--- ".getBytes(getEncoding()));
         String originalLabel = null;
         String newLabel = null;
@@ -132,10 +124,10 @@ public class DefaultSVNGNUDiffGenerator extends DefaultSVNDiffGenerator implemen
             throw new IOException(svne.getLocalizedMessage());
         }
         os.write(originalLabel.getBytes(getEncoding()));
-        os.write(getEOL());
+        os.write(EOL);
         os.write("+++ ".getBytes(getEncoding()));
         os.write(newLabel.getBytes(getEncoding()));
-        os.write(getEOL());
+        os.write(EOL);
     }
 
     protected void setOriginalFile(FSRoot originalRoot, String originalPath) {
@@ -154,7 +146,7 @@ public class DefaultSVNGNUDiffGenerator extends DefaultSVNDiffGenerator implemen
         long rev = 0;
         if (root != null) {
             FSFS fsfs = root.getOwner();
-            SVNProperties props = null;
+            Map props = null;
             if (root instanceof FSRevisionRoot) {
                 FSRevisionRoot revisionRoot = (FSRevisionRoot) root;
                 rev = revisionRoot.getRevision();
@@ -164,7 +156,7 @@ public class DefaultSVNGNUDiffGenerator extends DefaultSVNDiffGenerator implemen
                 txnName = txnRoot.getTxnID();
                 props = fsfs.getTransactionProperties(txnName);
             }
-            date = props.getStringValue(SVNRevisionProperty.DATE);
+            date = (String) props.get(SVNRevisionProperty.DATE);
         } 
         
         String dateString = null;
@@ -182,6 +174,21 @@ public class DefaultSVNGNUDiffGenerator extends DefaultSVNDiffGenerator implemen
         return path + '\t' + dateString + " (rev " + rev + ")";
     }
     
+    private void writeHeader(OutputStream result) throws SVNException {
+        try {
+            result.write(myHeader.getBytes(getEncoding())); 
+            result.write(EOL);
+            myIsHeaderWritten = true;
+        } catch (IOException e) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, e.getLocalizedMessage());
+            SVNErrorManager.error(err, e);
+        }
+    }
+    
+    protected boolean isHeaderForced(File file1, File file2) {
+        return true;
+    }
+
     protected boolean useLocalFileSeparatorChar() {
         return false;
     }

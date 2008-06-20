@@ -1,11 +1,12 @@
 /*
  * ====================================================================
- * Copyright (c) 2000-2008 SyntEvo GmbH, info@syntevo.com
- * All rights reserved.
+ * Copyright (c) 2004 TMate Software Ltd.  All rights reserved.
  *
- * This software is licensed as described in the file SEQUENCE-LICENSE,
- * which you should have received as part of this distribution. Use is
- * subject to license terms.
+ * This software is licensed as described in the file COPYING, which
+ * you should have received as part of this distribution.  The terms
+ * are also available at http://svnkit.com/license.html
+ * If newer versions of this license are posted there, you may use a
+ * newer version instead, at your option.
  * ====================================================================
  */
 
@@ -180,9 +181,7 @@ public abstract class QDiffSequenceGenerator implements QDiffGenerator {
 		for (Iterator blocks = blocksList.iterator(); blocks.hasNext();) {
 			QSequenceDifferenceBlock currentBlock = (QSequenceDifferenceBlock)blocks.next();
 			if (lastBlock != null) {
-				final int leftDifference = currentBlock.getLeftFrom() - 1 - lastBlock.getLeftTo();
-				final int rightDifference = currentBlock.getRightFrom() - 1 - lastBlock.getRightTo();
-				if (leftDifference > 2 * gutter && rightDifference > 2 * gutter) {
+				if (currentBlock.getLeftFrom() - 1 - lastBlock.getLeftTo() > gutter && currentBlock.getRightFrom() - 1 - lastBlock.getRightTo() > gutter) {
 					combinedBlocks.add(currentList);
 					currentList = new LinkedList();
 				}

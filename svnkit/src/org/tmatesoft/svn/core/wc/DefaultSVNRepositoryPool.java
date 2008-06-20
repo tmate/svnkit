@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2008 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -11,7 +11,7 @@
  */
 package org.tmatesoft.svn.core.wc;
 
-import org.tmatesoft.svn.core.internal.util.SVNHashMap;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Timer;
@@ -28,7 +28,6 @@ import org.tmatesoft.svn.core.io.SVNRepository;
 import org.tmatesoft.svn.core.io.SVNRepositoryFactory;
 import org.tmatesoft.svn.util.ISVNDebugLog;
 import org.tmatesoft.svn.util.SVNDebugLog;
-import org.tmatesoft.svn.util.SVNLogType;
 
 
 /**
@@ -97,7 +96,7 @@ public class DefaultSVNRepositoryPool implements ISVNRepositoryPool, ISVNSession
     private ISVNDebugLog myDebugLog;
     private Map myPool;
     private long myTimeout;
-    private Map myInactiveRepositories = new SVNHashMap();
+    private Map myInactiveRepositories = new HashMap();
     private Timer myTimer;
 
     private boolean myIsKeepConnection;
@@ -129,7 +128,7 @@ public class DefaultSVNRepositoryPool implements ISVNRepositoryPool, ISVNSession
     public DefaultSVNRepositoryPool(ISVNAuthenticationManager authManager, ISVNTunnelProvider tunnelProvider, long timeout, boolean keepConnection) {
         myAuthManager = authManager;
         myTunnelProvider = tunnelProvider;
-        myDebugLog = SVNDebugLog.getLog(SVNLogType.WC);
+        myDebugLog = SVNDebugLog.getDefaultLog();
         myTimeout = timeout > 0 ? timeout : DEFAULT_IDLE_TIMEOUT;
         myIsKeepConnection = keepConnection;
         myTimeout = timeout;
@@ -298,7 +297,7 @@ public class DefaultSVNRepositoryPool implements ISVNRepositoryPool, ISVNSession
     
     private Map getPool() {
         if (myPool == null) {
-            myPool = new SVNHashMap();
+            myPool = new HashMap();
         }
         return myPool;
     }
@@ -369,7 +368,7 @@ public class DefaultSVNRepositoryPool implements ISVNRepositoryPool, ISVNSession
     }
 
     public void setDebugLog(ISVNDebugLog log) {
-        myDebugLog = log == null ? SVNDebugLog.getLog(SVNLogType.WC) : log;
+        myDebugLog = log == null ? SVNDebugLog.getDefaultLog() : log;
         Map pool = getPool();
         for (Iterator protocols = pool.keySet().iterator(); protocols.hasNext();) {
             String key = (String) protocols.next();
@@ -398,7 +397,7 @@ public class DefaultSVNRepositoryPool implements ISVNRepositoryPool, ISVNSession
                     }
                 }
             } catch (Throwable th) {
-                SVNDebugLog.getLog(SVNLogType.WC).logSevere(th);
+                SVNDebugLog.getDefaultLog().error(th);
                 if (!scheduled && myTimer != null) {
                     myTimer.schedule(new TimeoutTask(), 10000);
                     scheduled = true;

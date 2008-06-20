@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2008 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -163,7 +163,6 @@ class HTTPRequest {
         }
         // if method is "CONNECT", then just return normal status 
         // only if there is nothing to read.
-        // this may throw EOFException, then and only then we retry.
         myConnection.readHeader(this);
         // store last time for the next request in case it was keep-alive one.
         myTimeout = computeTimeout(getResponseHeader());

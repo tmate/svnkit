@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2007 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2008 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -13,7 +13,7 @@ package org.tmatesoft.svn.core.wc;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import org.tmatesoft.svn.core.internal.util.SVNHashMap;
+import java.util.HashMap;
 import java.util.Map;
 
 import org.tmatesoft.svn.core.SVNException;
@@ -153,7 +153,7 @@ public class SVNCommitPacket {
             return EMPTY;
         }
         Collection items = new ArrayList();
-        Map lockTokens = myLockTokens == null ? null : new SVNHashMap(myLockTokens);
+        Map lockTokens = myLockTokens == null ? null : new HashMap(myLockTokens);
         for (int i = 0; myCommitItems != null && i < myCommitItems.length; i++) {
             SVNCommitItem commitItem = myCommitItems[i];
             if (!myIsSkipped[i]) {

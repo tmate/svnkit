@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <module relativePaths="true" type="JAVA_MODULE" version="4">
+  <component name="ModuleRootManager" />
   <component name="NewModuleRootManager" inherit-compiler-output="false">
     <output url="file://$MODULE_DIR$/bin" />
     <exclude-output />
@@ -27,7 +28,6 @@
       </library>
     </orderEntry>
     <orderEntry type="module" module-name="javahl" />
-    <orderEntry type="module" module-name="svnkit-cli" />
     <orderEntryProperties />
   </component>
 </module>
