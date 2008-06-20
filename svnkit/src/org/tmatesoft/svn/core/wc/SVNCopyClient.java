@@ -398,8 +398,6 @@ public class SVNCopyClient extends SVNBasicClient {
         }
         boolean srcIsURL = sources[0].isURL();
         boolean dstIsURL = dst.isURL();
-        System.out.println("src is URL " + sources[0].isURL());
-        System.out.println("dst is URL " + dst.isURL());
         
         if (sources.length > 1) {
             for (int i = 0; i < sources.length; i++) {

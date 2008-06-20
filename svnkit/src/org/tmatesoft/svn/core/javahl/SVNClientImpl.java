@@ -717,18 +717,7 @@ public class SVNClientImpl implements SVNClientInterface {
     }
 
     public void copy(CopySource[] sources, String destPath, String message, boolean copyAsChild, boolean makeParents, Map revprops) throws ClientException {
-        System.out.println("destPath: " + destPath);
-        for (int i = 0; i < sources.length; i++) {
-            System.out.println("source.path:  " + sources[i].getPath());
-            System.out.println("source.rev:  " + sources[i].getRevision());
-            System.out.println("source.peg:  " + sources[i].getPegRevision());
-        }
         SVNCopySource[] copySources = getCopySources(sources, copyAsChild);
-        for (int i = 0; i < copySources.length; i++) {
-            System.out.println("copy.source.URL:  " + copySources[i].getURL());
-            System.out.println("copy.source.isURL:  " + copySources[i].isURL());
-            System.out.println("copy.source.File:  " + copySources[i].getFile());
-        }
         copyOrMove(copySources, destPath, false, message, copyAsChild, makeParents, revprops);
     }
 
@@ -754,12 +743,14 @@ public class SVNClientImpl implements SVNClientInterface {
         SVNCopySource[] sources = new SVNCopySource[srcs.length];
         try {
             for (int i = 0; i < srcs.length; i++) {
+                // TODO revision is used both as peg and revision
+                // to be compatible with JavaHL bug.
+                SVNRevision revision = JavaHLObjectFactory.getSVNRevision(srcs[i].getRevision());
+                SVNRevision pegRevision = JavaHLObjectFactory.getSVNRevision(srcs[i].getRevision());
                 if (isURL(srcs[i].getPath())) {
-                    sources[i] = new SVNCopySource(JavaHLObjectFactory.getSVNRevision(srcs[i].getPegRevision()),
-                            JavaHLObjectFactory.getSVNRevision(srcs[i].getRevision()), SVNURL.parseURIEncoded(srcs[i].getPath()));
+                    sources[i] = new SVNCopySource(pegRevision, revision, SVNURL.parseURIEncoded(srcs[i].getPath()));
                 } else {
-                    sources[i] = new SVNCopySource(JavaHLObjectFactory.getSVNRevision(srcs[i].getPegRevision()),
-                            JavaHLObjectFactory.getSVNRevision(srcs[i].getRevision()), new File(srcs[i].getPath()).getAbsoluteFile());
+                    sources[i] = new SVNCopySource(pegRevision, revision, new File(srcs[i].getPath()).getAbsoluteFile());
                 }
             }
         } catch (SVNException e) {
@@ -803,7 +794,6 @@ public class SVNClientImpl implements SVNClientInterface {
                 client.doCopy(sources, new File(destPath).getAbsoluteFile(), isMove, makeParents, !copyAsChild);
             }
         } catch (SVNException e) {
-            e.printStackTrace();
             throwException(e);
         } finally {
             resetLog();
