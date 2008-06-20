@@ -23,6 +23,43 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
+import org.tigris.subversion.javahl.BlameCallback;
+import org.tigris.subversion.javahl.BlameCallback2;
+import org.tigris.subversion.javahl.ChangelistCallback;
+import org.tigris.subversion.javahl.ClientException;
+import org.tigris.subversion.javahl.CommitItem;
+import org.tigris.subversion.javahl.CommitMessage;
+import org.tigris.subversion.javahl.ConflictDescriptor;
+import org.tigris.subversion.javahl.ConflictResolverCallback;
+import org.tigris.subversion.javahl.ConflictResult;
+import org.tigris.subversion.javahl.CopySource;
+import org.tigris.subversion.javahl.DiffSummaryReceiver;
+import org.tigris.subversion.javahl.DirEntry;
+import org.tigris.subversion.javahl.Info;
+import org.tigris.subversion.javahl.Info2;
+import org.tigris.subversion.javahl.InfoCallback;
+import org.tigris.subversion.javahl.JavaHLObjectFactory;
+import org.tigris.subversion.javahl.ListCallback;
+import org.tigris.subversion.javahl.LogMessage;
+import org.tigris.subversion.javahl.LogMessageCallback;
+import org.tigris.subversion.javahl.Mergeinfo;
+import org.tigris.subversion.javahl.MergeinfoLogKind;
+import org.tigris.subversion.javahl.Notify;
+import org.tigris.subversion.javahl.Notify2;
+import org.tigris.subversion.javahl.NotifyInformation;
+import org.tigris.subversion.javahl.ProgressListener;
+import org.tigris.subversion.javahl.PromptUserPassword;
+import org.tigris.subversion.javahl.PropertyData;
+import org.tigris.subversion.javahl.ProplistCallback;
+import org.tigris.subversion.javahl.Revision;
+import org.tigris.subversion.javahl.RevisionKind;
+import org.tigris.subversion.javahl.RevisionRange;
+import org.tigris.subversion.javahl.SVNClient;
+import org.tigris.subversion.javahl.SVNClientInterface;
+import org.tigris.subversion.javahl.SVNClientLogLevel;
+import org.tigris.subversion.javahl.Status;
+import org.tigris.subversion.javahl.StatusCallback;
+import org.tigris.subversion.javahl.SubversionException;
 import org.tmatesoft.svn.core.ISVNDirEntryHandler;
 import org.tmatesoft.svn.core.ISVNLogEntryHandler;
 import org.tmatesoft.svn.core.SVNCancelException;
@@ -89,44 +126,6 @@ import org.tmatesoft.svn.core.wc.SVNWCUtil;
 import org.tmatesoft.svn.util.ISVNDebugLog;
 import org.tmatesoft.svn.util.SVNDebugLog;
 import org.tmatesoft.svn.util.Version;
-
-import org.tigris.subversion.javahl.BlameCallback;
-import org.tigris.subversion.javahl.BlameCallback2;
-import org.tigris.subversion.javahl.ChangelistCallback;
-import org.tigris.subversion.javahl.ClientException;
-import org.tigris.subversion.javahl.CommitItem;
-import org.tigris.subversion.javahl.CommitMessage;
-import org.tigris.subversion.javahl.ConflictDescriptor;
-import org.tigris.subversion.javahl.ConflictResolverCallback;
-import org.tigris.subversion.javahl.ConflictResult;
-import org.tigris.subversion.javahl.CopySource;
-import org.tigris.subversion.javahl.DiffSummaryReceiver;
-import org.tigris.subversion.javahl.DirEntry;
-import org.tigris.subversion.javahl.Info;
-import org.tigris.subversion.javahl.Info2;
-import org.tigris.subversion.javahl.InfoCallback;
-import org.tigris.subversion.javahl.JavaHLObjectFactory;
-import org.tigris.subversion.javahl.ListCallback;
-import org.tigris.subversion.javahl.LogMessage;
-import org.tigris.subversion.javahl.LogMessageCallback;
-import org.tigris.subversion.javahl.Mergeinfo;
-import org.tigris.subversion.javahl.MergeinfoLogKind;
-import org.tigris.subversion.javahl.Notify;
-import org.tigris.subversion.javahl.Notify2;
-import org.tigris.subversion.javahl.NotifyInformation;
-import org.tigris.subversion.javahl.ProgressListener;
-import org.tigris.subversion.javahl.PromptUserPassword;
-import org.tigris.subversion.javahl.PropertyData;
-import org.tigris.subversion.javahl.ProplistCallback;
-import org.tigris.subversion.javahl.Revision;
-import org.tigris.subversion.javahl.RevisionKind;
-import org.tigris.subversion.javahl.RevisionRange;
-import org.tigris.subversion.javahl.SVNClient;
-import org.tigris.subversion.javahl.SVNClientInterface;
-import org.tigris.subversion.javahl.SVNClientLogLevel;
-import org.tigris.subversion.javahl.Status;
-import org.tigris.subversion.javahl.StatusCallback;
-import org.tigris.subversion.javahl.SubversionException;
 
 
 /**
@@ -744,12 +743,14 @@ public class SVNClientImpl implements SVNClientInterface {
         SVNCopySource[] sources = new SVNCopySource[srcs.length];
         try {
             for (int i = 0; i < srcs.length; i++) {
+                // TODO revision is used both as peg and revision
+                // to be compatible with JavaHL bug.
+                SVNRevision revision = JavaHLObjectFactory.getSVNRevision(srcs[i].getRevision());
+                SVNRevision pegRevision = JavaHLObjectFactory.getSVNRevision(srcs[i].getRevision());
                 if (isURL(srcs[i].getPath())) {
-                    sources[i] = new SVNCopySource(JavaHLObjectFactory.getSVNRevision(srcs[i].getPegRevision()),
-                            JavaHLObjectFactory.getSVNRevision(srcs[i].getRevision()), SVNURL.parseURIEncoded(srcs[i].getPath()));
+                    sources[i] = new SVNCopySource(pegRevision, revision, SVNURL.parseURIEncoded(srcs[i].getPath()));
                 } else {
-                    sources[i] = new SVNCopySource(JavaHLObjectFactory.getSVNRevision(srcs[i].getPegRevision()),
-                            JavaHLObjectFactory.getSVNRevision(srcs[i].getRevision()), new File(srcs[i].getPath()).getAbsoluteFile());
+                    sources[i] = new SVNCopySource(pegRevision, revision, new File(srcs[i].getPath()).getAbsoluteFile());
                 }
             }
         } catch (SVNException e) {
