@@ -741,12 +741,14 @@ public class SVNClientImpl implements SVNClientInterface {
         SVNCopySource[] sources = new SVNCopySource[srcs.length];
         try {
             for (int i = 0; i < srcs.length; i++) {
+                // TODO revision is used both as peg and revision
+                // to be compatible with JavaHL bug.
+                SVNRevision revision = JavaHLObjectFactory.getSVNRevision(srcs[i].getRevision());
+                SVNRevision pegRevision = JavaHLObjectFactory.getSVNRevision(srcs[i].getRevision());
                 if (isURL(srcs[i].getPath())) {
-                    sources[i] = new SVNCopySource(JavaHLObjectFactory.getSVNRevision(srcs[i].getPegRevision()),
-                            JavaHLObjectFactory.getSVNRevision(srcs[i].getRevision()), SVNURL.parseURIEncoded(srcs[i].getPath()));
+                    sources[i] = new SVNCopySource(pegRevision, revision, SVNURL.parseURIEncoded(srcs[i].getPath()));
                 } else {
-                    sources[i] = new SVNCopySource(JavaHLObjectFactory.getSVNRevision(srcs[i].getPegRevision()),
-                            JavaHLObjectFactory.getSVNRevision(srcs[i].getRevision()), new File(srcs[i].getPath()).getAbsoluteFile());
+                    sources[i] = new SVNCopySource(pegRevision, revision, new File(srcs[i].getPath()).getAbsoluteFile());
                 }
             }
         } catch (SVNException e) {
@@ -1998,11 +2000,14 @@ public class SVNClientImpl implements SVNClientInterface {
         SVNDiffClient differ = getSVNDiffClient();
         differ.getDiffGenerator().setDiffDeleted(!noDiffDeleted);
         differ.getDiffGenerator().setForcedBinaryDiff(force);
+        if (relativeToDir != null) {
+            File base = new File(relativeToDir).getAbsoluteFile();
+            differ.getDiffGenerator().setBasePath(base);
+        }
         differ.setOptions(getOptions());
         SVNRevision rev1 = JavaHLObjectFactory.getSVNRevision(revision1);
         SVNRevision rev2 = JavaHLObjectFactory.getSVNRevision(revision2);
         try {
-            differ.getDiffGenerator().setBasePath(getDiffBasePath(relativeToDir));
             OutputStream out = SVNFileUtil.openFileForWriting(new File(outFileName));
             if (!isURL(target1) && !isURL(target2)) {
                 differ.doDiff(new File(target1).getAbsoluteFile(), rev1,
@@ -2040,12 +2045,15 @@ public class SVNClientImpl implements SVNClientInterface {
         SVNDiffClient differ = getSVNDiffClient();
         differ.getDiffGenerator().setDiffDeleted(!noDiffDeleted);
         differ.getDiffGenerator().setForcedBinaryDiff(force);
+        if (relativeToDir != null) {
+            File base = new File(relativeToDir).getAbsoluteFile();
+            differ.getDiffGenerator().setBasePath(base);
+        }
         differ.setOptions(getOptions());
         SVNRevision peg = JavaHLObjectFactory.getSVNRevision(pegRevision);
         SVNRevision rev1 = JavaHLObjectFactory.getSVNRevision(startRevision);
         SVNRevision rev2 = JavaHLObjectFactory.getSVNRevision(endRevision);
         try {
-            differ.getDiffGenerator().setBasePath(getDiffBasePath(relativeToDir));
             OutputStream out = SVNFileUtil.openFileForWriting(new File(outFileName));
             if (isURL(target)) {
                 SVNURL url = SVNURL.parseURIEncoded(target);
@@ -2062,17 +2070,6 @@ public class SVNClientImpl implements SVNClientInterface {
             resetLog();
         }
 	}
-
-    private static File getDiffBasePath(String relativePath) throws SVNException {
-        File file = null;
-        if (relativePath != null) {
-            if (isURL(relativePath)) {
-                SVNErrorManager.error(SVNErrorMessage.create(SVNErrorCode.BAD_RELATIVE_PATH, "Relative path ''{0}'' should not be URL", relativePath));                                
-            }
-            file = new File(relativePath).getAbsoluteFile();
-        }
-        return file;
-    }
 
     public void diffSummarize(String target1, Revision revision1, String target2, Revision revision2, int depth, String[] changelists, boolean ignoreAncestry, final DiffSummaryReceiver receiver) throws ClientException {
         SVNDiffClient differ = getSVNDiffClient();
