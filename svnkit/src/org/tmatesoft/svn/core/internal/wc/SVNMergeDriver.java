@@ -745,22 +745,7 @@ public abstract class SVNMergeDriver extends SVNBasicClient {
 				markMergeInfoAsInheritableForARange(child.myPath, childMergeSourcePath, 
 						child.myPreMergeMergeInfo, range, myChildrenWithMergeInfo, true, i);
                 if (i > 0) {
-                    boolean isInSwitchedSubTree = false;
-                    if (child.myIsSwitched) {
-                        isInSwitchedSubTree = true;
-                    } else if (i > 1) {
-                        for (int j = i - 1; j > 0; j--) {
-                            MergePath parent = (MergePath) myChildrenWithMergeInfo.get(j);
-                            if (parent != null && parent.myIsSwitched && 
-                                    SVNPathUtil.isAncestor(parent.myPath.getAbsolutePath().replace(File.separatorChar, '/'), 
-                                    child.myPath.getAbsolutePath().replace(File.separatorChar, '/'))) {
-                                isInSwitchedSubTree = true;
-                                break;
-                            }
-                        }
-                    }
-                    
-                    elideMergeInfo(myWCAccess, child.myPath, childEntry, isInSwitchedSubTree ? null : myTarget);
+                    elideMergeInfo(myWCAccess, child.myPath, childEntry, myTarget);
                 }
         	}
         }
@@ -1448,7 +1433,7 @@ public abstract class SVNMergeDriver extends SVNBasicClient {
             MergePath child = (MergePath) childrenWithMergeInfoArray[i];
             String childPath = child.myPath.getAbsolutePath().replace(File.separatorChar, '/');
             String pathStr = path.getAbsolutePath().replace(File.separatorChar, '/');
-            if (SVNPathUtil.isAncestor(childPath, pathStr) && !childPath.equals(pathStr)) {
+            if (SVNPathUtil.isAncestor(childPath, pathStr)) {
                 ancestorIndex = i;
             }
         }
