@@ -2006,7 +2006,16 @@ public abstract class SVNRepository {
      * @throws SVNException  if some i/o error has occurred
      */
     public abstract void closeSession();
-    
+  
+    /**
+     * Returns <code>true</code> if server has <code>capability</code>
+     * 
+     * @param capability one of {@link SVNCapability}
+     * @return boolean
+     * @throws SVNException if <code>capability</code> is not recognized
+     * @since SVNKit 1.2.0, SVN 1.5.0
+     * @see   SVNCapability
+     */
     public abstract boolean hasCapability(SVNCapability capability) throws SVNException;
 
     /**
