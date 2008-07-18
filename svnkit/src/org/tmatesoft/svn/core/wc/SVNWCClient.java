@@ -2779,25 +2779,25 @@ public class SVNWCClient extends SVNBasicClient {
                     File externalDir = new File(info.getAnchor().getRoot(), SVNPathUtil.append(path, externalPath));
                     if (processedDirs.add(externalDir)) {
                         //if externalDir is an empty unversioned dir SVNFileType won't help us to avoid 
-                    	//getting in an infinite loop
-                    	try {
-                        	wcAccess.open(externalDir, false, 0);
+                        //getting in an infinite loop
+                        try {
+                            wcAccess.open(externalDir, false, 0);
                         } catch (SVNException svne) {
-                        	if (svne.getErrorMessage().getErrorCode() == SVNErrorCode.WC_NOT_DIRECTORY) {
-                        		continue;
-                        	}
-                        	throw svne;
+                            if (svne.getErrorMessage().getErrorCode() == SVNErrorCode.WC_NOT_DIRECTORY) {
+                                continue;
+                            }
+                            throw svne;
                         } finally {
-                        	wcAccess.close();
+                            wcAccess.close();
                         }
 
                         try {
-                        	doSetWCFormat(externalDir, format);
+                            doSetWCFormat(externalDir, format);
                         } catch (SVNException e) {
-                        	if (e.getErrorMessage().getErrorCode() == SVNErrorCode.WC_NOT_DIRECTORY) {
-                        		continue;
-                        	}
-                        	throw e;
+                            if (e.getErrorMessage().getErrorCode() == SVNErrorCode.WC_NOT_DIRECTORY) {
+                                continue;
+                            }
+                            throw e;
                         }
                     }
                 }
@@ -2825,14 +2825,14 @@ public class SVNWCClient extends SVNBasicClient {
                             wcAccess.close();
                         }
 
-                    	try {
-                    		doSetWCFormat(externalDir, format);
-                    	} catch (SVNException e) {
-                    		if (e.getErrorMessage().getErrorCode() == SVNErrorCode.WC_NOT_DIRECTORY) {
-                    			continue;
-                    		}
-                    		throw e;
-                    	}
+                        try {
+                            doSetWCFormat(externalDir, format);
+                        } catch (SVNException e) {
+                            if (e.getErrorMessage().getErrorCode() == SVNErrorCode.WC_NOT_DIRECTORY) {
+                                continue;
+                            }
+                            throw e;
+                        }
                     }
                 }
             }
