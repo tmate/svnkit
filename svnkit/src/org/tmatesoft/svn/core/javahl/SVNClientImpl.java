@@ -239,6 +239,8 @@ public class SVNClientImpl implements SVNClientInterface {
         if (myDebugLog == null) {
             myDebugLog = new JavaHLCompositeLog();
             myDebugLog.addLogger(SVNDebugLog.getDefaultLog());
+            myDebugLog.addLogger(SVNDebugLog.getLog(SVNLogType.NETWORK));
+            myDebugLog.addLogger(SVNDebugLog.getLog(SVNLogType.WC));
             myDebugLog.addLogger(JavaHLDebugLog.getInstance());
         }
         return myDebugLog;
@@ -742,12 +744,14 @@ public class SVNClientImpl implements SVNClientInterface {
         SVNCopySource[] sources = new SVNCopySource[srcs.length];
         try {
             for (int i = 0; i < srcs.length; i++) {
+                // TODO revision is used both as peg and revision
+                // to be compatible with JavaHL bug.
+                SVNRevision revision = JavaHLObjectFactory.getSVNRevision(srcs[i].getRevision());
+                SVNRevision pegRevision = JavaHLObjectFactory.getSVNRevision(srcs[i].getRevision());
                 if (isURL(srcs[i].getPath())) {
-                    sources[i] = new SVNCopySource(JavaHLObjectFactory.getSVNRevision(srcs[i].getPegRevision()),
-                            JavaHLObjectFactory.getSVNRevision(srcs[i].getRevision()), SVNURL.parseURIEncoded(srcs[i].getPath()));
+                    sources[i] = new SVNCopySource(pegRevision, revision, SVNURL.parseURIEncoded(srcs[i].getPath()));
                 } else {
-                    sources[i] = new SVNCopySource(JavaHLObjectFactory.getSVNRevision(srcs[i].getPegRevision()),
-                            JavaHLObjectFactory.getSVNRevision(srcs[i].getRevision()), new File(srcs[i].getPath()).getAbsoluteFile());
+                    sources[i] = new SVNCopySource(pegRevision, revision, new File(srcs[i].getPath()).getAbsoluteFile());
                 }
             }
         } catch (SVNException e) {
@@ -1683,10 +1687,9 @@ public class SVNClientImpl implements SVNClientInterface {
 
     public static void enableLogging(int logLevel, String logFilePath) {
         try {
-            JavaHLDebugLog.getInstance().enableLogging(logLevel, new File(logFilePath), 
-                    new DefaultSVNDebugFormatter());
+            JavaHLDebugLog.getInstance().enableLogging(logLevel, new File(logFilePath), new DefaultSVNDebugFormatter());
         } catch (SVNException e) {
-            JavaHLDebugLog.getInstance().logSevere(SVNLogType.DEFAULT, e);
+            JavaHLDebugLog.getInstance().logSevere(e);
         }
     }
 

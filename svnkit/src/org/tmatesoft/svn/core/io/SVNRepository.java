@@ -55,7 +55,6 @@ import org.tmatesoft.svn.core.io.diff.SVNDeltaGenerator;
 import org.tmatesoft.svn.core.io.diff.SVNDiffWindow;
 import org.tmatesoft.svn.util.ISVNDebugLog;
 import org.tmatesoft.svn.util.SVNDebugLog;
-import org.tmatesoft.svn.util.SVNLogType;
 
 /**
  * The abstract class <b>SVNRepository</b> provides an interface for protocol
@@ -994,7 +993,8 @@ public abstract class SVNRepository {
         }
     }
 
-    public List getLocationSegments(String path, long pegRevision, long startRevision, long endRevision) throws SVNException {
+    public Collection getLocationSegments(String path, long pegRevision, long startRevision, 
+            long endRevision) throws SVNException {
         
         final List result = new LinkedList();
         getLocationSegments(path, pegRevision, startRevision, endRevision, new ISVNLocationSegmentHandler() {
@@ -2200,7 +2200,7 @@ public abstract class SVNRepository {
             synchronized(this) {
                 if (Thread.currentThread() == myLocker) {
                     if (!force) {
-                        getDebugLog().logFine(SVNLogType.DEFAULT, new Exception());
+                        getDebugLog().logFine(new Exception());
                         throw new Error("SVNRepository methods are not reenterable");
                     } 
                     myLockCount++;

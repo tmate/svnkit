@@ -19,7 +19,6 @@ import java.util.Set;
 import org.tmatesoft.svn.core.SVNNodeKind;
 import org.tmatesoft.svn.core.internal.util.jna.SVNJNAUtil;
 import org.tmatesoft.svn.util.SVNDebugLog;
-import org.tmatesoft.svn.util.SVNLogType;
 
 
 /**
@@ -151,7 +150,7 @@ public class SVNFileType {
                     SVNFileUtil.LS_COMMAND, "-ld", file.getAbsolutePath()
             });
         } catch (Throwable th) {
-            SVNDebugLog.getDefaultLog().logFine(SVNLogType.DEFAULT, th);
+            SVNDebugLog.getDefaultLog().logFine(th);
         }
         return line != null && line.startsWith("l");
     }

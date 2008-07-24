@@ -228,7 +228,7 @@ public class SVNBasicClient implements ISVNEventHandler {
      */
     public ISVNDebugLog getDebugLog() {
         if (myDebugLog == null) {
-            return SVNDebugLog.getDefaultLog();
+            return SVNDebugLog.getLog(SVNLogType.WC);
         }
         return myDebugLog;
     }
@@ -328,7 +328,7 @@ public class SVNBasicClient implements ISVNEventHandler {
             } catch (SVNException e) {
                 throw e;
             } catch (Throwable th) {
-                SVNDebugLog.getDefaultLog().logSevere(SVNLogType.WC, th);
+                SVNDebugLog.getLog(SVNLogType.WC).logSevere(th);
                 SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.UNKNOWN, 
                         "Error while dispatching event: {0}", new Object[] { th.getMessage() }, 
                         SVNErrorMessage.TYPE_ERROR, th);
@@ -521,29 +521,32 @@ public class SVNBasicClient implements ISVNEventHandler {
         if (wcElisionLimitPath == null || !wcElisionLimitPath.equals(path)) {
             Map mergeInfo = null;
             Map targetMergeInfo = null;
+            if (!SVNWCManager.isEntrySwitched(path, entry)) {
+                boolean[] inherited = new boolean[1];
 
-            boolean[] inherited = new boolean[1];
-                
-            targetMergeInfo = getWCMergeInfo(path, entry, wcElisionLimitPath, 
-                    SVNMergeInfoInheritance.INHERITED, false, inherited);
-                
-            if (inherited[0] || targetMergeInfo == null) {
-                return;
+                targetMergeInfo = getWCMergeInfo(path, entry, wcElisionLimitPath,
+                        SVNMergeInfoInheritance.INHERITED, false, inherited);
+
+                if (inherited[0] || targetMergeInfo == null) {
+                    return;
+                }
+
+                mergeInfo = getWCMergeInfo(path, entry, wcElisionLimitPath,
+                                           SVNMergeInfoInheritance.NEAREST_ANCESTOR,
+                                           false, inherited);
+
+                if (mergeInfo == null && wcElisionLimitPath == null) {
+                    mergeInfo = getWCOrRepositoryMergeInfo(path, entry,
+                            SVNMergeInfoInheritance.NEAREST_ANCESTOR, inherited, true, null);
+                }
+
+                if (mergeInfo == null && wcElisionLimitPath != null) {
+                    return;
+                }
+
+                SVNMergeInfoUtil.elideMergeInfo(mergeInfo,
+                        targetMergeInfo, path, null, access);
             }
-                
-            mergeInfo = getWCMergeInfo(path, entry, wcElisionLimitPath, 
-                    SVNMergeInfoInheritance.NEAREST_ANCESTOR, false, inherited);
-                
-            if (mergeInfo == null && wcElisionLimitPath == null) {
-                mergeInfo = getWCOrRepositoryMergeInfo(path, entry, SVNMergeInfoInheritance.NEAREST_ANCESTOR, 
-                        inherited, true, null);
-            }
-                
-            if (mergeInfo == null && wcElisionLimitPath != null) {
-                return;
-            }
-                
-            SVNMergeInfoUtil.elideMergeInfo(mergeInfo, targetMergeInfo, path, null, access);
         }
     }
 
@@ -638,10 +641,9 @@ public class SVNBasicClient implements ISVNEventHandler {
                     inherit = SVNMergeInfoInheritance.INHERITED;
                 } else {
                     wcMergeInfo = SVNPropertiesManager.parseMergeInfo(path, entry, base);
-                }
-
-                if (SVNWCManager.isEntrySwitched(path, entry)) {
-                    break;
+                    if (SVNWCManager.isEntrySwitched(path, entry)) {
+                        break;
+                    }
                 }
     
                 path = new File(SVNPathUtil.validateFilePath(path.getAbsolutePath())).getAbsoluteFile();

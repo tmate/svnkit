@@ -446,8 +446,8 @@ public class SVNWCClient extends SVNBasicClient {
             } else if (!SVNAdminArea.isSafeCleanup()) {
                 throw e;
             }
-            SVNDebugLog.getDefaultLog().logFine(SVNLogType.WC, "CLEANUP FAILED for " + path);
-            SVNDebugLog.getDefaultLog().logFine(SVNLogType.WC, e);
+            SVNDebugLog.getLog(SVNLogType.WC).logFine("CLEANUP FAILED for " + path);
+            SVNDebugLog.getLog(SVNLogType.WC).logFine(e);
         } finally {
             wcAccess.close();
             sleepForTimeStamp();
@@ -1514,8 +1514,7 @@ public class SVNWCClient extends SVNBasicClient {
                     SVNEntry entry = wcAccess.getEntry(path, false);
                     if (entry != null && entry.isDirectory() && entry.isScheduledForAddition()) {
                         if (depth != SVNDepth.INFINITY) {
-                            getDebugLog().logFine(SVNLogType.WC, 
-                                    "Forcing revert on path '" + path + "' to recurse");
+                            getDebugLog().logFine("Forcing revert on path '" + path + "' to recurse");
                             depth = SVNDepth.INFINITY;
                             wcAccess.close();
                             info = wcAccess.openAnchor(path, true, SVNWCAccess.INFINITE_DEPTH);
@@ -2780,25 +2779,25 @@ public class SVNWCClient extends SVNBasicClient {
                     File externalDir = new File(info.getAnchor().getRoot(), SVNPathUtil.append(path, externalPath));
                     if (processedDirs.add(externalDir)) {
                         //if externalDir is an empty unversioned dir SVNFileType won't help us to avoid 
-                    	//getting in an infinite loop
-                    	try {
-                        	wcAccess.open(externalDir, false, 0);
+                        //getting in an infinite loop
+                        try {
+                            wcAccess.open(externalDir, false, 0);
                         } catch (SVNException svne) {
-                        	if (svne.getErrorMessage().getErrorCode() == SVNErrorCode.WC_NOT_DIRECTORY) {
-                        		continue;
-                        	}
-                        	throw svne;
+                            if (svne.getErrorMessage().getErrorCode() == SVNErrorCode.WC_NOT_DIRECTORY) {
+                                continue;
+                            }
+                            throw svne;
                         } finally {
-                        	wcAccess.close();
+                            wcAccess.close();
                         }
 
                         try {
-                        	doSetWCFormat(externalDir, format);
+                            doSetWCFormat(externalDir, format);
                         } catch (SVNException e) {
-                        	if (e.getErrorMessage().getErrorCode() == SVNErrorCode.WC_NOT_DIRECTORY) {
-                        		continue;
-                        	}
-                        	throw e;
+                            if (e.getErrorMessage().getErrorCode() == SVNErrorCode.WC_NOT_DIRECTORY) {
+                                continue;
+                            }
+                            throw e;
                         }
                     }
                 }
@@ -2826,14 +2825,14 @@ public class SVNWCClient extends SVNBasicClient {
                             wcAccess.close();
                         }
 
-                    	try {
-                    		doSetWCFormat(externalDir, format);
-                    	} catch (SVNException e) {
-                    		if (e.getErrorMessage().getErrorCode() == SVNErrorCode.WC_NOT_DIRECTORY) {
-                    			continue;
-                    		}
-                    		throw e;
-                    	}
+                        try {
+                            doSetWCFormat(externalDir, format);
+                        } catch (SVNException e) {
+                            if (e.getErrorMessage().getErrorCode() == SVNErrorCode.WC_NOT_DIRECTORY) {
+                                continue;
+                            }
+                            throw e;
+                        }
                     }
                 }
             }

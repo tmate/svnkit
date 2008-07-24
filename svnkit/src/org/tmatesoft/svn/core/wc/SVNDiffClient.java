@@ -42,7 +42,6 @@ import org.tmatesoft.svn.core.internal.wc.SVNEventFactory;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNMergeDriver;
 import org.tmatesoft.svn.core.internal.wc.SVNRemoteDiffEditor;
-import org.tmatesoft.svn.core.internal.wc.admin.SVNAdminArea;
 import org.tmatesoft.svn.core.internal.wc.admin.SVNAdminAreaInfo;
 import org.tmatesoft.svn.core.internal.wc.admin.SVNEntry;
 import org.tmatesoft.svn.core.internal.wc.admin.SVNReporter;
@@ -1422,56 +1421,28 @@ public class SVNDiffClient extends SVNMergeDriver {
     public void getLogMergedMergeInfo(File path, SVNRevision pegRevision, SVNURL mergeSrcURL, 
             SVNRevision srcPegRevision, boolean discoverChangedPaths, 
             String[] revisionProperties, ISVNLogEntryHandler handler) throws SVNException {
-        getLogMergedMergeInfoImpl(path, null, pegRevision, mergeSrcURL, null, srcPegRevision, discoverChangedPaths, 
+        getLogMergedMergeInfoImpl(path, null, pegRevision, mergeSrcURL, srcPegRevision, discoverChangedPaths, 
                 revisionProperties, handler);
     }
 
     public void getLogMergedMergeInfo(SVNURL url, SVNRevision pegRevision, SVNURL mergeSrcURL, 
             SVNRevision srcPegRevision, boolean discoverChangedPaths, String[] revisionProperties, 
             ISVNLogEntryHandler handler) throws SVNException {
-        getLogMergedMergeInfoImpl(null, url, pegRevision, mergeSrcURL, null, srcPegRevision, discoverChangedPaths, 
-                revisionProperties, handler);
-    }
-
-    public void getLogMergedMergeInfo(File path, SVNRevision pegRevision, File mergeSrcPath, 
-            SVNRevision srcPegRevision, boolean discoverChangedPaths, 
-            String[] revisionProperties, ISVNLogEntryHandler handler) throws SVNException {
-        getLogMergedMergeInfoImpl(path, null, pegRevision, null, mergeSrcPath, srcPegRevision, discoverChangedPaths, 
-                revisionProperties, handler);
-    }
-
-    public void getLogMergedMergeInfo(SVNURL url, SVNRevision pegRevision, File mergeSrcPath, 
-            SVNRevision srcPegRevision, boolean discoverChangedPaths, String[] revisionProperties, 
-            ISVNLogEntryHandler handler) throws SVNException {
-        getLogMergedMergeInfoImpl(null, url, pegRevision, null, mergeSrcPath, srcPegRevision, discoverChangedPaths, 
+        getLogMergedMergeInfoImpl(null, url, pegRevision, mergeSrcURL, srcPegRevision, discoverChangedPaths, 
                 revisionProperties, handler);
     }
 
     public void getLogEligibleMergeInfo(File path, SVNRevision pegRevision, 
             SVNURL mergeSrcURL, SVNRevision srcPegRevision, boolean discoverChangedPaths, 
             String[] revisionProperties, ISVNLogEntryHandler handler) throws SVNException {
-        getLogEligibleMergeInfoImpl(path, null, pegRevision, mergeSrcURL, null, srcPegRevision, discoverChangedPaths, 
+        getLogEligibleMergeInfoImpl(path, null, pegRevision, mergeSrcURL, srcPegRevision, discoverChangedPaths, 
                 revisionProperties, handler);
     }
     
     public void getLogEligibleMergeInfo(SVNURL url, SVNRevision pegRevision, 
             SVNURL mergeSrcURL, SVNRevision srcPegRevision, boolean discoverChangedPaths, 
             String[] revisionProperties, ISVNLogEntryHandler handler) throws SVNException {
-        getLogEligibleMergeInfoImpl(null, url, pegRevision, mergeSrcURL, null, srcPegRevision, discoverChangedPaths, 
-                revisionProperties, handler);
-    }
-
-    public void getLogEligibleMergeInfo(File path, SVNRevision pegRevision, 
-            File mergeSrcPath, SVNRevision srcPegRevision, boolean discoverChangedPaths, 
-            String[] revisionProperties, ISVNLogEntryHandler handler) throws SVNException {
-        getLogEligibleMergeInfoImpl(path, null, pegRevision, null, mergeSrcPath, srcPegRevision, discoverChangedPaths, 
-                revisionProperties, handler);
-    }
-    
-    public void getLogEligibleMergeInfo(SVNURL url, SVNRevision pegRevision, 
-            File mergeSrcPath, SVNRevision srcPegRevision, boolean discoverChangedPaths, 
-            String[] revisionProperties, ISVNLogEntryHandler handler) throws SVNException {
-        getLogEligibleMergeInfoImpl(null, url, pegRevision, null, mergeSrcPath, srcPegRevision, discoverChangedPaths, 
+        getLogEligibleMergeInfoImpl(null, url, pegRevision, mergeSrcURL, srcPegRevision, discoverChangedPaths, 
                 revisionProperties, handler);
     }
 
@@ -1566,46 +1537,17 @@ public class SVNDiffClient extends SVNMergeDriver {
         return suggestions;
     }
 
-    private Object[] getLocationFromPathAndRevision(File path, SVNURL url, SVNRevision pegRevision) throws SVNException {
-        SVNWCAccess wcAccess = null;
-        SVNRepository repos = null;
-        SVNAdminArea adminArea = null;
-        try {
-            if (path != null && (pegRevision == SVNRevision.BASE || pegRevision == SVNRevision.WORKING || 
-                    pegRevision == SVNRevision.COMMITTED || pegRevision == SVNRevision.UNDEFINED)) {
-                int admLockLevel = getLevelsToLockFromDepth(SVNDepth.EMPTY);
-                wcAccess = createWCAccess();
-                wcAccess.probeOpen(path, false, admLockLevel);
-            }
-            long[] rev = { SVNRepository.INVALID_REVISION };
-            repos = createRepository(url, path, adminArea, pegRevision, pegRevision, rev);
-            return new Object[] { repos.getLocation(), SVNRevision.create(rev[0]) };
-        } finally {
-            if (wcAccess != null) {
-                wcAccess.close();
-            }
-            if (repos != null) {
-                repos.closeSession();
-            }
-        }
-    }
-    
     private void getLogMergedMergeInfoImpl(File path, SVNURL url, SVNRevision pegRevision, SVNURL mergeSrcURL, 
-            File mergeSrcPath, SVNRevision srcPegRevision, boolean discoverChangedPaths, String[] revisionProperties, 
+            SVNRevision srcPegRevision, boolean discoverChangedPaths, String[] revisionProperties, 
             ISVNLogEntryHandler handler) throws SVNException {
         SVNURL reposRoot[] = new SVNURL[1];
-        
-        Object[] location = getLocationFromPathAndRevision(mergeSrcPath, mergeSrcURL, srcPegRevision);
-        SVNURL realMergeSrcURL = (SVNURL) location[0];
-        SVNRevision realSrcPegRevision = (SVNRevision) location[1];
-
         Map targetMergeInfo = path != null ? getMergeInfo(path, pegRevision, reposRoot) : 
             getMergeInfo(url, pegRevision, reposRoot);
         if (targetMergeInfo == null) {
             return;
         }
         
-        Map srcHistory = getHistoryAsMergeInfo(realMergeSrcURL, null, realSrcPegRevision, SVNRepository.INVALID_REVISION, 
+        Map srcHistory = getHistoryAsMergeInfo(mergeSrcURL, null, srcPegRevision, SVNRepository.INVALID_REVISION, 
                 SVNRepository.INVALID_REVISION, null, null);
         Map mergeInfo = SVNMergeInfoUtil.intersectMergeInfo(targetMergeInfo, srcHistory);
         SVNMergeRangeList rangeList = new SVNMergeRangeList(new SVNMergeRange[0]);
@@ -1630,14 +1572,9 @@ public class SVNDiffClient extends SVNMergeDriver {
     }
 
     private void getLogEligibleMergeInfoImpl(File path, SVNURL url, SVNRevision pegRevision, 
-            SVNURL mergeSrcURL, File mergeSrcPath, SVNRevision srcPegRevision, boolean discoverChangedPaths, 
+            SVNURL mergeSrcURL, SVNRevision srcPegRevision, boolean discoverChangedPaths, 
             String[] revisionProperties, ISVNLogEntryHandler handler) throws SVNException {
         SVNURL reposRoot[] = new SVNURL[1];
-
-        Object[] location = getLocationFromPathAndRevision(mergeSrcPath, mergeSrcURL, srcPegRevision);
-        SVNURL realMergeSrcURL = (SVNURL) location[0];
-        SVNRevision realSrcPegRevision = (SVNRevision) location[1];
-
         Map mergeInfo = path != null ? getMergeInfo(path, pegRevision, reposRoot) : 
             getMergeInfo(url, pegRevision, reposRoot);
         Map history = getHistoryAsMergeInfo(url, path, pegRevision, SVNRepository.INVALID_REVISION, 
@@ -1653,8 +1590,8 @@ public class SVNDiffClient extends SVNMergeDriver {
         SVNRepository repos = null;
         Map sourceHistory = null;
         try {
-            repos = createRepository(realMergeSrcURL, null, null, true);
-            sourceHistory = getHistoryAsMergeInfo(realMergeSrcURL, null, realSrcPegRevision, 
+            repos = createRepository(mergeSrcURL, null, null, true);
+            sourceHistory = getHistoryAsMergeInfo(mergeSrcURL, null, srcPegRevision, 
                     SVNRepository.INVALID_REVISION, SVNRepository.INVALID_REVISION, repos, null);
         } finally {
             repos.closeSession();

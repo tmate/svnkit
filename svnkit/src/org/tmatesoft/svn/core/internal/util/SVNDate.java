@@ -25,7 +25,6 @@ import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.wc.ISVNOptions;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.util.SVNDebugLog;
-import org.tmatesoft.svn.util.SVNLogType;
 
 
 /**
@@ -185,7 +184,7 @@ public class SVNDate extends Date {
         try {
             return parseDatestamp(str);
         } catch (Throwable th) {
-            SVNDebugLog.getDefaultLog().logFine(SVNLogType.DEFAULT, th);
+            SVNDebugLog.getDefaultLog().logFine(th);
         }
         return NULL;
     }

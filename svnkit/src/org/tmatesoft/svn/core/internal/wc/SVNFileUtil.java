@@ -49,7 +49,6 @@ import org.tmatesoft.svn.core.internal.wc.admin.SVNTranslator;
 import org.tmatesoft.svn.core.wc.ISVNEventHandler;
 import org.tmatesoft.svn.core.wc.ISVNOptions;
 import org.tmatesoft.svn.util.SVNDebugLog;
-import org.tmatesoft.svn.util.SVNLogType;
 
 /**
  * @version 1.1.1
@@ -404,7 +403,7 @@ public class SVNFileUtil {
                 }
             }
         } catch (Throwable th) {
-            SVNDebugLog.getDefaultLog().logFinest(SVNLogType.DEFAULT, th);
+            SVNDebugLog.getDefaultLog().logFinest(th);
             return false;
         }
         return true;
@@ -425,7 +424,7 @@ public class SVNFileUtil {
                 });
             }
         } catch (Throwable th) {
-            SVNDebugLog.getDefaultLog().logFinest(SVNLogType.DEFAULT, th);
+            SVNDebugLog.getDefaultLog().logFinest(th);
         }
     }
 
@@ -442,7 +441,7 @@ public class SVNFileUtil {
         try {
             execCommand(new String[] { CHMOD_COMMAND, "g+s", dir.getAbsolutePath() });
         } catch (Throwable th) {
-            SVNDebugLog.getDefaultLog().logFinest(SVNLogType.DEFAULT, th);
+            SVNDebugLog.getDefaultLog().logFinest(th);
         }
     }
 
@@ -602,7 +601,7 @@ public class SVNFileUtil {
                     LN_COMMAND, "-s", linkName, link.getAbsolutePath()
             });
         } catch (Throwable th) {
-            SVNDebugLog.getDefaultLog().logFinest(SVNLogType.DEFAULT, th);
+            SVNDebugLog.getDefaultLog().logFinest(th);
         }
         return SVNFileType.getType(link) == SVNFileType.SYMLINK;
     }
@@ -644,7 +643,7 @@ public class SVNFileUtil {
                     LS_COMMAND, "-ld", link.getAbsolutePath()
             });
         } catch (Throwable th) {
-            SVNDebugLog.getDefaultLog().logFinest(SVNLogType.DEFAULT, th);
+            SVNDebugLog.getDefaultLog().logFinest(th);
         }
         if (ls == null || ls.lastIndexOf(" -> ") < 0) {
             return null;
@@ -759,7 +758,7 @@ public class SVNFileUtil {
         try {
             Runtime.getRuntime().exec("attrib " + (hidden ? "+" : "-") + "H \"" + file.getAbsolutePath() + "\"");
         } catch (Throwable th) {
-            SVNDebugLog.getDefaultLog().logFinest(SVNLogType.DEFAULT, th);
+            SVNDebugLog.getDefaultLog().logFinest(th);
         }
     }
 
@@ -1030,7 +1029,7 @@ public class SVNFileUtil {
                 line = execCommand(commandLine);
             }
         } catch (Throwable th) {
-            SVNDebugLog.getDefaultLog().logFinest(SVNLogType.DEFAULT, th);
+            SVNDebugLog.getDefaultLog().logFinest(th);
         }
         if (line == null || line.indexOf(' ') < 0) {
             return false;
@@ -1332,9 +1331,9 @@ public class SVNFileUtil {
             }
             return handleOutput ? null : result.toString().trim();
         } catch (IOException e) {
-            SVNDebugLog.getDefaultLog().logFinest(SVNLogType.DEFAULT, e);
+            SVNDebugLog.getDefaultLog().logFinest(e);
         } catch (InterruptedException e) {
-            SVNDebugLog.getDefaultLog().logFinest(SVNLogType.DEFAULT, e);
+            SVNDebugLog.getDefaultLog().logFinest(e);
         } finally {
             closeFile(is);
         }
@@ -1452,8 +1451,8 @@ public class SVNFileUtil {
                 // a Properties object and get the variable from that
                 return getEnvironment().getProperty(name);
             } catch (Throwable e1) {
-                SVNDebugLog.getDefaultLog().logFinest(SVNLogType.DEFAULT, e);
-                SVNDebugLog.getDefaultLog().logFinest(SVNLogType.DEFAULT, e1);
+                SVNDebugLog.getDefaultLog().logFinest(e);
+                SVNDebugLog.getDefaultLog().logFinest(e1);
                 return null;
             }
         }
