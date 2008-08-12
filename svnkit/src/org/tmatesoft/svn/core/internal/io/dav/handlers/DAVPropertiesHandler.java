@@ -14,6 +14,7 @@ package org.tmatesoft.svn.core.internal.io.dav.handlers;
 
 import java.io.UnsupportedEncodingException;
 import java.text.ParseException;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
@@ -25,7 +26,6 @@ import org.tmatesoft.svn.core.internal.io.dav.DAVProperties;
 import org.tmatesoft.svn.core.internal.io.dav.http.HTTPStatus;
 import org.tmatesoft.svn.core.internal.util.SVNBase64;
 import org.tmatesoft.svn.core.internal.util.SVNHashMap;
-import org.tmatesoft.svn.core.internal.util.SVNHashSet;
 import org.tmatesoft.svn.core.internal.util.SVNXMLUtil;
 import org.xml.sax.Attributes;
 
@@ -53,7 +53,7 @@ public class DAVPropertiesHandler extends BasicDAVHandler {
         return xmlBuffer;
     }
 
-    private static final Set PROP_ELEMENTS = new SVNHashSet();
+    private static final Set PROP_ELEMENTS = new HashSet();
 
     static {
         PROP_ELEMENTS.add(DAVElement.HREF);

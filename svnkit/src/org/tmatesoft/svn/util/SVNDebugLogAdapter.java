@@ -25,6 +25,7 @@ import org.tmatesoft.svn.core.internal.util.SVNLogStream;
  */
 public abstract class SVNDebugLogAdapter implements ISVNDebugLog {
 
+
     public void logError(SVNLogType logType, String message) {
         log(logType, message, Level.INFO);
     }

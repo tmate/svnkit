@@ -26,17 +26,11 @@ public class DefaultHTTPConnectionFactory implements IHTTPConnectionFactory {
     private File mySpoolDirectory;
     private String myHTTPCharset;
     private boolean myIsSpoolAll;
-    private boolean myIsUseSendAll;
-    
-    public DefaultHTTPConnectionFactory(File spoolDirectory, boolean spoolAll, String httpCharset) {
-        this(spoolDirectory, spoolAll, false, httpCharset);
-    }
 
-    public DefaultHTTPConnectionFactory(File spoolDirectory, boolean spoolAll, boolean useSendAllForDiff, String httpCharset) {
+    public DefaultHTTPConnectionFactory(File spoolDirectory, boolean spoolAll, String httpCharset) {
         mySpoolDirectory = spoolDirectory;
         myIsSpoolAll = spoolAll;
         myHTTPCharset = httpCharset;
-        myIsUseSendAll = useSendAllForDiff;
     }
 
     public IHTTPConnection createHTTPConnection(SVNRepository repository) throws SVNException {
@@ -46,10 +40,6 @@ public class DefaultHTTPConnectionFactory implements IHTTPConnectionFactory {
             spoolLocation = null;
         }
         return new HTTPConnection(repository, charset, spoolLocation, myIsSpoolAll);
-    }
-
-    public boolean useSendAllForDiff(SVNRepository repository) throws SVNException {
-        return myIsUseSendAll;
     }
 
 }

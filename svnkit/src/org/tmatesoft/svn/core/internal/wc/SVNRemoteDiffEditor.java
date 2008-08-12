@@ -14,6 +14,7 @@ package org.tmatesoft.svn.core.internal.wc;
 import java.io.File;
 import java.io.OutputStream;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 
@@ -26,7 +27,6 @@ import org.tmatesoft.svn.core.SVNProperties;
 import org.tmatesoft.svn.core.SVNProperty;
 import org.tmatesoft.svn.core.SVNPropertyValue;
 import org.tmatesoft.svn.core.internal.util.SVNHashMap;
-import org.tmatesoft.svn.core.internal.util.SVNHashSet;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
 import org.tmatesoft.svn.core.internal.wc.admin.SVNAdminArea;
 import org.tmatesoft.svn.core.io.ISVNEditor;
@@ -407,7 +407,7 @@ public class SVNRemoteDiffEditor implements ISVNEditor {
         if (dir != null && dir.isLocked()) {
             File tmpFile = dir.getBaseFile(name, true);
             if (myTempFiles == null) {
-                myTempFiles = new SVNHashSet();
+                myTempFiles = new HashSet();
             }
             myTempFiles.add(tmpFile);
             return tmpFile;
