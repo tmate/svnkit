@@ -15,6 +15,7 @@ import java.io.File;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Collection;
+import org.tmatesoft.svn.core.internal.util.SVNHashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
@@ -30,13 +31,12 @@ import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNMergeInfoInheritance;
 import org.tmatesoft.svn.core.SVNNodeKind;
-import org.tmatesoft.svn.core.SVNProperties;
 import org.tmatesoft.svn.core.SVNProperty;
-import org.tmatesoft.svn.core.SVNPropertyValue;
 import org.tmatesoft.svn.core.SVNURL;
+import org.tmatesoft.svn.core.SVNProperties;
+import org.tmatesoft.svn.core.SVNPropertyValue;
 import org.tmatesoft.svn.core.auth.ISVNAuthenticationManager;
 import org.tmatesoft.svn.core.internal.util.SVNEncodingUtil;
-import org.tmatesoft.svn.core.internal.util.SVNHashMap;
 import org.tmatesoft.svn.core.internal.util.SVNMergeInfoUtil;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
 import org.tmatesoft.svn.core.internal.wc.ISVNCommitPathHandler;
@@ -819,7 +819,7 @@ public class SVNCopyClient extends SVNBasicClient {
                 return SVNCommitInfo.NULL;
             }
 
-            Map allCommitables = new TreeMap(SVNCommitUtil.FILE_COMPARATOR);
+            Map allCommitables = new TreeMap();
             repos.setLocation(repos.getRepositoryRoot(true), false);
             Map pathsToExternalsProps = new SVNHashMap();
             for (int i = 0; i < copyPairs.size(); i++) {
@@ -948,7 +948,7 @@ public class SVNCopyClient extends SVNBasicClient {
             for (int i = 0; i < commitables.length; i++) {
                 commitables[i].setWCAccess(wcAccess);
             }
-            allCommitables = new TreeMap();
+            allCommitables.clear();
             SVNURL url = SVNCommitUtil.translateCommitables(commitables, allCommitables);
             
             repos = createRepository(url, null, null, true);
