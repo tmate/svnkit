@@ -16,6 +16,7 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
@@ -36,7 +37,6 @@ import org.tmatesoft.svn.core.SVNURL;
 import org.tmatesoft.svn.core.auth.ISVNAuthenticationManager;
 import org.tmatesoft.svn.core.internal.util.SVNEncodingUtil;
 import org.tmatesoft.svn.core.internal.util.SVNHashMap;
-import org.tmatesoft.svn.core.internal.util.SVNHashSet;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
 import org.tmatesoft.svn.core.internal.util.SVNURLUtil;
 import org.tmatesoft.svn.core.internal.wc.DefaultSVNOptions;
@@ -414,7 +414,7 @@ public class SVNCommitClient extends SVNBasicClient {
         if (urls == null || urls.length == 0) {
             return SVNCommitInfo.NULL;
         }
-        Collection paths = new SVNHashSet();
+        Collection paths = new HashSet();
         SVNURL rootURL = SVNURLUtil.condenceURLs(urls, paths, false);
         if (rootURL == null) {
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.RA_ILLEGAL_URL, 
@@ -1002,8 +1002,8 @@ public class SVNCommitClient extends SVNBasicClient {
                 }
                 info = SVNCommitter.commit(mediator.getTmpFiles(), commitables, repositoryRoot, commitEditor);
                 // update wc.
-                Collection processedItems = new SVNHashSet();
-                Collection explicitCommitPaths = new SVNHashSet();
+                Collection processedItems = new HashSet();
+                Collection explicitCommitPaths = new HashSet();
                 for (Iterator urls = commitables.keySet().iterator(); urls.hasNext();) {
                     String url = (String) urls.next();
                     SVNCommitItem item = (SVNCommitItem) commitables.get(url);
@@ -1191,7 +1191,7 @@ public class SVNCommitClient extends SVNBasicClient {
         try {
             Map lockTokens = new SVNHashMap();
             checkCancelled();
-            Collection changelistsSet = changelists != null ? new SVNHashSet() : null;
+            Collection changelistsSet = changelists != null ? new HashSet() : null;
             if (changelists != null) {
                 for (int j = 0; j < changelists.length; j++) {
                     changelistsSet.add(changelists[j]);
@@ -1340,7 +1340,7 @@ public class SVNCommitClient extends SVNBasicClient {
             try {
                 checkCancelled();
                 Map lockTokens = new SVNHashMap();
-                Collection changelistsSet = changelists != null ? new SVNHashSet() : null;
+                Collection changelistsSet = changelists != null ? new HashSet() : null;
                 if (changelists != null) {
                     for (int j = 0; j < changelists.length; j++) {
                         changelistsSet.add(changelists[j]);
@@ -1573,7 +1573,7 @@ public class SVNCommitClient extends SVNBasicClient {
         return true;
     }
 
-    private static boolean hasProcessedParents(Collection paths, String path) throws SVNException {
+    private static boolean hasProcessedParents(Collection paths, String path) {
         path = SVNPathUtil.removeTail(path);
         if (paths.contains(path)) {
             return true;

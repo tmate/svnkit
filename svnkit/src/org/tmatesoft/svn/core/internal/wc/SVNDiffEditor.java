@@ -17,6 +17,7 @@ import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
@@ -29,7 +30,6 @@ import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNProperties;
 import org.tmatesoft.svn.core.SVNProperty;
 import org.tmatesoft.svn.core.SVNPropertyValue;
-import org.tmatesoft.svn.core.internal.util.SVNHashSet;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
 import org.tmatesoft.svn.core.internal.wc.admin.SVNAdminArea;
 import org.tmatesoft.svn.core.internal.wc.admin.SVNAdminAreaInfo;
@@ -486,7 +486,7 @@ public class SVNDiffEditor implements ISVNEditor {
         
         Set processedFiles = null;
         if (getDiffCallback().isDiffUnversioned()) {
-            processedFiles = new SVNHashSet();
+            processedFiles = new HashSet();
         }
         for (Iterator entries = dir.entries(false); entries.hasNext();) {
             SVNEntry entry = (SVNEntry) entries.next();
@@ -634,7 +634,7 @@ public class SVNDiffEditor implements ISVNEditor {
         private String myPath;
         private SVNProperties myPropertyDiff;
         private SVNDirectoryInfo myParent;
-        private Set myComparedEntries = new SVNHashSet();
+        private Set myComparedEntries = new HashSet();
         private SVNDepth myDepth;
     }
 

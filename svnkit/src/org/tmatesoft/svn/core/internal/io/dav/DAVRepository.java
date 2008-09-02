@@ -17,6 +17,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
@@ -53,7 +54,6 @@ import org.tmatesoft.svn.core.internal.io.dav.http.IHTTPConnectionFactory;
 import org.tmatesoft.svn.core.internal.util.SVNDate;
 import org.tmatesoft.svn.core.internal.util.SVNEncodingUtil;
 import org.tmatesoft.svn.core.internal.util.SVNHashMap;
-import org.tmatesoft.svn.core.internal.util.SVNHashSet;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNDepthFilterEditor;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
@@ -592,7 +592,7 @@ public class DAVRepository extends SVNRepository {
 			for (int i = 0; i < targetPaths.length; i++) {
 				fullPaths[i] = doGetFullPath(targetPaths[i]);
             }
-            Collection relativePaths = new SVNHashSet();
+            Collection relativePaths = new HashSet();
             String path = SVNPathUtil.condencePaths(fullPaths, relativePaths, false);
             if (relativePaths.isEmpty()) {
                 relativePaths.add("");
@@ -1031,9 +1031,8 @@ public class DAVRepository extends SVNRepository {
         if (revision < 0) {
             revision = targetRevision;
         }
-        boolean sendAll = myConnectionFactory.useSendAllForDiff(this);
         runReport(getLocation(), targetRevision, target, url.toString(), depth, ignoreAncestry, false, 
-                getContents, false, sendAll, false, true, reporter, editor);
+                getContents, false, false, false, true, reporter, editor);
     }
 
     public void status(long revision, String target, SVNDepth depth, ISVNReporterBaton reporter, ISVNEditor editor) throws SVNException {
