@@ -127,8 +127,8 @@ import org.tmatesoft.svn.core.wc.SVNWCClient;
 import org.tmatesoft.svn.core.wc.SVNWCUtil;
 import org.tmatesoft.svn.util.ISVNDebugLog;
 import org.tmatesoft.svn.util.SVNDebugLog;
-import org.tmatesoft.svn.util.Version;
 import org.tmatesoft.svn.util.SVNLogType;
+import org.tmatesoft.svn.util.Version;
 
 
 /**
@@ -746,12 +746,14 @@ public class SVNClientImpl implements SVNClientInterface {
         SVNCopySource[] sources = new SVNCopySource[srcs.length];
         try {
             for (int i = 0; i < srcs.length; i++) {
+                // TODO revision is used both as peg and revision
+                // to be compatible with JavaHL bug.
+                SVNRevision revision = JavaHLObjectFactory.getSVNRevision(srcs[i].getRevision());
+                SVNRevision pegRevision = JavaHLObjectFactory.getSVNRevision(srcs[i].getRevision());
                 if (isURL(srcs[i].getPath())) {
-                    sources[i] = new SVNCopySource(JavaHLObjectFactory.getSVNRevision(srcs[i].getPegRevision()),
-                            JavaHLObjectFactory.getSVNRevision(srcs[i].getRevision()), SVNURL.parseURIEncoded(srcs[i].getPath()));
+                    sources[i] = new SVNCopySource(pegRevision, revision, SVNURL.parseURIEncoded(srcs[i].getPath()));
                 } else {
-                    sources[i] = new SVNCopySource(JavaHLObjectFactory.getSVNRevision(srcs[i].getPegRevision()),
-                            JavaHLObjectFactory.getSVNRevision(srcs[i].getRevision()), new File(srcs[i].getPath()).getAbsoluteFile());
+                    sources[i] = new SVNCopySource(pegRevision, revision, new File(srcs[i].getPath()).getAbsoluteFile());
                 }
             }
         } catch (SVNException e) {

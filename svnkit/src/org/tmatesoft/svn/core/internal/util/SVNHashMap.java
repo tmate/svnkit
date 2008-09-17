@@ -11,7 +11,6 @@
  */
 package org.tmatesoft.svn.core.internal.util;
 
-import java.io.File;
 import java.io.IOException;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
@@ -360,8 +359,6 @@ public class SVNHashMap implements Map, Cloneable, Serializable {
                 hash = hash*33 + str.charAt(i);
             }
             return hash;
-        } else if (key.getClass() == File.class) {
-            return hashCode(((File) key).getPath());
         }
         return key.hashCode();
     }

@@ -54,7 +54,7 @@ public class SVNPathUtil {
     public static boolean isCanonical(String path) {
         return (path != null && path.equals(canonicalizePath(path)));
     }
-    
+
     public static void checkPathIsValid(String path) throws SVNException {
         for (int i = 0; i < path.length(); i++) {
             char ch = path.charAt(i);

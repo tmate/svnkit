@@ -26,15 +26,9 @@ public interface IHTTPConnectionFactory {
             String charset = System.getProperty("svnkit.http.encoding", "US-ASCII");
             return new HTTPConnection(repository, charset, null, false);
         }
-
-        public boolean useSendAllForDiff(SVNRepository repository) throws SVNException {
-            return false;
-        }
         
     };
     
     public IHTTPConnection createHTTPConnection(SVNRepository repository) throws SVNException;
-    
-    public boolean useSendAllForDiff(SVNRepository repository) throws SVNException;
 
 }
