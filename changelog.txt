@@ -1,3 +1,58 @@
+== version 1.2.0-rc4
+
++ JNA library updated to version 3.0.5.
++ jsvnlook 'cat' and 'lock' commands added.
++ Update operation didn't work properly on sparse directories with 1.4.x Subversion servers, fixed.
++ SASL: minor bugfixes.
++ Other bugfixes.
+
+== version 1.2.0-rc3
+
++ SVNKit Eclipse plugin divided into two features: core svnkit library and optional JNA library.
++ SVNKit Eclipse plugin made compatible with base OSGI framework.
++ SVN+SSH protocol performance improvements.
++ File uid and guid wasn't properly fetched on OSX and BSD.
++ Other bugfixes and minor improvements.
+
+== version 1.2.0-rc2
+
++ SASL: incorrect output buffer size might result in failed commits, fixed.
++ Possible NPE on copy operation fixed.
+
+== version 1.2.0-rc1
+
++ Javadoc updated
++ SASL authentication support bugfixes
++ Bug in keyword expansion code fixed
++ Other bugfixes
+
+== version 1.2.0-beta5
+
++ SASL authentication support improved
++ Java SSH Trilead library updated to build 213
++ JNA library updated to version 3.0.4
++ Fixed: SSH connectivity problems with non-OpenSSH servers
++ Javadoc updated
++ Other bugfixes
+
+== version 1.2.0-beta4
+
++ Bugfixes
+
+== version 1.2.0-beta3
+
++ SASL authentication support improved.
++ Other bugfixes.
+
+== version 1.2.0-beta2
+
++ JavaHL compatiblity bugfixes
++ DAV protocol performance improvements
+
+== version 1.2.0-beta
+
++ Subversion 1.5.0 features support
+
 == version 1.1.7
 
 + SVNKit didn't work properly with Subversion 1.5.0 servers over svn protocol
