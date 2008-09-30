@@ -363,6 +363,7 @@ public class SVNDiffClient extends SVNMergeDriver {
                 doDiff(path, pegRevision, rN, rM, depth, useAncestry, result, changeLists);
             } catch (SVNException svne) {
                 dispatchEvent(SVNEventFactory.createErrorEvent(svne.getErrorMessage()));
+                continue;
             }
         }
     }
@@ -2719,7 +2720,7 @@ public class SVNDiffClient extends SVNMergeDriver {
                     depth, changeLists);
             boolean serverSupportsDepth = repository.hasCapability(SVNCapability.DEPTH);
             SVNReporter reporter = new SVNReporter(info, info.getAnchor().getFile(info.getTargetName()), false, 
-                    !serverSupportsDepth, depth, false, false, getDebugLog());
+                    !serverSupportsDepth, depth, false, getDebugLog());
             
             long pegRevisionNumber = getRevisionNumber(revision2, repository, path2);
             try {
@@ -2772,7 +2773,7 @@ public class SVNDiffClient extends SVNMergeDriver {
             ISVNEditor filterEditor = SVNAmbientDepthFilterEditor.wrap(editor, info, depth, false);
             boolean serverSupportsDepth = repository.hasCapability(SVNCapability.DEPTH);
             SVNReporter reporter = new SVNReporter(info, info.getAnchor().getFile(info.getTargetName()), 
-                    false, !serverSupportsDepth, depth, false, false, getDebugLog());
+                    false, !serverSupportsDepth, depth, false, getDebugLog());
             
             // this should be rev2.
             long pegRevisionNumber = getRevisionNumber(revision2, repository, path2);

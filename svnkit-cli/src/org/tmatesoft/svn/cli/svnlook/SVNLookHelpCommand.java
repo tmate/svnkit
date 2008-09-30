@@ -31,6 +31,9 @@ public class SVNLookHelpCommand extends SVNLookCommand {
         "Note: any subcommand which takes the ''--revision'' and ''--transaction''\n" +
         "      options will, if invoked without one of those options, act on\n" +
         "      the repository''s youngest revision.\n" +
+        "Note: any subcommand which takes the ''--revision'' and ''--transaction''\n" +
+        "      options will, if invoked without one of those options, act on\n" +
+        "      the repository''s youngest revision.\n" +
         "Type ''{0} help <subcommand>'' for help on a specific subcommand.\n" +
         "Type ''{0} --version'' to see the program version and FS modules.\n" +
         "\n" + 
