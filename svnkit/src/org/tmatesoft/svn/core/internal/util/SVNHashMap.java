@@ -11,10 +11,10 @@
  */
 package org.tmatesoft.svn.core.internal.util;
 
-import java.io.File;
 import java.io.IOException;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
+import java.io.File;
 import java.util.AbstractCollection;
 import java.util.AbstractSet;
 import java.util.Arrays;

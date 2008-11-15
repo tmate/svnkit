@@ -32,7 +32,6 @@ import org.tmatesoft.svn.core.internal.wc.SVNEventFactory;
 import org.tmatesoft.svn.core.internal.wc.SVNFileType;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNPropertiesManager;
-import org.tmatesoft.svn.core.internal.wc.SVNCopyDriver;
 import org.tmatesoft.svn.core.internal.wc.admin.SVNAdminArea;
 import org.tmatesoft.svn.core.internal.wc.admin.SVNEntry;
 import org.tmatesoft.svn.core.internal.wc.admin.SVNLog;
@@ -68,7 +67,7 @@ import org.tmatesoft.svn.util.SVNLogType;
  * @version 1.2
  * @author  TMate Software Ltd.
  */
-public class SVNMoveClient extends SVNCopyDriver {
+public class SVNMoveClient extends SVNBasicClient {
 
     private SVNWCClient myWCClient;
     private SVNCopyClient myCopyClient;
@@ -828,7 +827,7 @@ public class SVNMoveClient extends SVNCopyDriver {
             SVNFileUtil.copyFile(baseSrc, baseDst, false);
 
             boolean[] extend = new boolean[]{false};
-            Map mergeInfo = fetchMergeInfoForPropagation(src, extend, srcAccess);
+            Map mergeInfo = myCopyClient.fetchMergeInfoForPropagation(src, extend, srcAccess);
             Map wcMergeInfo = null;
             if (extend[0]) {
                 wcMergeInfo = SVNPropertiesManager.parseMergeInfo(dst, dstEntry, false);

@@ -39,8 +39,7 @@ public class SVNWinSecurity {
         return JNALibraryLoader.getSecurityLibrary() != null;
     }
     
-    public static SVNNTSecurityParameters getSecurityParams(String userName, String password, 
-            String ntDomain) {
+    public static SVNNTSecurityParameters getSecurityParams(String userName, String password, String ntDomain) {
         SecHandle crdHandle = getCredentialsHandle(userName, password, ntDomain);
         if (crdHandle == null) {
             return null;

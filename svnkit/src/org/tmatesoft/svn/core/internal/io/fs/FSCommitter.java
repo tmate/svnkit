@@ -441,7 +441,7 @@ public class FSCommitter {
                     protoFileOS = SVNFileUtil.openFileForWriting(revisionPrototypeFile, true);
                     FSID rootId = FSID.createTxnId("0", "0", myTxn.getTxnId());
 
-                    CountingOutputStream revWriter = new CountingOutputStream(protoFileOS, offset);
+                    CountingStream revWriter = new CountingStream(protoFileOS, offset);
                     newRootId = myTxnRoot.writeFinalRevision(newRootId, revWriter, newRevision, rootId, 
                             startNodeId, startCopyId);
                     long changedPathOffset = myTxnRoot.writeFinalChangedPathInfo(revWriter);

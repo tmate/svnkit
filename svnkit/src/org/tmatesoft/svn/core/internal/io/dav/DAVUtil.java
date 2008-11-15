@@ -50,8 +50,7 @@ public class DAVUtil {
         } else if (depth == DEPTH_INFINITE) {
             header.setHeaderValue(HTTPHeader.DEPTH_HEADER, "infinity");
         } else {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.RA_DAV_MALFORMED_DATA, 
-                    "Invalid PROPFIND depth value: '{0}'", new Integer(depth));
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.RA_DAV_MALFORMED_DATA, "Invalid PROPFIND depth value: '{0}'", new Integer(depth));
             SVNErrorManager.error(err, SVNLogType.NETWORK);
         }
         if (label != null) {
@@ -63,8 +62,7 @@ public class DAVUtil {
         return connection.doPropfind(path, header, body, davHandler);
     }
     
-    public static DAVProperties getResourceProperties(DAVConnection connection, String path, String label, 
-            DAVElement[] properties) throws SVNException {
+    public static DAVProperties getResourceProperties(DAVConnection connection, String path, String label, DAVElement[] properties) throws SVNException {
         Map resultMap = new SVNHashMap();
         HTTPStatus status = getProperties(connection, path, DEPTH_ZERO, label, properties, resultMap);
         if (status.getError() != null) {
@@ -207,15 +205,13 @@ public class DAVUtil {
         properties = findStartingProperties(connection, repos, path);
         SVNPropertyValue vccValue = properties.getPropertyValue(DAVElement.VERSION_CONTROLLED_CONFIGURATION);
         if (vccValue == null) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.RA_DAV_REQUEST_FAILED, 
-                    "The VCC property was not found on the resource");
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.RA_DAV_REQUEST_FAILED, "The VCC property was not found on the resource");
             SVNErrorManager.error(err, SVNLogType.NETWORK);
         }
         loppedPath = properties.getLoppedPath();
         SVNPropertyValue baselineRelativePathValue = properties.getPropertyValue(DAVElement.BASELINE_RELATIVE_PATH);
         if (baselineRelativePathValue == null) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.RA_DAV_REQUEST_FAILED, 
-                    "The relative-path property was not found on the resource");
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.RA_DAV_REQUEST_FAILED, "The relative-path property was not found on the resource");
             SVNErrorManager.error(err, SVNLogType.NETWORK);
         }
         String baselineRelativePath = SVNEncodingUtil.uriEncode(baselineRelativePathValue.getString());
