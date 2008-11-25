@@ -282,7 +282,7 @@ public class SVNRemoteDiffEditor implements ISVNEditor {
         SVNEventAction action;
         SVNStatusType[] type = {SVNStatusType.UNKNOWN, SVNStatusType.UNKNOWN};
         try {
-            retrieveParent(myCurrentFile.myWCFile, myIsDryRun);
+            retrieveParent(wcFile, myIsDryRun);
         } catch (SVNException e) {
             if (e.getErrorMessage().getErrorCode() == SVNErrorCode.WC_NOT_LOCKED) {
                 if (myEventHandler != null) {
