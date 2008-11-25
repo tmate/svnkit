@@ -15,6 +15,7 @@ import java.io.File;
 import java.util.ResourceBundle;
 
 import org.tmatesoft.svn.core.SVNException;
+import org.tmatesoft.svn.test.SVNTestScheme;
 
 /**
  * @author TMate Software Ltd.
@@ -22,18 +23,47 @@ import org.tmatesoft.svn.core.SVNException;
  */
 public class DAVSandboxFactory extends AbstractSVNSandboxFactory {
 
+    private String myApachePath;
+    private String myApacheRoot;
+    private int myApachePort;
+    private File myApacheConfigsDir;
+
     public static void setup(ResourceBundle bundle) {
-        DAVSandboxFactory sandboxFactory = new DAVSandboxFactory();
-        sandboxFactory.init(bundle);
-        registerSandboxFactory(sandboxFactory);
+        if (Boolean.TRUE.toString().equals(bundle.getString("test.http"))) {
+            DAVSandboxFactory sandboxFactory = new DAVSandboxFactory();
+            sandboxFactory.init(bundle);
+            registerSandboxFactory(sandboxFactory);
+        }
     }
 
     protected void init(ResourceBundle bundle) {
         super.init(bundle);
+        String apachePort = bundle.getString("apache.port");
+        myApachePort = Integer.parseInt(apachePort);
+        myApachePath = bundle.getString("apache.path");
+        myApacheRoot = bundle.getString("apache.root");
+        myApacheConfigsDir = new File(bundle.getString("apache.cfg.dir"));
+        setScheme(SVNTestScheme.DAV);
+    }
+
+    public String getApachePath() {
+        return myApachePath;
+    }
+
+    public String getApacheRoot() {
+        return myApacheRoot;
+    }
+
+    public int getApachePort() {
+        return myApachePort;
+    }
+
+    public File getApacheConfigsDir() {
+        return myApacheConfigsDir;
     }
 
     protected AbstractSVNSandbox createSandbox(File tmp) throws SVNException {
         tmp = tmp == null ? getDefaultTMP() : tmp;
-        return new DAVSandbox(tmp, getDumpsDir());
+        return new DAVSandbox(tmp, getDumpsDir(), getApachePath(), getApacheRoot(), getApachePort(), getApacheConfigsDir());
     }
 }
