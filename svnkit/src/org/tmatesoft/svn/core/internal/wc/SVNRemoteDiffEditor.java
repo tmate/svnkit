@@ -333,7 +333,7 @@ public class SVNRemoteDiffEditor implements ISVNEditor {
                         SVNRepository.INVALID_REVISION, kas.myStatus, kas.myStatus, SVNStatusType.INAPPLICABLE,
                         newAction, expectedAction, null, null);
                 myEventHandler.handleEvent(event, ISVNEventHandler.UNKNOWN);
-                myDeletedPaths.remove(myCurrentFile.myWCFile);
+                myDeletedPaths.remove(wcFile);
             }
         
             if (!isReplace) {
