@@ -33,7 +33,7 @@ public class DefaultSVNDebugLogger extends SVNDebugLogAdapter {
     public DefaultSVNDebugLogger() {
         myLoggers = new SVNHashMap();
     }
-
+    
     public void log(SVNLogType logType, Throwable th, Level logLevel) {
         Logger logger = getLogger(logType);
         if (logger.isLoggable(logLevel) && th != null) {

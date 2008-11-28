@@ -50,9 +50,7 @@ public class HTTPHeader {
     public static final String TIMEOUT_HEADER = "Timeout";
     public static final String DAV_HEADER = "DAV";
     public static final String SVN_DELTA_BASE_HEADER = "X-SVN-VR-Base";
-    public static final String ACCEPT_ENCODING_HEADER = "Accept-Encoding";
-    public static final String CONTENT_RANGE_HEADER = "content-range";
-    
+
     private Map myHeaders;
 
     public HTTPHeader() {

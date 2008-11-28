@@ -122,7 +122,6 @@ public class SVNCommandEnvironment extends AbstractSVNCommandEnvironment impleme
     private List myRevisionRanges;
     private SVNShowRevisionType myShowRevsType;
     private Collection myChangelists;
-    private String myAuthorOfInterest;
     
     public SVNCommandEnvironment(String programName, PrintStream out, PrintStream err, InputStream in) {
         super(programName, out, err, in);
@@ -513,8 +512,6 @@ public class SVNCommandEnvironment extends AbstractSVNCommandEnvironment impleme
             }
         } else if (option == SVNOption.REINTEGRATE) {
             myIsReIntegrate = true;
-        } else if (option == SVNOption.AUTHOR_OF_INTEREST) {
-            myAuthorOfInterest = optionValue.getValue();
         }
     }
     
@@ -747,11 +744,7 @@ public class SVNCommandEnvironment extends AbstractSVNCommandEnvironment impleme
     public String getNewTarget() {
         return myNewTarget;
     }
-
-    public String getAuthorOfInterest() {
-        return myAuthorOfInterest;
-    }
-
+    
     public long getLimit() {
         return myLimit;
     }

@@ -379,6 +379,7 @@ public class SVNCommitUtil {
     public static SVNCommitItem[] harvestCommitables(SVNWCAccess baseAccess, Collection paths, Map lockTokens, 
             boolean justLocked, SVNDepth depth, boolean force, Collection changelists, 
             ISVNCommitParameters params) throws SVNException {
+        // TODO
         Map commitables = new TreeMap(FILE_COMPARATOR);
         Collection danglers = new SVNHashSet();
         Iterator targets = paths.iterator();
@@ -985,14 +986,5 @@ public class SVNCommitUtil {
             wcAccess.close();
         }
         return false;
-    }
-
-    public static String validateCommitMessage(String message) {
-        if (message == null) {
-            return message;
-        }
-        message = message.replaceAll("\r\n", "\n");
-        message = message.replace('\r', '\n');
-        return message;
     }
 }

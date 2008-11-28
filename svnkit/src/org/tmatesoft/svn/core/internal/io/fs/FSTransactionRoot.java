@@ -16,10 +16,8 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.ArrayList;
 import java.util.Date;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Map;
 
 import org.tmatesoft.svn.core.SVNErrorCode;
@@ -160,16 +158,6 @@ public class FSTransactionRoot extends FSRoot {
             unparsedEntries.put(name, unparsedVal);
         }
         return unparsedEntries;
-    }
-
-    public static FSTransactionInfo beginTransactionForCommit(long baseRevision, SVNProperties revisionProperties, FSFS owner) throws SVNException {
-        List caps = new ArrayList();
-        caps.add("mergeinfo");
-        String author = revisionProperties.getStringValue(SVNRevisionProperty.AUTHOR);
-        FSHooks.runStartCommitHook(owner.getRepositoryRoot(), author, caps);
-        FSTransactionInfo txn = FSTransactionRoot.beginTransaction(baseRevision, FSTransactionRoot.SVN_FS_TXN_CHECK_LOCKS, owner);
-        owner.changeTransactionProperties(txn.getTxnId(), revisionProperties);
-        return txn;
     }
 
     public static FSTransactionInfo beginTransaction(long baseRevision, int flags, FSFS owner) throws SVNException {
@@ -441,7 +429,7 @@ public class FSTransactionRoot extends FSRoot {
         changesFile.write("\n".getBytes("UTF-8"));
     }
 
-    public long writeFinalChangedPathInfo(final CountingOutputStream protoFile) throws SVNException, IOException {
+    public long writeFinalChangedPathInfo(final CountingStream protoFile) throws SVNException, IOException {
         long offset = protoFile.getPosition();
         Map changedPaths = getChangedPaths();
 
@@ -497,7 +485,7 @@ public class FSTransactionRoot extends FSRoot {
         getOwner().writeCurrentFile(newRevision, newNodeId, newCopyId);
     }
 
-    public FSID writeFinalRevision(FSID newId, final CountingOutputStream protoFile, long revision, FSID id, 
+    public FSID writeFinalRevision(FSID newId, final CountingStream protoFile, long revision, FSID id, 
             String startNodeId, String startCopyId) throws SVNException, IOException {
         newId = null;
         if (!id.isTxn()) {
