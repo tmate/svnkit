@@ -379,6 +379,7 @@ public class SVNCommitUtil {
     public static SVNCommitItem[] harvestCommitables(SVNWCAccess baseAccess, Collection paths, Map lockTokens, 
             boolean justLocked, SVNDepth depth, boolean force, Collection changelists, 
             ISVNCommitParameters params) throws SVNException {
+        // TODO
         Map commitables = new TreeMap(FILE_COMPARATOR);
         Collection danglers = new SVNHashSet();
         Iterator targets = paths.iterator();

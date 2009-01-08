@@ -70,7 +70,7 @@ public class DAVEditorHandler extends BasicDAVDeltaHandler {
         Map attrs = new SVNHashMap();
         attrs.put("send-all", Boolean.toString(sendAll));
         SVNXMLUtil.openNamespaceDeclarationTag(SVNXMLUtil.SVN_NAMESPACE_PREFIX, "update-report", 
-                SVN_NAMESPACES_LIST, SVNXMLUtil.PREFIX_MAP, attrs, xmlBuffer, true);
+                SVN_NAMESPACES_LIST, SVNXMLUtil.PREFIX_MAP, attrs, xmlBuffer);
         
         SVNXMLUtil.openCDataTag(SVNXMLUtil.SVN_NAMESPACE_PREFIX, "src-path", url, xmlBuffer);
         if (targetRevision >= 0) {
@@ -195,24 +195,23 @@ public class DAVEditorHandler extends BasicDAVDeltaHandler {
     protected String myPath;
     protected String myPropertyName;
     protected boolean myIsDirectory;
-    protected Stack myDirs; 
-    protected Map myLockTokens;
-    protected DAVRepository myOwner;
-    protected boolean myIsFetchContent;
-
     private String myChecksum;
     private String myEncoding;
     private ISVNDeltaConsumer myDeltaConsumer;
     private boolean myIsReceiveAll;
+    private Stack myDirs; 
     private DAVConnection myConnection;
     private IHTTPConnectionFactory myConnectionFactory;
+    private DAVRepository myOwner;
     private String myHref;
     private String myCurrentWCPath;
     private boolean myIsInResource;
+    private boolean myIsFetchContent;
     private boolean myIsFetchProps;
     private boolean myHasTarget;
     private Map myVersionURLs;
-
+    private Map myLockTokens;
+    
     public DAVEditorHandler(IHTTPConnectionFactory connectionFactory, DAVRepository owner, ISVNEditor editor, 
             Map lockTokens, boolean fetchContent, boolean hasTarget) {
         myConnectionFactory = connectionFactory;

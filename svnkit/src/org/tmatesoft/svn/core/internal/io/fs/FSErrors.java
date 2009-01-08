@@ -117,11 +117,7 @@ public class FSErrors {
         return err;
     }
 
-    public static SVNErrorMessage errorConflict(String path, StringBuffer conflictPath) {
-        if (conflictPath != null) {
-            conflictPath.delete(0, conflictPath.length());
-            conflictPath.append(path);
-        }
+    public static SVNErrorMessage errorConflict(String path) {
         SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_CONFLICT, "Conflict at ''{0}''", path);
         return err;
     }

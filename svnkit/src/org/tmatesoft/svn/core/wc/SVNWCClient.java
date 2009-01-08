@@ -3729,7 +3729,8 @@ public class SVNWCClient extends SVNBasicClient {
             if (entry.isDirectory() && !entry.isThisDir()) {
                 return;
             }
-            if ((myIsPristine && entry.isScheduledForAddition()) || (!myIsPristine && entry.isScheduledForDeletion())) {
+            if ((myIsPristine && entry.isScheduledForAddition()) || 
+                    (!myIsPristine && entry.isScheduledForDeletion())) {
                 return;
             }
             if (!SVNWCAccess.matchesChangeList(myChangeLists, entry)) {
