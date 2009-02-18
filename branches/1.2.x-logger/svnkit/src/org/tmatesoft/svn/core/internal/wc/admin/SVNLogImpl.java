@@ -30,6 +30,7 @@ import org.tmatesoft.svn.core.internal.util.SVNEncodingUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 import org.tmatesoft.svn.util.SVNLogType;
+import org.tmatesoft.svn.util.SVNDebugLog;
 
 
 /**
@@ -87,6 +88,9 @@ public class SVNLogImpl extends SVNLog {
         }
         SVNFileUtil.rename(myTmpFile, myFile);
         SVNFileUtil.setReadonly(myFile, true);
+
+        String logContent = SVNFileUtil.readFile(myFile);
+        SVNDebugLog.getDefaultLog().log("[END] Journal Content " + myFile.getAbsolutePath() + " ==============\n" + logContent + "\n====================");
     }
 
     public Collection readCommands() throws SVNException {

@@ -173,6 +173,24 @@ public class SVNPathUtil {
         return result.toString();
     }
 
+    public static String getCommaSeparatedPaths(File[] paths) {
+        if (paths == null) {
+            return "NULL";
+        }
+        if (paths.length == 0) {
+            return "EMPTY";
+        }
+        StringBuffer buffer = new StringBuffer();
+        for (int i = 0; i < paths.length; i++) {
+            File path = paths[i];
+            buffer.append(path.getPath());
+            if (i != paths.length - 1) {
+                buffer.append(", ");
+            }
+        }
+        return buffer.toString();
+    }
+
     public static String canonicalizeAbsolutePath(String path) {
         if (path == null) {
             return null;

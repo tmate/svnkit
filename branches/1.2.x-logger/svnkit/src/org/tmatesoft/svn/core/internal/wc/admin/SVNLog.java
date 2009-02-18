@@ -28,6 +28,7 @@ import org.tmatesoft.svn.core.internal.wc.SVNAdminUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.wc.SVNStatusType;
 import org.tmatesoft.svn.util.SVNLogType;
+import org.tmatesoft.svn.util.SVNDebugLog;
 
 
 /**
@@ -199,6 +200,7 @@ public abstract class SVNLog {
     }
 
     public void run(SVNLogRunner runner) throws SVNException {
+        SVNDebugLog.getDefaultLog().log("Running log file " + toString());
         Collection commands = readCommands();
         if (commands == null || commands.isEmpty()) {
             return;

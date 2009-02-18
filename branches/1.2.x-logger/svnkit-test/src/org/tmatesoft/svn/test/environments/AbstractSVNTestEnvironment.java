@@ -146,7 +146,7 @@ public abstract class AbstractSVNTestEnvironment {
         try {
             os.write(data);
         } catch (IOException e) {
-            SVNTestDebugLog.log(e);
+            SVNTestDebugLog.getDebugLog().log(e);
         } finally {
             SVNFileUtil.closeFile(os);
         }
