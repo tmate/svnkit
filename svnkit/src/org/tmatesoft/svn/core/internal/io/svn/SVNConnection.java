@@ -16,7 +16,6 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.io.SequenceInputStream;
 import java.lang.reflect.Constructor;
 import java.util.Iterator;
 import java.util.List;
@@ -91,7 +90,7 @@ public class SVNConnection {
         return myIsCommitRevprops;
     }
     
-    private InputStream skipLeadingGrabage(int attempt) throws SVNException {
+    private InputStream skipLeadingGrabage() throws SVNException {
         byte[] bytes = myHandshakeBuffer;
         int r = 0;
         try {
@@ -103,12 +102,9 @@ public class SVNConnection {
         if (r >= 0) {
             for (int i = 0; i < r; i++) {
                 if (bytes[i] == '(' && bytes[i + 1] == ' ') {
-                    return new SequenceInputStream(new ByteArrayInputStream(bytes, i, r - i), getInputStream());
+                    return new ByteArrayInputStream(bytes, i, r - i);
                 }
             }
-        }
-        if (r >= 0 && attempt == 0) {
-            return skipLeadingGrabage(attempt + 1);
         }
         SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.RA_SVN_MALFORMED_DATA, "Handshake failed, received: ''{0}''", new String(bytes));
         SVNErrorManager.error(err, SVNLogType.NETWORK);
@@ -117,7 +113,7 @@ public class SVNConnection {
 
     protected void handshake(SVNRepositoryImpl repository) throws SVNException {
         checkConnection();
-        InputStream is = skipLeadingGrabage(0);
+        InputStream is = skipLeadingGrabage();
         List items = null;
         try {
             items = SVNReader.parse(is, "nnll", null);

@@ -21,7 +21,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
-import java.util.regex.PatternSyntaxException;
 
 import org.tmatesoft.svn.cli.SVNCommandUtil;
 import org.tmatesoft.svn.core.ISVNLogEntryHandler;
@@ -51,9 +50,7 @@ public class SVNLogCommand extends SVNXMLCommand implements ISVNLogEntryHandler 
     private static final String SEPARATOR = "------------------------------------------------------------------------\n";
 
     private LinkedList myMergeStack;
-    private String myAuthorOfInterest;
-    private String myLogRegularExpression;
-    
+
     public SVNLogCommand() {
         super("log", null);
     }
@@ -76,8 +73,6 @@ public class SVNLogCommand extends SVNXMLCommand implements ISVNLogEntryHandler 
         options.add(SVNOption.LIMIT);
         options.add(SVNOption.WITH_ALL_REVPROPS);
         options.add(SVNOption.WITH_REVPROP);
-        options.add(SVNOption.AUTHOR_OF_INTEREST);
-        options.add(SVNOption.REGULAR_EXPRESSION);
         return options;
     }
 
@@ -143,9 +138,6 @@ public class SVNLogCommand extends SVNXMLCommand implements ISVNLogEntryHandler 
             }
         }
 
-        myAuthorOfInterest = getSVNEnvironment().getAuthorOfInterest();
-        myLogRegularExpression = getSVNEnvironment().getRegularExpression();
-        
         SVNLogClient client = getSVNEnvironment().getClientManager().getLogClient();
         if (!getSVNEnvironment().isQuiet()) {
             client.setEventHandler(new SVNNotifyPrinter(getSVNEnvironment()));
@@ -228,15 +220,11 @@ public class SVNLogCommand extends SVNXMLCommand implements ISVNLogEntryHandler 
         }
     }
     
-    protected void printLogEntry(SVNLogEntry logEntry) throws SVNException {
+    protected void printLogEntry(SVNLogEntry logEntry) {
         if (logEntry == null) {
             return;
         }
 
-        if (myAuthorOfInterest != null && !"".equals(myAuthorOfInterest) && !myAuthorOfInterest.equals(logEntry.getAuthor())) {
-            return;
-        }
-        
         SVNProperties revisionProperties = logEntry.getRevisionProperties();
         String author = revisionProperties.getStringValue(SVNRevisionProperty.AUTHOR);
         String message = revisionProperties.getStringValue(SVNRevisionProperty.LOG);
@@ -246,29 +234,11 @@ public class SVNLogCommand extends SVNXMLCommand implements ISVNLogEntryHandler 
         if (message == null && logEntry.getRevision() == 0) {
             return;
         }
-
+        
         if (!SVNRevision.isValidRevisionNumber(logEntry.getRevision())) {
             myMergeStack.removeLast();
             return;
         }
-
-        if (myLogRegularExpression != null) {
-            if (message == null) {
-                return;
-            }
-            String[] result = null;
-            try {
-                 result = message.split(myLogRegularExpression);
-            } catch (PatternSyntaxException psy) {
-                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.CL_ARG_PARSING_ERROR, "you specified an invalid regular expression: {0}", 
-                        psy.getMessage());
-                SVNErrorManager.error(err, SVNLogType.CLIENT);
-            }
-            if (result.length == 1 && message.equals(result[0]) && !message.equals(myLogRegularExpression)) {
-                return;
-            }
-        }
-        
         StringBuffer buffer = new StringBuffer();
         if (author == null) {
             author = "(no author)";
@@ -328,15 +298,11 @@ public class SVNLogCommand extends SVNXMLCommand implements ISVNLogEntryHandler 
         getSVNEnvironment().getOut().print(buffer.toString());
     }
     
-    protected void printLogEntryXML(SVNLogEntry logEntry) throws SVNException {
+    protected void printLogEntryXML(SVNLogEntry logEntry) {
         if (logEntry == null) {
             return;
         }
-
-        if (myAuthorOfInterest != null && !"".equals(myAuthorOfInterest) && !myAuthorOfInterest.equals(logEntry.getAuthor())) {
-            return;
-        }
-
+        
         SVNProperties revProps = logEntry.getRevisionProperties();
         String author = revProps.getStringValue(SVNRevisionProperty.AUTHOR);
         String message = revProps.getStringValue(SVNRevisionProperty.LOG);
@@ -345,24 +311,6 @@ public class SVNLogCommand extends SVNXMLCommand implements ISVNLogEntryHandler 
         
         if (logEntry.getRevision() == 0 && message == null) {
             return;
-        }
-
-        if (myLogRegularExpression != null) {
-            if (message == null) {
-                return;
-            }
-
-            String[] result = null;
-            try {
-                 result = message.split(myLogRegularExpression);
-            } catch (PatternSyntaxException psy) {
-                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.CL_ARG_PARSING_ERROR, "you specified an invalid regular expression: {0}", 
-                        psy.getMessage());
-                SVNErrorManager.error(err, SVNLogType.CLIENT);
-            }
-            if (result.length == 1 && message.equals(result[0]) && !message.equals(myLogRegularExpression)) {
-                return;
-            }
         }
 
         if (author != null) {
