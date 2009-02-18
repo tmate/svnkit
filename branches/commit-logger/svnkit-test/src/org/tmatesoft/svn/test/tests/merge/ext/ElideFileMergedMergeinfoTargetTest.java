@@ -70,13 +70,13 @@ public class ElideFileMergedMergeinfoTargetTest extends AbstractExtMergeTest {
         getEnvironment().merge(getBranch(), getTrunkWC(), ranges, SVNDepth.INFINITY, false, false);
         getEnvironment().merge(getBranch().appendPath("A/file_renamed", false), getTrunkFile("A/file"), ranges, SVNDepth.UNKNOWN, false, false);
 
-        SVNTestDebugLog.log("A/file:");
+        SVNTestDebugLog.getDebugLog().log("A/file:");
         getEnvironment().getFileContents(getTrunkFile("A/file"), System.out);
         SVNPropertyValue value = getEnvironment().getProperty(getTrunkFile("A/file"), SVNProperty.MERGE_INFO, SVNRevision.WORKING);
-        SVNTestDebugLog.log("\nmerge info = " + value);
-        SVNTestDebugLog.log("A/file2:");
+        SVNTestDebugLog.getDebugLog().log("\nmerge info = " + value);
+        SVNTestDebugLog.getDebugLog().log("A/file2:");
         getEnvironment().getFileContents(getTrunkFile("A/file2"), System.out);
         SVNPropertyValue value2 = getEnvironment().getProperty(getTrunkFile("A/file2"), SVNProperty.MERGE_INFO, SVNRevision.WORKING);
-        SVNTestDebugLog.log("\nmerge info = " + value2);
+        SVNTestDebugLog.getDebugLog().log("\nmerge info = " + value2);
     }
 }
