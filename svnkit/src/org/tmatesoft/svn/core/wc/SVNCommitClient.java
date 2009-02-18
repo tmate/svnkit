@@ -21,6 +21,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.logging.Level;
 
 import org.tmatesoft.svn.core.SVNCancelException;
 import org.tmatesoft.svn.core.SVNCommitInfo;
@@ -59,6 +60,7 @@ import org.tmatesoft.svn.core.io.ISVNEditor;
 import org.tmatesoft.svn.core.io.SVNRepository;
 import org.tmatesoft.svn.core.io.diff.SVNDeltaGenerator;
 import org.tmatesoft.svn.util.SVNLogType;
+import org.tmatesoft.svn.util.SVNDebugLog;
 
 /**
  * The <b>SVNCommitClient</b> class provides methods to perform operations that relate to 
@@ -1173,6 +1175,10 @@ public class SVNCommitClient extends SVNBasicClient {
         if (paths == null || paths.length == 0) {
             return SVNCommitPacket.EMPTY;
         }
+
+        String msg = "[collect commit items] " + SVNPathUtil.getCommaSeparatedPaths(paths) + "; force = " + force;
+        SVNDebugLog.getDefaultLog().log(msg);
+
         Collection targets = new ArrayList();
         SVNStatusClient statusClient = new SVNStatusClient(getRepositoryPool(), getOptions());
         statusClient.setEventHandler(new ISVNEventHandler() {

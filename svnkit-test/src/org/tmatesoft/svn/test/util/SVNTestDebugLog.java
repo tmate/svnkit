@@ -77,7 +77,7 @@ public class SVNTestDebugLog extends SVNDebugLogAdapter implements ISVNEventHand
         return INSTANCE;
     }
 
-    public static void log(String message) {
+    public void log(String message) {
         System.out.println(message);
     }
 

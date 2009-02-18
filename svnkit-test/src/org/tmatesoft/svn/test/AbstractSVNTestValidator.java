@@ -27,10 +27,10 @@ public abstract class AbstractSVNTestValidator {
 
     public void fail(String message, SVNTestErrorCode errorCode) throws SVNException {
 //        SVNErrorManager.error(SVNErrorMessage.create(errorCode, "FAILED:\n" + message), SVNLogType.DEFAULT);
-       SVNTestDebugLog.log("FAILED:\n" + message);
+       SVNTestDebugLog.getDebugLog().log("FAILED:\n" + message);
     }
 
     public void success() {
-        SVNTestDebugLog.log("PASSED");
+        SVNTestDebugLog.getDebugLog().log("PASSED");
     }
 }
