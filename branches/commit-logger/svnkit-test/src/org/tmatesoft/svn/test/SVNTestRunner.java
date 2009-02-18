@@ -75,7 +75,7 @@ public class SVNTestRunner {
             try {
                 test.dispose();
             } catch (SVNException e) {
-                SVNTestDebugLog.log(e);
+                SVNTestDebugLog.getDebugLog().log(e);
             }
         }
     }
@@ -86,7 +86,7 @@ public class SVNTestRunner {
             try {
                 environment.dispose();
             } catch (SVNException e) {
-                SVNTestDebugLog.log(e);
+                SVNTestDebugLog.getDebugLog().log(e);
             }
         }
     }
@@ -97,7 +97,7 @@ public class SVNTestRunner {
             try {
                 sandbox.dispose();
             } catch (SVNException e) {
-                SVNTestDebugLog.log(e);
+                SVNTestDebugLog.getDebugLog().log(e);
             }
         }
     }
