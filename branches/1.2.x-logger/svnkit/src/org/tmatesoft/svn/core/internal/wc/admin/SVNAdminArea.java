@@ -26,6 +26,7 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.logging.Level;
 
 import org.tmatesoft.svn.core.SVNCancelException;
 import org.tmatesoft.svn.core.SVNCommitInfo;
@@ -770,7 +771,7 @@ public abstract class SVNAdminArea {
     }
 
     public SVNEntry modifyEntry(String name, Map attributes, boolean save, boolean force) throws SVNException {
-        SVNDebugLog.getDefaultLog().log("[RUN] modify entry " + name + " : " + attributes);
+        SVNDebugLog.getDefaultLog().log(SVNLogType.SPECIAL, "[RUN] modify entry " + name + " : " + attributes, Level.FINEST);
         if (name == null) {
             name = getThisDirName();
         }

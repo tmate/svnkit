@@ -15,11 +15,13 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
+import java.util.logging.Level;
 
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.test.AbstractSVNTestValidator;
 import org.tmatesoft.svn.test.SVNTestErrorCode;
 import org.tmatesoft.svn.test.util.SVNTestDebugLog;
+import org.tmatesoft.svn.util.SVNLogType;
 
 /**
  * @author TMate Software Ltd.
@@ -92,7 +94,7 @@ public class SVNWorkingCopyValidator extends AbstractSVNTestValidator  implement
 
         for (Iterator iterator = getStateConflicts().iterator(); iterator.hasNext();) {
             SVNWCStateConflict conflict = (SVNWCStateConflict) iterator.next();
-            SVNTestDebugLog.getDebugLog().log(conflict.toString());
+            SVNTestDebugLog.getDebugLog().log(SVNLogType.SPECIAL, conflict.toString(), Level.FINEST);
         }
 
         fail("Test failed", SVNTestErrorCode.UNKNOWN);

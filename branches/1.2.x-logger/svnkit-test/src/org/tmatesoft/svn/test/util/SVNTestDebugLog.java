@@ -77,11 +77,11 @@ public class SVNTestDebugLog extends SVNDebugLogAdapter implements ISVNEventHand
         return INSTANCE;
     }
 
-    public void log(String message) {
+    public void log(SVNLogType logType, String message, Level logLevel) {
         System.out.println(message);
     }
 
-    public void log(Throwable th) {
+    public void log(SVNLogType logType, Throwable th, Level logLevel) {
         th.printStackTrace(System.err);
     }
 
@@ -118,24 +118,6 @@ public class SVNTestDebugLog extends SVNDebugLogAdapter implements ISVNEventHand
         return SVNPathUtil.getRelativePath(getTMP(), path);
     }
 
-    public void log(SVNLogType logType, Throwable th, Level logLevel) {
-        if (getExceptions().contains(logType)) {
-            return;
-        }
-        log(logType, th.getMessage(), logLevel);
-    }
-
-    public void log(SVNLogType logType, String message, Level logLevel) {
-        if (getExceptions().contains(logType)) {
-            return;
-        }
-        StringBuffer buffer = new StringBuffer();
-        buffer.append(logType.getShortName());
-        buffer.append(": ");
-        buffer.append(message);
-        log(buffer.toString());
-    }
-
     public void log(SVNLogType logType, String message, byte[] data) {
         if (!myIsTracing) {
             return;
@@ -160,7 +142,7 @@ public class SVNTestDebugLog extends SVNDebugLogAdapter implements ISVNEventHand
         buffer.append(event.getContentsStatus());
         buffer.append("\n\tproperties status: ");
         buffer.append(event.getPropertiesStatus());
-        log(buffer.toString());
+        log(SVNLogType.SPECIAL, buffer.toString(), Level.FINEST);
     }
 
     public void checkCancelled() throws SVNCancelException {
@@ -184,7 +166,7 @@ public class SVNTestDebugLog extends SVNDebugLogAdapter implements ISVNEventHand
                 try {
                     read = myInput.read();
                 } catch (IOException e) {
-                    getDebugLog().log(e);
+                    getDebugLog().log(SVNLogType.SPECIAL, e, Level.FINEST);
                 }
             }
         }

@@ -20,6 +20,7 @@ import java.io.Writer;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
+import java.util.logging.Level;
 
 import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
@@ -90,7 +91,7 @@ public class SVNLogImpl extends SVNLog {
         SVNFileUtil.setReadonly(myFile, true);
 
         String logContent = SVNFileUtil.readFile(myFile);
-        SVNDebugLog.getDefaultLog().log("[END] Journal Content " + myFile.getAbsolutePath() + " ==============\n" + logContent + "\n====================");
+        SVNDebugLog.getDefaultLog().log(SVNLogType.SPECIAL, "[END] Journal Content " + myFile.getAbsolutePath() + " ==============\n" + logContent + "\n====================", Level.FINEST);
     }
 
     public Collection readCommands() throws SVNException {

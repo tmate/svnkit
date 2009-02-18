@@ -579,14 +579,14 @@ public class SVNFileUtil {
                 try {
                     srcChannel.close();
                 } catch (IOException e) {
-                    SVNDebugLog.getDefaultLog().log(e);
+                    SVNDebugLog.getDefaultLog().log(SVNLogType.SPECIAL, e, Level.FINEST);
                 }
             }
             if (dstChannel != null) {
                 try {
                     dstChannel.close();
                 } catch (IOException e) {
-                    SVNDebugLog.getDefaultLog().log(e);
+                    SVNDebugLog.getDefaultLog().log(SVNLogType.SPECIAL, e, Level.FINEST);
                 }
             }
             SVNFileUtil.closeFile(is);
@@ -1314,7 +1314,7 @@ public class SVNFileUtil {
         try {
             is.close();
         } catch (IOException e) {
-            SVNDebugLog.getDefaultLog().log(e);
+            SVNDebugLog.getDefaultLog().log(SVNLogType.SPECIAL, e, Level.FINEST);
         }
     }
 
@@ -1325,7 +1325,7 @@ public class SVNFileUtil {
         try {
             inFile.close();
         } catch (IOException e) {
-            SVNDebugLog.getDefaultLog().log(e);
+            SVNDebugLog.getDefaultLog().log(SVNLogType.SPECIAL, e, Level.FINEST);
         }
     }
 
@@ -1336,7 +1336,7 @@ public class SVNFileUtil {
         try {
             os.close();
         } catch (IOException e) {
-            SVNDebugLog.getDefaultLog().log(e);
+            SVNDebugLog.getDefaultLog().log(SVNLogType.SPECIAL, e, Level.FINEST);
         }
     }
 
@@ -1347,7 +1347,7 @@ public class SVNFileUtil {
         try {
             raf.close();
         } catch (IOException e) {
-            SVNDebugLog.getDefaultLog().log(e);
+            SVNDebugLog.getDefaultLog().log(SVNLogType.SPECIAL, e, Level.FINEST);
         }
     }
 
@@ -1442,7 +1442,7 @@ public class SVNFileUtil {
             try {
                 os.close();
             } catch (IOException e) {
-                SVNDebugLog.getDefaultLog().log(e);
+                SVNDebugLog.getDefaultLog().log(SVNLogType.SPECIAL, e, Level.FINEST);
             }
         }
     }
@@ -1452,7 +1452,7 @@ public class SVNFileUtil {
             try {
                 is.close();
             } catch (IOException e) {
-                SVNDebugLog.getDefaultLog().log(e);
+                SVNDebugLog.getDefaultLog().log(SVNLogType.SPECIAL, e, Level.FINEST);
             }
         }
     }

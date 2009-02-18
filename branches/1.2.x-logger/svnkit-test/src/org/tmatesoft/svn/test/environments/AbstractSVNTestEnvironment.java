@@ -17,6 +17,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.UnsupportedEncodingException;
 import java.util.Collection;
+import java.util.logging.Level;
 
 import org.tmatesoft.svn.core.SVNDepth;
 import org.tmatesoft.svn.core.SVNException;
@@ -37,6 +38,7 @@ import org.tmatesoft.svn.core.wc.SVNInfo;
 import org.tmatesoft.svn.core.wc.SVNRevision;
 import org.tmatesoft.svn.core.wc.SVNWCClient;
 import org.tmatesoft.svn.test.util.SVNTestDebugLog;
+import org.tmatesoft.svn.util.SVNLogType;
 
 /**
  * @author TMate Software Ltd.
@@ -146,7 +148,7 @@ public abstract class AbstractSVNTestEnvironment {
         try {
             os.write(data);
         } catch (IOException e) {
-            SVNTestDebugLog.getDebugLog().log(e);
+            SVNTestDebugLog.getDebugLog().log(SVNLogType.SPECIAL, e, Level.FINEST);
         } finally {
             SVNFileUtil.closeFile(os);
         }

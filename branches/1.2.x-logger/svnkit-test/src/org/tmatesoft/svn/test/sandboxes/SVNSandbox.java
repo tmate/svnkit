@@ -16,6 +16,7 @@ import java.io.IOException;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.logging.Level;
 
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNURL;
@@ -110,7 +111,7 @@ public class SVNSandbox extends AbstractSVNSandbox {
             SVNErrorMessage error = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, e);
             SVNErrorManager.error(error, e, SVNLogType.DEFAULT);
         } catch (InterruptedException e) {
-            SVNTestDebugLog.getDebugLog().log(e);
+            SVNTestDebugLog.getDebugLog().log(SVNLogType.SPECIAL, e, Level.FINEST);
         }
     }
 

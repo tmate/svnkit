@@ -13,6 +13,7 @@ package org.tmatesoft.svn.test;
 
 import java.util.Iterator;
 import java.util.ResourceBundle;
+import java.util.logging.Level;
 
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.test.environments.AbstractSVNTestEnvironment;
@@ -24,6 +25,7 @@ import org.tmatesoft.svn.test.sandboxes.DAVSandboxFactory;
 import org.tmatesoft.svn.test.tests.AbstractSVNTest;
 import org.tmatesoft.svn.test.util.SVNResourceUtil;
 import org.tmatesoft.svn.test.util.SVNTestDebugLog;
+import org.tmatesoft.svn.util.SVNLogType;
 
 /**
  * @author TMate Software Ltd.
@@ -75,7 +77,7 @@ public class SVNTestRunner {
             try {
                 test.dispose();
             } catch (SVNException e) {
-                SVNTestDebugLog.getDebugLog().log(e);
+                SVNTestDebugLog.getDebugLog().log(SVNLogType.SPECIAL, e, Level.FINEST);
             }
         }
     }
@@ -86,7 +88,7 @@ public class SVNTestRunner {
             try {
                 environment.dispose();
             } catch (SVNException e) {
-                SVNTestDebugLog.getDebugLog().log(e);
+                SVNTestDebugLog.getDebugLog().log(SVNLogType.SPECIAL, e, Level.FINEST);
             }
         }
     }
@@ -97,7 +99,7 @@ public class SVNTestRunner {
             try {
                 sandbox.dispose();
             } catch (SVNException e) {
-                SVNTestDebugLog.getDebugLog().log(e);
+                SVNTestDebugLog.getDebugLog().log(SVNLogType.SPECIAL, e, Level.FINEST);
             }
         }
     }
