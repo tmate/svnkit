@@ -11,12 +11,15 @@
  */
 package org.tmatesoft.svn.test.tests.merge.ext;
 
+import java.util.logging.Level;
+
 import org.tmatesoft.svn.core.SVNDepth;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.wc.SVNRevision;
 import org.tmatesoft.svn.test.util.SVNTestDebugLog;
 import org.tmatesoft.svn.test.wc.SVNTestFileDescriptor;
 import org.tmatesoft.svn.test.wc.SVNWCDescriptor;
+import org.tmatesoft.svn.util.SVNLogType;
 
 /**
  * @author TMate Software Ltd.
@@ -63,7 +66,7 @@ public abstract class MergeRenamedDirSourceTest extends AbstractExtMergeTest {
         myEndRevision = endRevision;
         doMerge(startRevision, endRevision);
 
-        SVNTestDebugLog.getDebugLog().log("\ncontents of merge target after merge:\n");
+        SVNTestDebugLog.getDebugLog().log(SVNLogType.SPECIAL, "\ncontents of merge target after merge:\n", Level.FINEST);
         getEnvironment().getFileContents(getTrunkFile("A/file"), System.out);
     }
 

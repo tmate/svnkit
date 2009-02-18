@@ -18,6 +18,7 @@ import java.io.OutputStream;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.logging.Level;
 
 import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
@@ -47,7 +48,7 @@ public class SVNLogRunner {
         SVNException error = null;
         String fileName = attributes.getStringValue(SVNLog.NAME_ATTR);
 
-        SVNDebugLog.getDefaultLog().log("[RUN]" + name + " for admin dir: " + adminArea.getAdminDirectory() + " | fileName " + fileName + " | force = " + SVNProperty.booleanValue(attributes.getStringValue(SVNLog.FORCE_ATTR)));
+        SVNDebugLog.getDefaultLog().log(SVNLogType.SPECIAL, "[RUN]" + name + " for admin dir: " + adminArea.getAdminDirectory() + " | fileName " + fileName + " | force = " + SVNProperty.booleanValue(attributes.getStringValue(SVNLog.FORCE_ATTR)), Level.FINEST);
         if (SVNLog.DELETE_ENTRY.equals(name)) {
             File path = adminArea.getFile(fileName);
             SVNAdminArea dir = adminArea.getWCAccess().probeRetrieve(path);
@@ -207,13 +208,13 @@ public class SVNLogRunner {
 
             File src = adminArea.getFile(fileName);
             File dst = adminArea.getFile(attributes.getStringValue(SVNLog.DEST_ATTR));
-            SVNDebugLog.getDefaultLog().log("[RUN] move src = " + src.getPath() + " dst = " + dst.getPath());
+            SVNDebugLog.getDefaultLog().log(SVNLogType.SPECIAL, "[RUN] move src = " + src.getPath() + " dst = " + dst.getPath(), Level.FINEST);
             try {
                 SVNFileUtil.rename(src, dst);
             } catch (SVNException svne) {
                 error = new SVNException(svne.getErrorMessage().wrap("Can't move source to dest"), svne);
             }
-            SVNDebugLog.getDefaultLog().log("[RUN] after move src length = " + src.length() + " dst length = " + dst.length());
+            SVNDebugLog.getDefaultLog().log(SVNLogType.SPECIAL, "[RUN] after move src length = " + src.length() + " dst length = " + dst.length(), Level.FINEST);
         } else if (SVNLog.APPEND.equals(name)) {
             File src = adminArea.getFile(fileName);
             File dst = adminArea.getFile(attributes.getStringValue(SVNLog.DEST_ATTR));
@@ -314,7 +315,7 @@ public class SVNLogRunner {
             File src = adminArea.getFile(fileName);
             File dst = adminArea.getFile(dstName);
 
-            SVNDebugLog.getDefaultLog().log("[RUN] cp and translate src = " + src.getPath() + " dst = " + dst.getPath());            
+            SVNDebugLog.getDefaultLog().log(SVNLogType.SPECIAL, "[RUN] cp and translate src = " + src.getPath() + " dst = " + dst.getPath(), Level.FINEST);
             //when performing a merge from a log runner we may have just set 
             //new properties (log command that copies a new base prop file), 
             //but probably we've got a non empty props cache which is no more 
@@ -328,7 +329,7 @@ public class SVNLogRunner {
                         throw svne;
                     }
                 }
-                SVNDebugLog.getDefaultLog().log("[RUN] after cp and translate src length = " + src.length() + " dst length = " + dst.length());                
+                SVNDebugLog.getDefaultLog().log(SVNLogType.SPECIAL, "[RUN] after cp and translate src length = " + src.length() + " dst length = " + dst.length(), Level.FINEST);
 
                 
                 // get properties for this entry.
@@ -349,23 +350,23 @@ public class SVNLogRunner {
             String dstName = attributes.getStringValue(SVNLog.DEST_ATTR);
             String versionedName = attributes.getStringValue(SVNLog.ATTR2);
             adminArea.closeVersionedProperties();
-            SVNDebugLog.getDefaultLog().log("[RUN] cp and detranslate src = " + fileName + " dst = " + dstName);
+            SVNDebugLog.getDefaultLog().log(SVNLogType.SPECIAL, "[RUN] cp and detranslate src = " + fileName + " dst = " + dstName, Level.FINEST);
             try {
                 SVNTranslator.translate(adminArea, versionedName != null ? versionedName : fileName, fileName, dstName, false);
             } catch (SVNException svne) {
                 error = svne;
             }
-            SVNDebugLog.getDefaultLog().log("[RUN] after cp and detranslate src length = " + adminArea.getFile(fileName).length() + " dst length = " + adminArea.getFile(dstName).length());                            
+            SVNDebugLog.getDefaultLog().log(SVNLogType.SPECIAL, "[RUN] after cp and detranslate src length = " + adminArea.getFile(fileName).length() + " dst length = " + adminArea.getFile(dstName).length(), Level.FINEST);
         } else if (SVNLog.COPY.equals(name)) {
             File src = adminArea.getFile(fileName);
             File dst = adminArea.getFile(attributes.getStringValue(SVNLog.DEST_ATTR));
-            SVNDebugLog.getDefaultLog().log("[RUN] copy src = " + src.getPath() + " dst = " + dst.getPath());            
+            SVNDebugLog.getDefaultLog().log(SVNLogType.SPECIAL, "[RUN] copy src = " + src.getPath() + " dst = " + dst.getPath(), Level.FINEST);
             try {
                 SVNFileUtil.copy(src, dst, true, false);
             } catch (SVNException svne) {
                 error = svne;
             }
-            SVNDebugLog.getDefaultLog().log("[RUN] after copy src length = " + src.length() + " dst length = " + dst.length());            
+            SVNDebugLog.getDefaultLog().log(SVNLogType.SPECIAL, "[RUN] after copy src length = " + src.length() + " dst length = " + dst.length(), Level.FINEST);
         } else if (SVNLog.MERGE.equals(name)) {
             File target = adminArea.getFile(fileName);
             try {
@@ -395,13 +396,13 @@ public class SVNLogRunner {
                 SVNVersionedProperties props = adminArea.getProperties(fileName);
                 SVNEntry entry = adminArea.getEntry(fileName, true);
 
-                SVNDebugLog.getDefaultLog().log("[RUN] merge local path = " + fileName + " left = " + leftPath + "right = " + rightPath);
+                SVNDebugLog.getDefaultLog().log(SVNLogType.SPECIAL, "[RUN] merge local path = " + fileName + " left = " + leftPath + "right = " + rightPath, Level.FINEST);
                 
                 SVNStatusType mergeResult = adminArea.mergeText(fileName, adminArea.getFile(leftPath),
                         adminArea.getFile(rightPath), null, targetLabel, leftLabel, rightLabel, null, false, 
                         null, null);
 
-                SVNDebugLog.getDefaultLog().log("[RUN] after merge local path length = " + adminArea.getFile(fileName).length() + " left length = " + adminArea.getFile(leftPath).length() + "right length= " + adminArea.getFile(rightPath).length());                
+                SVNDebugLog.getDefaultLog().log(SVNLogType.SPECIAL, "[RUN] after merge local path length = " + adminArea.getFile(fileName).length() + " left length = " + adminArea.getFile(leftPath).length() + "right length= " + adminArea.getFile(rightPath).length(), Level.FINEST);
 
                 if (props.getPropertyValue(SVNProperty.EXECUTABLE) != null) {
                     SVNFileUtil.setExecutable(target, true);
@@ -472,7 +473,7 @@ public class SVNLogRunner {
         } else {
             adminArea.closeEntries();
         }
-        SVNDebugLog.getDefaultLog().log("[END] log failed for " + adminArea.getAdminDirectory());
+        SVNDebugLog.getDefaultLog().log(SVNLogType.SPECIAL, "[END] log failed for " + adminArea.getAdminDirectory(), Level.FINEST);
     }
 
     public void logCompleted(SVNAdminArea adminArea) throws SVNException {
@@ -486,7 +487,7 @@ public class SVNLogRunner {
         adminArea.handleKillMe();
         myIsEntriesChanged = false;
         myIsWCPropertiesChanged = false;
-        SVNDebugLog.getDefaultLog().log("[END] log completed for " + adminArea.getAdminDirectory());
+        SVNDebugLog.getDefaultLog().log(SVNLogType.SPECIAL, "[END] log completed for " + adminArea.getAdminDirectory(), Level.FINEST);
     }
 
 }

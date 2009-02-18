@@ -11,9 +11,9 @@
  */
 package org.tmatesoft.svn.test;
 
-import org.tmatesoft.svn.core.SVNErrorMessage;
+import java.util.logging.Level;
+
 import org.tmatesoft.svn.core.SVNException;
-import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.util.SVNLogType;
 import org.tmatesoft.svn.test.util.SVNTestDebugLog;
 
@@ -27,10 +27,10 @@ public abstract class AbstractSVNTestValidator {
 
     public void fail(String message, SVNTestErrorCode errorCode) throws SVNException {
 //        SVNErrorManager.error(SVNErrorMessage.create(errorCode, "FAILED:\n" + message), SVNLogType.DEFAULT);
-       SVNTestDebugLog.getDebugLog().log("FAILED:\n" + message);
+       SVNTestDebugLog.getDebugLog().log(SVNLogType.SPECIAL, "FAILED:\n" + message, Level.FINEST);
     }
 
     public void success() {
-        SVNTestDebugLog.getDebugLog().log("PASSED");
+        SVNTestDebugLog.getDebugLog().log(SVNLogType.SPECIAL, "PASSED", Level.FINEST);
     }
 }

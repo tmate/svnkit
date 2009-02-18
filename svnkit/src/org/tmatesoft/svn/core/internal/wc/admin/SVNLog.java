@@ -15,6 +15,7 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
+import java.util.logging.Level;
 
 import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
@@ -200,7 +201,7 @@ public abstract class SVNLog {
     }
 
     public void run(SVNLogRunner runner) throws SVNException {
-        SVNDebugLog.getDefaultLog().log("Running log file " + toString());
+        SVNDebugLog.getDefaultLog().log(SVNLogType.SPECIAL, "Running log file " + toString(), Level.FINEST);
         Collection commands = readCommands();
         if (commands == null || commands.isEmpty()) {
             return;

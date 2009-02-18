@@ -26,6 +26,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.logging.Level;
 
 import org.tmatesoft.svn.core.SVNDepth;
 import org.tmatesoft.svn.core.SVNErrorCode;
@@ -1689,7 +1690,7 @@ public class SVNAdminArea14 extends SVNAdminArea {
             if (fileType == SVNFileType.FILE || fileType == SVNFileType.SYMLINK) {
                 boolean modified = false;
                 File workingFile = getFile(fileName);  
-                SVNDebugLog.getDefaultLog().log("[RUN] post commit on file or symlink working file length = " + workingFile.length() + " tmpFile length = " + tmpFile.length());
+                SVNDebugLog.getDefaultLog().log(SVNLogType.SPECIAL, "[RUN] post commit on file or symlink working file length = " + workingFile.length() + " tmpFile length = " + tmpFile.length(), Level.FINEST);
                 long tmpTimestamp = tmpFile.lastModified();
                 long wkTimestamp = workingFile.lastModified(); 
                 if (tmpTimestamp != wkTimestamp) {
@@ -1698,7 +1699,7 @@ public class SVNAdminArea14 extends SVNAdminArea {
                     try {
                         String tmpFile2Path = SVNFileUtil.getBasePath(tmpFile2);
                         SVNTranslator.translate(this, fileName, fileName, tmpFile2Path, false);
-                        SVNDebugLog.getDefaultLog().log("[RUN] post commit, check if modified: tmpFile2 - translated from working - length " + tmpFile2.length());
+                        SVNDebugLog.getDefaultLog().log(SVNLogType.SPECIAL, "[RUN] post commit, check if modified: tmpFile2 - translated from working - length " + tmpFile2.length(), Level.FINEST);
                         modified = !SVNFileUtil.compareFiles(tmpFile, tmpFile2, null);
                     } catch (SVNException svne) {
                         SVNErrorMessage err = SVNErrorMessage.create(errorCode, "Error comparing ''{0}'' and ''{1}''", new Object[] {workingFile, tmpFile});
@@ -1754,8 +1755,8 @@ public class SVNAdminArea14 extends SVNAdminArea {
             File wcFile = getFile(fileName);
             File tmpFile2 = null;
             try {
-                SVNDebugLog.getDefaultLog().log("[RUN] post commit, overwriting: file " + wcFile.getPath());
-                SVNDebugLog.getDefaultLog().log("[RUN] post commit, overwriting: tmpFile length" + tmpFile.length() + " base length " + baseFile.length() + " working length " + wcFile.length());
+                SVNDebugLog.getDefaultLog().log(SVNLogType.SPECIAL, "[RUN] post commit, overwriting: file " + wcFile.getPath(), Level.FINEST);
+                SVNDebugLog.getDefaultLog().log(SVNLogType.SPECIAL, "[RUN] post commit, overwriting: tmpFile length" + tmpFile.length() + " base length " + baseFile.length() + " working length " + wcFile.length(), Level.FINEST);
                 tmpFile2 = SVNFileUtil.createUniqueFile(tmpFile.getParentFile(), fileName, ".tmp", false);
                 boolean overwritten = false;
                 SVNFileType fileType = SVNFileType.getType(tmpFile);
@@ -1768,11 +1769,11 @@ public class SVNAdminArea14 extends SVNAdminArea {
                         SVNTranslator.translate(this, fileName, fileName,
                                 SVNFileUtil.getBasePath(tmpFile2), true, true);
                     }
-                    SVNDebugLog.getDefaultLog().log("[RUN] post commit, translating: tmpFile length" + tmpFile.length() + " base length " + baseFile.length() + " working length " + wcFile.length() + " translate target " + tmpFile2.length());                    
+                    SVNDebugLog.getDefaultLog().log(SVNLogType.SPECIAL, "[RUN] post commit, translating: tmpFile length" + tmpFile.length() + " base length " + baseFile.length() + " working length " + wcFile.length() + " translate target " + tmpFile2.length(), Level.FINEST);
                     if (!SVNFileUtil.compareFiles(tmpFile2, wcFile, null)) {
                         SVNFileUtil.copyFile(tmpFile2, wcFile, true);
                         overwritten = true;
-                        SVNDebugLog.getDefaultLog().log("[RUN] post commit, copying: tmpFile length" + tmpFile.length() + " base length " + baseFile.length() + " working length " + wcFile.length() + " translate target " + tmpFile2.length());                        
+                        SVNDebugLog.getDefaultLog().log(SVNLogType.SPECIAL, "[RUN] post commit, copying: tmpFile length" + tmpFile.length() + " base length " + baseFile.length() + " working length " + wcFile.length() + " translate target " + tmpFile2.length(), Level.FINEST);
                     }
 
                 }
@@ -1788,7 +1789,7 @@ public class SVNAdminArea14 extends SVNAdminArea {
                 }
                 if (fileType == SVNFileType.FILE) {
                     SVNFileUtil.rename(tmpFile, baseFile);
-                    SVNDebugLog.getDefaultLog().log("[RUN] post commit, mv tmpFile baseFile: tmpFile length" + tmpFile.length() + " base length " + baseFile.length());
+                    SVNDebugLog.getDefaultLog().log(SVNLogType.SPECIAL, "[RUN] post commit, mv tmpFile baseFile: tmpFile length" + tmpFile.length() + " base length " + baseFile.length(), Level.FINEST);
                 }
                 if (setReadWrite) {
                     SVNFileUtil.setReadonly(wcFile, false);
