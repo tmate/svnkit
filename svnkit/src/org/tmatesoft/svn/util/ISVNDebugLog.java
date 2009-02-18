@@ -47,7 +47,9 @@ public interface ISVNDebugLog {
     public void log(SVNLogType logType, String message, Level logLevel);
 
     public void log(String message);
-    
+
+    public void log(Throwable error);
+
     public void log(SVNLogType logType, String message, byte[] data);
 
     public InputStream createLogStream(SVNLogType logType, InputStream is);

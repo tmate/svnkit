@@ -69,6 +69,10 @@ public abstract class SVNDebugLogAdapter implements ISVNDebugLog {
         log(SVNLogType.SPECIAL, message, Level.FINE);
     }
 
+    public void log(Throwable error) {
+        log(SVNLogType.SPECIAL, error, Level.FINE);
+    }
+
     public void flushStream(Object stream) {
         if (stream instanceof SVNLogInputStream) {
             SVNLogInputStream logStream = (SVNLogInputStream) stream;
