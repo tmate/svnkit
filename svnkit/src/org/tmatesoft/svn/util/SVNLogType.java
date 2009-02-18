@@ -22,6 +22,9 @@ public class SVNLogType {
     public static final SVNLogType FSFS = new SVNLogType("svnkit-fsfs", "FSFS");
     public static final SVNLogType CLIENT = new SVNLogType("svnkit-cli", "CLI");
     public static final SVNLogType DEFAULT = new SVNLogType("svnkit", "DEFAULT");
+
+// special log type for easy log searching   
+    public static final SVNLogType SPECIAL = new SVNLogType("svnkit-issue", "TEST");
     
     private String myName;
     private String myShortName;

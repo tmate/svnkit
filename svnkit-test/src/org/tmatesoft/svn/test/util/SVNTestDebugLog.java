@@ -77,11 +77,11 @@ public class SVNTestDebugLog extends SVNDebugLogAdapter implements ISVNEventHand
         return INSTANCE;
     }
 
-    public static void log(String message) {
+    public void log(String message) {
         System.out.println(message);
     }
 
-    public static void log(Throwable th) {
+    public void log(Throwable th) {
         th.printStackTrace(System.err);
     }
 
@@ -184,7 +184,7 @@ public class SVNTestDebugLog extends SVNDebugLogAdapter implements ISVNEventHand
                 try {
                     read = myInput.read();
                 } catch (IOException e) {
-                    log(e);
+                    getDebugLog().log(e);
                 }
             }
         }
