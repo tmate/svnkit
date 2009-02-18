@@ -48,6 +48,7 @@ import org.tmatesoft.svn.core.internal.wc.SVNFileType;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNWCProperties;
 import org.tmatesoft.svn.util.SVNLogType;
+import org.tmatesoft.svn.util.SVNDebugLog;
 
 
 /**
@@ -1688,6 +1689,7 @@ public class SVNAdminArea14 extends SVNAdminArea {
             if (fileType == SVNFileType.FILE || fileType == SVNFileType.SYMLINK) {
                 boolean modified = false;
                 File workingFile = getFile(fileName);  
+                SVNDebugLog.getDefaultLog().log("[RUN] post commit on file or symlink working file length = " + workingFile.length() + " tmpFile length = " + tmpFile.length());
                 long tmpTimestamp = tmpFile.lastModified();
                 long wkTimestamp = workingFile.lastModified(); 
                 if (tmpTimestamp != wkTimestamp) {
@@ -1696,6 +1698,7 @@ public class SVNAdminArea14 extends SVNAdminArea {
                     try {
                         String tmpFile2Path = SVNFileUtil.getBasePath(tmpFile2);
                         SVNTranslator.translate(this, fileName, fileName, tmpFile2Path, false);
+                        SVNDebugLog.getDefaultLog().log("[RUN] post commit, check if modified: tmpFile2 - translated from working - length " + tmpFile2.length());
                         modified = !SVNFileUtil.compareFiles(tmpFile, tmpFile2, null);
                     } catch (SVNException svne) {
                         SVNErrorMessage err = SVNErrorMessage.create(errorCode, "Error comparing ''{0}'' and ''{1}''", new Object[] {workingFile, tmpFile});
@@ -1751,6 +1754,8 @@ public class SVNAdminArea14 extends SVNAdminArea {
             File wcFile = getFile(fileName);
             File tmpFile2 = null;
             try {
+                SVNDebugLog.getDefaultLog().log("[RUN] post commit, overwriting: file " + wcFile.getPath());
+                SVNDebugLog.getDefaultLog().log("[RUN] post commit, overwriting: tmpFile length" + tmpFile.length() + " base length " + baseFile.length() + " working length " + wcFile.length());
                 tmpFile2 = SVNFileUtil.createUniqueFile(tmpFile.getParentFile(), fileName, ".tmp", false);
                 boolean overwritten = false;
                 SVNFileType fileType = SVNFileType.getType(tmpFile);
@@ -1763,10 +1768,13 @@ public class SVNAdminArea14 extends SVNAdminArea {
                         SVNTranslator.translate(this, fileName, fileName,
                                 SVNFileUtil.getBasePath(tmpFile2), true, true);
                     }
+                    SVNDebugLog.getDefaultLog().log("[RUN] post commit, translating: tmpFile length" + tmpFile.length() + " base length " + baseFile.length() + " working length " + wcFile.length() + " translate target " + tmpFile2.length());                    
                     if (!SVNFileUtil.compareFiles(tmpFile2, wcFile, null)) {
                         SVNFileUtil.copyFile(tmpFile2, wcFile, true);
                         overwritten = true;
+                        SVNDebugLog.getDefaultLog().log("[RUN] post commit, copying: tmpFile length" + tmpFile.length() + " base length " + baseFile.length() + " working length " + wcFile.length() + " translate target " + tmpFile2.length());                        
                     }
+
                 }
                 boolean needsReadonly = getProperties(fileName).getPropertyValue(SVNProperty.NEEDS_LOCK) != null && entry.getLockToken() == null;
                 boolean needsExecutable = getProperties(fileName).getPropertyValue(SVNProperty.EXECUTABLE) != null;
@@ -1780,6 +1788,7 @@ public class SVNAdminArea14 extends SVNAdminArea {
                 }
                 if (fileType == SVNFileType.FILE) {
                     SVNFileUtil.rename(tmpFile, baseFile);
+                    SVNDebugLog.getDefaultLog().log("[RUN] post commit, mv tmpFile baseFile: tmpFile length" + tmpFile.length() + " base length " + baseFile.length());
                 }
                 if (setReadWrite) {
                     SVNFileUtil.setReadonly(wcFile, false);
