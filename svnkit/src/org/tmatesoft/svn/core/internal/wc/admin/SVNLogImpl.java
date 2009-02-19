@@ -91,7 +91,7 @@ public class SVNLogImpl extends SVNLog {
         SVNFileUtil.setReadonly(myFile, true);
 
         String logContent = SVNFileUtil.readFile(myFile);
-        SVNDebugLog.getDefaultLog().log(SVNLogType.SPECIAL, "[END] Journal Content " + myFile.getAbsolutePath() + " ==============\n" + logContent + "\n====================", Level.FINEST);
+        SVNDebugLog.getDefaultLog().log(SVNLogType.SPECIAL, "[END] Journal Content " + myFile.getAbsolutePath() + "\n==============\n" + logContent + "\n====================", Level.FINEST);
     }
 
     public Collection readCommands() throws SVNException {
