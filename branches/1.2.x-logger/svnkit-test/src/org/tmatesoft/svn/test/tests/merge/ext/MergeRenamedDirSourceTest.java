@@ -66,7 +66,7 @@ public abstract class MergeRenamedDirSourceTest extends AbstractExtMergeTest {
         myEndRevision = endRevision;
         doMerge(startRevision, endRevision);
 
-        SVNTestDebugLog.getDebugLog().log(SVNLogType.SPECIAL, "\ncontents of merge target after merge:\n", Level.FINEST);
+        SVNTestDebugLog.getDebugLog().log(SVNLogType.DEFAULT, "\ncontents of merge target after merge:\n", Level.FINEST);
         getEnvironment().getFileContents(getTrunkFile("A/file"), System.out);
     }
 

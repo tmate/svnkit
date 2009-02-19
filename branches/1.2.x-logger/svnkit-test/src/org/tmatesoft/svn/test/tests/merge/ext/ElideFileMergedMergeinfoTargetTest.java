@@ -72,13 +72,13 @@ public class ElideFileMergedMergeinfoTargetTest extends AbstractExtMergeTest {
         getEnvironment().merge(getBranch(), getTrunkWC(), ranges, SVNDepth.INFINITY, false, false);
         getEnvironment().merge(getBranch().appendPath("A/file_renamed", false), getTrunkFile("A/file"), ranges, SVNDepth.UNKNOWN, false, false);
 
-        SVNTestDebugLog.getDebugLog().log(SVNLogType.SPECIAL, "A/file:", Level.FINEST);
+        SVNTestDebugLog.getDebugLog().log(SVNLogType.DEFAULT, "A/file:", Level.FINEST);
         getEnvironment().getFileContents(getTrunkFile("A/file"), System.out);
         SVNPropertyValue value = getEnvironment().getProperty(getTrunkFile("A/file"), SVNProperty.MERGE_INFO, SVNRevision.WORKING);
-        SVNTestDebugLog.getDebugLog().log(SVNLogType.SPECIAL, "\nmerge info = " + value, Level.FINEST);
-        SVNTestDebugLog.getDebugLog().log(SVNLogType.SPECIAL, "A/file2:", Level.FINEST);
+        SVNTestDebugLog.getDebugLog().log(SVNLogType.DEFAULT, "\nmerge info = " + value, Level.FINEST);
+        SVNTestDebugLog.getDebugLog().log(SVNLogType.DEFAULT, "A/file2:", Level.FINEST);
         getEnvironment().getFileContents(getTrunkFile("A/file2"), System.out);
         SVNPropertyValue value2 = getEnvironment().getProperty(getTrunkFile("A/file2"), SVNProperty.MERGE_INFO, SVNRevision.WORKING);
-        SVNTestDebugLog.getDebugLog().log(SVNLogType.SPECIAL, "\nmerge info = " + value2, Level.FINEST);
+        SVNTestDebugLog.getDebugLog().log(SVNLogType.DEFAULT, "\nmerge info = " + value2, Level.FINEST);
     }
 }

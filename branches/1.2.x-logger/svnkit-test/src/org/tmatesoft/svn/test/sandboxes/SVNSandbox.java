@@ -111,7 +111,7 @@ public class SVNSandbox extends AbstractSVNSandbox {
             SVNErrorMessage error = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, e);
             SVNErrorManager.error(error, e, SVNLogType.DEFAULT);
         } catch (InterruptedException e) {
-            SVNTestDebugLog.getDebugLog().log(SVNLogType.SPECIAL, e, Level.FINEST);
+            SVNTestDebugLog.getDebugLog().log(SVNLogType.DEFAULT, e, Level.FINEST);
         }
     }
 

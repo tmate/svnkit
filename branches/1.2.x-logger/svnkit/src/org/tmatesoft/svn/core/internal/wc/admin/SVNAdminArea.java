@@ -771,7 +771,7 @@ public abstract class SVNAdminArea {
     }
 
     public SVNEntry modifyEntry(String name, Map attributes, boolean save, boolean force) throws SVNException {
-        SVNDebugLog.getDefaultLog().log(SVNLogType.SPECIAL, "[RUN] modify entry " + name + " : " + attributes, Level.FINEST);
+        SVNDebugLog.getDefaultLog().log(SVNLogType.DEFAULT, "[RUN] modify entry " + name + " : " + attributes, Level.FINEST);
         if (name == null) {
             name = getThisDirName();
         }
