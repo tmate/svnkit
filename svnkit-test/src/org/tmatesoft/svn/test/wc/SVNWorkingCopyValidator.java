@@ -94,7 +94,7 @@ public class SVNWorkingCopyValidator extends AbstractSVNTestValidator  implement
 
         for (Iterator iterator = getStateConflicts().iterator(); iterator.hasNext();) {
             SVNWCStateConflict conflict = (SVNWCStateConflict) iterator.next();
-            SVNTestDebugLog.getDebugLog().log(SVNLogType.SPECIAL, conflict.toString(), Level.FINEST);
+            SVNTestDebugLog.getDebugLog().log(SVNLogType.DEFAULT, conflict.toString(), Level.FINEST);
         }
 
         fail("Test failed", SVNTestErrorCode.UNKNOWN);

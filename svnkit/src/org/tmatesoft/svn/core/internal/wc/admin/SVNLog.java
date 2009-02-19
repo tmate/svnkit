@@ -201,7 +201,7 @@ public abstract class SVNLog {
     }
 
     public void run(SVNLogRunner runner) throws SVNException {
-        SVNDebugLog.getDefaultLog().log(SVNLogType.SPECIAL, "Running log file " + toString(), Level.FINEST);
+        SVNDebugLog.getDefaultLog().log(SVNLogType.DEFAULT, "Running log file " + toString(), Level.FINEST);
         Collection commands = readCommands();
         if (commands == null || commands.isEmpty()) {
             return;

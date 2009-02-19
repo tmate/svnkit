@@ -1176,7 +1176,7 @@ public class SVNCommitClient extends SVNBasicClient {
         }
 
         String msg = "[collect commit items] " + SVNPathUtil.getCommaSeparatedPaths(paths) + "; force = " + force;
-        SVNDebugLog.getDefaultLog().log(SVNLogType.SPECIAL, msg, Level.FINEST);
+        SVNDebugLog.getDefaultLog().log(SVNLogType.DEFAULT, msg, Level.FINEST);
 
         Collection targets = new ArrayList();
         SVNStatusClient statusClient = new SVNStatusClient(getRepositoryPool(), getOptions());

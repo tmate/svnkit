@@ -77,7 +77,7 @@ public class SVNTestRunner {
             try {
                 test.dispose();
             } catch (SVNException e) {
-                SVNTestDebugLog.getDebugLog().log(SVNLogType.SPECIAL, e, Level.FINEST);
+                SVNTestDebugLog.getDebugLog().log(SVNLogType.DEFAULT, e, Level.FINEST);
             }
         }
     }
@@ -88,7 +88,7 @@ public class SVNTestRunner {
             try {
                 environment.dispose();
             } catch (SVNException e) {
-                SVNTestDebugLog.getDebugLog().log(SVNLogType.SPECIAL, e, Level.FINEST);
+                SVNTestDebugLog.getDebugLog().log(SVNLogType.DEFAULT, e, Level.FINEST);
             }
         }
     }
@@ -99,7 +99,7 @@ public class SVNTestRunner {
             try {
                 sandbox.dispose();
             } catch (SVNException e) {
-                SVNTestDebugLog.getDebugLog().log(SVNLogType.SPECIAL, e, Level.FINEST);
+                SVNTestDebugLog.getDebugLog().log(SVNLogType.DEFAULT, e, Level.FINEST);
             }
         }
     }

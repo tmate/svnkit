@@ -142,7 +142,7 @@ public class SVNTestDebugLog extends SVNDebugLogAdapter implements ISVNEventHand
         buffer.append(event.getContentsStatus());
         buffer.append("\n\tproperties status: ");
         buffer.append(event.getPropertiesStatus());
-        log(SVNLogType.SPECIAL, buffer.toString(), Level.FINEST);
+        log(SVNLogType.DEFAULT, buffer.toString(), Level.FINEST);
     }
 
     public void checkCancelled() throws SVNCancelException {
@@ -166,7 +166,7 @@ public class SVNTestDebugLog extends SVNDebugLogAdapter implements ISVNEventHand
                 try {
                     read = myInput.read();
                 } catch (IOException e) {
-                    getDebugLog().log(SVNLogType.SPECIAL, e, Level.FINEST);
+                    getDebugLog().log(SVNLogType.DEFAULT, e, Level.FINEST);
                 }
             }
         }
