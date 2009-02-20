@@ -1758,7 +1758,7 @@ public class SVNAdminArea14 extends SVNAdminArea {
             File tmpFile2 = null;
             try {
                 SVNDebugLog.getDefaultLog().log(SVNLogType.DEFAULT, "[RUN] post commit, overwriting: working file =" + wcFile.getPath(), Level.FINEST);
-                SVNDebugLog.getDefaultLog().log(SVNLogType.DEFAULT, "[RUN] post commit, overwriting: tmpFile length" + tmpFile.length() + " base length " + baseFile.length() + " working length " + wcFile.length(), Level.FINEST);
+                SVNDebugLog.getDefaultLog().log(SVNLogType.DEFAULT, "[RUN] post commit, overwriting: tmpFile length " + tmpFile.length() + " base length " + baseFile.length() + " working length " + wcFile.length(), Level.FINEST);
                 tmpFile2 = SVNFileUtil.createUniqueFile(tmpFile.getParentFile(), fileName, ".tmp", false);
                 boolean overwritten = false;
                 SVNFileType fileType = SVNFileType.getType(tmpFile);

@@ -544,14 +544,18 @@ public class SVNFileUtil {
             return;
         }
         File tmpDst = dst;
-        if (SVNFileType.getType(dst) != SVNFileType.NONE) {
+        final SVNFileType fileType = SVNFileType.getType(dst);
+        SVNDebugLog.getDefaultLog().log(SVNLogType.DEFAULT, "[COPY] dst file type = " + fileType.toString(), Level.FINEST);
+        if (fileType != SVNFileType.NONE) {
             if (safe) {
                 tmpDst = createUniqueFile(dst.getParentFile(), ".copy", ".tmp", true);
+                SVNDebugLog.getDefaultLog().log(SVNLogType.DEFAULT, "[COPY] tmpDst = " + tmpDst.getPath(), Level.FINEST);
             } else {
                 dst.delete();
             }
         }
         boolean executable = isExecutable(src);
+        SVNDebugLog.getDefaultLog().log(SVNLogType.DEFAULT, "[COPY] src isExecutable = " + executable, Level.FINEST);
         dst.getParentFile().mkdirs();
 
         FileChannel srcChannel = null;
@@ -566,6 +570,7 @@ public class SVNFileUtil {
             os = createFileOutputStream(tmpDst, false);
             dstChannel = os.getChannel();
             long totalSize = srcChannel.size();
+            SVNDebugLog.getDefaultLog().log(SVNLogType.DEFAULT, "[COPY] srcChannel.size() = " + totalSize, Level.FINEST);
             long toCopy = totalSize;
             while (toCopy > 0) {
                 toCopy -= dstChannel.transferFrom(srcChannel, totalSize - toCopy, toCopy);
@@ -574,6 +579,7 @@ public class SVNFileUtil {
             error = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, "Cannot copy file ''{0}'' to ''{1}'': {2}", new Object[] {
                     src, dst, e.getLocalizedMessage()
             });
+            SVNDebugLog.getDefaultLog().log(SVNLogType.DEFAULT, "[COPY] transfer error " + error, Level.FINEST);
         } finally {
             if (srcChannel != null) {
                 try {
@@ -591,6 +597,7 @@ public class SVNFileUtil {
             }
             SVNFileUtil.closeFile(is);
             SVNFileUtil.closeFile(os);
+            SVNDebugLog.getDefaultLog().log(SVNLogType.DEFAULT, "[COPY] state after transfer: source length " + src.length() + "workingFile length " + dst.length() + (dst != tmpDst ? " tmpDst length " + tmpDst.length() : ""), Level.FINEST);
         }
         if (error != null) {
             error = null;
@@ -599,24 +606,29 @@ public class SVNFileUtil {
             try {
                 sis = SVNFileUtil.openFileForReading(src, SVNLogType.WC);
                 dos = SVNFileUtil.openFileForWriting(dst);
+                SVNDebugLog.getDefaultLog().log(SVNLogType.DEFAULT, "[COPY] additional copy", Level.FINEST);
                 SVNTranslator.copy(sis, dos);
             } catch (IOException e) {
                 error = SVNErrorMessage.create(SVNErrorCode.IO_ERROR,
                         "Cannot copy file ''{0}'' to ''{1}'': {2}", new Object[] { src, dst,
                         e.getLocalizedMessage() });
+                SVNDebugLog.getDefaultLog().log(SVNLogType.DEFAULT, "[COPY] copy error = " + error, Level.FINEST);
             } finally {
                 SVNFileUtil.closeFile(dos);
                 SVNFileUtil.closeFile(sis);
             }
         }
+        SVNDebugLog.getDefaultLog().log(SVNLogType.DEFAULT, "[COPY] state after the copy to tmpDst: source length " + src.length() + "workingFile length " + dst.length() + (dst != tmpDst ? " tmpDst length " + tmpDst.length() : ""), Level.FINEST);        
         if (error != null) {
             SVNErrorManager.error(error, Level.FINE, SVNLogType.WC);
         }
         if (safe && tmpDst != dst) {
             rename(tmpDst, dst);
+            SVNDebugLog.getDefaultLog().log(SVNLogType.DEFAULT, "[COPY] state after rename: source length " + src.length() + "workingFile length " + dst.length(), Level.FINEST);            
         }
         if (executable) {
             setExecutable(dst, true);
+            SVNDebugLog.getDefaultLog().log(SVNLogType.DEFAULT, "[COPY] state set executable: source length " + src.length() + "workingFile length " + dst.length() + (dst != tmpDst ? " tmpDst length " + tmpDst.length() : ""), Level.FINEST);            
         }
         dst.setLastModified(src.lastModified());
     }
