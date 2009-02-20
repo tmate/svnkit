@@ -549,11 +549,11 @@ public class SVNFileUtil {
         if (fileType != SVNFileType.NONE) {
             if (safe) {
                 tmpDst = createUniqueFile(dst.getParentFile(), ".copy", ".tmp", true);
-                SVNDebugLog.getDefaultLog().log(SVNLogType.DEFAULT, "[COPY] tmpDst = " + tmpDst.getPath(), Level.FINEST);
             } else {
                 dst.delete();
             }
         }
+        SVNDebugLog.getDefaultLog().log(SVNLogType.DEFAULT, "[COPY] src = " + src.getPath() + "dst = " + dst.getPath() + "tmpDst = " + tmpDst.getPath(), Level.FINEST);
         boolean executable = isExecutable(src);
         SVNDebugLog.getDefaultLog().log(SVNLogType.DEFAULT, "[COPY] src isExecutable = " + executable, Level.FINEST);
         dst.getParentFile().mkdirs();
