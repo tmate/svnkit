@@ -51,7 +51,7 @@ public class SVNRemoteDiffEditor implements ISVNEditor {
     protected File myTarget;
     protected SVNAdminArea myAdminArea;
     protected boolean myIsDryRun;
-
+    
     protected SVNDeltaProcessor myDeltaProcessor;
     protected ISVNEventHandler myEventHandler;
     protected ISVNEventHandler myCancelHandler;
@@ -63,9 +63,9 @@ public class SVNRemoteDiffEditor implements ISVNEditor {
     protected Collection myTempFiles;
     protected Map myDeletedPaths;
     private boolean myIsUseGlobalTmp;
-
+    
     public SVNRemoteDiffEditor(SVNAdminArea adminArea, File target, AbstractDiffCallback callback,
-                               SVNRepository repos, long revision1, long revision2, boolean dryRun,
+                               SVNRepository repos, long revision1, long revision2, boolean dryRun, 
                                ISVNEventHandler handler, ISVNEventHandler cancelHandler) {
         myAdminArea = adminArea;
         myTarget = target;
@@ -84,7 +84,7 @@ public class SVNRemoteDiffEditor implements ISVNEditor {
         myRevision1 = revision1;
         myRevision2 = revision2;
     }
-
+    
     public void targetRevision(long revision) throws SVNException {
         myRevision2 = revision;
     }
@@ -140,14 +140,14 @@ public class SVNRemoteDiffEditor implements ISVNEditor {
     public void addDir(String path, String copyFromPath, long copyFromRevision)  throws SVNException {
         myCurrentDirectory = new SVNDirectoryInfo(myCurrentDirectory, path, true);
         myCurrentDirectory.myBaseProperties = new SVNProperties();
-
+        
         SVNEventAction expectedAction = SVNEventAction.UPDATE_ADD;
         SVNEventAction action = expectedAction;
         SVNStatusType type = getDiffCallback().directoryAdded(path, myRevision2);
         if (type == SVNStatusType.MISSING || type == SVNStatusType.OBSTRUCTED) {
-            action = SVNEventAction.SKIP;
+            action = SVNEventAction.SKIP; 
         }
-
+        
         if (myEventHandler != null) {
             boolean isReplace = false;
             KindActionState kas = (KindActionState) myDeletedPaths.get(myCurrentDirectory.myWCFile);
@@ -429,13 +429,13 @@ public class SVNRemoteDiffEditor implements ISVNEditor {
         return SVNFileUtil.createUniqueFile(getTempDirectory(), ".diff", ".tmp", myIsUseGlobalTmp);
 
     }
+        
+    public void setUseGlobalTmp(boolean global) {
+        myIsUseGlobalTmp = global;
+    }
 
     protected SVNFileInfo createFileInfo(String path, boolean added) {
         return new SVNFileInfo(path, added);
-    }
-
-    public void setUseGlobalTmp(boolean global) {
-        myIsUseGlobalTmp = global;
     }
 
     protected class SVNDirectoryInfo {

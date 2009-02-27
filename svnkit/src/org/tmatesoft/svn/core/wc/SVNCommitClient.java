@@ -1136,8 +1136,7 @@ public class SVNCommitClient extends SVNBasicClient {
      *                          instead
      */
     public SVNCommitPacket doCollectCommitItems(File[] paths, boolean keepLocks, boolean force, boolean recursive) throws SVNException {
-        SVNDepth depth = recursive ? SVNDepth.INFINITY : SVNDepth.EMPTY;
-        return doCollectCommitItems(paths, keepLocks, force, depth, null);
+        return doCollectCommitItems(paths, keepLocks, force, SVNDepth.fromRecurse(recursive), null);
     }
 
     /**
@@ -1262,8 +1261,7 @@ public class SVNCommitClient extends SVNBasicClient {
      */
     public SVNCommitPacket[] doCollectCommitItems(File[] paths, boolean keepLocks, boolean force, 
             boolean recursive, boolean combinePackets) throws SVNException {
-        SVNDepth depth = recursive ? SVNDepth.INFINITY : SVNDepth.EMPTY;
-        return doCollectCommitItems(paths, keepLocks, force, depth, combinePackets, null);
+        return doCollectCommitItems(paths, keepLocks, force, SVNDepth.fromRecurse(recursive), combinePackets, null);
     }
     
     /**
@@ -1575,7 +1573,7 @@ public class SVNCommitClient extends SVNBasicClient {
         return true;
     }
 
-    private static boolean hasProcessedParents(Collection paths, String path) throws SVNException {
+    private static boolean hasProcessedParents(Collection paths, String path) {
         path = SVNPathUtil.removeTail(path);
         if (paths.contains(path)) {
             return true;

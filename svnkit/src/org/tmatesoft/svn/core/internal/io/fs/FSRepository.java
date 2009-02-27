@@ -485,10 +485,6 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
     }
 
     public void lock(Map pathsToRevisions, String comment, boolean force, ISVNLockHandler handler) throws SVNException {
-        lock(pathsToRevisions, comment, force, false, handler);
-    }
-
-    public void lock(Map pathsToRevisions, String comment, boolean force, boolean isDAVComment, ISVNLockHandler handler) throws SVNException {
         try {
             openRepository();
             for (Iterator paths = pathsToRevisions.keySet().iterator(); paths.hasNext();) {
@@ -499,7 +495,7 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
                 SVNLock lock = null;
                 SVNErrorMessage error = null;
                 try {
-                    lock = myFSFS.lockPath(reposPath, null, getUserName(), comment, null, curRevision, force, isDAVComment);
+                    lock = myFSFS.lockPath(reposPath, null, getUserName(), comment, null, curRevision, force);
                 } catch (SVNException svne) {
                     error = svne.getErrorMessage();
                     if (!FSErrors.isLockError(error)) {

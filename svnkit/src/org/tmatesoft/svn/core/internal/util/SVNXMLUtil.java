@@ -61,8 +61,7 @@ public class SVNXMLUtil {
         return addXMLHeader(target, true);
     }
 
-    public static StringBuffer openNamespaceDeclarationTag(String prefix, String header, Collection namespaces, Map prefixMap, Map attrs, 
-            StringBuffer target, boolean addEOL) {
+    public static StringBuffer openNamespaceDeclarationTag(String prefix, String header, Collection namespaces, Map prefixMap, Map attrs, StringBuffer target) {
         target = target == null ? new StringBuffer() : target;
         target.append("<");
         if (prefix != null) {
@@ -107,16 +106,13 @@ public class SVNXMLUtil {
                 target.append("\"");
             }
         }
-        target.append(">");
-        if (addEOL) {
-            target.append('\n');
-        }
+        target.append(">\n");
         return target;
     }
 
     public static StringBuffer openNamespaceDeclarationTag(String prefix, String header, Collection namespaces, Map prefixMap, 
             StringBuffer target) {
-        return openNamespaceDeclarationTag(prefix, header, namespaces, prefixMap, null, target, true);
+        return openNamespaceDeclarationTag(prefix, header, namespaces, prefixMap, null, target);
     }
 
     public static StringBuffer addXMLFooter(String prefix, String header, StringBuffer target) {
@@ -132,11 +128,27 @@ public class SVNXMLUtil {
     }
 
     public static StringBuffer openCDataTag(String prefix, String tagName, String cdata, StringBuffer target) {
-        return openCDataTag(prefix, tagName, cdata, null, target);
+        if (cdata == null) {
+            return target;
+        }
+        target = openXMLTag(prefix, tagName, XML_STYLE_PROTECT_CDATA, null, target);
+        target.append(SVNEncodingUtil.xmlEncodeCDATA(cdata));
+        target = closeXMLTag(prefix, tagName, target);
+        return target;
     }
 
     public static StringBuffer openCDataTag(String tagName, String cdata, StringBuffer target) {
         return openCDataTag(null, tagName, cdata, target);
+    }
+
+    public static StringBuffer openCDataTag(String prefix, String tagName, String cdata, Map attributes, StringBuffer target) {
+        if (cdata == null) {
+            return target;
+        }
+        target = openXMLTag(prefix, tagName, XML_STYLE_PROTECT_CDATA, attributes, target);
+        target.append(SVNEncodingUtil.xmlEncodeCDATA(cdata));
+        target = closeXMLTag(prefix, tagName, target);
+        return target;
     }
 
     public static StringBuffer openCDataTag(String prefix, String tagName, String cdata, String attr, String value, StringBuffer target) {
@@ -145,32 +157,6 @@ public class SVNXMLUtil {
         return openCDataTag(prefix, tagName, cdata, attributes, target);
     }
 
-    public static StringBuffer openCDataTag(String prefix, String tagName, String cdata, String attr, String value, boolean escapeQuotes, 
-            boolean encodeCDATA, StringBuffer target) {
-        Map attributes = new SVNHashMap();
-        attributes.put(attr, value);
-        return openCDataTag(prefix, tagName, cdata, attributes, escapeQuotes, encodeCDATA, target);
-    }
-
-    public static StringBuffer openCDataTag(String prefix, String tagName, String cdata, Map attributes, StringBuffer target) {
-        return openCDataTag(prefix, tagName, cdata, attributes, false, true, target);
-    }
-
-    public static StringBuffer openCDataTag(String prefix, String tagName, String cdata, Map attributes, boolean escapeQuotes, 
-            boolean encodeCDATA, StringBuffer target) {
-        if (cdata == null) {
-            return target;
-        }
-        target = openXMLTag(prefix, tagName, XML_STYLE_PROTECT_CDATA, attributes, target);
-        if (encodeCDATA) {
-            target.append(SVNEncodingUtil.xmlEncodeCDATA(cdata, escapeQuotes));
-        } else {
-            target.append(cdata);
-        }
-        target = closeXMLTag(prefix, tagName, target);
-        return target;
-    }
-    
     public static StringBuffer openXMLTag(String prefix, String tagName, int style, String attr, String value, StringBuffer target) {
         Map attributes = new SVNHashMap();
         attributes.put(attr, value);
@@ -212,10 +198,6 @@ public class SVNXMLUtil {
     }
 
     public static StringBuffer closeXMLTag(String prefix, String tagName, StringBuffer target) {
-        return closeXMLTag(prefix, tagName, target, true);
-    }
-    
-    public static StringBuffer closeXMLTag(String prefix, String tagName, StringBuffer target, boolean addEOL) {
         target = target == null ? new StringBuffer() : target;
         target.append("</");
         if (prefix != null) {
@@ -223,10 +205,7 @@ public class SVNXMLUtil {
             target.append(":");
         }
         target.append(tagName);
-        target.append(">");
-        if (addEOL) {
-            target.append('\n');
-        }
+        target.append(">\n");
         return target;
     }
 }

@@ -29,6 +29,7 @@ public class SVNLock {
     private String myID;
     private String myOwner;
     private String myComment;
+    
     private Date myCreationDate;
     private Date myExpirationDate;
     
@@ -55,6 +56,7 @@ public class SVNLock {
         myCreationDate = created;
         myExpirationDate = expires;
     }
+    
     
     /**
      * Gets the lock comment.

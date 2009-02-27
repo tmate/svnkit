@@ -14,7 +14,6 @@ package org.tmatesoft.svn.core.internal.io.dav.handlers;
 
 import java.util.Collection;
 import java.util.LinkedList;
-import java.util.List;
 import java.util.Map;
 import java.util.Stack;
 
@@ -51,7 +50,6 @@ public abstract class BasicDAVHandler extends DefaultHandler {
     private static final Object ROOT = new Object();
 
     private Map myPrefixesMap;
-    private List myNamespacesCollection;
     private String myNamespace;
     private StringBuffer myCDATA;
     private Stack myParent;
@@ -59,7 +57,6 @@ public abstract class BasicDAVHandler extends DefaultHandler {
 
     protected BasicDAVHandler() {
         myPrefixesMap = new SVNHashMap();
-        myNamespacesCollection = new LinkedList();
         myParent = new Stack();
     }
 
@@ -73,7 +70,6 @@ public abstract class BasicDAVHandler extends DefaultHandler {
 
     protected void init() {
         myPrefixesMap.clear();
-        myNamespacesCollection.clear();
         myParent.clear();
         myParent.push(ROOT);
     }
@@ -117,10 +113,6 @@ public abstract class BasicDAVHandler extends DefaultHandler {
             myPrefixesMap.put(prefix, mappings);
         }
         mappings.push(uri);
-        
-        if (!myNamespacesCollection.contains(uri)) {
-            myNamespacesCollection.add(uri);
-        }
     }
 
     public void endPrefixMapping(String prefix) throws SAXException {
@@ -137,10 +129,6 @@ public abstract class BasicDAVHandler extends DefaultHandler {
     protected void invalidXML() throws SVNException {
         SVNErrorManager.error(SVNErrorMessage.create(SVNErrorCode.XML_MALFORMED, "Malformed XML"), SVNLogType.NETWORK);
 
-    }
-    
-    protected List getNamespaces() {
-        return myNamespacesCollection;
     }
 
     private DAVElement getParent() {
