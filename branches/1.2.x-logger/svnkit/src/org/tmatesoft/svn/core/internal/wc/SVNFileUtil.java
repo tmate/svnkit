@@ -384,6 +384,7 @@ public class SVNFileUtil {
             renamed = src.renameTo(dst);
         } else {
             if (SVNJNAUtil.moveFile(src, dst)) {
+                SVNDebugLog.getDefaultLog().log(SVNLogType.DEFAULT, "[MOVE] JNA move OK", Level.FINEST);
                 renamed = true;
             } else {
                 boolean wasRO = dst.exists() && !dst.canWrite();
@@ -391,8 +392,10 @@ public class SVNFileUtil {
                 setReadonly(dst, false);
                 // use special loop on windows.
                 for (int i = 0; i < 10; i++) {
-                    dst.delete();
+                    boolean deleted = dst.delete();
+                    SVNDebugLog.getDefaultLog().log(SVNLogType.DEFAULT, "[MOVE] delete dst, attempt " + i + " , delete call returned " + deleted, Level.FINEST);
                     if (src.renameTo(dst)) {
+                        SVNDebugLog.getDefaultLog().log(SVNLogType.DEFAULT, "[MOVE] renameTo call returned true", Level.FINEST);
                         if (wasRO && !isOpenVMS) {
                             dst.setReadOnly();
                         }
@@ -547,10 +550,12 @@ public class SVNFileUtil {
         final SVNFileType fileType = SVNFileType.getType(dst);
         SVNDebugLog.getDefaultLog().log(SVNLogType.DEFAULT, "[COPY] dst file type = " + fileType.toString(), Level.FINEST);
         if (fileType != SVNFileType.NONE) {
+            SVNDebugLog.getDefaultLog().log(SVNLogType.DEFAULT, "[COPY] src = " + src + " dst = " + dst + " dstFileType = " + fileType + " safe = " + safe, Level.FINEST);
             if (safe) {
                 tmpDst = createUniqueFile(dst.getParentFile(), ".copy", ".tmp", true);
             } else {
-                dst.delete();
+                boolean deleted = dst.delete();
+                SVNDebugLog.getDefaultLog().log(SVNLogType.DEFAULT, "dst.delete() returned " + deleted, Level.FINEST);
             }
         }
         SVNDebugLog.getDefaultLog().log(SVNLogType.DEFAULT, "[COPY] src = " + src.getPath() + "dst = " + dst.getPath() + "tmpDst = " + tmpDst.getPath(), Level.FINEST);
@@ -1199,6 +1204,7 @@ public class SVNFileUtil {
     }
 
     public static FileOutputStream createFileOutputStream(File file, boolean append) throws IOException {
+        SVNDebugLog.getDefaultLog().log(SVNLogType.DEFAULT, "[WRITE] file = " + file, Level.FINEST);
         int retryCount = SVNFileUtil.isWindows ? 11 : 1;
         FileOutputStream os = null;
         for (int i = 0; i < retryCount; i++) {
@@ -1206,11 +1212,13 @@ public class SVNFileUtil {
                 os = new FileOutputStream(file, append);
                 break;
             } catch (IOException e) {
+                SVNDebugLog.getDefaultLog().log(SVNLogType.DEFAULT, "[WRITE] attempt = " + i + " | " + e, Level.FINEST);                
                 if (i + 1 >= retryCount) {
                     throw e;
                 }
                 SVNFileUtil.closeFile(os);
                 if (file.exists() && file.isFile() && file.canWrite()) {
+                    SVNDebugLog.getDefaultLog().log(SVNLogType.DEFAULT, "[WRITE] attempt = " + i + " file exists and is writable", Level.FINEST);                                    
                     try {
                         Thread.sleep(100);
                     } catch (InterruptedException e1) {
@@ -1272,6 +1280,7 @@ public class SVNFileUtil {
     }
 
     public static FileInputStream createFileInputStream(File file) throws IOException {
+        SVNDebugLog.getDefaultLog().log(SVNLogType.DEFAULT, "[READ] file = " + file, Level.FINEST);
         int retryCount = SVNFileUtil.isWindows ? 11 : 1;
         FileInputStream is = null;
         for (int i = 0; i < retryCount; i++) {
@@ -1279,11 +1288,13 @@ public class SVNFileUtil {
                 is = new FileInputStream(file);
                 break;
             } catch (IOException e) {
+                SVNDebugLog.getDefaultLog().log(SVNLogType.DEFAULT, "[READ] attempt = " + i + " | " + e, Level.FINEST);
                 if (i + 1 >= retryCount) {
                     throw e;
                 }
                 SVNFileUtil.closeFile(is);
                 if (file.exists() && file.isFile() && file.canRead()) {
+                    SVNDebugLog.getDefaultLog().log(SVNLogType.DEFAULT, "[READ] file exists and is readable", Level.FINEST);
                     try {
                         Thread.sleep(100);
                     } catch (InterruptedException e1) {
