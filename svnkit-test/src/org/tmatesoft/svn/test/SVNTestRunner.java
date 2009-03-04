@@ -13,6 +13,7 @@ package org.tmatesoft.svn.test;
 
 import java.util.Iterator;
 import java.util.ResourceBundle;
+import java.util.Map;
 import java.util.logging.Level;
 
 import org.tmatesoft.svn.core.SVNException;
@@ -36,7 +37,7 @@ public class SVNTestRunner {
     public static void main(String[] args) {
         ResourceBundle bundle = SVNResourceUtil.createBundle();
         AbstractSVNTestEnvironment environment = SVNResourceUtil.createEnvironment(bundle);
-        AbstractSVNTest test = SVNResourceUtil.createTest(bundle);
+        Map tests = SVNResourceUtil.createTests(bundle);
 
         FSSandboxFactory.setup(bundle);
         DAVSandboxFactory.setup(bundle);
@@ -44,12 +45,26 @@ public class SVNTestRunner {
 
         SVNTestDebugLog.init(bundle);
 
+        for (Iterator iterator = tests.entrySet().iterator(); iterator.hasNext();) {
+            Map.Entry entry = (Map.Entry) iterator.next();
+
+            SVNTestDebugLog.getDebugLog().log(SVNLogType.DEFAULT, "Running test: " + entry.getKey(), Level.FINEST);
+            SVNTestDebugLog.getDebugLog().log(SVNLogType.DEFAULT, "____________________________________", Level.FINEST);
+
+            final AbstractSVNTest test = (AbstractSVNTest) entry.getValue();
+            runSingleTest(test, environment, bundle);
+
+            SVNTestDebugLog.getDebugLog().log(SVNLogType.DEFAULT, "____________________________________", Level.FINEST);
+        }
+    }
+
+    private static void runSingleTest(AbstractSVNTest test, AbstractSVNTestEnvironment environment, ResourceBundle bundle) {
         Iterator sandboxes = AbstractSVNSandboxFactory.create();
         while (sandboxes.hasNext()) {
             AbstractSVNSandbox sandbox = (AbstractSVNSandbox) sandboxes.next();
             try {
                 loadOptions(test, bundle);
-                
+
                 environment.init();
                 sandbox.init(environment);
                 test.init(sandbox, environment);
