@@ -452,6 +452,11 @@ public class SVNFileUtil {
                 return true;
             }
         }
+
+        if (file.canWrite()) {
+            return true;
+        }
+
         try {
             if (file.length() < 1024 * 100) {
                 // faster way for small files.
