@@ -698,7 +698,8 @@ public class SVNWCAccess implements ISVNEventHandler {
     }
 
     public static boolean matchesChangeList(Collection changeLists, SVNEntry entry) {
-        return changeLists == null || changeLists.isEmpty() || (entry != null && entry.getChangelistName() != null && changeLists.contains(entry.getChangelistName()));
+        return changeLists == null || changeLists.isEmpty() || 
+        (entry != null && entry.getChangelistName() != null && changeLists.contains(entry.getChangelistName()));
     }
     
 }

@@ -12,10 +12,12 @@
 package org.tmatesoft.svn.core.internal.io.fs;
 
 import java.io.OutputStream;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.Stack;
 
@@ -91,14 +93,32 @@ public class FSCommitEditor implements ISVNEditor {
         long youngestRev = myFSFS.getYoungestRevision();
 
         if (isTxnOwner) {
-            myTxn = FSTransactionRoot.beginTransactionForCommit(youngestRev, myRevProps, myFSFS);
+            myTxn = beginTransactionForCommit(youngestRev);
         } else {
-            myFSFS.changeTransactionProperties(myTxn.getTxnId(), myRevProps);
+            changeTransactionProperties(myTxn.getTxnId());
         }
         myTxnRoot = myFSFS.createTransactionRoot(myTxn);
         myCommitter = new FSCommitter(myFSFS, myTxnRoot, myTxn, myLockTokens, getAuthor());
         DirBaton dirBaton = new DirBaton(revision, myBasePath, false);
         myDirsStack.push(dirBaton);
+    }
+
+    private FSTransactionInfo beginTransactionForCommit(long baseRevision) throws SVNException {
+        List caps = new ArrayList();
+        caps.add("mergeinfo");
+        FSHooks.runStartCommitHook(myFSFS.getRepositoryRoot(), getAuthor(), caps);
+        FSTransactionInfo txn = FSTransactionRoot.beginTransaction(baseRevision, 
+                FSTransactionRoot.SVN_FS_TXN_CHECK_LOCKS, myFSFS);
+        changeTransactionProperties(txn.getTxnId());
+        return txn;
+    }
+
+    private void changeTransactionProperties(String txnId) throws SVNException {
+        for (Iterator iter = myRevProps.nameSet().iterator(); iter.hasNext();) {
+            String propName = (String) iter.next();
+            SVNPropertyValue propValue = myRevProps.getSVNPropertyValue(propName);
+            myFSFS.setTransactionProperty(txnId, propName, propValue);
+        }
     }
 
     private String getAuthor() {
@@ -351,18 +371,19 @@ public class FSCommitEditor implements ISVNEditor {
             }
     
             long committedRev = -1;
-            if (myDeltaConsumer != null) {
-                myDeltaConsumer.close();
+            SVNErrorMessage errorMessage = null;
+            committedRev = finalizeCommit();
+            try {
+               FSHooks.runPostCommitHook(myFSFS.getRepositoryRoot(), committedRev);
+            } catch (SVNException svne) {
+                errorMessage = SVNErrorMessage.create(SVNErrorCode.REPOS_POST_COMMIT_HOOK_FAILED, svne.getErrorMessage().getFullMessage(), SVNErrorMessage.TYPE_WARNING);
             }
-            
-            SVNErrorMessage[] errorMessage = new SVNErrorMessage[1];
-            committedRev = myCommitter.commitTxn(true, true, errorMessage, null);
-                
+    
             SVNProperties revProps = myFSFS.getRevisionProperties(committedRev);
             String dateProp = revProps.getStringValue(SVNRevisionProperty.DATE);
             Date datestamp = dateProp != null ? SVNDate.parseDateString(dateProp) : null;
             
-            SVNCommitInfo info = new SVNCommitInfo(committedRev, getAuthor(), datestamp, errorMessage[0]);
+            SVNCommitInfo info = new SVNCommitInfo(committedRev, getAuthor(), datestamp, errorMessage);
             releaseLocks();
             return info;
         } finally {
@@ -384,6 +405,14 @@ public class FSCommitEditor implements ISVNEditor {
                 }
             }
         }
+    }
+
+    private long finalizeCommit() throws SVNException {
+        FSHooks.runPreCommitHook(myFSFS.getRepositoryRoot(), myTxn.getTxnId());
+        if (myDeltaConsumer != null) {
+            myDeltaConsumer.close();
+        }
+        return myCommitter.commitTxn();
     }
 
     public void abortEdit() throws SVNException {
