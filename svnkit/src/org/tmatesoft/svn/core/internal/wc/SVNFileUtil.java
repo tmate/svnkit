@@ -90,7 +90,8 @@ public class SVNFileUtil {
         }
     };
 
-    private static boolean ourUseUnsafeCopyOnly = Boolean.TRUE.toString().equalsIgnoreCase(System.getProperty("svnkit.no.safe.copy", System.getProperty("javasvn.no.safe.copy", "false")));    
+    private static boolean ourUseUnsafeCopyOnly = Boolean.TRUE.toString().equalsIgnoreCase(System.getProperty("svnkit.no.safe.copy", System.getProperty("javasvn.no.safe.copy", "false")));
+    private static boolean ourCopyOnSetWritable = Boolean.TRUE.toString().equalsIgnoreCase(System.getProperty("svnkit.fast.setWritable", "true"));
 
     private static String nativeEOLMarker;
     private static String ourGroupID;
@@ -168,6 +169,14 @@ public class SVNFileUtil {
 
     public static synchronized void setUseUnsafeCopyOnly(boolean useUnsafeCopyOnly) {
         ourUseUnsafeCopyOnly = useUnsafeCopyOnly;
+    }
+
+    public static synchronized boolean useCopyOnSetWritable() {
+        return ourCopyOnSetWritable;
+    }
+
+    public static synchronized void setUseCopyOnSetWritable(boolean useCopyOnSetWritable) {
+        ourCopyOnSetWritable = useCopyOnSetWritable;
     }
 
     public static String getIdCommand() {
@@ -453,23 +462,31 @@ public class SVNFileUtil {
             }
         }
         try {
-            if (isWindows) {
-                Process p = null;
-                try {
-                    p = Runtime.getRuntime().exec(ATTRIB_COMMAND + " -R \"" + file.getAbsolutePath() + "\"");
-                    p.waitFor();
-                } finally {
-                    if (p != null) {
-                        closeFile(p.getInputStream());
-                        closeFile(p.getOutputStream());
-                        closeFile(p.getErrorStream());
-                        p.destroy();
-                    }
-                }
+            if (useCopyOnSetWritable() && file.length() < 1024 * 100) {
+                // faster way for small files.
+                File tmp = createUniqueFile(file.getParentFile(), file.getName(), ".ro", true);
+                copyFile(file, tmp, false);
+                copyFile(tmp, file, false);
+                deleteFile(tmp);
             } else {
-                execCommand(new String[] {
-                        CHMOD_COMMAND, "ugo+w", file.getAbsolutePath()
-                });
+                if (isWindows) {
+                    Process p = null;
+                    try {
+                        p = Runtime.getRuntime().exec(ATTRIB_COMMAND + " -R \"" + file.getAbsolutePath() + "\"");
+                        p.waitFor();
+                    } finally {
+                        if (p != null) {
+                            closeFile(p.getInputStream());
+                            closeFile(p.getOutputStream());
+                            closeFile(p.getErrorStream());
+                            p.destroy();
+                        }
+                    }
+                } else {
+                    execCommand(new String[]{
+                            CHMOD_COMMAND, "ugo+w", file.getAbsolutePath()
+                    });
+                }
             }
         } catch (Throwable th) {
             SVNDebugLog.getDefaultLog().logFinest(SVNLogType.DEFAULT, th);
