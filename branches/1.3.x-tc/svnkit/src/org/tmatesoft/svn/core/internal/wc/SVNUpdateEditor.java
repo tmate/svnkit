@@ -299,7 +299,7 @@ public class SVNUpdateEditor implements ISVNEditor, ISVNCleanupHandler {
     private File alreadyInTreeConflict(File path) throws SVNException {
         File ancestor = path;
         List ancestors = new ArrayList();
-        SVNWCAccess access = SVNWCAccess.newInstance(null);
+        SVNWCAccess access = SVNWCAccess.newInstance(myWCAccess);
         access.probeOpen(ancestor, false, 0);
         SVNEntry entry = access.getEntry(path, true);
         if (entry != null) {
@@ -307,6 +307,7 @@ public class SVNUpdateEditor implements ISVNEditor, ISVNCleanupHandler {
         }
         ancestor = ancestor.getParentFile();
         while (ancestor != null) {
+            access =SVNWCAccess.newInstance(myWCAccess);
             SVNAdminArea adminArea = access.probeOpen(ancestor, false, 0);
             if (adminArea == null) {
                 break;
@@ -528,6 +529,9 @@ public class SVNUpdateEditor implements ISVNEditor, ISVNCleanupHandler {
     }
 
     public void addDir(String path, String copyFromPath, long copyFromRevision) throws SVNException {
+        File fullPath = myAdminInfo.getAnchor().getFile(path);
+        String name = SVNPathUtil.tail(path);        
+        boolean isLocallyDeleted = inDeletedTree(fullPath, true);
         SVNAdminArea parentArea = myCurrentDirectory.getAdminArea();
         SVNDirectoryInfo parentDirectory = myCurrentDirectory;
         myCurrentDirectory = createDirectoryInfo(myCurrentDirectory, path, true);
@@ -544,9 +548,19 @@ public class SVNUpdateEditor implements ISVNEditor, ISVNCleanupHandler {
         
         parentDirectory.flushLog();
         checkIfPathIsUnderRoot(path);
-        String name = SVNPathUtil.tail(path);
-        File childDir = parentArea.getFile(name);
-        SVNFileType kind = SVNFileType.getType(childDir);
+
+        if (inSkippedTree(fullPath) && !isLocallyDeleted) {
+            return;
+        }
+
+        File victim = alreadyInTreeConflict(fullPath);
+        if (victim != null) {
+            addSkippedTree(fullPath);
+            SVNEvent event = SVNEventFactory.createSVNEvent(fullPath, SVNNodeKind.DIR, null, -1, SVNEventAction.SKIP, null, null, null);
+            myWCAccess.handleEvent(event);
+        }
+
+        SVNFileType kind = SVNFileType.getType(fullPath);
         if (kind == SVNFileType.FILE || kind == SVNFileType.UNKNOWN) {
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_OBSTRUCTED_UPDATE, 
                     "Failed to add directory ''{0}'': a non-directory object of the same name already exists", 
@@ -557,7 +571,7 @@ public class SVNUpdateEditor implements ISVNEditor, ISVNCleanupHandler {
         if (kind == SVNFileType.DIRECTORY) {
             SVNAdminArea adminArea = null;
             try {
-                adminArea = SVNWCAccess.newInstance(null).open(childDir, false, 0);
+                adminArea = SVNWCAccess.newInstance(null).open(fullPath, false, 0);
             } catch (SVNException svne) {
                 if (svne.getErrorMessage().getErrorCode() != SVNErrorCode.WC_NOT_DIRECTORY) {
                     throw svne;
@@ -599,10 +613,13 @@ public class SVNUpdateEditor implements ISVNEditor, ISVNCleanupHandler {
                 if (entry != null && (entry.isScheduledForAddition() || entry.isScheduledForReplacement()) && !entry.isCopied()) {
                     myCurrentDirectory.isAddExisted = true;
                 } else {
-                    SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_OBSTRUCTED_UPDATE, 
-                            "Failed to add directory ''{0}'': a versioned directory of the same name already exists", 
-                            myCurrentDirectory.getPath());
-                    SVNErrorManager.error(err, SVNLogType.WC);
+                    SVNURL theirURL = SVNURL.parseURIEncoded(myCurrentDirectory.URL);
+                    SVNTreeConflictDescription treeConflict = checkTreeConflict(fullPath, entry, parentArea, parentDirectory.getLog(), SVNConflictAction.ADD, SVNNodeKind.DIR, theirURL);
+                    if (treeConflict != null) {
+                        addSkippedTree(fullPath);
+                        SVNEvent event = SVNEventFactory.createSVNEvent(fullPath, SVNNodeKind.DIR, null, -1, SVNEventAction.TREE_CONFLICT, null, null, null);
+                        myWCAccess.handleEvent(event);
+                    }
                 }
             }
         }
@@ -640,22 +657,41 @@ public class SVNUpdateEditor implements ISVNEditor, ISVNCleanupHandler {
             adminArea.modifyEntry(adminArea.getThisDirName(), attributes, true, true);
         }
         
+        SVNFileUtil.ensureDirectoryExists(fullPath);
         String rootURL = null;
-        if (SVNPathUtil.isAncestor(myRootURL, myCurrentDirectory.URL)) {
+        if (myRootURL != null && SVNPathUtil.isAncestor(myRootURL, myCurrentDirectory.URL)) {
             rootURL = myRootURL;
         }
-        if (myWCAccess.getAdminArea(childDir) != null) {
-            myWCAccess.closeAdminArea(childDir);
+
+        SVNWCManager.ensureAdminAreaExists(fullPath, myCurrentDirectory.URL, rootURL, null, myTargetRevision, myCurrentDirectory.myAmbientDepth);
+
+        SVNAdminArea childArea = null;
+        if (myAdminInfo.getAnchor().getRoot().equals(fullPath)) {
+            ISVNEventHandler eventHandler = myWCAccess.getEventHandler();
+            try {
+                myWCAccess.setEventHandler(null);
+                childArea = myWCAccess.open(fullPath, true, 0);
+            } catch(SVNException e) {
+                if (e.getErrorMessage().getErrorCode() == SVNErrorCode.WC_LOCKED) {
+                    childArea = myWCAccess.retrieve(fullPath);
+                } else {
+                    throw e;
+                }
+            } finally {
+                myWCAccess.setEventHandler(eventHandler);
+            }
         }
-        
-        if (SVNWCManager.ensureAdminAreaExists(childDir, myCurrentDirectory.URL, rootURL, null, 
-                myTargetRevision, myCurrentDirectory.myAmbientDepth)) {
-            // hack : remove created lock file.
-            SVNFileUtil.deleteFile(new File(childDir, SVNFileUtil.getAdminDirectoryName() + "/lock"));
+
+        if (isLocallyDeleted) {
+            attributes.clear();
+            attributes.put(SVNProperty.SCHEDULE, SVNProperty.SCHEDULE_DELETE);
+            parentArea.modifyEntry(name, attributes, true, false);
+            childArea = myWCAccess.retrieve(fullPath);
+            childArea.modifyEntry(name, attributes, true, false);
         }
-        SVNAdminArea childArea = myWCAccess.open(childDir, true, 0);
+        childArea = myWCAccess.open(fullPath, true, 0);
         myWCAccess.registerCleanupHandler(childArea, myCurrentDirectory);
-        if (!myCurrentDirectory.isAddExisted) {
+        if (!myCurrentDirectory.isAddExisted && !isLocallyDeleted) {
             SVNEvent event = SVNEventFactory.createSVNEvent(parentArea.getFile(entry.getName()), 
                     SVNNodeKind.DIR, null, myTargetRevision, myCurrentDirectory.isExisted ? 
                             SVNEventAction.UPDATE_EXISTS : SVNEventAction.UPDATE_ADD, null, null, null);
