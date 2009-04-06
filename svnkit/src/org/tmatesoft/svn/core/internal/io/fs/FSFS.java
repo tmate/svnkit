@@ -1462,6 +1462,7 @@ public class FSFS {
             path = "";
         }
         String testPath = host != null ? SVNPathUtil.append("\\\\" + host, path) : path;
+        testPath = testPath.replaceFirst("\\|", "\\:");
         File rootPath = new File(testPath).getAbsoluteFile();
         while (!isRepositoryRoot(rootPath)) {
             if (rootPath.getParentFile() == null) {
