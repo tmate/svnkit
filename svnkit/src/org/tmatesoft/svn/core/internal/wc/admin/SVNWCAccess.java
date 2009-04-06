@@ -34,6 +34,7 @@ import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 import org.tmatesoft.svn.core.wc.ISVNEventHandler;
 import org.tmatesoft.svn.core.wc.ISVNOptions;
 import org.tmatesoft.svn.core.wc.SVNEvent;
+import org.tmatesoft.svn.core.wc.SVNTreeConflictDescription;
 import org.tmatesoft.svn.util.SVNLogType;
 
 
@@ -379,6 +380,9 @@ public class SVNWCAccess implements ISVNEventHandler {
                 if (entry.getKind() != SVNNodeKind.DIR  || area.getThisDirName().equals(entry.getName())) {
                     continue;
                 }
+                if (entry.getDepth() == SVNDepth.EXCLUDE) {
+                    continue;
+                }
                 File childPath = new File(path, entry.getName());
                 try {
                     // this method will put created area into our map.
@@ -507,6 +511,44 @@ public class SVNWCAccess implements ISVNEventHandler {
             }
         }
         return false;
+    }
+
+    public SVNTreeConflictDescription getTreeConflict(File path) throws SVNException {
+        File parent = path.getParentFile();
+        if (parent == null) {
+            return null;
+        }
+        boolean closeParentArea = false;
+        SVNAdminArea parentArea = null;
+        try {
+            parentArea = retrieve(parent);
+        } catch (SVNException e) {
+            if (e.getErrorMessage().getErrorCode() == SVNErrorCode.WC_NOT_LOCKED) {
+                e = null;
+                try {
+                    parentArea = open(parent, false, 0);
+                    closeParentArea = true;
+                } catch (SVNException internal) {
+                    if (internal.getErrorMessage().getErrorCode() == SVNErrorCode.WC_NOT_DIRECTORY) {
+                        return null;
+                    }
+                    e = internal;
+                }
+            }
+            if (e != null) {
+                throw e;
+            }
+        }
+        SVNTreeConflictDescription treeConflict = parentArea.getTreeConflict(path.getName());
+        if (closeParentArea) {
+            closeAdminArea(parent);
+        }
+        return treeConflict;
+    }
+
+    public boolean hasTreeConflict(File path) throws SVNException {
+        SVNTreeConflictDescription treeConflict = getTreeConflict(path);
+        return treeConflict != null;
     }
     
     public SVNEntry getEntry(File path, boolean showHidden) throws SVNException {
@@ -679,17 +721,9 @@ public class SVNWCAccess implements ISVNEventHandler {
     private File probe(File path, Level logLevel) throws SVNException {
         int wcFormat = -1;
         SVNFileType type = SVNFileType.getType(path);
-        boolean eligible = type == SVNFileType.DIRECTORY;
-        // only treat as directories those, that are not versioned in parent wc.
+        boolean eligible = type == SVNFileType.DIRECTORY || (type == SVNFileType.SYMLINK && path.isDirectory());
         if (eligible) {
             wcFormat = SVNAdminAreaFactory.checkWC(path, true, logLevel);
-        } else if (type == SVNFileType.SYMLINK && path.isDirectory()) {
-            // either wc root which is a link or link within wc.
-            // check for being root.
-            eligible = isWCRoot(path);
-            if (eligible) {
-                wcFormat = SVNAdminAreaFactory.checkWC(path, true, logLevel);
-            }
         } else {
             wcFormat = 0;
         }

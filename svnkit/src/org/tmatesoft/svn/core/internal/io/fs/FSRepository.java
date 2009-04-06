@@ -226,8 +226,8 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
             }
             if (properties != null) {
                 FSRevisionNode revNode = root.getRevisionNode(repositoryPath);
-                if (revNode.getFileChecksum() != null) {
-                    properties.put(SVNProperty.CHECKSUM, revNode.getFileChecksum());
+                if (revNode.getFileMD5Checksum() != null) {
+                    properties.put(SVNProperty.CHECKSUM, revNode.getFileMD5Checksum());
                 }
                 if (revision >= 0) {
                     properties.put(SVNProperty.REVISION, Long.toString(revision));
@@ -725,6 +725,15 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
         SVNErrorManager.error(err, SVNLogType.FSFS);
     }
 
+    protected long getDeletedRevisionImpl(String path, long pegRevision, long endRevision) throws SVNException {
+        try {
+            openRepository();
+            return myFSFS.getDeletedRevision(path, pegRevision, endRevision);
+        } finally {
+            closeRepository();
+        }
+    }
+
     private void openRepository() throws SVNException {
         try {
             openRepositoryRoot();
@@ -958,4 +967,5 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
         }
         return myLogDriver;
     }
+
 }

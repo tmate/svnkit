@@ -62,6 +62,7 @@ public class FSFS {
     public static final String UUID_FILE = "uuid";
     public static final String FS_TYPE_FILE = "fs-type";
     public static final String TXN_CURRENT_FILE = "txn-current";
+    public static final String MIN_UNPACKED_REV_FILE = "min-unpacked-rev";
     public static final String TXN_CURRENT_LOCK_FILE = "txn-current-lock";
     public static final String REVISION_PROPERTIES_DIR = "revprops";
     public static final String WRITE_LOCK_FILE = "write-lock";
@@ -94,14 +95,17 @@ public class FSFS {
     public static final int DIGEST_SUBDIR_LEN = 3;
     public static final int REPOSITORY_FORMAT = 5;
     public static final int REPOSITORY_FORMAT_LEGACY = 3;
-    public static final int DB_FORMAT = 3;
+    public static final int DB_FORMAT = 4;
     public static final int DB_FORMAT_LOW = 1;
     public static final int LAYOUT_FORMAT_OPTION_MINIMAL_FORMAT = 3;
     public static final int MIN_CURRENT_TXN_FORMAT = 3;
     public static final int MIN_PROTOREVS_DIR_FORMAT = 3;
     public static final int MIN_NO_GLOBAL_IDS_FORMAT = 3;
     public static final int MIN_MERGE_INFO_FORMAT = 3;
-
+    public static final int MIN_REP_SHARING_FORMAT = 4;
+    public static final int MIN_PACKED_FORMAT = 4;
+    public static final int MIN_KIND_IN_CHANGED_FORMAT = 4;
+    
     //TODO: we should be able to change this via some option
     private static long DEFAULT_MAX_FILES_PER_DIRECTORY = 1000;
     private static final String DB_TYPE = "fsfs";
@@ -158,7 +162,11 @@ public class FSFS {
         synchronized (writeLock) {
             try {
                 writeLock.lock();
-                SVNFileUtil.createFile(getCurrentFile(), "0 1 1\n", "US-ASCII");
+                try {
+                    SVNFileUtil.createFile(getCurrentFile(), "0 1 1\n", "US-ASCII");
+                } catch (SVNException svne) {
+                    //ignore errors
+                }
             } finally {
                 writeLock.unlock();
                 FSWriteLock.release(writeLock);
@@ -418,14 +426,11 @@ public class FSFS {
             }
             return myYoungestRevisionCache;
         } catch (NumberFormatException nfe) {
-            //
+            myYoungestRevisionCache = 0;
         } finally {
             file.close();
         }
-        SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_CORRUPT, 
-                "Can''t parse revision number in file ''{0}''", getCurrentFile()); 
-        SVNErrorManager.error(err, SVNLogType.FSFS);
-        return -1;
+        return myYoungestRevisionCache;
     }
     
     public void upgrade() throws SVNException {
@@ -559,7 +564,8 @@ public class FSFS {
     }
     
     public Map getDirContents(FSRevisionNode revNode) throws SVNException {
-        if (revNode.getTextRepresentation() != null && revNode.getTextRepresentation().isTxn()) {
+        FSRepresentation txtRep = revNode.getTextRepresentation();
+        if (txtRep != null && txtRep.isTxn()) {
             FSFile childrenFile = getTransactionRevisionNodeChildrenFile(revNode.getId());
             Map entries = null;
             try {
@@ -573,12 +579,11 @@ public class FSFS {
                 childrenFile.close();
             }
             return entries;
-        } else if (revNode.getTextRepresentation() != null) {
-            FSRepresentation textRep = revNode.getTextRepresentation();
+        } else if (txtRep != null) {
             FSFile revisionFile = null;
             
             try {
-                revisionFile = openAndSeekRepresentation(textRep);
+                revisionFile = openAndSeekRepresentation(txtRep);
                 String repHeader = revisionFile.readLine(160);
                 
                 if(!"PLAIN".equals(repHeader)){
@@ -590,10 +595,10 @@ public class FSFS {
                 SVNProperties rawEntries = revisionFile.readProperties(false, false);
                 String checksum = revisionFile.digest();
                
-                if (!checksum.equals(textRep.getHexDigest())) {
-                    SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_CORRUPT, "Checksum mismatch while reading representation:\n   expected:  {0}\n     actual:  {1}", new Object[] {
-                            checksum, textRep.getHexDigest()
-                    });
+                if (!checksum.equals(txtRep.getMD5HexDigest())) {
+                    SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_CORRUPT, 
+                            "Checksum mismatch while reading representation:\n   expected:  {0}\n     actual:  {1}", 
+                            new Object[] { checksum, txtRep.getMD5HexDigest() });
                     SVNErrorManager.error(err, SVNLogType.FSFS);
                 }
 
@@ -635,9 +640,9 @@ public class FSFS {
                 SVNProperties props = revisionFile.readProperties(false, true);
                 String checksum = revisionFile.digest();
 
-                if (!checksum.equals(propsRep.getHexDigest())) {
+                if (!checksum.equals(propsRep.getMD5HexDigest())) {
                     SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_CORRUPT, "Checksum mismatch while reading representation:\n   expected:  {0}\n     actual:  {1}", new Object[] {
-                            checksum, propsRep.getHexDigest()
+                            checksum, propsRep.getMD5HexDigest()
                     });
                     SVNErrorManager.error(err, SVNLogType.FSFS);
                 }
@@ -964,14 +969,16 @@ public class FSFS {
         revNodeFile.write(count.getBytes("UTF-8"));
         
         if (revNode.getTextRepresentation() != null) {
-            String textRepresentation = FSRevisionNode.HEADER_TEXT + ": "
-                    + (revNode.getTextRepresentation().getTxnId() != null && revNode.getType() == SVNNodeKind.DIR ? "-1" : revNode.getTextRepresentation().toString()) + "\n";
+            FSRepresentation txtRep = revNode.getTextRepresentation();
+            String textRepresentation = FSRevisionNode.HEADER_TEXT + ": " + (txtRep.getTxnId() != null && revNode.getType() == SVNNodeKind.DIR ? 
+                    "-1" : txtRep.getStringRepresentation(myDBFormat)) + "\n";
             revNodeFile.write(textRepresentation.getBytes("UTF-8"));
         }
         
         if (revNode.getPropsRepresentation() != null) {
-            String propsRepresentation = FSRevisionNode.HEADER_PROPS + ": " + 
-            (revNode.getPropsRepresentation().getTxnId() != null ? "-1" : revNode.getPropsRepresentation().toString()) + "\n";
+            FSRepresentation propRep = revNode.getPropsRepresentation();
+            String propsRepresentation = FSRevisionNode.HEADER_PROPS + ": " + (propRep.getTxnId() != null ? 
+                    "-1" : propRep.getStringRepresentation(myDBFormat)) + "\n";
             revNodeFile.write(propsRepresentation.getBytes("UTF-8"));
         }
         

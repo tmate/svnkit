@@ -50,11 +50,11 @@ import org.tmatesoft.svn.core.wc.SVNDiffStatus;
 import org.tmatesoft.svn.core.wc.SVNEvent;
 import org.tmatesoft.svn.core.wc.SVNEventAction;
 import org.tmatesoft.svn.core.wc.SVNInfo;
-import org.tmatesoft.svn.core.wc.SVNMergeFileSet;
 import org.tmatesoft.svn.core.wc.SVNRevision;
 import org.tmatesoft.svn.core.wc.SVNRevisionRange;
 import org.tmatesoft.svn.core.wc.SVNStatus;
 import org.tmatesoft.svn.core.wc.SVNStatusType;
+import org.tmatesoft.svn.core.wc.SVNMergeFileSet;
 import org.tmatesoft.svn.util.SVNLogType;
 
 /**
@@ -238,8 +238,8 @@ public class JavaHLObjectFactory {
         }
         
         Status st = new Status(path, url, nodeKind, revision, lastChangedRevision, lastChangedDate, lastCommitAuthor, textStatus, propStatus,
-                repositoryTextStatus, repositoryPropStatus, locked, copied, conflictOld, conflictNew, conflictWorking, urlCopiedFrom, revisionCopiedFrom,
-                switched, lockToken, lockOwner, lockComment, lockCreationDate, reposLock,
+                repositoryTextStatus, repositoryPropStatus, locked, copied, false, null, conflictOld, conflictNew, conflictWorking, urlCopiedFrom, revisionCopiedFrom,
+                switched, false, lockToken, lockOwner, lockComment, lockCreationDate, reposLock,
                 /* remote: rev, date, kind, author */
                 reposRev, reposDate, reposKind, reposAuthor, status.getChangelistName());
         return st;
@@ -277,27 +277,35 @@ public class JavaHLObjectFactory {
         if (conflictDescription == null){
             return null;
         }
-
+// tree conflict description doesn't have merged files set       
         SVNMergeFileSet mergeFiles = conflictDescription.getMergeFiles();
+        if (mergeFiles == null) {
+            return null;
+        }
+        String basePath = null;
+        String repositoryPath = null;
+        try {
+            basePath = mergeFiles.getBasePath();
+            repositoryPath = mergeFiles.getRepositoryPath();
+        } catch (SVNException e) {
+        }
 
-        File workingFile = mergeFiles.getWCFile();
-        File baseFile = mergeFiles.getBaseFile();
-        File theirFile = mergeFiles.getRepositoryFile();
-        File mineFile = mergeFiles.getLocalFile();
-        File mergedFile = mergeFiles.getResultFile();
-
-        return new ConflictDescriptor(workingFile != null ? workingFile.getAbsolutePath().replace(File.separatorChar, '/') : null,
+        // TODO 16
+        return new ConflictDescriptor(mergeFiles.getLocalPath(),
                 getConflictKind(conflictDescription.isPropertyConflict()),
                 getNodeKind(conflictDescription.getNodeKind()),
                 conflictDescription.getPropertyName(),
-                conflictDescription.getMergeFiles().isBinary(),
-                conflictDescription.getMergeFiles().getMimeType(),
+                mergeFiles.isBinary(),
+                mergeFiles.getMimeType(),
                 getConflictAction(conflictDescription.getConflictAction()),
                 getConflictReason(conflictDescription.getConflictReason()),
-                baseFile != null ? baseFile.getAbsolutePath().replace(File.separatorChar, '/') : null,
-                theirFile != null ? theirFile.getAbsolutePath().replace(File.separatorChar, '/') : null,
-                mineFile != null ? mineFile.getAbsolutePath().replace(File.separatorChar, '/') : null,
-                mergedFile != null ? mergedFile.getAbsolutePath().replace(File.separatorChar, '/') : null
+                0,
+                basePath,
+                repositoryPath,
+                mergeFiles.getWCPath(),
+                mergeFiles.getResultPath(),
+                null, 
+                null
                 );
     }
 
@@ -439,7 +447,8 @@ public class JavaHLObjectFactory {
                 String path = (String) iter.next();
                 SVNLogEntryPath entryPath = (SVNLogEntryPath)cpaths.get(path);
                 if(entryPath != null){
-                    clientChangePaths.add(new ChangePath(path, entryPath.getCopyRevision(), entryPath.getCopyPath(), entryPath.getType()));
+                    // TODO 
+                    clientChangePaths.add(new ChangePath(path, entryPath.getCopyRevision(), entryPath.getCopyPath(), entryPath.getType(), NodeKind.unknown));
                 }
             }
             cp = (ChangePath[]) clientChangePaths.toArray(new ChangePath[clientChangePaths.size()]);
@@ -513,7 +522,8 @@ public class JavaHLObjectFactory {
                 String path = (String) iter.next();
                 SVNLogEntryPath entryPath = (SVNLogEntryPath)cpaths.get(path);
                 if(entryPath != null){
-                    clientChangePaths.add(new ChangePath(path, entryPath.getCopyRevision(), entryPath.getCopyPath(), entryPath.getType()));
+                    // TODO 16
+                    clientChangePaths.add(new ChangePath(path, entryPath.getCopyRevision(), entryPath.getCopyPath(), entryPath.getType(), NodeKind.unknown));
                 }
             }
             cp = (ChangePath[]) clientChangePaths.toArray(new ChangePath[clientChangePaths.size()]);
@@ -636,6 +646,7 @@ public class JavaHLObjectFactory {
         if (path != null) {
             path = path.replace(File.separatorChar, '/');
         }
+        // TODO 16
         return new Info2(
                 path,
                 info.getURL() != null ? info.getURL().toString() : null,
@@ -656,7 +667,9 @@ public class JavaHLObjectFactory {
                 info.getConflictNewFile() != null ? info.getConflictNewFile().getName() : null,
                 info.getConflictWrkFile() != null ? info.getConflictWrkFile().getName() : null,
                 info.getPropConflictFile() != null ? info.getPropConflictFile().getName() : null,
-                info.getChangelistName(), info.getWorkingSize(), info.getRepositorySize()
+                info.getChangelistName(), info.getWorkingSize(), info.getRepositorySize(),
+                Depth.unknown,
+                null
                 );
     }
 
@@ -683,6 +696,7 @@ public class JavaHLObjectFactory {
         if (event.getErrorMessage() != null) {
             errMsg = event.getErrorMessage().getFullMessage();
         }
+        // TODO 16
         return new NotifyInformation(
                 path,
                 getNotifyActionValue(event.getAction()),
@@ -695,7 +709,8 @@ public class JavaHLObjectFactory {
                 getLockStatusValue(event.getLockStatus()),
                 event.getRevision(),
                 event.getChangelistName(),
-                createRevisionRange(event.getMergeRange())
+                createRevisionRange(event.getMergeRange()), 
+                ""
         );
     }
     

@@ -19,7 +19,9 @@ import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNNodeKind;
 import org.tmatesoft.svn.core.SVNProperty;
 import org.tmatesoft.svn.core.SVNURL;
+import org.tmatesoft.svn.core.internal.wc.SVNTreeConflictUtil;
 import org.tmatesoft.svn.core.io.SVNRepository;
+import org.tmatesoft.svn.core.wc.SVNRevision;
 
 
 /**
@@ -105,7 +107,8 @@ public class SVNEntry {
     }
 
     public boolean isHidden() {
-        return (isDeleted() || isAbsent()) && !isScheduledForAddition() && !isScheduledForReplacement();
+        return (isDeleted() && !isScheduledForAddition() && !isScheduledForReplacement()) || 
+            isAbsent() || getDepth() == SVNDepth.EXCLUDE;
     }
 
     public boolean isFile() {
@@ -435,6 +438,38 @@ public class SVNEntry {
 
     public String[] getPresentProperties() {
         return (String[]) myAttributes.get(SVNProperty.PRESENT_PROPS);
+    }
+
+    public String getExternalFilePath() {
+        return (String) myAttributes.get(SVNProperty.FILE_EXTERNAL_PATH);
+    }
+    
+    public SVNRevision getExternalFileRevision() {
+        SVNRevision revision = (SVNRevision) myAttributes.get(SVNProperty.FILE_EXTERNAL_REVISION);
+        return revision;
+    }
+    
+    public SVNRevision getExternalFilePegRevision() {
+        SVNRevision pegRevision = (SVNRevision) myAttributes.get(SVNProperty.FILE_EXTERNAL_PEG_REVISION);
+        return pegRevision;
+    }
+
+    public String getTreeConflictData() {
+        return (String) myAttributes.get(SVNProperty.TREE_CONFLICT_DATA);
+    }
+
+    public Map getTreeConflicts() throws SVNException {
+        String conflictData = getTreeConflictData();
+        return SVNTreeConflictUtil.readTreeConflicts(getAdminArea().getRoot(), conflictData);
+    }
+
+    public void setTreeConflictData(String conflictData) {
+        setAttributeValue(SVNProperty.TREE_CONFLICT_DATA, conflictData);
+    }
+    
+    public void setTreeConflicts(Map treeConflicts) throws SVNException {
+        String conflictData = SVNTreeConflictUtil.getTreeConflictData(treeConflicts);
+        setTreeConflictData(conflictData);
     }
 
     public Map asMap() {

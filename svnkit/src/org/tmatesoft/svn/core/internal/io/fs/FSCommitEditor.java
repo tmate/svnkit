@@ -126,7 +126,7 @@ public class FSCommitEditor implements ISVNEditor {
         SVNNodeKind kind = myTxnRoot.checkNodeKind(fullPath);
 
         if (kind == SVNNodeKind.NONE) {
-            return;
+            SVNErrorManager.error(FSErrors.errorOutOfDate(fullPath, kind), SVNLogType.FSFS);
         }
 
         FSRevisionNode existingNode = myTxnRoot.getRevisionNode(fullPath);
@@ -184,6 +184,7 @@ public class FSCommitEditor implements ISVNEditor {
 
     private void changeNodeProperties(String path, SVNProperties propNamesToValues) throws SVNException {
         FSParentPath parentPath = null;
+        SVNNodeKind kind = null;
         SVNProperties properties = null;
         boolean done = false;
         boolean haveRealChanges = false;
@@ -195,6 +196,7 @@ public class FSCommitEditor implements ISVNEditor {
 
             if (!done) {
                 parentPath = myTxnRoot.openPath(path, true, true);
+                kind = parentPath.getRevNode().getType();
 
                 if ((myTxnRoot.getTxnFlags() & FSTransactionRoot.SVN_FS_TXN_CHECK_LOCKS) != 0) {
                     FSCommitter.allowLockedOperation(myFSFS, path, getAuthor(), myLockTokens, false, false);
@@ -237,7 +239,7 @@ public class FSCommitEditor implements ISVNEditor {
 
         if (haveRealChanges) {
             myTxnRoot.setProplist(parentPath.getRevNode(), properties);
-            myCommitter.addChange(path, parentPath.getRevNode().getId(), FSPathChangeKind.FS_PATH_CHANGE_MODIFY, false, true, SVNRepository.INVALID_REVISION, null);
+            myCommitter.addChange(path, parentPath.getRevNode().getId(), FSPathChangeKind.FS_PATH_CHANGE_MODIFY, false, true, SVNRepository.INVALID_REVISION, null, kind);
         }
     }
     
@@ -333,11 +335,11 @@ public class FSCommitEditor implements ISVNEditor {
         if (textChecksum != null) {
             String fullPath = SVNPathUtil.getAbsolutePath(SVNPathUtil.append(myBasePath, path));
             FSRevisionNode revNode = myTxnRoot.getRevisionNode(fullPath);
-            if (revNode.getTextRepresentation() != null && !textChecksum.equals(revNode.getTextRepresentation().getHexDigest())) {
+            FSRepresentation txtRep = revNode.getTextRepresentation();
+            if (txtRep != null && !textChecksum.equals(txtRep.getMD5HexDigest())) {
                 SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.CHECKSUM_MISMATCH,
-                        "Checksum mismatch for resulting fulltext\n({0}):\n   expected checksum:  {1}\n   actual checksum:    {2}\n", new Object[] {
-                                fullPath, textChecksum, revNode.getTextRepresentation().getHexDigest()
-                        });
+                        "Checksum mismatch for resulting fulltext\n({0}):\n   expected checksum:  {1}\n   actual checksum:    {2}\n",
+                        new Object[] { fullPath, textChecksum, txtRep.getMD5HexDigest() });
                 SVNErrorManager.error(err, SVNLogType.FSFS);
             }
         }

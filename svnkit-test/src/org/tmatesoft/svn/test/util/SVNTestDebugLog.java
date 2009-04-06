@@ -43,11 +43,11 @@ public class SVNTestDebugLog extends SVNDebugLogAdapter implements ISVNEventHand
         INSTANCE.setTMP(tmp);
     }
 
-    public synchronized static void enable() {
+    public static void enable() {
         SVNDebugLog.setDefaultLog(getDebugLog());
     }
 
-    public synchronized static void disable() {
+    public static void disable() {
         SVNDebugLog.setDefaultLog(null);
     }
 

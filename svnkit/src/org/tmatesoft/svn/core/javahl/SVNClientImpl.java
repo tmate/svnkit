@@ -1840,10 +1840,7 @@ public class SVNClientImpl implements SVNClientInterface {
                 }
                 public SVNProperties getRevisionProperties(String message, SVNCommitItem[] commitables, SVNProperties revisionProperties) throws SVNException {
                     return revisionProperties == null ? new SVNProperties() : revisionProperties;
-                }
-                public boolean accept(File file) throws SVNException {
-                    return true;
-                }
+                }                    
             };
         }
         return null;
@@ -2217,5 +2214,14 @@ public class SVNClientImpl implements SVNClientInterface {
                     JavaHLObjectFactory.getSVNRevision(revision),
                     JavaHLObjectFactory.getSVNDepth(depth), changeListsCollection, handler);
         }
+    }
+
+    public void logMessages(String path, Revision pegRevision, RevisionRange[] ranges, boolean stopOnCopy, boolean discoverPath, boolean includeMergedRevisions, String[] revProps, long limit,
+            LogMessageCallback callback) throws ClientException {
+        // TODO
+    }
+
+    public void setRevProperty(String path, String name, Revision rev, String value, String originalValue, boolean force) throws ClientException {
+        // TODO
     }
 }

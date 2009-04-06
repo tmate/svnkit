@@ -77,7 +77,9 @@ public class SVNAdminArea15 extends SVNAdminArea14 {
         return false;
     }
 
-    protected void writeExtraOptions(Writer writer, String entryName, Map entryAttrs, int emptyFields) throws SVNException, IOException {
+    protected int writeExtraOptions(Writer writer, String entryName, Map entryAttrs, int emptyFields) throws SVNException, IOException {
+        emptyFields = super.writeExtraOptions(writer, entryName, entryAttrs, emptyFields);
+        
         String changelist = (String) entryAttrs.get(SVNProperty.CHANGELIST); 
         if (writeString(writer, changelist, emptyFields)) {
             emptyFields = 0;
@@ -94,6 +96,7 @@ public class SVNAdminArea15 extends SVNAdminArea14 {
         }
 
         String workingSize = (String) entryAttrs.get(SVNProperty.WORKING_SIZE);
+        workingSize = "-1".equals(workingSize) ? null : workingSize;
         if (writeString(writer, workingSize, emptyFields)) {
             emptyFields = 0;
         } else {
@@ -102,13 +105,19 @@ public class SVNAdminArea15 extends SVNAdminArea14 {
         
         boolean isThisDir = getThisDirName().equals(entryName);
         boolean isSubDir = !isThisDir && SVNProperty.KIND_DIR.equals(entryAttrs.get(SVNProperty.KIND)); 
-        String depth = (String) entryAttrs.get(SVNProperty.DEPTH);
-        if (!isSubDir && SVNDepth.fromString(depth) != SVNDepth.INFINITY) {
-            writeValue(writer, depth, emptyFields);
-            emptyFields = 0;
+        String depthStr = (String) entryAttrs.get(SVNProperty.DEPTH);
+        SVNDepth depth = SVNDepth.fromString(depthStr);
+        if ((isSubDir && depth != SVNDepth.EXCLUDE) || depth == SVNDepth.INFINITY) {
+            emptyFields++;
         } else {
-            ++emptyFields;
+            if (writeValue(writer, depthStr, emptyFields)) {
+                emptyFields = 0;    
+            } else {
+                ++emptyFields;
+            }
         }
+
+        return emptyFields;
     }
 
     protected int getFormatVersion() {

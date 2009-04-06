@@ -2719,7 +2719,7 @@ public class SVNDiffClient extends SVNExtendedMergeDriver {
                     depth, changeLists);
             boolean serverSupportsDepth = repository.hasCapability(SVNCapability.DEPTH);
             SVNReporter reporter = new SVNReporter(info, info.getAnchor().getFile(info.getTargetName()), false, 
-                    !serverSupportsDepth, depth, false, false, getDebugLog());
+                    !serverSupportsDepth, depth, false, false, true, getDebugLog());
             
             long pegRevisionNumber = getRevisionNumber(revision2, repository, path2);
             try {
@@ -2769,10 +2769,10 @@ public class SVNDiffClient extends SVNExtendedMergeDriver {
             SVNDiffEditor editor = new SVNDiffEditor(wcAccess, info, callback, useAncestry, reverse /* reverse */, 
                     revision2 == SVNRevision.BASE || revision2 == SVNRevision.COMMITTED /* compare to base */, 
                     depth, changeLists);
-            ISVNEditor filterEditor = SVNAmbientDepthFilterEditor.wrap(editor, info, depth, false);
+            ISVNEditor filterEditor = SVNAmbientDepthFilterEditor.wrap(editor, info, false);
             boolean serverSupportsDepth = repository.hasCapability(SVNCapability.DEPTH);
             SVNReporter reporter = new SVNReporter(info, info.getAnchor().getFile(info.getTargetName()), 
-                    false, !serverSupportsDepth, depth, false, false, getDebugLog());
+                    false, !serverSupportsDepth, depth, false, false, true, getDebugLog());
             
             // this should be rev2.
             long pegRevisionNumber = getRevisionNumber(revision2, repository, path2);
