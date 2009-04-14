@@ -34,6 +34,7 @@ import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 import org.tmatesoft.svn.core.wc.ISVNEventHandler;
 import org.tmatesoft.svn.core.wc.ISVNOptions;
 import org.tmatesoft.svn.core.wc.SVNEvent;
+import org.tmatesoft.svn.core.wc.SVNTreeConflictDescription;
 import org.tmatesoft.svn.util.SVNLogType;
 
 
@@ -379,6 +380,9 @@ public class SVNWCAccess implements ISVNEventHandler {
                 if (entry.getKind() != SVNNodeKind.DIR  || area.getThisDirName().equals(entry.getName())) {
                     continue;
                 }
+                if (entry.getDepth() == SVNDepth.EXCLUDE) {
+                    continue;
+                }
                 File childPath = new File(path, entry.getName());
                 try {
                     // this method will put created area into our map.
@@ -507,6 +511,44 @@ public class SVNWCAccess implements ISVNEventHandler {
             }
         }
         return false;
+    }
+
+    public SVNTreeConflictDescription getTreeConflict(File path) throws SVNException {
+        File parent = path.getParentFile();
+        if (parent == null) {
+            return null;
+        }
+        boolean closeParentArea = false;
+        SVNAdminArea parentArea = null;
+        try {
+            parentArea = retrieve(parent);
+        } catch (SVNException e) {
+            if (e.getErrorMessage().getErrorCode() == SVNErrorCode.WC_NOT_LOCKED) {
+                e = null;
+                try {
+                    parentArea = open(parent, false, 0);
+                    closeParentArea = true;
+                } catch (SVNException internal) {
+                    if (internal.getErrorMessage().getErrorCode() == SVNErrorCode.WC_NOT_DIRECTORY) {
+                        return null;
+                    }
+                    e = internal;
+                }
+            }
+            if (e != null) {
+                throw e;
+            }
+        }
+        SVNTreeConflictDescription treeConflict = parentArea.getTreeConflict(path.getName());
+        if (closeParentArea) {
+            closeAdminArea(parent);
+        }
+        return treeConflict;
+    }
+
+    public boolean hasTreeConflict(File path) throws SVNException {
+        SVNTreeConflictDescription treeConflict = getTreeConflict(path);
+        return treeConflict != null;
     }
     
     public SVNEntry getEntry(File path, boolean showHidden) throws SVNException {
@@ -648,10 +690,25 @@ public class SVNWCAccess implements ISVNEventHandler {
         }
         return adminArea;
     }
-    
+
     public void walkEntries(File path, ISVNEntryHandler handler, boolean showHidden, SVNDepth depth) throws SVNException {
+        walkEntries(path, handler, showHidden, false, depth);
+    }
+    
+    public void walkEntries(File path, ISVNEntryHandler handler, boolean showHidden, boolean includeTC, SVNDepth depth) throws SVNException {
+        // wrap handler into tc handler
+        if (includeTC) {
+            handler = new TCEntryHandler(path, this, handler, depth);
+        }
         SVNEntry entry = getEntry(path, showHidden);
         if (entry == null) {
+            if (includeTC) {
+                SVNTreeConflictDescription tc = getTreeConflict(path);
+                if (tc != null) {
+                    handler.handleEntry(path, null);
+                    return;
+                }
+            }
             handler.handleError(path, SVNErrorMessage.create(SVNErrorCode.UNVERSIONED_RESOURCE, 
                     "''{0}'' is not under version control", path));
             return;
@@ -666,7 +723,7 @@ public class SVNWCAccess implements ISVNEventHandler {
         } else if (entry.isDirectory()) {
             SVNAdminArea adminArea = entry.getAdminArea();
             try {
-                adminArea.walkThisDirectory(handler, showHidden, depth);
+                adminArea.walkThisDirectory(handler, includeTC ? true : showHidden, depth);
             } catch (SVNException svne) {
                 handler.handleError(path, svne.getErrorMessage());
             }
@@ -711,4 +768,59 @@ public class SVNWCAccess implements ISVNEventHandler {
         return changeLists == null || changeLists.isEmpty() || (entry != null && entry.getChangelistName() != null && changeLists.contains(entry.getChangelistName()));
     }
     
+    private static class TCEntryHandler implements ISVNEntryHandler {
+        
+        private ISVNEntryHandler myDelegate;
+        private SVNDepth myDepth;
+        private File myTargetPath;
+        private SVNWCAccess myWCAccess;
+
+        public TCEntryHandler(File target, SVNWCAccess wcAccess, ISVNEntryHandler delegate, SVNDepth depth) {
+            myDelegate = delegate;
+            myDepth = depth;
+            myTargetPath = target;
+            myWCAccess = wcAccess;
+        }
+
+        public void handleEntry(File path, SVNEntry entry) throws SVNException {
+            myDelegate.handleEntry(path, entry);
+            if (!entry.isDirectory() || entry.isHidden()) {
+                return;
+            }
+            boolean checkChildren = false;
+            if (myDepth == SVNDepth.IMMEDIATES || myDepth == SVNDepth.FILES) {
+                checkChildren = path.equals(myTargetPath);
+            } else if (myDepth == SVNDepth.INFINITY || myDepth == SVNDepth.EXCLUDE || myDepth == SVNDepth.UNKNOWN) {
+                checkChildren = true;
+            } else {
+                return;
+            }
+            if (!checkChildren) {
+                return;
+            }
+            Map tcs = entry.getTreeConflicts();
+            for(Iterator paths = tcs.keySet().iterator(); paths.hasNext();) {
+                File p = (File) paths.next();
+                SVNTreeConflictDescription tc = (SVNTreeConflictDescription) tcs.get(p);
+                if (tc.getNodeKind() == SVNNodeKind.DIR && myDepth == SVNDepth.FILES) {
+                    continue;
+                }
+                SVNEntry conflictEntry = myWCAccess.getEntry(p, true);
+                if (conflictEntry == null || conflictEntry.isDeleted()) {
+                    myDelegate.handleEntry(p, null);
+                }
+            }
+        }
+
+        public void handleError(File path, SVNErrorMessage error) throws SVNException {
+            if (error != null && error.getErrorCode() == SVNErrorCode.UNVERSIONED_RESOURCE) {
+                SVNTreeConflictDescription tc = myWCAccess.getTreeConflict(path);
+                if (tc != null) {
+                    myDelegate.handleEntry(path, null);
+                    return;
+                }
+            }
+            myDelegate.handleError(path, error);
+        }
+    }
 }

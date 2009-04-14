@@ -86,7 +86,7 @@ public class FSUpdateContext {
     }
 
     public void reset(FSRepository repository, FSFS owner, long revision, File reportFile, String target, String targetPath, boolean isSwitch, SVNDepth depth, boolean ignoreAncestry,
-            boolean textDeltas, ISVNEditor editor) throws SVNException {
+            boolean textDeltas, boolean sendCopyFrom, ISVNEditor editor) throws SVNException {
         dispose();
         myRepository = repository;
         myFSFS = owner;
@@ -99,6 +99,7 @@ public class FSUpdateContext {
         sendTextDeltas = textDeltas;
         myTargetPath = targetPath;
         this.isSwitch = isSwitch;
+        mySendCopyFromArgs = sendCopyFrom;
     }
 
     public OutputStream getReportFileForWriting() throws SVNException {
@@ -349,7 +350,7 @@ public class FSUpdateContext {
                 }
                 
                 targetEntries.remove(entryName);
-                if (sourceEntries != null) {
+                if (sourceEntries != null && (pathInfo == null || pathInfo.getDepth() != SVNDepth.EXCLUDE || targetEntry != null)) {
                     sourceEntries.remove(entryName);
                 }
             }
@@ -444,7 +445,7 @@ public class FSUpdateContext {
                 return;
             }
             FSRevisionNode sourceNode = sourceRoot.getRevisionNode(sourcePath);
-            sourceHexDigest = sourceNode.getFileChecksum();
+            sourceHexDigest = sourceNode.getFileMD5Checksum();
         }
         
         FSRepositoryUtil.sendTextDelta(getEditor(), editPath, sourcePath, sourceHexDigest, 
@@ -524,7 +525,7 @@ public class FSUpdateContext {
                 }
             }
             FSRevisionNode targetNode = getTargetRoot().getRevisionNode(targetPath);
-            String targetHexDigest = targetNode.getFileChecksum();
+            String targetHexDigest = targetNode.getFileMD5Checksum();
             getEditor().closeFile(editPath, targetHexDigest);
         }
     }

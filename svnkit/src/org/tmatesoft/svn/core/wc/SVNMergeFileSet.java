@@ -347,30 +347,11 @@ public class SVNMergeFileSet {
         return myCopyFromFile;
     }
 
-    public String toString() {
-        final StringBuffer buffer = new StringBuffer();
-        buffer.append("{Merge File Set: ");
-        buffer.append("admin area = ");
-        buffer.append(myAdminArea);
-        buffer.append("; local file path = ");
-        buffer.append(myLocalFilePath);
-        buffer.append("; base file path =");
-        buffer.append(myBaseFilePath);
-        buffer.append("; repository file path = ");
-        buffer.append(myRepositoryFilePath);
-        buffer.append("; WC file path = ");
-        buffer.append(myWCFilePath);
-        buffer.append("; merge result path = ");
-        buffer.append(myMergeResultFilePath);
-        buffer.append("; local file = ");
-        buffer.append(myLocalFile);
-        buffer.append("; base file = ");
-        buffer.append(myBaseFile);
-        buffer.append("; repository file = ");
-        buffer.append(myRepositoryFile);
-        buffer.append("; merge result file = ");
-        buffer.append(myMergeResultFile);
-        buffer.append('}');
-        return buffer.toString();
+    public String getCopyFromPath() {
+        String root = myAdminArea.getRoot().getAbsolutePath().replace(File.separatorChar, '/');
+        String copyFrom = getCopyFromFile().getAbsolutePath().replace(File.separatorChar, '/');
+        String copyFromPath = copyFrom.substring(root.length());
+        copyFromPath = copyFromPath.startsWith("/") ? copyFromPath.substring("/".length()) : copyFromPath;
+        return copyFromPath;
     }
 }

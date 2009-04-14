@@ -56,6 +56,14 @@ public class FSRecoverer {
         String nextNodeID = null;
         String nextCopyID = null;
         long maxRev = getLargestRevision();
+        long youngestRev = myOwner.getYoungestRevision();
+        
+        if (youngestRev > maxRev) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_CORRUPT, "Expected current rev to be <= {0} but found {1}", 
+                    new Object[] { String.valueOf(maxRev), String.valueOf(youngestRev) });
+            SVNErrorManager.error(err, SVNLogType.FSFS);
+        }
+        
         if (myOwner.getDBFormat() < FSFS.MIN_NO_GLOBAL_IDS_FORMAT) {
             long[] rootOffset = { -1 };
             String[] maxNodeID = { "0" };
@@ -67,7 +75,7 @@ public class FSRecoverer {
                 FSFile revFile = null;
                 try {
                     revFile = myOwner.getRevisionFSFile(rev);
-                    FSRepositoryUtil.loadRootChangesOffset(revFile, rootOffset, null);
+                    FSRepositoryUtil.loadRootChangesOffset(myOwner, rev, revFile, rootOffset, null);
                     findMaxIDs(rev, revFile, rootOffset[0], maxNodeID, maxCopyID);
                 } finally {
                     if (revFile != null) {
@@ -78,6 +86,25 @@ public class FSRecoverer {
             nextNodeID = FSRepositoryUtil.generateNextKey(maxNodeID[0]);
             nextCopyID = FSRepositoryUtil.generateNextKey(maxCopyID[0]);
         }
+        
+        File revpropFile = null;
+        try {
+            revpropFile = myOwner.getRevisionPropertiesFile(maxRev);
+        } catch (SVNException svne) {
+            if (svne.getErrorMessage().getErrorCode() == SVNErrorCode.FS_NO_SUCH_REVISION) {
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_CORRUPT, "Revision {0} has a revs file but no revprops file", 
+                        String.valueOf(maxRev));
+                SVNErrorManager.error(err, SVNLogType.FSFS);
+            }
+            throw svne;
+        }
+        
+        if (!revpropFile.isFile()) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_CORRUPT, "Revision {0} has a non-file where its revprops file should be", 
+                    String.valueOf(maxRev));
+            SVNErrorManager.error(err, SVNLogType.FSFS);
+        }
+        
         try {
             myOwner.writeCurrentFile(maxRev, nextNodeID, nextCopyID);
         } catch (IOException ioe) {
@@ -166,7 +193,7 @@ public class FSRecoverer {
         }
     }
     
-    private long getLargestRevision() {
+    private long getLargestRevision() throws SVNException {
         long right = 1;
         while (true) {
             File revFile = myOwner.getRevisionFile(right);

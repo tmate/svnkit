@@ -170,8 +170,14 @@ public class SVNStatusCommand extends SVNXMLCommand implements ISVNStatusHandler
         if (status.isSwitched()) {
             xmlMap.put("switched", "true");
         }
+        if (status.isFileExternal()) {
+            xmlMap.put("file-external", "true");
+        }
         if (status.getEntry() != null && !status.isCopied()) {
             xmlMap.put("revision", status.getRevision().toString());
+        }
+        if (status.getTreeConflict() != null) {
+            xmlMap.put("tree-conflicted", "true");
         }
         xmlBuffer = openXMLTag("wc-status", SVNXMLUtil.XML_STYLE_NORMAL, xmlMap, xmlBuffer);
         if (status.getEntry() != null && status.getCommittedRevision().isValid()) {

@@ -39,9 +39,11 @@ import java.util.Properties;
 import java.util.StringTokenizer;
 import java.util.logging.Level;
 
+import org.tmatesoft.svn.core.ISVNCanceller;
 import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
+import org.tmatesoft.svn.core.SVNNodeKind;
 import org.tmatesoft.svn.core.internal.util.SVNFormatUtil;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
 import org.tmatesoft.svn.core.internal.util.SVNUUIDGenerator;
@@ -915,7 +917,7 @@ public class SVNFileUtil {
         }
     }
 
-    public static void deleteAll(File dir, boolean deleteDirs, ISVNEventHandler cancelBaton) throws SVNException {
+    public static void deleteAll(File dir, boolean deleteDirs, ISVNCanceller cancelBaton) throws SVNException {
         if (dir == null) {
             return;
         }
@@ -993,23 +995,23 @@ public class SVNFileUtil {
             return null;
         }
 
-        String hexMD5Digest = hexDigest.toLowerCase();
+        hexDigest = hexDigest.toLowerCase();
 
-        int digestLength = hexMD5Digest.length() / 2;
+        int digestLength = hexDigest.length() / 2;
 
-        if (digestLength == 0 || 2 * digestLength != hexMD5Digest.length()) {
+        if (digestLength == 0 || 2 * digestLength != hexDigest.length()) {
             return null;
         }
 
         byte[] digest = new byte[digestLength];
-        for (int i = 0; i < hexMD5Digest.length() / 2; i++) {
-            if (!isHex(hexMD5Digest.charAt(2 * i)) || !isHex(hexMD5Digest.charAt(2 * i + 1))) {
+        for (int i = 0; i < hexDigest.length() / 2; i++) {
+            if (!isHex(hexDigest.charAt(2 * i)) || !isHex(hexDigest.charAt(2 * i + 1))) {
                 return null;
             }
 
-            int hi = Character.digit(hexMD5Digest.charAt(2 * i), 16) << 4;
+            int hi = Character.digit(hexDigest.charAt(2 * i), 16) << 4;
 
-            int lo = Character.digit(hexMD5Digest.charAt(2 * i + 1), 16);
+            int lo = Character.digit(hexDigest.charAt(2 * i + 1), 16);
             Integer ib = new Integer(hi | lo);
             byte b = ib.byteValue();
 
@@ -1173,6 +1175,22 @@ public class SVNFileUtil {
         } else {
             return mod.toLowerCase().indexOf('x', 7) >= 7;
         }
+    }
+
+    public static File ensureDirectoryExists(File path) throws SVNException {
+        SVNFileType type = SVNFileType.getType(path);
+        SVNNodeKind kind = SVNFileType.getNodeKind(type);
+        if (kind != SVNNodeKind.NONE && kind != SVNNodeKind.DIR) {
+            SVNErrorMessage error = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, "''{0}'' is not a directory", path);
+            SVNErrorManager.error(error, SVNLogType.WC);
+        } else if (kind == SVNNodeKind.NONE) {
+            boolean created = path.mkdirs();
+            if (!created) {
+                SVNErrorMessage error = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, "Unable to make directories", path);
+                SVNErrorManager.error(error, SVNLogType.WC);
+            }
+        }
+        return path;
     }
 
     public static void copyDirectory(File srcDir, File dstDir, boolean copyAdminDir, ISVNEventHandler cancel) throws SVNException {
