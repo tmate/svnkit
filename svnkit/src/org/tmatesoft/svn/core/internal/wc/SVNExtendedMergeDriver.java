@@ -21,7 +21,6 @@ import java.io.UnsupportedEncodingException;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.TreeMap;
 
 import org.tmatesoft.svn.core.SVNDepth;
 import org.tmatesoft.svn.core.SVNErrorCode;
@@ -57,6 +56,7 @@ public abstract class SVNExtendedMergeDriver extends SVNMergeDriver {
     private ISVNExtendedMergeCallback myExtendedMergeCallback;
     private SVNCopyDriver myCopyDriver;
     private SVNURL myPrimaryURL;
+    private SVNURL mySecondURL;
     private long myRevision1;
     private long myRevision2;
     private File myTempDirectory;
@@ -187,7 +187,7 @@ public abstract class SVNExtendedMergeDriver extends SVNMergeDriver {
         }
         getPendingFiles().add(target);
 
-        SVNURL sourceURL = myPrimaryURL.appendPath(mergeSource, false);
+        SVNURL sourceURL = myPrimaryURL.appendPath(mergeSource, false);        
         mergeSources = getMergeSources(sourceURL, mergeSources);
         SVNURL url1 = mergeSources[0];
         SVNURL url2 = mergeSources[1];
@@ -271,7 +271,8 @@ public abstract class SVNExtendedMergeDriver extends SVNMergeDriver {
             mergeSources[1] = sourceURL;
         } else {
             mergeSources[0] = sourceURL;
-            mergeSources[1] = sourceURL;
+            String relativePath = SVNPathUtil.getRelativePath(myPrimaryURL.getPath(), sourceURL.getPath());            
+            mergeSources[1] = mySecondURL.appendPath(relativePath, false);
         }
         return mergeSources;
     }
@@ -289,6 +290,10 @@ public abstract class SVNExtendedMergeDriver extends SVNMergeDriver {
             return;
         }
 
+        myPrimaryURL = revision1 < revision2 ? url1 : url2;
+        mySecondURL = revision1 < revision2 ? url2 : url1;
+        myRevision1 = revision1;
+        myRevision2 = revision2;
         try {
             super.doDirectoryMerge(url1, revision1, url2, revision2, parentEntry, adminArea, depth);
             doAdditionalMerge();
@@ -301,13 +306,6 @@ public abstract class SVNExtendedMergeDriver extends SVNMergeDriver {
             deleteReportFile();
             getPendingFiles().clear();
         }
-    }
-
-    protected SVNRemoteDiffEditor driveMergeReportEditor(File targetWCPath, SVNURL url1, long revision1, SVNURL url2, long revision2, List childrenWithMergeInfo, boolean isRollBack, SVNDepth depth, SVNAdminArea adminArea, SVNMergeCallback mergeCallback, SVNRemoteDiffEditor editor) throws SVNException {
-        myPrimaryURL = revision1 > revision2 ? url1 : url2;
-        myRevision1 = revision1;
-        myRevision2 = revision2;
-        return super.driveMergeReportEditor(targetWCPath, url1, revision1, url2, revision2, childrenWithMergeInfo, isRollBack, depth, adminArea, mergeCallback, editor);
     }
 
     protected void doAdditionalMerge() throws SVNException {
@@ -383,50 +381,6 @@ public abstract class SVNExtendedMergeDriver extends SVNMergeDriver {
             myRepository1.setLocation(url1, false);
         }
         return new Object[]{myCurrentRemainingRanges, targetMergeInfo, implicitMergeInfo};
-    }
-
-    // Subversion has a bug for file merge:
-    // calculating natural history fails at certain conditions, it should not interrupt merge-ext process anyway
-    // TODO: remove this method after the fix
-    protected Map calculateImplicitMergeInfo(SVNRepository repos, SVNURL url, long[] targetRev, long start, long end) throws SVNException {
-        if (skipExtendedMerge()) {
-            return super.calculateImplicitMergeInfo(repos, url, targetRev, start, end);
-        }
-        Map implicitMergeInfo = null;
-        boolean closeSession = false;
-        SVNURL sessionURL = null;
-        try {
-            if (repos != null) {
-                sessionURL = ensureSessionURL(repos, url);
-            } else {
-                repos = createRepository(url, null, null, false);
-                closeSession = true;
-            }
-
-            if (targetRev[0] < start) {
-                try {
-                    getLocations(url, null, repos, SVNRevision.create(targetRev[0]), SVNRevision.create(start), SVNRevision.UNDEFINED);
-                    targetRev[0] = start;
-                } catch (SVNException svne) {
-                    SVNErrorMessage error = svne.getErrorMessage();
-                    if (error.getErrorCode() == SVNErrorCode.FS_NOT_FOUND) {
-                        // Hack! Skipping error to let merge-ext continue.
-                        implicitMergeInfo = new TreeMap();
-                    }
-                }
-            }
-            if (implicitMergeInfo == null) {
-                implicitMergeInfo = getHistoryAsMergeInfo(url, null, SVNRevision.create(targetRev[0]), start, end, repos, null);
-            }
-            if (sessionURL != null) {
-                repos.setLocation(sessionURL, false);
-            }
-        } finally {
-            if (closeSession) {
-                repos.closeSession();
-            }
-        }
-        return implicitMergeInfo;
     }
 
     private static SVNAdminArea retrieve(SVNWCAccess access, File target) throws SVNException {
