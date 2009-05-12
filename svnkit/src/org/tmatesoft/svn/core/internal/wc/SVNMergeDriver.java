@@ -2024,16 +2024,7 @@ public abstract class SVNMergeDriver extends SVNBasicClient {
             result[1] = new TreeMap();//implicit merge info
             return result;
         }
-
-        Map implicitMergeInfo = calculateImplicitMergeInfo(repos, url, targetRev, start, end);
-        if (implicitMergeInfo != null) {
-            result[1] = implicitMergeInfo;
-        }
-        return result;
-    }
-
-    protected Map calculateImplicitMergeInfo(SVNRepository repos, SVNURL url, long[] targetRev, long start, long end) throws SVNException {
-        Map implicitMergeInfo = null;
+        
         boolean closeSession = false;
         SVNURL sessionURL = null;
         try {
@@ -2043,12 +2034,14 @@ public abstract class SVNMergeDriver extends SVNBasicClient {
                 repos = createRepository(url, null, null, false);
                 closeSession = true;
             }
-
+            
             if (targetRev[0] < start) {
-                getLocations(url, null, repos, SVNRevision.create(targetRev[0]), SVNRevision.create(start), SVNRevision.UNDEFINED);
+                getLocations(url, null, repos, SVNRevision.create(targetRev[0]), 
+                        SVNRevision.create(start), SVNRevision.UNDEFINED);
                 targetRev[0] = start;
             }
-            implicitMergeInfo = getHistoryAsMergeInfo(url, null, SVNRevision.create(targetRev[0]), start, end, repos, null);
+            result[1] = getHistoryAsMergeInfo(url, null, SVNRevision.create(targetRev[0]), start, end, 
+            		repos, null);
             if (sessionURL != null) {
                 repos.setLocation(sessionURL, false);
             }
@@ -2057,9 +2050,9 @@ public abstract class SVNMergeDriver extends SVNBasicClient {
                 repos.closeSession();
             }
         }
-        return implicitMergeInfo;
+        return result;
     }
-
+    
     private int findNearestAncestor(Object[] childrenWithMergeInfoArray, boolean pathIsOwnAncestor, File path) {
         if (childrenWithMergeInfoArray == null) {
             return 0;
@@ -2405,7 +2398,7 @@ public abstract class SVNMergeDriver extends SVNBasicClient {
     	}
     }
     
-    protected SVNRemoteDiffEditor driveMergeReportEditor(File targetWCPath, SVNURL url1, long revision1, 
+    private SVNRemoteDiffEditor driveMergeReportEditor(File targetWCPath, SVNURL url1, long revision1, 
     		SVNURL url2, final long revision2, final List childrenWithMergeInfo, final boolean isRollBack, 
     		SVNDepth depth, SVNAdminArea adminArea, SVNMergeCallback mergeCallback, 
             SVNRemoteDiffEditor editor) throws SVNException {
@@ -2523,7 +2516,7 @@ public abstract class SVNMergeDriver extends SVNBasicClient {
     }
 
     protected SVNRemoteDiffEditor getMergeReportEditor(long defaultStart, long revision, SVNAdminArea adminArea, SVNDepth depth, 
-            AbstractDiffCallback mergeCallback, SVNRemoteDiffEditor editor) {
+            AbstractDiffCallback mergeCallback, SVNRemoteDiffEditor editor) throws SVNException {
         if (editor == null) {
             editor = new SVNRemoteDiffEditor(adminArea, adminArea.getRoot(), mergeCallback, myRepository2,
                     defaultStart, revision, myIsDryRun, this, this);

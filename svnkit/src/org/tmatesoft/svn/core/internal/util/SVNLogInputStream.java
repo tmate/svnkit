@@ -15,6 +15,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 
+import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
+import org.tmatesoft.svn.util.ISVNDebugLog;
+
 
 /**
  * @version 1.3
@@ -25,9 +28,12 @@ public class SVNLogInputStream extends InputStream {
     private OutputStream myLog;
     private InputStream myIn;
 
-    public SVNLogInputStream(InputStream in, OutputStream log) {
+    public SVNLogInputStream(InputStream in, ISVNDebugLog log) {
         myIn = in;
-        myLog = log;
+        myLog = log.createInputLogStream();
+        if (myLog == null) {
+            myLog = SVNFileUtil.DUMMY_OUT;
+        }
     }
 
     public long skip(long n) throws IOException {
@@ -41,9 +47,7 @@ public class SVNLogInputStream extends InputStream {
             throw e;
         } finally {
             try {
-                if (myLog != null) {
-                    myLog.close();
-                }
+                myLog.close();
             } catch (IOException e) {
             }
         }
@@ -55,9 +59,7 @@ public class SVNLogInputStream extends InputStream {
             read = myIn.read(b, off, len);
             if (read > 0) {
                 try {
-                    if (myLog != null) {
-                        myLog.write(b, off, read);
-                    }
+                    myLog.write(b, off, read);
                 } catch (IOException e) {
                 }
             }
@@ -72,7 +74,7 @@ public class SVNLogInputStream extends InputStream {
         try {
             read = myIn.read();
             try {
-                if (read >= 0 && myLog != null) {
+                if (read >= 0) {
                     myLog.write(read & 0xFF);
                 }
             } catch (IOException e) {
@@ -85,9 +87,7 @@ public class SVNLogInputStream extends InputStream {
     
     public void flushBuffer() {
         try {
-            if (myLog != null) {
-                myLog.flush();
-            }
+            myLog.flush();            
         } catch (IOException e) {
         }
     }
