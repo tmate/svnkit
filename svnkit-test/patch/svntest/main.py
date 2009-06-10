@@ -1487,7 +1487,7 @@ def run_tests(test_list, serial_only = False):
       quiet_mode = True
 
     elif opt == "--cleanup":
-      cleanup_mode = True
+      cleanup_mode = False
 
     elif opt == "--list":
       list_tests = True
@@ -1548,6 +1548,7 @@ def run_tests(test_list, serial_only = False):
     if svn_bin is None:
       svn_bin = ''
     svn_binary = os.path.join(svn_bin, 'jsvn' + _bat)
+#    svn_binary = os.path.abspath('/home/alex/workspace/svn_1.6.x/subversion/svn/svn' + _bat)
     svnadmin_binary = os.path.join(svn_bin, 'jsvnadmin' + _bat)
     svnlook_binary = os.path.join(svn_bin, 'jsvnlook' + _bat)
     svnsync_binary = os.path.join(svn_bin, 'jsvnsync' + _bat)
