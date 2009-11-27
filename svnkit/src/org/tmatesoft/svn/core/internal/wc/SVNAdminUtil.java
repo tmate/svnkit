@@ -11,12 +11,9 @@
  */
 package org.tmatesoft.svn.core.internal.wc;
 
-import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.io.OutputStream;
-import java.util.logging.Level;
 
 import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
@@ -45,8 +42,7 @@ public class SVNAdminUtil {
     private static final String PROP_WORK_DIR_NAME = "props";
     private static final String PROP_WC_DIR_NAME = "wcprops";
     private static final String TMP_DIR_NAME = "tmp";
-    private static final String SDB_FILE_NAME = "wc.db";
-    
+
     private static final String DIR_PROPS_FILE = "dir-props";
     private static final String DIR_BASE_PROPS_FILE = "dir-prop-base";
     private static final String DIR_REVERT_PROPS_FILE = "dir-prop-revert";
@@ -195,11 +191,6 @@ public class SVNAdminUtil {
         }
         return buffer.toString();
     }
-
-    public static File getSDBFile(File dir) {
-        File sdbFile = new File(dir, SVNFileUtil.getAdminDirectoryName());
-        return new File(sdbFile, SDB_FILE_NAME);
-    }
     
     /**
      * Creates "tempfile[.n].tmp" in admin area's /tmp dir
@@ -223,46 +214,6 @@ public class SVNAdminUtil {
         String adminPath = buffer.toString();
         File dir = adminArea.getFile(adminPath);
         return SVNFileUtil.createUniqueFile(dir, prefix, suffix, false);
-    }
-
-    public static int getVersion(File path) throws SVNException {
-        File adminDir = new File(path, SVNFileUtil.getAdminDirectoryName());
-        File entriesFile = new File(adminDir, "entries");
-        int formatVersion = -1;
-
-        BufferedReader reader = null;
-        String line = null;
-    
-        try {
-            reader = new BufferedReader(new InputStreamReader(SVNFileUtil.openFileForReading(entriesFile, Level.FINEST, SVNLogType.WC), "UTF-8"));
-            line = reader.readLine();
-        } catch (IOException e) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, "Cannot read entries file ''{0}'': {1}", new Object[] {entriesFile, e.getLocalizedMessage()});
-            SVNErrorManager.error(err, e, SVNLogType.WC);
-        } catch (SVNException svne) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_NOT_DIRECTORY, "''{0}'' is not a working copy", path);
-            err.setChildErrorMessage(svne.getErrorMessage());
-            SVNErrorManager.error(err, svne, Level.FINEST, SVNLogType.WC);
-        } finally {
-            SVNFileUtil.closeFile(reader);
-        }
-        
-        if (line == null || line.length() == 0) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.STREAM_UNEXPECTED_EOF, "Reading ''{0}''", entriesFile);
-            SVNErrorMessage err1 = SVNErrorMessage.create(SVNErrorCode.WC_NOT_DIRECTORY, "''{0}'' is not a working copy", path);
-            err1.setChildErrorMessage(err);
-            SVNErrorManager.error(err1, Level.FINEST, SVNLogType.WC);
-        }
-        
-        try {
-            formatVersion = Integer.parseInt(line.trim());
-        } catch (NumberFormatException e) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.BAD_VERSION_FILE_FORMAT, "First line of ''{0}'' contains non-digit", entriesFile);
-            SVNErrorMessage err1 = SVNErrorMessage.create(SVNErrorCode.WC_NOT_DIRECTORY, "''{0}'' is not a working copy", path);
-            err1.setChildErrorMessage(err);
-            SVNErrorManager.error(err1, Level.FINEST, SVNLogType.WC);
-        }
-        return formatVersion;
     }
 
 }

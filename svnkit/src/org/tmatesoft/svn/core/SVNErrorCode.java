@@ -251,16 +251,7 @@ public class SVNErrorCode implements Serializable {
     public static final SVNErrorCode WC_LOCKED = new SVNErrorCode(WC_CATEGORY, 4, "Attempted to lock an already-locked dir");
     public static final SVNErrorCode WC_NOT_LOCKED = new SVNErrorCode(WC_CATEGORY, 5, "Working copy not locked; this is probably a bug, please report");
     public static final SVNErrorCode WC_INVALID_LOCK = new SVNErrorCode(WC_CATEGORY, 6, "Invalid lock");
-
-    /**
-     * @since 1.4, SVN 1.7
-     */
-    public static final SVNErrorCode WC_NOT_WORKING_COPY = new SVNErrorCode(WC_CATEGORY, 7, "Path is not a working copy directory");
-
-    /**
-     * @deprecated This name is deprecated. Use WC_NOT_WORKING_COPY. Provided for backward compatibility with pre-1.4 API
-     */
-    public static final SVNErrorCode WC_NOT_DIRECTORY = WC_NOT_WORKING_COPY;
+    public static final SVNErrorCode WC_NOT_DIRECTORY = new SVNErrorCode(WC_CATEGORY, 7, "Path is not a working copy directory");
     public static final SVNErrorCode WC_NOT_FILE = new SVNErrorCode(WC_CATEGORY, 8, "Path is not a working copy file");
     public static final SVNErrorCode WC_BAD_ADM_LOG = new SVNErrorCode(WC_CATEGORY, 9, "Problem running log");
     public static final SVNErrorCode WC_PATH_NOT_FOUND = new SVNErrorCode(WC_CATEGORY, 10, "Can't find a working copy path");
@@ -310,36 +301,6 @@ public class SVNErrorCode implements Serializable {
      */
     public static final SVNErrorCode WC_CANNOT_MOVE_FILE_EXTERNAL =  new SVNErrorCode(WC_CATEGORY, 31, "Cannot move a file external");
 
-    /**
-     * @since 1.4, SVN 1.7
-     */
-    public static final SVNErrorCode WC_DB_ERROR = new SVNErrorCode(WC_CATEGORY, 32, "Something's amiss with the wc sqlite database");
-
-    /**
-     * @since 1.4, SVN 1.7
-     */
-    public static final SVNErrorCode WC_MISSING = new SVNErrorCode(WC_CATEGORY, 33, "The working copy is missing");
-
-    /**
-     * @since 1.4, SVN 1.7
-     */
-    public static final SVNErrorCode WC_NOT_SYMLINK = new SVNErrorCode(WC_CATEGORY, 34, "The specified node is not a symlink");
-
-    /**
-     * @since 1.4, SVN 1.7
-     */
-    public static final SVNErrorCode WC_PATH_UNEXPECTED_STATUS = new SVNErrorCode(WC_CATEGORY, 35, "The specified path has an unexpected status");
-
-    /**
-     * @since 1.4, SVN 1.7
-     */
-    public static final SVNErrorCode WC_UPGRADE_REQUIRED = new SVNErrorCode(WC_CATEGORY, 36, "The working copy needs to be upgraded");
-    
-    /**
-     * @since 1.4, SVN 1.7
-     */
-    public static final SVNErrorCode WC_CLEANUP_REQUIRED = new SVNErrorCode(WC_CATEGORY, 37, "Previous operation was interrupted; run 'svn cleanup'");
-    
     public static final SVNErrorCode FS_GENERAL = new SVNErrorCode(FS_CATEGORY, 0, "General filesystem error");
     public static final SVNErrorCode FS_CLEANUP = new SVNErrorCode(FS_CATEGORY, 1, "Error closing filesystem");
     public static final SVNErrorCode FS_ALREADY_OPEN = new SVNErrorCode(FS_CATEGORY, 2, "Filesystem is already open");
