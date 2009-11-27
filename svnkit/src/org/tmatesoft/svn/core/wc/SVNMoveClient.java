@@ -820,6 +820,7 @@ public class SVNMoveClient extends SVNCopyDriver {
             SVNVersionedProperties srcBaseProps = srcArea.getBaseProperties(src.getName());
             SVNVersionedProperties dstProps = dstArea.getProperties(dst.getName());
             SVNVersionedProperties dstBaseProps  = dstArea.getBaseProperties(dst.getName());
+            dstProps.removeAll();
             dstBaseProps.removeAll();
             srcProps.copyTo(dstProps);
             srcBaseProps.copyTo(dstBaseProps);

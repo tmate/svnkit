@@ -2072,9 +2072,10 @@ public abstract class SVNMergeDriver extends SVNBasicClient implements ISVNMerge
                 repos = createRepository(url, null, null, false);
                 closeSession = true;
             }
-
+            
             if (targetRev[0] < start) {
-                getLocations(url, null, repos, SVNRevision.create(targetRev[0]), SVNRevision.create(start), SVNRevision.UNDEFINED);
+                getLocations(url, null, repos, SVNRevision.create(targetRev[0]), 
+                        SVNRevision.create(start), SVNRevision.UNDEFINED);
                 targetRev[0] = start;
             }
             implicitMergeInfo = getHistoryAsMergeInfo(url, null, SVNRevision.create(targetRev[0]), start, end, repos, null);
@@ -2088,7 +2089,7 @@ public abstract class SVNMergeDriver extends SVNBasicClient implements ISVNMerge
         }
         return implicitMergeInfo;
     }
-
+    
     private int findNearestAncestor(Object[] childrenWithMergeInfoArray, boolean pathIsOwnAncestor, File path) {
         if (childrenWithMergeInfoArray == null) {
             return 0;

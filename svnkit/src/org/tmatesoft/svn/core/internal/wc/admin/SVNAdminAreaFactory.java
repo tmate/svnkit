@@ -23,7 +23,6 @@ import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNNodeKind;
 import org.tmatesoft.svn.core.SVNURL;
-import org.tmatesoft.svn.core.internal.wc.SVNClassLoader;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.internal.wc.SVNEventFactory;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
@@ -44,17 +43,17 @@ public abstract class SVNAdminAreaFactory implements Comparable {
     public static final int WC_FORMAT_14 = 8;
     public static final int WC_FORMAT_15 = 9;
     public static final int WC_FORMAT_16 = 10;
-    
-    public static final int SVN_WC_VERSION = 15;
-    public static final int SVN_WC__HAS_WORK_QUEUE = 13;
-    
+
     private static final Collection ourFactories = new TreeSet();
     private static boolean ourIsUpgradeEnabled = Boolean.valueOf(System.getProperty("svnkit.upgradeWC", System.getProperty("javasvn.upgradeWC", "true"))).booleanValue();
     private static ISVNAdminAreaFactorySelector ourSelector;
     private static ISVNAdminAreaFactorySelector ourDefaultSelector = new DefaultSelector();
 
     static {
-        SVNAdminAreaFactory.registerFactories();
+        SVNAdminAreaFactory.registerFactory(new SVNAdminArea16Factory());
+        SVNAdminAreaFactory.registerFactory(new SVNAdminArea15Factory());
+        SVNAdminAreaFactory.registerFactory(new SVNAdminArea14Factory());
+        SVNAdminAreaFactory.registerFactory(new SVNXMLAdminAreaFactory());
     }
     
     public static void setUpgradeEnabled(boolean enabled) {
@@ -193,11 +192,17 @@ public abstract class SVNAdminAreaFactory implements Comparable {
     }
 
     private static SVNAdminAreaFactory getAdminAreaFactory(int wcFormat) throws SVNException {
-        for (Iterator ourFactoriesIter = ourFactories.iterator(); ourFactoriesIter.hasNext();) {
-            SVNAdminAreaFactory nextFactory = (SVNAdminAreaFactory) ourFactoriesIter;
-            if (nextFactory.getSupportedVersion() == wcFormat) {
-                return nextFactory; 
-            }
+        if (wcFormat == SVNXMLAdminAreaFactory.WC_FORMAT) {
+            return new SVNXMLAdminAreaFactory();
+        }
+        if (wcFormat == SVNAdminArea14Factory.WC_FORMAT) {
+            return new SVNAdminArea14Factory();           
+        }
+        if (wcFormat == SVNAdminArea15Factory.WC_FORMAT) {
+            return new SVNAdminArea15Factory();
+        }
+        if (wcFormat == SVNAdminArea16Factory.WC_FORMAT) {
+            return new SVNAdminArea16Factory();
         }
         SVNErrorManager.error(SVNErrorMessage.create(SVNErrorCode.WC_UNSUPPORTED_FORMAT), SVNLogType.DEFAULT);
         return null;
@@ -237,7 +242,7 @@ public abstract class SVNAdminAreaFactory implements Comparable {
             }
         }
     }
-    
+
     public static void createVersionedDirectory(File path, SVNURL url, SVNURL rootURL, String uuid, long revNumber, SVNDepth depth) throws SVNException {
         createVersionedDirectory(path, url != null ? url.toString() : null, rootURL != null ? rootURL.toString() : null, uuid, revNumber, depth);
     }
@@ -316,9 +321,4 @@ public abstract class SVNAdminAreaFactory implements Comparable {
         }
 
     }
-    
-    private static void registerFactories() {
-        ourFactories.addAll(SVNClassLoader.getAvailableAdminAreaFactories());
-    }
-    
 }

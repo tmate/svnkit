@@ -38,6 +38,7 @@ import org.tmatesoft.svn.core.SVNRevisionProperty;
 import org.tmatesoft.svn.core.internal.util.SVNDate;
 import org.tmatesoft.svn.core.internal.util.SVNHashMap;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
+import org.tmatesoft.svn.core.internal.util.SVNUUIDGenerator;
 import org.tmatesoft.svn.core.internal.wc.DefaultSVNOptions;
 import org.tmatesoft.svn.core.internal.wc.SVNConfigFile;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
@@ -886,7 +887,7 @@ public class FSFS {
         }
         
         if (!revPropsFile.exists() && !returnMissing) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_NO_SUCH_REVISION, "No such revision {0}", String.valueOf(revision));
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_NO_SUCH_REVISION, "No such revision {0}", new Long(revision));
             SVNErrorManager.error(err, SVNLogType.FSFS);
         }
         return revPropsFile;
@@ -1614,7 +1615,7 @@ public class FSFS {
         File revisionFile = getRevisionFile(revision);
         
         if (!revisionFile.exists()) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_NO_SUCH_REVISION, "No such revision {0}", String.valueOf(revision));
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_NO_SUCH_REVISION, "No such revision {0}", new Long(revision));
             SVNErrorManager.error(err, SVNLogType.FSFS);
         }
         return new FSFile(revisionFile);
@@ -1623,7 +1624,7 @@ public class FSFS {
     protected FSFile getPackOrRevisionFSFile(long revision) throws SVNException {
         File file = getAbsoluteRevisionPath(revision);
         if (!file.exists()) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_NO_SUCH_REVISION, "No such revision {0}", String.valueOf(revision));
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_NO_SUCH_REVISION, "No such revision {0}", new Long(revision));
             SVNErrorManager.error(err, SVNLogType.FSFS);
         }
         return new FSFile(file);
@@ -1803,7 +1804,7 @@ public class FSFS {
         }
         
         SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_NO_SUCH_REVISION, 
-                "No such revision {0}", String.valueOf(revision));
+                "No such revision {0}", new Long(revision));
         SVNErrorManager.error(err, SVNLogType.FSFS);
     }
     
@@ -1874,7 +1875,8 @@ public class FSFS {
 
         SVNLock lock = null;
         if (token == null) {
-            token = FSRepositoryUtil.generateLockToken();
+            String uuid = SVNUUIDGenerator.formatUUID(SVNUUIDGenerator.generateUUID());
+            token = FSFS.SVN_OPAQUE_LOCK_TOKEN + uuid;
             lock = new FSLock(path, token, username, comment, new Date(System.currentTimeMillis()), expirationDate, isDAVComment);
         } else {
             lock = new FSLock(path, token, username, comment, new Date(System.currentTimeMillis()), expirationDate, isDAVComment);
