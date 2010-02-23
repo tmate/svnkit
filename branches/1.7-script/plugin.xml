@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?eclipse version="3.4"?>
+<plugin>
+
+   <extension
+         point="org.eclipse.ui.actionSets">
+      <actionSet
+            label="TMateSoft"
+            visible="true"
+            id="com.tmatesoft.refactoring.split.actionSet">
+         <menu
+               label="TMateSoft"
+               id="tmateMenu">
+            <separator
+                  name="refactoringGroup">
+            </separator>
+         </menu>
+         <action
+               label="Split refactoring"
+               class="com.tmatesoft.refactoring.split.actions.SplitAction"
+               menubarPath="tmateMenu/refactoringGroup"
+               id="com.tmatesoft.refactoring.split.actions.SplitAction">
+         </action>
+      </actionSet>
+   </extension>
+
+</plugin>
