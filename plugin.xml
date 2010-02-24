@@ -2,26 +2,27 @@
 <?eclipse version="3.4"?>
 <plugin>
 
-   <extension
-         point="org.eclipse.ui.actionSets">
-      <actionSet
-            label="TMateSoft"
-            visible="true"
-            id="com.tmatesoft.refactoring.split.actionSet">
-         <menu
-               label="TMateSoft"
-               id="tmateMenu">
-            <separator
-                  name="refactoringGroup">
-            </separator>
-         </menu>
-         <action
-               label="Split refactoring"
-               class="com.tmatesoft.refactoring.split.actions.SplitAction"
-               menubarPath="tmateMenu/refactoringGroup"
-               id="com.tmatesoft.refactoring.split.actions.SplitAction">
-         </action>
-      </actionSet>
-   </extension>
+	<extension point="org.eclipse.ui.popupMenus">
+
+		<objectContribution objectClass="org.eclipse.core.resources.IProject"
+			adaptable="true" id="tmate.projectContributions">
+
+			<filter name="projectNature" value="org.eclipse.jdt.core.javanature">
+			</filter>
+
+			<menu id="tmate.menu" label="TMateSoft Tools">
+				<groupMarker name="additions">
+				</groupMarker>
+			</menu>
+
+			<action label="Split refactoring"
+				class="org.tmatesoft.refactoring.split.actions.SplitAction"
+				menubarPath="tmate.menu/additions" id="tmate.SplitAction">
+			</action>
+
+		</objectContribution>
+
+	</extension>
+
 
 </plugin>

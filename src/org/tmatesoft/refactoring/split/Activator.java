@@ -1,4 +1,4 @@
-package com.tmatesoft.refactoring.split;
+package org.tmatesoft.refactoring.split;
 
 import org.eclipse.jface.resource.ImageDescriptor;
 import org.eclipse.ui.plugin.AbstractUIPlugin;
