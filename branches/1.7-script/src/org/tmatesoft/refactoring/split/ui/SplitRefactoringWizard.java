@@ -1,8 +1,8 @@
-package com.tmatesoft.refactoring.split.ui;
+package org.tmatesoft.refactoring.split.ui;
 
 import org.eclipse.ltk.ui.refactoring.RefactoringWizard;
+import org.tmatesoft.refactoring.split.core.SplitRefactoring;
 
-import com.tmatesoft.refactoring.split.core.SplitRefactoring;
 
 public class SplitRefactoringWizard extends RefactoringWizard {
 

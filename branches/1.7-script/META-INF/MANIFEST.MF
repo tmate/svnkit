@@ -1,9 +1,9 @@
 Manifest-Version: 1.0
 Bundle-ManifestVersion: 2
 Bundle-Name: Split refactoring
-Bundle-SymbolicName: com.tmatesoft.refactoring.split;singleton:=true
+Bundle-SymbolicName: org.tmatesoft.refactoring.split;singleton:=true
 Bundle-Version: 1.0.0.qualifier
-Bundle-Activator: com.tmatesoft.refactoring.split.Activator
+Bundle-Activator: org.tmatesoft.refactoring.split.Activator
 Bundle-Vendor: TMate Software
 Require-Bundle: org.eclipse.ui,
  org.eclipse.core.runtime,

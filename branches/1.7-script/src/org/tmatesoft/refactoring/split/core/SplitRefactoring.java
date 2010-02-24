@@ -1,15 +1,18 @@
-package com.tmatesoft.refactoring.split.core;
+package org.tmatesoft.refactoring.split.core;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import org.eclipse.core.resources.IProject;
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.core.runtime.OperationCanceledException;
 import org.eclipse.jdt.core.IJavaElement;
+import org.eclipse.jdt.core.IJavaProject;
 import org.eclipse.jdt.core.IPackageFragment;
 import org.eclipse.jdt.core.IType;
+import org.eclipse.jdt.core.JavaCore;
 import org.eclipse.jdt.core.search.IJavaSearchConstants;
 import org.eclipse.jdt.core.search.IJavaSearchScope;
 import org.eclipse.jdt.core.search.SearchEngine;
@@ -17,18 +20,25 @@ import org.eclipse.jdt.core.search.SearchMatch;
 import org.eclipse.jdt.core.search.SearchParticipant;
 import org.eclipse.jdt.core.search.SearchPattern;
 import org.eclipse.jdt.core.search.SearchRequestor;
+import org.eclipse.jface.viewers.IStructuredSelection;
 import org.eclipse.ltk.core.refactoring.Change;
 import org.eclipse.ltk.core.refactoring.NullChange;
 import org.eclipse.ltk.core.refactoring.Refactoring;
 import org.eclipse.ltk.core.refactoring.RefactoringStatus;
 
 public class SplitRefactoring extends Refactoring {
+	
+	public static final String TITLE = "Split refactoring";
 
 	private String sourcePackageName = "org.tmatesoft.svn.core.wc";
 	private String targetPackageName = "org.tmatesoft.svn.core.internal.wc.v16";
 	private List<String> typesToHideNames = Arrays.asList(new String[] {
 			"org.tmatesoft.svn.core.internal.wc.admin.SVNWCAccess",
 			"org.tmatesoft.svn.core.internal.wc.admin.SVNAdminArea" });
+
+	private IStructuredSelection selection;
+	private IProject project;
+	private IJavaProject javaProject;
 
 	private IPackageFragment sourcePackage;
 	private IPackageFragment targetPackage;
@@ -45,12 +55,27 @@ public class SplitRefactoring extends Refactoring {
 		try {
 			progressMonitor.beginTask("Checking preconditions...", 2);
 
-			final IJavaSearchScope workspaceScope = SearchEngine.createWorkspaceScope();
+			if (selection != null) {
+				final Object element = selection.getFirstElement();
+				if (element != null && element instanceof IProject) {
+					project = (IProject) element;
+				}
+			}
+
+			if (project == null) {
+				status.merge(RefactoringStatus.createFatalErrorStatus("Please select project"));
+				return status;
+			}
+
+			javaProject = JavaCore.create(project);
+
+			final IJavaSearchScope scope = SearchEngine.createJavaSearchScope(new IJavaElement[] { javaProject },
+					IJavaSearchScope.SOURCES);
 
 			if (sourcePackageName == null) {
 				status.merge(RefactoringStatus.createFatalErrorStatus("Source package has not been specified."));
 			} else {
-				sourcePackage = searchPackage(sourcePackageName, workspaceScope, progressMonitor, status);
+				sourcePackage = searchPackage(sourcePackageName, scope, progressMonitor, status);
 			}
 			if (targetPackageName == null) {
 				status.merge(RefactoringStatus.createFatalErrorStatus("Target package has not been specified."));
@@ -59,7 +84,7 @@ public class SplitRefactoring extends Refactoring {
 				status.merge(RefactoringStatus.createFatalErrorStatus("Types to hide have not been specified."));
 			} else {
 				for (final String typeName : typesToHideNames) {
-					final IType type = searchType(typeName, workspaceScope, progressMonitor, status);
+					final IType type = searchType(typeName, scope, progressMonitor, status);
 					if (type != null) {
 						typesToHide.add(type);
 					}
@@ -89,7 +114,7 @@ public class SplitRefactoring extends Refactoring {
 		IPackageFragment found = searchOneElement(IPackageFragment.class, pattern, scope, progressMonitor);
 		if (found == null) {
 			status.merge(RefactoringStatus.createFatalErrorStatus(String.format(
-					"Specified package '%s' has not been found", packageName)));
+					"Package '%s' has not been found in selected project", packageName)));
 		}
 		return found;
 	}
@@ -108,7 +133,7 @@ public class SplitRefactoring extends Refactoring {
 		final IType found = searchOneElement(IType.class, pattern, scope, progressMonitor);
 		if (found == null) {
 			status.merge(RefactoringStatus.createFatalErrorStatus(String.format(
-					"Specified type '%s' has not been found", typeName)));
+					"Type '%s' has not been found in selected project", typeName)));
 		}
 		return found;
 	}
@@ -164,7 +189,11 @@ public class SplitRefactoring extends Refactoring {
 
 	@Override
 	public String getName() {
-		return "TMateSoft's Split";
+		return TITLE;
+	}
+
+	public void setSelection(IStructuredSelection selection) {
+		this.selection = selection;
 	}
 
 }

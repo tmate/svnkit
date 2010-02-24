@@ -1,4 +1,4 @@
-package com.tmatesoft.refactoring.split.ui;
+package org.tmatesoft.refactoring.split.ui;
 
 import org.eclipse.ltk.ui.refactoring.UserInputWizardPage;
 import org.eclipse.swt.SWT;
