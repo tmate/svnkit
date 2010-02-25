@@ -2,12 +2,15 @@ package org.tmatesoft.refactoring.split.core;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.eclipse.core.resources.IProject;
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.core.runtime.OperationCanceledException;
+import org.eclipse.jdt.core.ICompilationUnit;
 import org.eclipse.jdt.core.IJavaElement;
 import org.eclipse.jdt.core.IJavaProject;
 import org.eclipse.jdt.core.IPackageFragment;
@@ -25,9 +28,10 @@ import org.eclipse.ltk.core.refactoring.Change;
 import org.eclipse.ltk.core.refactoring.NullChange;
 import org.eclipse.ltk.core.refactoring.Refactoring;
 import org.eclipse.ltk.core.refactoring.RefactoringStatus;
+import org.eclipse.ltk.core.refactoring.TextFileChange;
 
 public class SplitRefactoring extends Refactoring {
-	
+
 	public static final String TITLE = "Split refactoring";
 
 	private String sourcePackageName = "org.tmatesoft.svn.core.wc";
@@ -42,9 +46,10 @@ public class SplitRefactoring extends Refactoring {
 
 	private IPackageFragment sourcePackage;
 	private IPackageFragment targetPackage;
-	private List<IType> typesToHide = new ArrayList<IType>();
+	private List<IType> typesToHide;
 
-	private SearchEngine searchEngine = new SearchEngine();
+	private SearchEngine searchEngine;
+	private IJavaSearchScope searchScope;
 
 	@Override
 	public RefactoringStatus checkInitialConditions(IProgressMonitor progressMonitor) throws CoreException,
@@ -53,7 +58,7 @@ public class SplitRefactoring extends Refactoring {
 		final RefactoringStatus status = new RefactoringStatus();
 
 		try {
-			progressMonitor.beginTask("Checking preconditions...", 2);
+			progressMonitor.beginTask("Checking preconditions...", 1);
 
 			if (selection != null) {
 				final Object element = selection.getFirstElement();
@@ -69,28 +74,35 @@ public class SplitRefactoring extends Refactoring {
 
 			javaProject = JavaCore.create(project);
 
-			final IJavaSearchScope scope = SearchEngine.createJavaSearchScope(new IJavaElement[] { javaProject },
+			if (targetPackageName == null) {
+				status.merge(RefactoringStatus.createFatalErrorStatus("Target package has not been specified."));
+				return status;
+			}
+
+			searchEngine = new SearchEngine();
+			searchScope = SearchEngine.createJavaSearchScope(new IJavaElement[] { javaProject },
 					IJavaSearchScope.SOURCES);
 
 			if (sourcePackageName == null) {
 				status.merge(RefactoringStatus.createFatalErrorStatus("Source package has not been specified."));
+				return status;
 			} else {
-				sourcePackage = searchPackage(sourcePackageName, scope, progressMonitor, status);
-			}
-			if (targetPackageName == null) {
-				status.merge(RefactoringStatus.createFatalErrorStatus("Target package has not been specified."));
+				sourcePackage = searchPackage(sourcePackageName, searchScope, progressMonitor, status);
 			}
 			if (typesToHideNames == null || typesToHideNames.isEmpty()) {
 				status.merge(RefactoringStatus.createFatalErrorStatus("Types to hide have not been specified."));
+				return status;
 			} else {
+				typesToHide = new ArrayList<IType>();
 				for (final String typeName : typesToHideNames) {
-					final IType type = searchType(typeName, scope, progressMonitor, status);
+					final IType type = searchType(typeName, searchScope, progressMonitor, status);
 					if (type != null) {
 						typesToHide.add(type);
 					}
 				}
-				if (typesToHide == null || typesToHide.isEmpty()) {
+				if (typesToHide.isEmpty()) {
 					status.merge(RefactoringStatus.createFatalErrorStatus("Types to hide have not been found."));
+					return status;
 				}
 			}
 		} finally {
@@ -169,11 +181,17 @@ public class SplitRefactoring extends Refactoring {
 	}
 
 	@Override
-	public RefactoringStatus checkFinalConditions(IProgressMonitor pm) throws CoreException, OperationCanceledException {
+	public RefactoringStatus checkFinalConditions(IProgressMonitor progressMonitor) throws CoreException,
+			OperationCanceledException {
 
 		final RefactoringStatus status = new RefactoringStatus();
 
-		// TODO
+		try {
+			progressMonitor.beginTask("Checking preconditions...", 1);
+
+		} finally {
+			progressMonitor.done();
+		}
 
 		return status;
 	}
