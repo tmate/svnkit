@@ -11,12 +11,12 @@ import org.eclipse.ui.IWorkbenchPart;
 import org.tmatesoft.refactoring.split.core.SplitRefactoring;
 import org.tmatesoft.refactoring.split.ui.SplitRefactoringWizard;
 
-public class SplitAction implements IObjectActionDelegate {
+public class SplitRefactoringAction implements IObjectActionDelegate {
 
 	private IWorkbenchPart targetPart;
 	private IStructuredSelection selection;
 
-	public SplitAction() {
+	public SplitRefactoringAction() {
 	}
 
 	public void run(IAction action) {
