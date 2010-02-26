@@ -16,7 +16,7 @@
 			</menu>
 
 			<action label="Split refactoring"
-				class="org.tmatesoft.refactoring.split.actions.SplitAction"
+				class="org.tmatesoft.refactoring.split.actions.SplitRefactoringAction"
 				menubarPath="tmate.menu/additions" id="tmate.SplitAction">
 			</action>
 
