@@ -7,16 +7,12 @@ import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
-import org.eclipse.core.resources.IFile;
 import org.eclipse.core.resources.IProject;
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.core.runtime.IStatus;
-import org.eclipse.core.runtime.NullProgressMonitor;
 import org.eclipse.core.runtime.OperationCanceledException;
-import org.eclipse.core.runtime.Plugin;
 import org.eclipse.core.runtime.Status;
 import org.eclipse.core.runtime.SubProgressMonitor;
 import org.eclipse.jdt.core.ICompilationUnit;
@@ -25,24 +21,15 @@ import org.eclipse.jdt.core.IJavaProject;
 import org.eclipse.jdt.core.IMethod;
 import org.eclipse.jdt.core.IPackageFragment;
 import org.eclipse.jdt.core.IPackageFragmentRoot;
-import org.eclipse.jdt.core.ISourceRange;
 import org.eclipse.jdt.core.IType;
 import org.eclipse.jdt.core.JavaCore;
 import org.eclipse.jdt.core.dom.AST;
-import org.eclipse.jdt.core.dom.ASTNode;
 import org.eclipse.jdt.core.dom.ASTParser;
 import org.eclipse.jdt.core.dom.ASTRequestor;
 import org.eclipse.jdt.core.dom.CompilationUnit;
-import org.eclipse.jdt.core.dom.ImportDeclaration;
-import org.eclipse.jdt.core.dom.MethodDeclaration;
 import org.eclipse.jdt.core.dom.Modifier;
-import org.eclipse.jdt.core.dom.NodeFinder;
 import org.eclipse.jdt.core.dom.PackageDeclaration;
-import org.eclipse.jdt.core.dom.QualifiedName;
 import org.eclipse.jdt.core.dom.TypeDeclaration;
-import org.eclipse.jdt.core.dom.rewrite.ASTRewrite;
-import org.eclipse.jdt.core.dom.rewrite.ImportRewrite;
-import org.eclipse.jdt.core.dom.rewrite.ListRewrite;
 import org.eclipse.jdt.core.search.IJavaSearchConstants;
 import org.eclipse.jdt.core.search.IJavaSearchScope;
 import org.eclipse.jdt.core.search.SearchEngine;
@@ -50,18 +37,13 @@ import org.eclipse.jdt.core.search.SearchMatch;
 import org.eclipse.jdt.core.search.SearchParticipant;
 import org.eclipse.jdt.core.search.SearchPattern;
 import org.eclipse.jdt.core.search.SearchRequestor;
-import org.eclipse.jface.text.Document;
+import org.eclipse.jdt.internal.corext.refactoring.changes.CreateCompilationUnitChange;
+import org.eclipse.jdt.internal.corext.refactoring.changes.CreatePackageChange;
 import org.eclipse.jface.viewers.IStructuredSelection;
 import org.eclipse.ltk.core.refactoring.Change;
 import org.eclipse.ltk.core.refactoring.CompositeChange;
-import org.eclipse.ltk.core.refactoring.DocumentChange;
-import org.eclipse.ltk.core.refactoring.NullChange;
 import org.eclipse.ltk.core.refactoring.Refactoring;
 import org.eclipse.ltk.core.refactoring.RefactoringStatus;
-import org.eclipse.ltk.core.refactoring.TextFileChange;
-import org.eclipse.text.edits.MalformedTreeException;
-import org.eclipse.text.edits.MultiTextEdit;
-import org.eclipse.text.edits.TextEdit;
 import org.tmatesoft.refactoring.split.SplitRefactoringActivator;
 
 public class SplitRefactoring extends Refactoring {
@@ -87,7 +69,9 @@ public class SplitRefactoring extends Refactoring {
 
 	private Map<ICompilationUnit, List<IMethod>> units = new LinkedHashMap<ICompilationUnit, List<IMethod>>();
 
-	private Map<String, Change> changes = new LinkedHashMap<String, Change>();
+	private List<Change> changes = new LinkedList<Change>();
+
+	private IPackageFragmentRoot packageRoot;
 
 	@Override
 	public String getName() {
@@ -271,19 +255,20 @@ public class SplitRefactoring extends Refactoring {
 		try {
 			progressMonitor.beginTask("Checking preconditions...", 1);
 
-			/*
-			 * final IJavaElement packageRoot =
-			 * sourcePackage.getAncestor(IJavaElement.PACKAGE_FRAGMENT_ROOT); if
-			 * (packageRoot != null && packageRoot instanceof
-			 * IPackageFragmentRoot) { final IPackageFragmentRoot root =
-			 * (IPackageFragmentRoot) packageRoot; targetPackage =
-			 * root.createPackageFragment(targetPackageName, true,
-			 * progressMonitor); } if (targetPackage == null) {
-			 * status.merge(RefactoringStatus
-			 * .createFatalErrorStatus(String.format
-			 * ("Can't create package '%s'", targetPackageName))); return
-			 * status; }
-			 */
+			final IJavaElement ancestor = sourcePackage.getAncestor(IJavaElement.PACKAGE_FRAGMENT_ROOT);
+			if (ancestor != null && ancestor instanceof IPackageFragmentRoot) {
+				packageRoot = (IPackageFragmentRoot) ancestor;
+			}
+			if (packageRoot == null) {
+				status.merge(RefactoringStatus.createFatalErrorStatus(String.format("Can't find package root for '%s'",
+						sourcePackage)));
+				return status;
+			}
+
+			targetPackage = packageRoot.getPackageFragment(targetPackageName);
+			if (!targetPackage.exists()) {
+				changes.add(new CreatePackageChange(targetPackage));
+			}
 
 			final IJavaSearchScope sourcePackageScope = SearchEngine.createJavaSearchScope(
 					new IJavaElement[] { sourcePackage }, IJavaSearchScope.SOURCES);
@@ -333,121 +318,33 @@ public class SplitRefactoring extends Refactoring {
 			final List<IMethod> methods, final CompilationUnit node, final RefactoringStatus status)
 			throws CoreException {
 
-		final ASTRewrite oldAstRewrite = ASTRewrite.create(node.getAST());
-
-		// final ImportRewrite oldImportRewrite = ImportRewrite.create(node,
-		// true);
-
-		final AST newAst = AST.newAST(AST.JLS3);
-		final CompilationUnit newUnit = newAst.newCompilationUnit();
-		final PackageDeclaration newPackage = newAst.newPackageDeclaration();
-		newPackage.setName(newAst.newName(targetPackageName));
-		newUnit.setPackage(newPackage);
-		final TypeDeclaration newType = newAst.newTypeDeclaration();
-		newType.setInterface(false);
-		newType.modifiers().add(newAst.newModifier(Modifier.ModifierKeyword.PUBLIC_KEYWORD));
 		final String typeName = node.getTypeRoot().findPrimaryType().getElementName();
-		newType.setName(newAst.newSimpleName(typeName));
-		final ASTRewrite newAstRewrite = ASTRewrite.create(newAst);
-		final ListRewrite newTypeBodyRewrite = newAstRewrite.getListRewrite(newType, newType
-				.getBodyDeclarationsProperty());
-		newUnit.types().add(newType);
 
-		// final ImportRewrite newImportRewrite = ImportRewrite.create(newIUnit,
-		// true);
+		final ICompilationUnit cu = targetPackage.getCompilationUnit(source.getElementName());
+		if (!cu.exists()) {
 
-		for (final IMethod method : methods) {
-			final ASTNode methodNode = NodeFinder.perform(node, method.getSourceRange());
-			if (methodNode instanceof MethodDeclaration) {
-				final ASTNode moveMethod = oldAstRewrite.createMoveTarget(methodNode);
-				newTypeBodyRewrite.insertLast(moveMethod, null);
+			AST ast = AST.newAST(AST.JLS3);
+			CompilationUnit unit = ast.newCompilationUnit();
+			PackageDeclaration packageDeclaration = ast.newPackageDeclaration();
+			packageDeclaration.setName(ast.newName(targetPackageName));
+			unit.setPackage(packageDeclaration);
+			TypeDeclaration type = ast.newTypeDeclaration();
+			type.setInterface(false);
+			type.modifiers().add(ast.newModifier(Modifier.ModifierKeyword.PUBLIC_KEYWORD));
+			type.setName(ast.newSimpleName(typeName));
+			unit.types().add(type);
 
-				// TODO implement delegation
-				oldAstRewrite.remove(methodNode, null);
-			}
+			changes.add(new CreateCompilationUnitChange(cu, unit.toString(), null));
+
 		}
 
-		rewriteAST(source, oldAstRewrite);
-
-		rewriteAST(targetPackageName + "." + typeName, newAstRewrite);
-
-	}
-
-	private void rewriteAST(String elementName, ASTRewrite astRewrite) {
-		try {
-			MultiTextEdit edit = new MultiTextEdit();
-			TextEdit astEdit = astRewrite.rewriteAST();
-
-			if (!isEmptyEdit(astEdit))
-				edit.addChild(astEdit);
-			// TextEdit importEdit = importRewrite.rewriteImports(new
-			// NullProgressMonitor());
-			// if (!isEmptyEdit(importEdit))
-			// edit.addChild(importEdit);
-			if (isEmptyEdit(edit))
-				return;
-
-			Change change = changes.get(elementName);
-			if (change == null) {
-				change = new DocumentChange(elementName, new Document());
-				changes.put(elementName, change);
-			}
-			if (change instanceof DocumentChange) {
-				((DocumentChange) change).addEdit(astEdit);
-			}
-		} catch (MalformedTreeException exception) {
-			log(exception);
-		} catch (IllegalArgumentException exception) {
-			log(exception);
-		} catch (CoreException exception) {
-			log(exception);
-		}
-	}
-
-	private void rewriteAST(ICompilationUnit unit, ASTRewrite astRewrite) {
-		try {
-			MultiTextEdit edit = new MultiTextEdit();
-			TextEdit astEdit = astRewrite.rewriteAST();
-
-			if (!isEmptyEdit(astEdit))
-				edit.addChild(astEdit);
-			// TextEdit importEdit = importRewrite.rewriteImports(new
-			// NullProgressMonitor());
-			// if (!isEmptyEdit(importEdit))
-			// edit.addChild(importEdit);
-			if (isEmptyEdit(edit))
-				return;
-
-			final String elementName = unit.getElementName();
-			Change change = changes.get(elementName);
-			if (change == null) {
-				change = new TextFileChange(elementName, (IFile) unit.getResource());
-				changes.put(elementName, change);
-				((TextFileChange) change).setTextType("java");
-				((TextFileChange) change).setEdit(edit);
-			}
-			if (change instanceof TextFileChange) {
-				((TextFileChange) change).getEdit().addChild(edit);
-			}
-		} catch (MalformedTreeException exception) {
-			log(exception);
-		} catch (IllegalArgumentException exception) {
-			log(exception);
-		} catch (CoreException exception) {
-			log(exception);
-		}
-	}
-
-	private boolean isEmptyEdit(TextEdit edit) {
-		return edit.getClass() == MultiTextEdit.class && !edit.hasChildren();
 	}
 
 	@Override
 	public Change createChange(IProgressMonitor progressMonitor) throws CoreException, OperationCanceledException {
 		try {
 			progressMonitor.beginTask("Creating change...", 1);
-			final CompositeChange change = new CompositeChange(getName(), changes.values().toArray(
-					new Change[changes.size()]));
+			final CompositeChange change = new CompositeChange(getName(), changes.toArray(new Change[changes.size()]));
 			return change;
 		} finally {
 			progressMonitor.done();
