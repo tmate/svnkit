@@ -10,6 +10,7 @@ import java.util.Map;
 
 import org.eclipse.core.resources.IProject;
 import org.eclipse.core.runtime.CoreException;
+import org.eclipse.core.runtime.IPath;
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.core.runtime.IStatus;
 import org.eclipse.core.runtime.OperationCanceledException;
@@ -22,12 +23,17 @@ import org.eclipse.jdt.core.IMethod;
 import org.eclipse.jdt.core.IPackageFragment;
 import org.eclipse.jdt.core.IPackageFragmentRoot;
 import org.eclipse.jdt.core.IType;
+import org.eclipse.jdt.core.ITypeRoot;
 import org.eclipse.jdt.core.JavaCore;
 import org.eclipse.jdt.core.dom.AST;
+import org.eclipse.jdt.core.dom.ASTNode;
 import org.eclipse.jdt.core.dom.ASTParser;
 import org.eclipse.jdt.core.dom.ASTRequestor;
 import org.eclipse.jdt.core.dom.CompilationUnit;
+import org.eclipse.jdt.core.dom.ImportDeclaration;
+import org.eclipse.jdt.core.dom.MethodDeclaration;
 import org.eclipse.jdt.core.dom.Modifier;
+import org.eclipse.jdt.core.dom.NodeFinder;
 import org.eclipse.jdt.core.dom.PackageDeclaration;
 import org.eclipse.jdt.core.dom.TypeDeclaration;
 import org.eclipse.jdt.core.search.IJavaSearchConstants;
@@ -39,6 +45,7 @@ import org.eclipse.jdt.core.search.SearchPattern;
 import org.eclipse.jdt.core.search.SearchRequestor;
 import org.eclipse.jdt.internal.corext.refactoring.changes.CreateCompilationUnitChange;
 import org.eclipse.jdt.internal.corext.refactoring.changes.CreatePackageChange;
+import org.eclipse.jdt.internal.corext.refactoring.changes.MultiStateCompilationUnitChange;
 import org.eclipse.jface.viewers.IStructuredSelection;
 import org.eclipse.ltk.core.refactoring.Change;
 import org.eclipse.ltk.core.refactoring.CompositeChange;
@@ -289,11 +296,12 @@ public class SplitRefactoring extends Refactoring {
 				}
 			}
 
+			final SubProgressMonitor subMonitor = new SubProgressMonitor(progressMonitor, 1);
 			final ASTRequestor requestor = new ASTRequestor() {
 				@Override
 				public void acceptAST(ICompilationUnit source, CompilationUnit ast) {
 					try {
-						rewriteCompilationUnit(this, source, units.get(source), ast, status);
+						rewriteCompilationUnit(this, source, units.get(source), ast, status, subMonitor);
 					} catch (CoreException exception) {
 						log(exception);
 					}
@@ -302,10 +310,9 @@ public class SplitRefactoring extends Refactoring {
 
 			final ASTParser parser = ASTParser.newParser(AST.JLS3);
 			parser.setProject(javaProject);
-			parser.setResolveBindings(true);
 			final Collection<ICompilationUnit> collection = units.keySet();
-			parser.createASTs(collection.toArray(new ICompilationUnit[collection.size()]), new String[0], requestor,
-					new SubProgressMonitor(progressMonitor, 1));
+			final ICompilationUnit[] array = collection.toArray(new ICompilationUnit[collection.size()]);
+			parser.createASTs(array, new String[0], requestor, new SubProgressMonitor(progressMonitor, 1));
 
 		} finally {
 			progressMonitor.done();
@@ -314,30 +321,45 @@ public class SplitRefactoring extends Refactoring {
 		return status;
 	}
 
-	public void rewriteCompilationUnit(final ASTRequestor requestor, final ICompilationUnit source,
-			final List<IMethod> methods, final CompilationUnit node, final RefactoringStatus status)
-			throws CoreException {
+	public void rewriteCompilationUnit(final ASTRequestor requestor, final ICompilationUnit sourceUnit,
+			final List<IMethod> sourceMethods, final CompilationUnit sourceNode, final RefactoringStatus status,
+			final IProgressMonitor monitor) throws CoreException {
 
-		final String typeName = node.getTypeRoot().findPrimaryType().getElementName();
+		final String sourceUnitName = sourceUnit.getElementName();
+		final IType sourceType = sourceNode.getTypeRoot().findPrimaryType();
+		final String sourceTypeName = sourceType.getElementName();
 
-		final ICompilationUnit cu = targetPackage.getCompilationUnit(source.getElementName());
-		if (!cu.exists()) {
+		// TODO add version to target names
+		final String unitName = sourceUnitName;
+		final String typeName = sourceTypeName;
 
-			AST ast = AST.newAST(AST.JLS3);
-			CompilationUnit unit = ast.newCompilationUnit();
-			PackageDeclaration packageDeclaration = ast.newPackageDeclaration();
-			packageDeclaration.setName(ast.newName(targetPackageName));
-			unit.setPackage(packageDeclaration);
-			TypeDeclaration type = ast.newTypeDeclaration();
-			type.setInterface(false);
+		final ICompilationUnit unit = targetPackage.getCompilationUnit(unitName);
+		if (!unit.exists()) {
+
+			final AST ast = AST.newAST(AST.JLS3);
+			final CompilationUnit node = ast.newCompilationUnit();
+
+			node.imports().addAll(ASTNode.copySubtrees(ast, sourceNode.imports()));
+
+			final PackageDeclaration packageDeclaration = ast.newPackageDeclaration();
+			packageDeclaration.setName(ast.newName(targetPackage.getElementName()));
+			node.setPackage(packageDeclaration);
+
+			final TypeDeclaration type = ast.newTypeDeclaration();
+			type.setInterface(sourceType.isInterface());
 			type.modifiers().add(ast.newModifier(Modifier.ModifierKeyword.PUBLIC_KEYWORD));
 			type.setName(ast.newSimpleName(typeName));
-			unit.types().add(type);
+			node.types().add(type);
 
-			changes.add(new CreateCompilationUnitChange(cu, unit.toString(), null));
+			for (final IMethod sourceMethod : sourceMethods) {
+				final MethodDeclaration sourceMethodNode = (MethodDeclaration) NodeFinder.perform(sourceNode,
+						sourceMethod.getSourceRange());
+				type.bodyDeclarations().add(ASTNode.copySubtree(ast, sourceMethodNode));
+			}
+
+			changes.add(new CreateCompilationUnitChange(unit, node.toString(), null));
 
 		}
-
 	}
 
 	@Override
