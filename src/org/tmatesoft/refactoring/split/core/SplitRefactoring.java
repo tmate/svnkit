@@ -3,10 +3,12 @@ package org.tmatesoft.refactoring.split.core;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.eclipse.core.resources.IProject;
 import org.eclipse.core.runtime.CoreException;
@@ -25,17 +27,26 @@ import org.eclipse.jdt.core.IPackageFragmentRoot;
 import org.eclipse.jdt.core.IType;
 import org.eclipse.jdt.core.ITypeRoot;
 import org.eclipse.jdt.core.JavaCore;
+import org.eclipse.jdt.core.ToolFactory;
 import org.eclipse.jdt.core.dom.AST;
 import org.eclipse.jdt.core.dom.ASTNode;
 import org.eclipse.jdt.core.dom.ASTParser;
 import org.eclipse.jdt.core.dom.ASTRequestor;
+import org.eclipse.jdt.core.dom.ASTVisitor;
 import org.eclipse.jdt.core.dom.CompilationUnit;
+import org.eclipse.jdt.core.dom.IPackageBinding;
+import org.eclipse.jdt.core.dom.ITypeBinding;
 import org.eclipse.jdt.core.dom.ImportDeclaration;
 import org.eclipse.jdt.core.dom.MethodDeclaration;
 import org.eclipse.jdt.core.dom.Modifier;
+import org.eclipse.jdt.core.dom.Name;
 import org.eclipse.jdt.core.dom.NodeFinder;
 import org.eclipse.jdt.core.dom.PackageDeclaration;
+import org.eclipse.jdt.core.dom.QualifiedType;
+import org.eclipse.jdt.core.dom.SimpleType;
+import org.eclipse.jdt.core.dom.Type;
 import org.eclipse.jdt.core.dom.TypeDeclaration;
+import org.eclipse.jdt.core.formatter.CodeFormatter;
 import org.eclipse.jdt.core.search.IJavaSearchConstants;
 import org.eclipse.jdt.core.search.IJavaSearchScope;
 import org.eclipse.jdt.core.search.SearchEngine;
@@ -46,11 +57,16 @@ import org.eclipse.jdt.core.search.SearchRequestor;
 import org.eclipse.jdt.internal.corext.refactoring.changes.CreateCompilationUnitChange;
 import org.eclipse.jdt.internal.corext.refactoring.changes.CreatePackageChange;
 import org.eclipse.jdt.internal.corext.refactoring.changes.MultiStateCompilationUnitChange;
+import org.eclipse.jface.text.BadLocationException;
+import org.eclipse.jface.text.Document;
+import org.eclipse.jface.text.IDocument;
 import org.eclipse.jface.viewers.IStructuredSelection;
 import org.eclipse.ltk.core.refactoring.Change;
 import org.eclipse.ltk.core.refactoring.CompositeChange;
 import org.eclipse.ltk.core.refactoring.Refactoring;
 import org.eclipse.ltk.core.refactoring.RefactoringStatus;
+import org.eclipse.text.edits.MalformedTreeException;
+import org.eclipse.text.edits.TextEdit;
 import org.tmatesoft.refactoring.split.SplitRefactoringActivator;
 
 public class SplitRefactoring extends Refactoring {
@@ -66,6 +82,7 @@ public class SplitRefactoring extends Refactoring {
 	private IStructuredSelection selection;
 	private IProject project;
 	private IJavaProject javaProject;
+	private IPackageFragmentRoot packageRoot;
 
 	private IPackageFragment sourcePackage;
 	private IPackageFragment targetPackage;
@@ -78,7 +95,7 @@ public class SplitRefactoring extends Refactoring {
 
 	private List<Change> changes = new LinkedList<Change>();
 
-	private IPackageFragmentRoot packageRoot;
+	private CodeFormatter codeFormatter = ToolFactory.createCodeFormatter(null);
 
 	@Override
 	public String getName() {
@@ -302,13 +319,14 @@ public class SplitRefactoring extends Refactoring {
 				public void acceptAST(ICompilationUnit source, CompilationUnit ast) {
 					try {
 						rewriteCompilationUnit(this, source, units.get(source), ast, status, subMonitor);
-					} catch (CoreException exception) {
+					} catch (Exception exception) {
 						log(exception);
 					}
 				}
 			};
 
 			final ASTParser parser = ASTParser.newParser(AST.JLS3);
+			parser.setResolveBindings(true);
 			parser.setProject(javaProject);
 			final Collection<ICompilationUnit> collection = units.keySet();
 			final ICompilationUnit[] array = collection.toArray(new ICompilationUnit[collection.size()]);
@@ -323,7 +341,7 @@ public class SplitRefactoring extends Refactoring {
 
 	public void rewriteCompilationUnit(final ASTRequestor requestor, final ICompilationUnit sourceUnit,
 			final List<IMethod> sourceMethods, final CompilationUnit sourceNode, final RefactoringStatus status,
-			final IProgressMonitor monitor) throws CoreException {
+			final IProgressMonitor monitor) throws CoreException, MalformedTreeException, BadLocationException {
 
 		final String sourceUnitName = sourceUnit.getElementName();
 		final IType sourceType = sourceNode.getTypeRoot().findPrimaryType();
@@ -339,8 +357,6 @@ public class SplitRefactoring extends Refactoring {
 			final AST ast = AST.newAST(AST.JLS3);
 			final CompilationUnit node = ast.newCompilationUnit();
 
-			node.imports().addAll(ASTNode.copySubtrees(ast, sourceNode.imports()));
-
 			final PackageDeclaration packageDeclaration = ast.newPackageDeclaration();
 			packageDeclaration.setName(ast.newName(targetPackage.getElementName()));
 			node.setPackage(packageDeclaration);
@@ -351,13 +367,58 @@ public class SplitRefactoring extends Refactoring {
 			type.setName(ast.newSimpleName(typeName));
 			node.types().add(type);
 
+			final Set<IMethod> methods = new HashSet<IMethod>();
 			for (final IMethod sourceMethod : sourceMethods) {
+				if (!methods.contains(sourceMethod)) {
+					methods.add(sourceMethod);
+				}
+			}
+
+			final Set<SimpleType> types = new HashSet<SimpleType>();
+			final ASTVisitor visitor = new ASTVisitor() {
+				@Override
+				public boolean visit(SimpleType typeNode) {
+					if (!types.contains(typeNode)) {
+						types.add(typeNode);
+					}
+					return super.visit(typeNode);
+				}
+
+			};
+
+			for (final IMethod sourceMethod : methods) {
 				final MethodDeclaration sourceMethodNode = (MethodDeclaration) NodeFinder.perform(sourceNode,
 						sourceMethod.getSourceRange());
 				type.bodyDeclarations().add(ASTNode.copySubtree(ast, sourceMethodNode));
+				sourceMethodNode.accept(visitor);
 			}
 
-			changes.add(new CreateCompilationUnitChange(unit, node.toString(), null));
+			final Set<IPackageFragment> packages = new HashSet<IPackageFragment>();
+			for (final SimpleType typeNode : types) {
+				final ITypeBinding binding = typeNode.resolveBinding();
+				final IPackageBinding packageBinding = binding.getPackage();
+				final IPackageFragment packageElement = (IPackageFragment) packageBinding.getJavaElement();
+				if (!targetPackage.equals(packageElement)) {
+					if (!packages.contains(packageElement)) {
+						packages.add(packageElement);
+					}
+				}
+			}
+
+			for (final IPackageFragment packageFragment : packages) {
+				final ImportDeclaration importDeclaration = ast.newImportDeclaration();
+				importDeclaration.setOnDemand(true);
+				importDeclaration.setName(ast.newName(packageFragment.getElementName()));
+				node.imports().add(importDeclaration);
+			}
+
+			final String source = node.toString();
+			final TextEdit formatEdit = codeFormatter.format(CodeFormatter.K_COMPILATION_UNIT, source, 0, source
+					.length(), 0, javaProject.findRecommendedLineSeparator());
+			Document document = new Document(source);
+			formatEdit.apply(document);
+
+			changes.add(new CreateCompilationUnitChange(unit, document.get(), null));
 
 		}
 	}
