@@ -3,6 +3,7 @@ package org.tmatesoft.refactoring.split.core;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
@@ -27,17 +28,21 @@ import org.eclipse.jdt.core.IPackageFragmentRoot;
 import org.eclipse.jdt.core.IType;
 import org.eclipse.jdt.core.ITypeRoot;
 import org.eclipse.jdt.core.JavaCore;
+import org.eclipse.jdt.core.JavaModelException;
 import org.eclipse.jdt.core.ToolFactory;
 import org.eclipse.jdt.core.dom.AST;
 import org.eclipse.jdt.core.dom.ASTNode;
 import org.eclipse.jdt.core.dom.ASTParser;
 import org.eclipse.jdt.core.dom.ASTRequestor;
 import org.eclipse.jdt.core.dom.ASTVisitor;
+import org.eclipse.jdt.core.dom.ArrayType;
 import org.eclipse.jdt.core.dom.CompilationUnit;
+import org.eclipse.jdt.core.dom.IMethodBinding;
 import org.eclipse.jdt.core.dom.IPackageBinding;
 import org.eclipse.jdt.core.dom.ITypeBinding;
 import org.eclipse.jdt.core.dom.ImportDeclaration;
 import org.eclipse.jdt.core.dom.MethodDeclaration;
+import org.eclipse.jdt.core.dom.MethodInvocation;
 import org.eclipse.jdt.core.dom.Modifier;
 import org.eclipse.jdt.core.dom.Name;
 import org.eclipse.jdt.core.dom.NodeFinder;
@@ -46,6 +51,7 @@ import org.eclipse.jdt.core.dom.QualifiedType;
 import org.eclipse.jdt.core.dom.SimpleType;
 import org.eclipse.jdt.core.dom.Type;
 import org.eclipse.jdt.core.dom.TypeDeclaration;
+import org.eclipse.jdt.core.dom.TypeLiteral;
 import org.eclipse.jdt.core.formatter.CodeFormatter;
 import org.eclipse.jdt.core.search.IJavaSearchConstants;
 import org.eclipse.jdt.core.search.IJavaSearchScope;
@@ -91,7 +97,7 @@ public class SplitRefactoring extends Refactoring {
 	private SearchEngine searchEngine = new SearchEngine();
 	private IJavaSearchScope projectScope;
 
-	private Map<ICompilationUnit, List<IMethod>> units = new LinkedHashMap<ICompilationUnit, List<IMethod>>();
+	private Map<ICompilationUnit, Set<IMethod>> units = new LinkedHashMap<ICompilationUnit, Set<IMethod>>();
 
 	private List<Change> changes = new LinkedList<Change>();
 
@@ -306,9 +312,12 @@ public class SplitRefactoring extends Refactoring {
 					for (final IMethod method : methods) {
 						final ICompilationUnit unit = method.getCompilationUnit();
 						if (!units.containsKey(unit)) {
-							units.put(unit, new LinkedList<IMethod>());
+							units.put(unit, new HashSet<IMethod>());
 						}
-						units.get(unit).add(method);
+						final Set<IMethod> set = units.get(unit);
+						if (!set.contains(method)) {
+							set.add(method);
+						}
 					}
 				}
 			}
@@ -340,7 +349,7 @@ public class SplitRefactoring extends Refactoring {
 	}
 
 	public void rewriteCompilationUnit(final ASTRequestor requestor, final ICompilationUnit sourceUnit,
-			final List<IMethod> sourceMethods, final CompilationUnit sourceNode, final RefactoringStatus status,
+			final Set<IMethod> sourceMethods, final CompilationUnit sourceNode, final RefactoringStatus status,
 			final IProgressMonitor monitor) throws CoreException, MalformedTreeException, BadLocationException {
 
 		final String sourceUnitName = sourceUnit.getElementName();
@@ -367,60 +376,109 @@ public class SplitRefactoring extends Refactoring {
 			type.setName(ast.newSimpleName(typeName));
 			node.types().add(type);
 
-			final Set<IMethod> methods = new HashSet<IMethod>();
+			final Set<IType> usedTypes = new HashSet<IType>();
+			final Map<IMethod, MethodDeclaration> addMethods = new HashMap<IMethod, MethodDeclaration>();
 			for (final IMethod sourceMethod : sourceMethods) {
-				if (!methods.contains(sourceMethod)) {
-					methods.add(sourceMethod);
+				getAddMethodsAndImportPackages(sourceNode, sourceMethod, addMethods, usedTypes);
+			}
+
+			final List imports = node.imports();
+			for (final IType usedType : usedTypes) {
+				final IPackageFragment usedPackage = usedType.getPackageFragment();
+				if (!"java.lang".equals(usedPackage.getElementName())) {
+					final ImportDeclaration importDeclaration = ast.newImportDeclaration();
+					importDeclaration.setOnDemand(false);
+					importDeclaration.setName(ast.newQualifiedName(ast.newName(usedPackage.getElementName()), ast
+							.newSimpleName(usedType.getElementName())));
+					imports.add(importDeclaration);
 				}
 			}
 
-			final Set<SimpleType> types = new HashSet<SimpleType>();
-			final ASTVisitor visitor = new ASTVisitor() {
-				@Override
-				public boolean visit(SimpleType typeNode) {
-					if (!types.contains(typeNode)) {
-						types.add(typeNode);
-					}
-					return super.visit(typeNode);
-				}
-
-			};
-
-			for (final IMethod sourceMethod : methods) {
-				final MethodDeclaration sourceMethodNode = (MethodDeclaration) NodeFinder.perform(sourceNode,
-						sourceMethod.getSourceRange());
-				type.bodyDeclarations().add(ASTNode.copySubtree(ast, sourceMethodNode));
-				sourceMethodNode.accept(visitor);
-			}
-
-			final Set<IPackageFragment> packages = new HashSet<IPackageFragment>();
-			for (final SimpleType typeNode : types) {
-				final ITypeBinding binding = typeNode.resolveBinding();
-				final IPackageBinding packageBinding = binding.getPackage();
-				final IPackageFragment packageElement = (IPackageFragment) packageBinding.getJavaElement();
-				if (!targetPackage.equals(packageElement)) {
-					if (!packages.contains(packageElement)) {
-						packages.add(packageElement);
-					}
-				}
-			}
-
-			for (final IPackageFragment packageFragment : packages) {
-				final ImportDeclaration importDeclaration = ast.newImportDeclaration();
-				importDeclaration.setOnDemand(true);
-				importDeclaration.setName(ast.newName(packageFragment.getElementName()));
-				node.imports().add(importDeclaration);
+			final List bodyDeclarations = type.bodyDeclarations();
+			for (final MethodDeclaration sourceMethodDeclaration : addMethods.values()) {
+				bodyDeclarations.add(ASTNode.copySubtree(ast, sourceMethodDeclaration));
 			}
 
 			final String source = node.toString();
+			final Document document = new Document(source);
 			final TextEdit formatEdit = codeFormatter.format(CodeFormatter.K_COMPILATION_UNIT, source, 0, source
 					.length(), 0, javaProject.findRecommendedLineSeparator());
-			Document document = new Document(source);
 			formatEdit.apply(document);
 
 			changes.add(new CreateCompilationUnitChange(unit, document.get(), null));
 
 		}
+	}
+
+	private void getAddMethodsAndImportPackages(final CompilationUnit sourceNode, final IMethod sourceMethod,
+			final Map<IMethod, MethodDeclaration> addMethods, final Set<IType> usedTypes) throws JavaModelException {
+
+		if (addMethods.containsKey(sourceMethod))
+			return;
+
+		final IType sourceMethodDeclaringType = sourceMethod.getDeclaringType();
+
+		final Set<IMethod> invocedMethods = new HashSet<IMethod>();
+
+		final ASTVisitor visitor = new ASTVisitor() {
+
+			public boolean visit(final MethodInvocation node) {
+				addInvocedMethod(node);
+				return super.visit(node);
+			}
+
+			public boolean visit(SimpleType node) {
+				addUsedType(node);
+				return super.visit(node);
+			}
+
+			public boolean visit(final ArrayType node) {
+				addUsedType(node.getComponentType());
+				return super.visit(node);
+			}
+
+			@Override
+			public boolean visit(TypeLiteral node) {
+				addUsedType(node.getType());
+				return super.visit(node);
+			}
+
+			private void addInvocedMethod(final MethodInvocation node) {
+				final IMethodBinding binding = node.resolveMethodBinding().getMethodDeclaration();
+				final IMethod method = (IMethod) binding.getJavaElement();
+				final IType declaringType = method.getDeclaringType();
+				if (sourceMethodDeclaringType.equals(declaringType)) {
+					if (!invocedMethods.contains(method)) {
+						invocedMethods.add(method);
+					}
+				} else {
+					if (!usedTypes.contains(declaringType)) {
+						usedTypes.add(declaringType);
+					}
+				}
+			}
+
+			private void addUsedType(final Type node) {
+				final ITypeBinding binding = node.resolveBinding().getTypeDeclaration();
+				final IType type = (IType) binding.getJavaElement();
+				if (type != null && !usedTypes.contains(type)) {
+					usedTypes.add(type);
+				}
+			}
+
+		};
+
+		final MethodDeclaration sourceMethodNode = (MethodDeclaration) NodeFinder.perform(sourceNode, sourceMethod
+				.getSourceRange());
+
+		addMethods.put(sourceMethod, sourceMethodNode);
+
+		sourceMethodNode.accept(visitor);
+
+		for (final IMethod invocedMethod : invocedMethods) {
+			getAddMethodsAndImportPackages(sourceNode, invocedMethod, addMethods, usedTypes);
+		}
+
 	}
 
 	@Override
