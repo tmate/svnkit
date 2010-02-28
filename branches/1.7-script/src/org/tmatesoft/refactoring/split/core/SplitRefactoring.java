@@ -18,6 +18,7 @@ import org.eclipse.core.runtime.IStatus;
 import org.eclipse.core.runtime.OperationCanceledException;
 import org.eclipse.core.runtime.Status;
 import org.eclipse.core.runtime.SubProgressMonitor;
+import org.eclipse.jdt.core.Flags;
 import org.eclipse.jdt.core.ICompilationUnit;
 import org.eclipse.jdt.core.IJavaElement;
 import org.eclipse.jdt.core.IJavaProject;
@@ -371,29 +372,64 @@ public class SplitRefactoring extends Refactoring {
 			node.types().add(type);
 
 			type.setInterface(sourceType.isInterface());
-			type.modifiers().add(ast.newModifier(Modifier.ModifierKeyword.PUBLIC_KEYWORD));
+			final List modifiers = type.modifiers();
+			modifiers.add(ast.newModifier(Modifier.ModifierKeyword.PUBLIC_KEYWORD));
+			final int sourceFlags = sourceType.getFlags();
+			if (Flags.isAbstract(sourceFlags)) {
+				modifiers.add(ast.newModifier(Modifier.ModifierKeyword.ABSTRACT_KEYWORD));
+			}
 			type.setName(ast.newSimpleName(typeName));
 
 			final Set<IType> usedTypes = new HashSet<IType>();
 
 			final TypeDeclaration sourceTypeNode = (TypeDeclaration) NodeFinder.perform(sourceNode, sourceType
 					.getSourceRange());
-			final Type sourceSuperclassType = sourceTypeNode.getSuperclassType();
-			if (sourceSuperclassType != null) {
-				final ITypeBinding sourceSuperclassBinding = sourceSuperclassType.resolveBinding();
-				final IPackageBinding sourceSuperclassPackageBinding = sourceSuperclassBinding.getPackage();
-				final IPackageFragment sourceSuperclassPackage = (IPackageFragment) sourceSuperclassPackageBinding
-						.getJavaElement();
-				final IType sourceSuperclass = (IType) sourceSuperclassBinding.getJavaElement();
-				if (sourceSuperclass != null) {
-					final ICompilationUnit sourceSuperclassUnit = sourceSuperclass.getCompilationUnit();
-					if (!sourcePackage.equals(sourceSuperclassPackage) && !units.containsKey(sourceSuperclassUnit)) {
-						usedTypes.add(sourceSuperclass);
-						type.setSuperclassType((Type) ASTNode.copySubtree(ast, sourceSuperclassType));
-					} else {
-						final String sourceSuperclassName = sourceSuperclass.getElementName();
-						final String targetSuperclassName = sourceSuperclassName + targetSuffix;
-						type.setSuperclassType(ast.newSimpleType(ast.newName(targetSuperclassName)));
+
+			if (!type.isInterface()) {
+				final Type sourceSuperclassType = sourceTypeNode.getSuperclassType();
+				if (sourceSuperclassType != null) {
+					final ITypeBinding sourceSuperclassBinding = sourceSuperclassType.resolveBinding();
+					final IPackageBinding sourceSuperclassPackageBinding = sourceSuperclassBinding.getPackage();
+					final IPackageFragment sourceSuperclassPackage = (IPackageFragment) sourceSuperclassPackageBinding
+							.getJavaElement();
+					final IType sourceSuperclass = (IType) sourceSuperclassBinding.getJavaElement();
+					if (sourceSuperclass != null) {
+						final ICompilationUnit sourceSuperclassUnit = sourceSuperclass.getCompilationUnit();
+						if (!sourcePackage.equals(sourceSuperclassPackage) && !units.containsKey(sourceSuperclassUnit)) {
+							usedTypes.add(sourceSuperclass);
+							type.setSuperclassType((Type) ASTNode.copySubtree(ast, sourceSuperclassType));
+						} else {
+							final String sourceSuperclassName = sourceSuperclass.getElementName();
+							final String targetSuperclassName = sourceSuperclassName + targetSuffix;
+							type.setSuperclassType(ast.newSimpleType(ast.newName(targetSuperclassName)));
+						}
+					}
+				}
+			}
+
+			final List<Type> sourceSuperInterfaceTypes = sourceTypeNode.superInterfaceTypes();
+			final List<Type> superInterfaceTypes = type.superInterfaceTypes();
+			if (sourceSuperInterfaceTypes != null && !sourceSuperInterfaceTypes.isEmpty()) {
+				for (final Type sourceSuperInterfaceType : sourceSuperInterfaceTypes) {
+					if (sourceSuperInterfaceType != null) {
+						final ITypeBinding sourceSuperInterfaceBinding = sourceSuperInterfaceType.resolveBinding();
+						final IPackageBinding sourceSuperInterfacePackageBinding = sourceSuperInterfaceBinding
+								.getPackage();
+						final IPackageFragment sourceSuperInterfacePackage = (IPackageFragment) sourceSuperInterfacePackageBinding
+								.getJavaElement();
+						final IType sourceSuperInterface = (IType) sourceSuperInterfaceBinding.getJavaElement();
+						if (sourceSuperInterface != null) {
+							final ICompilationUnit sourceSuperInterfaceUnit = sourceSuperInterface.getCompilationUnit();
+							if (!sourcePackage.equals(sourceSuperInterfacePackage)
+									&& !units.containsKey(sourceSuperInterfaceUnit)) {
+								usedTypes.add(sourceSuperInterface);
+								superInterfaceTypes.add((Type) ASTNode.copySubtree(ast, sourceSuperInterfaceType));
+							} else {
+								final String sourceSuperInterfaceName = sourceSuperInterface.getElementName();
+								final String targetSuperInterfaceName = sourceSuperInterfaceName + targetSuffix;
+								superInterfaceTypes.add(ast.newSimpleType(ast.newName(targetSuperInterfaceName)));
+							}
+						}
 					}
 				}
 			}
