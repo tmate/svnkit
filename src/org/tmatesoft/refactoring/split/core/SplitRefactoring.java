@@ -13,7 +13,6 @@ import java.util.Set;
 
 import org.eclipse.core.resources.IProject;
 import org.eclipse.core.runtime.CoreException;
-import org.eclipse.core.runtime.IPath;
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.core.runtime.IStatus;
 import org.eclipse.core.runtime.OperationCanceledException;
@@ -26,7 +25,6 @@ import org.eclipse.jdt.core.IMethod;
 import org.eclipse.jdt.core.IPackageFragment;
 import org.eclipse.jdt.core.IPackageFragmentRoot;
 import org.eclipse.jdt.core.IType;
-import org.eclipse.jdt.core.ITypeRoot;
 import org.eclipse.jdt.core.JavaCore;
 import org.eclipse.jdt.core.JavaModelException;
 import org.eclipse.jdt.core.ToolFactory;
@@ -38,16 +36,15 @@ import org.eclipse.jdt.core.dom.ASTVisitor;
 import org.eclipse.jdt.core.dom.ArrayType;
 import org.eclipse.jdt.core.dom.CompilationUnit;
 import org.eclipse.jdt.core.dom.IMethodBinding;
-import org.eclipse.jdt.core.dom.IPackageBinding;
 import org.eclipse.jdt.core.dom.ITypeBinding;
 import org.eclipse.jdt.core.dom.ImportDeclaration;
 import org.eclipse.jdt.core.dom.MethodDeclaration;
 import org.eclipse.jdt.core.dom.MethodInvocation;
 import org.eclipse.jdt.core.dom.Modifier;
-import org.eclipse.jdt.core.dom.Name;
 import org.eclipse.jdt.core.dom.NodeFinder;
 import org.eclipse.jdt.core.dom.PackageDeclaration;
 import org.eclipse.jdt.core.dom.QualifiedType;
+import org.eclipse.jdt.core.dom.SimpleName;
 import org.eclipse.jdt.core.dom.SimpleType;
 import org.eclipse.jdt.core.dom.Type;
 import org.eclipse.jdt.core.dom.TypeDeclaration;
@@ -62,10 +59,8 @@ import org.eclipse.jdt.core.search.SearchPattern;
 import org.eclipse.jdt.core.search.SearchRequestor;
 import org.eclipse.jdt.internal.corext.refactoring.changes.CreateCompilationUnitChange;
 import org.eclipse.jdt.internal.corext.refactoring.changes.CreatePackageChange;
-import org.eclipse.jdt.internal.corext.refactoring.changes.MultiStateCompilationUnitChange;
 import org.eclipse.jface.text.BadLocationException;
 import org.eclipse.jface.text.Document;
-import org.eclipse.jface.text.IDocument;
 import org.eclipse.jface.viewers.IStructuredSelection;
 import org.eclipse.ltk.core.refactoring.Change;
 import org.eclipse.ltk.core.refactoring.CompositeChange;
@@ -81,6 +76,8 @@ public class SplitRefactoring extends Refactoring {
 
 	private String sourcePackageName = "org.tmatesoft.svn.core.wc";
 	private String targetPackageName = "org.tmatesoft.svn.core.internal.wc.v16";
+	private String targetSuffix = "16";
+
 	private List<String> typesToHideNames = Arrays.asList(new String[] {
 			"org.tmatesoft.svn.core.internal.wc.admin.SVNWCAccess",
 			"org.tmatesoft.svn.core.internal.wc.admin.SVNAdminArea" });
@@ -327,7 +324,7 @@ public class SplitRefactoring extends Refactoring {
 				@Override
 				public void acceptAST(ICompilationUnit source, CompilationUnit ast) {
 					try {
-						rewriteCompilationUnit(this, source, units.get(source), ast, status, subMonitor);
+						splitCompilationUnit(source, units.get(source), ast, status, subMonitor);
 					} catch (Exception exception) {
 						log(exception);
 					}
@@ -348,17 +345,15 @@ public class SplitRefactoring extends Refactoring {
 		return status;
 	}
 
-	public void rewriteCompilationUnit(final ASTRequestor requestor, final ICompilationUnit sourceUnit,
-			final Set<IMethod> sourceMethods, final CompilationUnit sourceNode, final RefactoringStatus status,
-			final IProgressMonitor monitor) throws CoreException, MalformedTreeException, BadLocationException {
+	public void splitCompilationUnit(final ICompilationUnit sourceUnit, final Set<IMethod> sourceMethods,
+			final CompilationUnit sourceNode, final RefactoringStatus status, final IProgressMonitor monitor)
+			throws CoreException, MalformedTreeException, BadLocationException {
 
-		final String sourceUnitName = sourceUnit.getElementName();
 		final IType sourceType = sourceNode.getTypeRoot().findPrimaryType();
 		final String sourceTypeName = sourceType.getElementName();
 
-		// TODO add version to target names
-		final String unitName = sourceUnitName;
-		final String typeName = sourceTypeName;
+		final String typeName = sourceTypeName + targetSuffix;
+		final String unitName = typeName + ".java";
 
 		final ICompilationUnit unit = targetPackage.getCompilationUnit(unitName);
 		if (!unit.exists()) {
@@ -443,26 +438,55 @@ public class SplitRefactoring extends Refactoring {
 				return super.visit(node);
 			}
 
+			@Override
+			public boolean visit(SimpleName node) {
+				addUsedType(node);
+				return super.visit(node);
+			}
+
 			private void addInvocedMethod(final MethodInvocation node) {
 				final IMethodBinding binding = node.resolveMethodBinding().getMethodDeclaration();
 				final IMethod method = (IMethod) binding.getJavaElement();
 				final IType declaringType = method.getDeclaringType();
-				if (sourceMethodDeclaringType.equals(declaringType)) {
-					if (!invocedMethods.contains(method)) {
-						invocedMethods.add(method);
+				if (declaringType != null) {
+					if (sourceMethodDeclaringType.equals(declaringType)) {
+						if (!invocedMethods.contains(method)) {
+							invocedMethods.add(method);
+						}
+					} else {
+						if (!usedTypes.contains(declaringType)) {
+							usedTypes.add(declaringType);
+						}
 					}
-				} else {
-					if (!usedTypes.contains(declaringType)) {
-						usedTypes.add(declaringType);
+				}
+			}
+
+			private void addUsedType(final IType type) {
+				if (type != null) {
+					if (!usedTypes.contains(type)) {
+						usedTypes.add(type);
 					}
+				}
+			}
+
+			private void addUsedType(final ITypeBinding binding) {
+				final IType type = (IType) binding.getJavaElement();
+				if (type != null) {
+					addUsedType(type);
 				}
 			}
 
 			private void addUsedType(final Type node) {
 				final ITypeBinding binding = node.resolveBinding().getTypeDeclaration();
-				final IType type = (IType) binding.getJavaElement();
-				if (type != null && !usedTypes.contains(type)) {
-					usedTypes.add(type);
+				if (binding != null) {
+					addUsedType(binding);
+				}
+			}
+
+			private void addUsedType(SimpleName node) {
+				final ITypeBinding binding = node.resolveTypeBinding().getTypeDeclaration();
+				if (binding != null) {
+					addUsedType(binding);
 				}
 			}
 
