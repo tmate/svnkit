@@ -36,11 +36,13 @@ import org.eclipse.jdt.core.dom.ASTVisitor;
 import org.eclipse.jdt.core.dom.ArrayType;
 import org.eclipse.jdt.core.dom.CompilationUnit;
 import org.eclipse.jdt.core.dom.IMethodBinding;
+import org.eclipse.jdt.core.dom.IPackageBinding;
 import org.eclipse.jdt.core.dom.ITypeBinding;
 import org.eclipse.jdt.core.dom.ImportDeclaration;
 import org.eclipse.jdt.core.dom.MethodDeclaration;
 import org.eclipse.jdt.core.dom.MethodInvocation;
 import org.eclipse.jdt.core.dom.Modifier;
+import org.eclipse.jdt.core.dom.Name;
 import org.eclipse.jdt.core.dom.NodeFinder;
 import org.eclipse.jdt.core.dom.PackageDeclaration;
 import org.eclipse.jdt.core.dom.QualifiedType;
@@ -366,12 +368,36 @@ public class SplitRefactoring extends Refactoring {
 			node.setPackage(packageDeclaration);
 
 			final TypeDeclaration type = ast.newTypeDeclaration();
+			node.types().add(type);
+
 			type.setInterface(sourceType.isInterface());
 			type.modifiers().add(ast.newModifier(Modifier.ModifierKeyword.PUBLIC_KEYWORD));
 			type.setName(ast.newSimpleName(typeName));
-			node.types().add(type);
 
 			final Set<IType> usedTypes = new HashSet<IType>();
+
+			final TypeDeclaration sourceTypeNode = (TypeDeclaration) NodeFinder.perform(sourceNode, sourceType
+					.getSourceRange());
+			final Type sourceSuperclassType = sourceTypeNode.getSuperclassType();
+			if (sourceSuperclassType != null) {
+				final ITypeBinding sourceSuperclassBinding = sourceSuperclassType.resolveBinding();
+				final IPackageBinding sourceSuperclassPackageBinding = sourceSuperclassBinding.getPackage();
+				final IPackageFragment sourceSuperclassPackage = (IPackageFragment) sourceSuperclassPackageBinding
+						.getJavaElement();
+				final IType sourceSuperclass = (IType) sourceSuperclassBinding.getJavaElement();
+				if (sourceSuperclass != null) {
+					final ICompilationUnit sourceSuperclassUnit = sourceSuperclass.getCompilationUnit();
+					if (!sourcePackage.equals(sourceSuperclassPackage) && !units.containsKey(sourceSuperclassUnit)) {
+						usedTypes.add(sourceSuperclass);
+						type.setSuperclassType((Type) ASTNode.copySubtree(ast, sourceSuperclassType));
+					} else {
+						final String sourceSuperclassName = sourceSuperclass.getElementName();
+						final String targetSuperclassName = sourceSuperclassName + targetSuffix;
+						type.setSuperclassType(ast.newSimpleType(ast.newName(targetSuperclassName)));
+					}
+				}
+			}
+
 			final Map<IMethod, MethodDeclaration> addMethods = new HashMap<IMethod, MethodDeclaration>();
 			for (final IMethod sourceMethod : sourceMethods) {
 				getAddMethodsAndImportPackages(sourceNode, sourceMethod, addMethods, usedTypes);
