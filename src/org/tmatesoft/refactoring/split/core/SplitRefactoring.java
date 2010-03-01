@@ -35,11 +35,14 @@ import org.eclipse.jdt.core.dom.ASTParser;
 import org.eclipse.jdt.core.dom.ASTRequestor;
 import org.eclipse.jdt.core.dom.ASTVisitor;
 import org.eclipse.jdt.core.dom.ArrayType;
+import org.eclipse.jdt.core.dom.BlockComment;
 import org.eclipse.jdt.core.dom.CompilationUnit;
 import org.eclipse.jdt.core.dom.IMethodBinding;
 import org.eclipse.jdt.core.dom.IPackageBinding;
 import org.eclipse.jdt.core.dom.ITypeBinding;
 import org.eclipse.jdt.core.dom.ImportDeclaration;
+import org.eclipse.jdt.core.dom.Javadoc;
+import org.eclipse.jdt.core.dom.LineComment;
 import org.eclipse.jdt.core.dom.MethodDeclaration;
 import org.eclipse.jdt.core.dom.MethodInvocation;
 import org.eclipse.jdt.core.dom.Modifier;
@@ -47,6 +50,8 @@ import org.eclipse.jdt.core.dom.NodeFinder;
 import org.eclipse.jdt.core.dom.PackageDeclaration;
 import org.eclipse.jdt.core.dom.SimpleName;
 import org.eclipse.jdt.core.dom.SimpleType;
+import org.eclipse.jdt.core.dom.TagElement;
+import org.eclipse.jdt.core.dom.TextElement;
 import org.eclipse.jdt.core.dom.Type;
 import org.eclipse.jdt.core.dom.TypeDeclaration;
 import org.eclipse.jdt.core.dom.TypeLiteral;
@@ -434,8 +439,8 @@ public class SplitRefactoring extends Refactoring {
 									.getDeclaredMethods();
 							for (IMethodBinding sourceTypeDeclaredMethod : sourceTypeDeclaredMethods) {
 								for (final IMethodBinding sourceSuperInterfaceMethodBinding : sourceSuperInterfaceMethods) {
-									if (sourceTypeDeclaredMethod.overrides(sourceSuperInterfaceMethodBinding)) {										
-										sourceMethods.add((IMethod)sourceTypeDeclaredMethod.getJavaElement());
+									if (sourceTypeDeclaredMethod.overrides(sourceSuperInterfaceMethodBinding)) {
+										sourceMethods.add((IMethod) sourceTypeDeclaredMethod.getJavaElement());
 									}
 								}
 							}
@@ -464,7 +469,26 @@ public class SplitRefactoring extends Refactoring {
 
 			final List bodyDeclarations = type.bodyDeclarations();
 			for (final MethodDeclaration sourceMethodDeclaration : addMethods.values()) {
-				bodyDeclarations.add(ASTNode.copySubtree(ast, sourceMethodDeclaration));
+				
+				final MethodDeclaration methodCopy = (MethodDeclaration) ASTNode.copySubtree(ast,
+						sourceMethodDeclaration);
+				final IMethodBinding sourceMethodBinding = sourceMethodDeclaration.resolveBinding();
+
+				final String from = sourceMethodBinding.getDeclaringClass().getQualifiedName();
+
+				Javadoc javadoc = methodCopy.getJavadoc();
+				if (javadoc == null) {
+					javadoc = ast.newJavadoc();
+					methodCopy.setJavadoc(javadoc);
+				}
+				final TagElement tag = ast.newTagElement();
+				tag.setTagName("@from ");
+				final TextElement text = ast.newTextElement();
+				text.setText(from);
+				tag.fragments().add(text);
+				javadoc.tags().add(tag);
+
+				bodyDeclarations.add(methodCopy);
 			}
 
 			final String source = node.toString();
