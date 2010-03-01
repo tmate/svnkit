@@ -43,10 +43,8 @@ import org.eclipse.jdt.core.dom.ImportDeclaration;
 import org.eclipse.jdt.core.dom.MethodDeclaration;
 import org.eclipse.jdt.core.dom.MethodInvocation;
 import org.eclipse.jdt.core.dom.Modifier;
-import org.eclipse.jdt.core.dom.Name;
 import org.eclipse.jdt.core.dom.NodeFinder;
 import org.eclipse.jdt.core.dom.PackageDeclaration;
-import org.eclipse.jdt.core.dom.QualifiedType;
 import org.eclipse.jdt.core.dom.SimpleName;
 import org.eclipse.jdt.core.dom.SimpleType;
 import org.eclipse.jdt.core.dom.Type;
@@ -384,6 +382,8 @@ public class SplitRefactoring extends Refactoring {
 
 			final TypeDeclaration sourceTypeNode = (TypeDeclaration) NodeFinder.perform(sourceNode, sourceType
 					.getSourceRange());
+			final ITypeBinding sourceTypeBinding = sourceTypeNode.resolveBinding();
+			final IMethodBinding[] sourceTypeDeclaredMethods = sourceTypeBinding.getDeclaredMethods();
 
 			if (!type.isInterface()) {
 				final Type sourceSuperclassType = sourceTypeNode.getSuperclassType();
@@ -395,7 +395,7 @@ public class SplitRefactoring extends Refactoring {
 					final IType sourceSuperclass = (IType) sourceSuperclassBinding.getJavaElement();
 					if (sourceSuperclass != null) {
 						final ICompilationUnit sourceSuperclassUnit = sourceSuperclass.getCompilationUnit();
-						if (!sourcePackage.equals(sourceSuperclassPackage) && !units.containsKey(sourceSuperclassUnit)) {
+						if (!sourcePackage.equals(sourceSuperclassPackage) || !units.containsKey(sourceSuperclassUnit)) {
 							usedTypes.add(sourceSuperclass);
 							type.setSuperclassType((Type) ASTNode.copySubtree(ast, sourceSuperclassType));
 						} else {
@@ -421,7 +421,7 @@ public class SplitRefactoring extends Refactoring {
 						if (sourceSuperInterface != null) {
 							final ICompilationUnit sourceSuperInterfaceUnit = sourceSuperInterface.getCompilationUnit();
 							if (!sourcePackage.equals(sourceSuperInterfacePackage)
-									&& !units.containsKey(sourceSuperInterfaceUnit)) {
+									|| !units.containsKey(sourceSuperInterfaceUnit)) {
 								usedTypes.add(sourceSuperInterface);
 								superInterfaceTypes.add((Type) ASTNode.copySubtree(ast, sourceSuperInterfaceType));
 							} else {
@@ -429,6 +429,17 @@ public class SplitRefactoring extends Refactoring {
 								final String targetSuperInterfaceName = sourceSuperInterfaceName + targetSuffix;
 								superInterfaceTypes.add(ast.newSimpleType(ast.newName(targetSuperInterfaceName)));
 							}
+
+							final IMethodBinding[] sourceSuperInterfaceMethods = sourceSuperInterfaceBinding
+									.getDeclaredMethods();
+							for (IMethodBinding sourceTypeDeclaredMethod : sourceTypeDeclaredMethods) {
+								for (final IMethodBinding sourceSuperInterfaceMethodBinding : sourceSuperInterfaceMethods) {
+									if (sourceTypeDeclaredMethod.overrides(sourceSuperInterfaceMethodBinding)) {										
+										sourceMethods.add((IMethod)sourceTypeDeclaredMethod.getJavaElement());
+									}
+								}
+							}
+
 						}
 					}
 				}
