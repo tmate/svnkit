@@ -565,14 +565,20 @@ public class SplitRefactoring extends Refactoring {
 
 		class ASTVisitorImpl extends ASTVisitor {
 
+			@Override
+			public boolean visit(SimpleName node) {
+				determineEntity(node);
+				return super.visit(node);
+			}
+
 			public boolean visit(final ArrayType node) {
 				addUsedType(node.getComponentType().resolveBinding(), node);
 				return super.visit(node);
 			}
-
+			
 			@Override
-			public boolean visit(SimpleName node) {
-				determineEntity(node);
+			public boolean visit(TypeLiteral node) {
+				addUsedType(node.getType().resolveBinding(), node);
 				return super.visit(node);
 			}
 
@@ -604,6 +610,10 @@ public class SplitRefactoring extends Refactoring {
 									final ITypeBinding parentClass = declaringClass.getDeclaringClass();
 									if (parentClass == null) {
 										usedFields.add(field);
+										final ITypeBinding type = binding.getType();
+										if(type!=null) {
+											addUsedType(type, node);											
+										}
 									} else {
 										addNestedType(declaringType);
 									}
@@ -693,7 +703,17 @@ public class SplitRefactoring extends Refactoring {
 
 			private void addNestedType(IType nestedType) {
 				if (nestedType != null) {
-					nestedTypes.add(nestedType);
+					if (!nestedTypes.contains(nestedType)) {
+						nestedTypes.add(nestedType);
+						try {
+							for (final IMethod method : nestedType.getMethods()) {
+								buildSplitRefactoringModel(sourceNode, method, addMethods, usedTypes, usedFields,
+										nestedTypes);
+							}
+						} catch (JavaModelException e) {
+							log(e);
+						}
+					}
 				}
 			}
 
@@ -713,10 +733,12 @@ public class SplitRefactoring extends Refactoring {
 			for (final IMethodBinding methodBinding : declaredMethods) {
 				if (methodBinding.isConstructor()) {
 					final IMethod constructor = (IMethod) methodBinding.getJavaElement();
-					final MethodDeclaration constructorNode = (MethodDeclaration) NodeFinder.perform(sourceNode,
-							constructor.getSourceRange());
-					addMethods.put(constructor, constructorNode);
-					constructorNode.accept(visitor);
+					if (constructor != null) {
+						final MethodDeclaration constructorNode = (MethodDeclaration) NodeFinder.perform(sourceNode,
+								constructor.getSourceRange());
+						addMethods.put(constructor, constructorNode);
+						constructorNode.accept(visitor);
+					}
 				}
 			}
 
