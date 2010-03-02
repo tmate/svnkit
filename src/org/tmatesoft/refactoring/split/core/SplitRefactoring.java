@@ -20,6 +20,7 @@ import org.eclipse.core.runtime.Status;
 import org.eclipse.core.runtime.SubProgressMonitor;
 import org.eclipse.jdt.core.Flags;
 import org.eclipse.jdt.core.ICompilationUnit;
+import org.eclipse.jdt.core.IField;
 import org.eclipse.jdt.core.IJavaElement;
 import org.eclipse.jdt.core.IJavaProject;
 import org.eclipse.jdt.core.IMethod;
@@ -37,9 +38,14 @@ import org.eclipse.jdt.core.dom.ASTVisitor;
 import org.eclipse.jdt.core.dom.ArrayType;
 import org.eclipse.jdt.core.dom.BlockComment;
 import org.eclipse.jdt.core.dom.CompilationUnit;
+import org.eclipse.jdt.core.dom.Expression;
+import org.eclipse.jdt.core.dom.FieldAccess;
+import org.eclipse.jdt.core.dom.FieldDeclaration;
+import org.eclipse.jdt.core.dom.IBinding;
 import org.eclipse.jdt.core.dom.IMethodBinding;
 import org.eclipse.jdt.core.dom.IPackageBinding;
 import org.eclipse.jdt.core.dom.ITypeBinding;
+import org.eclipse.jdt.core.dom.IVariableBinding;
 import org.eclipse.jdt.core.dom.ImportDeclaration;
 import org.eclipse.jdt.core.dom.Javadoc;
 import org.eclipse.jdt.core.dom.LineComment;
@@ -52,6 +58,7 @@ import org.eclipse.jdt.core.dom.SimpleName;
 import org.eclipse.jdt.core.dom.SimpleType;
 import org.eclipse.jdt.core.dom.TagElement;
 import org.eclipse.jdt.core.dom.TextElement;
+import org.eclipse.jdt.core.dom.ThisExpression;
 import org.eclipse.jdt.core.dom.Type;
 import org.eclipse.jdt.core.dom.TypeDeclaration;
 import org.eclipse.jdt.core.dom.TypeLiteral;
@@ -451,8 +458,9 @@ public class SplitRefactoring extends Refactoring {
 			}
 
 			final Map<IMethod, MethodDeclaration> addMethods = new HashMap<IMethod, MethodDeclaration>();
+			final Set<IField> usedFields = new HashSet<IField>();
 			for (final IMethod sourceMethod : sourceMethods) {
-				getAddMethodsAndImportPackages(sourceNode, sourceMethod, addMethods, usedTypes);
+				getAddMethodsAndImportPackages(sourceNode, sourceMethod, addMethods, usedTypes, usedFields);
 			}
 
 			final List imports = node.imports();
@@ -468,8 +476,17 @@ public class SplitRefactoring extends Refactoring {
 			}
 
 			final List bodyDeclarations = type.bodyDeclarations();
+
+			for (final IField sourceField : usedFields) {
+				final FieldDeclaration sourceFieldNode = (FieldDeclaration) NodeFinder.perform(sourceNode, sourceField
+						.getSourceRange());
+				final FieldDeclaration fieldDeclarationCopy = (FieldDeclaration) ASTNode.copySubtree(ast,
+						sourceFieldNode);
+				bodyDeclarations.add(fieldDeclarationCopy);
+			}
+
 			for (final MethodDeclaration sourceMethodDeclaration : addMethods.values()) {
-				
+
 				final MethodDeclaration methodCopy = (MethodDeclaration) ASTNode.copySubtree(ast,
 						sourceMethodDeclaration);
 				final IMethodBinding sourceMethodBinding = sourceMethodDeclaration.resolveBinding();
@@ -503,7 +520,8 @@ public class SplitRefactoring extends Refactoring {
 	}
 
 	private void getAddMethodsAndImportPackages(final CompilationUnit sourceNode, final IMethod sourceMethod,
-			final Map<IMethod, MethodDeclaration> addMethods, final Set<IType> usedTypes) throws JavaModelException {
+			final Map<IMethod, MethodDeclaration> addMethods, final Set<IType> usedTypes, final Set<IField> usedFields)
+			throws JavaModelException {
 
 		if (addMethods.containsKey(sourceMethod))
 			return;
@@ -514,76 +532,71 @@ public class SplitRefactoring extends Refactoring {
 
 		final ASTVisitor visitor = new ASTVisitor() {
 
-			public boolean visit(final MethodInvocation node) {
-				addInvocedMethod(node);
-				return super.visit(node);
-			}
-
-			public boolean visit(SimpleType node) {
-				addUsedType(node);
-				return super.visit(node);
-			}
-
 			public boolean visit(final ArrayType node) {
-				addUsedType(node.getComponentType());
-				return super.visit(node);
-			}
-
-			@Override
-			public boolean visit(TypeLiteral node) {
-				addUsedType(node.getType());
+				addUsedType(node.getComponentType().resolveBinding());
 				return super.visit(node);
 			}
 
 			@Override
 			public boolean visit(SimpleName node) {
-				addUsedType(node);
+				determineEntity(node);
 				return super.visit(node);
 			}
 
-			private void addInvocedMethod(final MethodInvocation node) {
-				final IMethodBinding binding = node.resolveMethodBinding().getMethodDeclaration();
-				final IMethod method = (IMethod) binding.getJavaElement();
-				final IType declaringType = method.getDeclaringType();
-				if (declaringType != null) {
-					if (sourceMethodDeclaringType.equals(declaringType)) {
-						if (!invocedMethods.contains(method)) {
-							invocedMethods.add(method);
+			private void determineEntity(SimpleName node) {
+				final IBinding binding = node.resolveBinding();
+				switch (binding.getKind()) {
+				case IBinding.METHOD:
+					addInvocedMethod((IMethodBinding) binding);
+					break;
+				case IBinding.TYPE:
+					addUsedType((ITypeBinding) binding);
+					break;
+				case IBinding.VARIABLE:
+					addUsedField((IVariableBinding) binding);
+					break;
+				}
+
+			}
+
+			private void addUsedField(IVariableBinding binding) {
+				if (binding.isField()) {
+					final ITypeBinding declaringClass = binding.getDeclaringClass();
+					if (declaringClass != null && !declaringClass.isAnonymous()) {
+						final IField field = (IField) binding.getJavaElement();
+						final IType declaringType = (IType) declaringClass.getJavaElement();
+						if (declaringType != null) {
+							if (sourceMethodDeclaringType.equals(declaringType)) {
+								usedFields.add(field);
+							} else {
+								usedTypes.add(declaringType);
+							}
 						}
-					} else {
-						if (!usedTypes.contains(declaringType)) {
+					}
+				}
+			}
+
+			private void addInvocedMethod(final IMethodBinding binding) {
+				final ITypeBinding declaringClass = binding.getDeclaringClass();
+				if (!declaringClass.isAnonymous()) {
+					final IMethod method = (IMethod) binding.getJavaElement();
+					final IType declaringType = (IType) declaringClass.getJavaElement();
+					if (declaringType != null) {
+						if (sourceMethodDeclaringType.equals(declaringType)) {
+							invocedMethods.add(method);
+						} else {
 							usedTypes.add(declaringType);
 						}
 					}
 				}
 			}
 
-			private void addUsedType(final IType type) {
-				if (type != null) {
-					if (!usedTypes.contains(type)) {
+			private void addUsedType(final ITypeBinding binding) {
+				if (!binding.isAnonymous()) {
+					final IType type = (IType) binding.getJavaElement();
+					if (type != null) {
 						usedTypes.add(type);
 					}
-				}
-			}
-
-			private void addUsedType(final ITypeBinding binding) {
-				final IType type = (IType) binding.getJavaElement();
-				if (type != null) {
-					addUsedType(type);
-				}
-			}
-
-			private void addUsedType(final Type node) {
-				final ITypeBinding binding = node.resolveBinding().getTypeDeclaration();
-				if (binding != null) {
-					addUsedType(binding);
-				}
-			}
-
-			private void addUsedType(SimpleName node) {
-				final ITypeBinding binding = node.resolveTypeBinding().getTypeDeclaration();
-				if (binding != null) {
-					addUsedType(binding);
 				}
 			}
 
@@ -597,7 +610,7 @@ public class SplitRefactoring extends Refactoring {
 		sourceMethodNode.accept(visitor);
 
 		for (final IMethod invocedMethod : invocedMethods) {
-			getAddMethodsAndImportPackages(sourceNode, invocedMethod, addMethods, usedTypes);
+			getAddMethodsAndImportPackages(sourceNode, invocedMethod, addMethods, usedTypes, usedFields);
 		}
 
 	}
