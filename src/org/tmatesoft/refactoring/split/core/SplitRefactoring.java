@@ -575,7 +575,7 @@ public class SplitRefactoring extends Refactoring {
 				addUsedType(node.getComponentType().resolveBinding(), node);
 				return super.visit(node);
 			}
-			
+
 			@Override
 			public boolean visit(TypeLiteral node) {
 				addUsedType(node.getType().resolveBinding(), node);
@@ -611,8 +611,8 @@ public class SplitRefactoring extends Refactoring {
 									if (parentClass == null) {
 										usedFields.add(field);
 										final ITypeBinding type = binding.getType();
-										if(type!=null) {
-											addUsedType(type, node);											
+										if (type != null) {
+											addUsedType(type, node);
 										}
 									} else {
 										addNestedType(declaringType);
@@ -706,6 +706,23 @@ public class SplitRefactoring extends Refactoring {
 					if (!nestedTypes.contains(nestedType)) {
 						nestedTypes.add(nestedType);
 						try {
+
+							final TypeDeclaration typeDeclaration = (TypeDeclaration) NodeFinder.perform(sourceNode,
+									nestedType.getSourceRange());
+							if (!typeDeclaration.isInterface()) {
+								final Type superclassType = typeDeclaration.getSuperclassType();
+								if (superclassType != null) {
+									addUsedType(superclassType.resolveBinding(), typeDeclaration);
+								}
+							}
+
+							final List<Type> superInterfaceTypes = typeDeclaration.superInterfaceTypes();
+							if (superInterfaceTypes != null) {
+								for (final Type superInterface : superInterfaceTypes) {
+									addUsedType(superInterface.resolveBinding(), typeDeclaration);
+								}
+							}
+
 							for (final IMethod method : nestedType.getMethods()) {
 								buildSplitRefactoringModel(sourceNode, method, addMethods, usedTypes, usedFields,
 										nestedTypes);
