@@ -366,7 +366,7 @@ public class SplitRefactoring extends Refactoring {
 		final IType sourceType = sourceNode.getTypeRoot().findPrimaryType();
 		final String sourceTypeName = sourceType.getElementName();
 
-		final String typeName = sourceTypeName + targetSuffix;
+		final String typeName = addSuffix(sourceTypeName);
 		final String unitName = typeName + ".java";
 
 		final ICompilationUnit unit = targetPackage.getCompilationUnit(unitName);
@@ -413,7 +413,7 @@ public class SplitRefactoring extends Refactoring {
 							type.setSuperclassType((Type) ASTNode.copySubtree(ast, sourceSuperclassType));
 						} else {
 							final String sourceSuperclassName = sourceSuperclass.getElementName();
-							final String targetSuperclassName = sourceSuperclassName + targetSuffix;
+							final String targetSuperclassName = addSuffix(sourceSuperclassName);
 							type.setSuperclassType(ast.newSimpleType(ast.newName(targetSuperclassName)));
 						}
 					}
@@ -439,7 +439,7 @@ public class SplitRefactoring extends Refactoring {
 								superInterfaceTypes.add((Type) ASTNode.copySubtree(ast, sourceSuperInterfaceType));
 							} else {
 								final String sourceSuperInterfaceName = sourceSuperInterface.getElementName();
-								final String targetSuperInterfaceName = sourceSuperInterfaceName + targetSuffix;
+								final String targetSuperInterfaceName = addSuffix(sourceSuperInterfaceName);
 								superInterfaceTypes.add(ast.newSimpleType(ast.newName(targetSuperInterfaceName)));
 							}
 
@@ -491,8 +491,12 @@ public class SplitRefactoring extends Refactoring {
 
 				final MethodDeclaration methodCopy = (MethodDeclaration) ASTNode.copySubtree(ast,
 						sourceMethodDeclaration);
-				final IMethodBinding sourceMethodBinding = sourceMethodDeclaration.resolveBinding();
 
+				if (sourceMethodDeclaration.isConstructor()) {
+					methodCopy.setName(ast.newSimpleName(addSuffix(sourceTypeName)));
+				}
+
+				final IMethodBinding sourceMethodBinding = sourceMethodDeclaration.resolveBinding();
 				final String from = sourceMethodBinding.getDeclaringClass().getQualifiedName();
 
 				Javadoc javadoc = methodCopy.getJavadoc();
@@ -526,6 +530,18 @@ public class SplitRefactoring extends Refactoring {
 
 			changes.add(new CreateCompilationUnitChange(unit, document.get(), null));
 
+		}
+	}
+
+	/**
+	 * @param sourceTypeName
+	 * @return
+	 */
+	private String addSuffix(final String str) {
+		if (!str.endsWith(targetSuffix)) {
+			return str + targetSuffix;
+		} else {
+			return str;
 		}
 	}
 
@@ -579,15 +595,24 @@ public class SplitRefactoring extends Refactoring {
 			private void addUsedField(IVariableBinding binding, final ASTNode node) {
 				if (binding.isField()) {
 					final ITypeBinding declaringClass = binding.getDeclaringClass();
-					if (declaringClass != null && !declaringClass.isAnonymous()) {
-						final IField field = (IField) binding.getJavaElement();
-						final IType declaringType = (IType) declaringClass.getJavaElement();
-						if (declaringType != null) {
-							if (sourceMethodDeclaringType.equals(declaringType)) {
-								usedFields.add(field);
-							} else {
-								addUsedType(declaringClass, node);
+					if (declaringClass != null) {
+						if (!declaringClass.isAnonymous()) {
+							final IField field = (IField) binding.getJavaElement();
+							final IType declaringType = (IType) declaringClass.getJavaElement();
+							if (declaringType != null) {
+								if (sourceMethodDeclaringType.equals(declaringType)) {
+									final ITypeBinding parentClass = declaringClass.getDeclaringClass();
+									if (parentClass == null) {
+										usedFields.add(field);
+									} else {
+										addNestedType(declaringType);
+									}
+								} else {
+									addUsedType(declaringClass, node);
+								}
 							}
+						} else {
+							// TODO anonymous class
 						}
 					}
 				}
@@ -646,7 +671,7 @@ public class SplitRefactoring extends Refactoring {
 					case IBinding.METHOD:
 						break;
 					case IBinding.TYPE:
-						simpleName.setIdentifier(simpleName.getIdentifier() + targetSuffix);
+						simpleName.setIdentifier(addSuffix(simpleName.getIdentifier()));
 						break;
 					case IBinding.VARIABLE:
 						break;
@@ -659,7 +684,7 @@ public class SplitRefactoring extends Refactoring {
 						final SimpleType simpleType = (SimpleType) componentType;
 						if (node instanceof SimpleName) {
 							final SimpleName simpleName = (SimpleName) node;
-							simpleName.setIdentifier(simpleName.getIdentifier() + targetSuffix);
+							simpleName.setIdentifier(addSuffix(simpleName.getIdentifier()));
 						}
 					}
 				}
@@ -683,6 +708,18 @@ public class SplitRefactoring extends Refactoring {
 			visitor.addNestedType(sourceMethodDeclaringType);
 		} else {
 			addMethods.put(sourceMethod, sourceMethodNode);
+
+			final IMethodBinding[] declaredMethods = sourceMethodDeclaringClass.getDeclaredMethods();
+			for (final IMethodBinding methodBinding : declaredMethods) {
+				if (methodBinding.isConstructor()) {
+					final IMethod constructor = (IMethod) methodBinding.getJavaElement();
+					final MethodDeclaration constructorNode = (MethodDeclaration) NodeFinder.perform(sourceNode,
+							constructor.getSourceRange());
+					addMethods.put(constructor, constructorNode);
+					constructorNode.accept(visitor);
+				}
+			}
+
 		}
 
 		sourceMethodNode.accept(visitor);
