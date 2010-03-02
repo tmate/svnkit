@@ -52,6 +52,7 @@ import org.eclipse.jdt.core.dom.LineComment;
 import org.eclipse.jdt.core.dom.MethodDeclaration;
 import org.eclipse.jdt.core.dom.MethodInvocation;
 import org.eclipse.jdt.core.dom.Modifier;
+import org.eclipse.jdt.core.dom.Name;
 import org.eclipse.jdt.core.dom.NodeFinder;
 import org.eclipse.jdt.core.dom.PackageDeclaration;
 import org.eclipse.jdt.core.dom.SimpleName;
@@ -528,12 +529,12 @@ public class SplitRefactoring extends Refactoring {
 
 		final IType sourceMethodDeclaringType = sourceMethod.getDeclaringType();
 
-		final Set<IMethod> invocedMethods = new HashSet<IMethod>();
+		final Set<IMethod> invokedMethods = new HashSet<IMethod>();
 
 		final ASTVisitor visitor = new ASTVisitor() {
 
 			public boolean visit(final ArrayType node) {
-				addUsedType(node.getComponentType().resolveBinding());
+				addUsedType(node.getComponentType().resolveBinding(), node);
 				return super.visit(node);
 			}
 
@@ -547,19 +548,19 @@ public class SplitRefactoring extends Refactoring {
 				final IBinding binding = node.resolveBinding();
 				switch (binding.getKind()) {
 				case IBinding.METHOD:
-					addInvocedMethod((IMethodBinding) binding);
+					addInvokedMethod((IMethodBinding) binding, node);
 					break;
 				case IBinding.TYPE:
-					addUsedType((ITypeBinding) binding);
+					addUsedType((ITypeBinding) binding, node);
 					break;
 				case IBinding.VARIABLE:
-					addUsedField((IVariableBinding) binding);
+					addUsedField((IVariableBinding) binding, node);
 					break;
 				}
 
 			}
 
-			private void addUsedField(IVariableBinding binding) {
+			private void addUsedField(IVariableBinding binding, final ASTNode node) {
 				if (binding.isField()) {
 					final ITypeBinding declaringClass = binding.getDeclaringClass();
 					if (declaringClass != null && !declaringClass.isAnonymous()) {
@@ -569,35 +570,71 @@ public class SplitRefactoring extends Refactoring {
 							if (sourceMethodDeclaringType.equals(declaringType)) {
 								usedFields.add(field);
 							} else {
-								usedTypes.add(declaringType);
+								addUsedType(declaringClass, node);
 							}
 						}
 					}
 				}
 			}
 
-			private void addInvocedMethod(final IMethodBinding binding) {
+			private void addInvokedMethod(final IMethodBinding binding, final ASTNode node) {
 				final ITypeBinding declaringClass = binding.getDeclaringClass();
 				if (!declaringClass.isAnonymous()) {
 					final IMethod method = (IMethod) binding.getJavaElement();
 					final IType declaringType = (IType) declaringClass.getJavaElement();
 					if (declaringType != null) {
 						if (sourceMethodDeclaringType.equals(declaringType)) {
-							invocedMethods.add(method);
+							invokedMethods.add(method);
 						} else {
-							usedTypes.add(declaringType);
+							addUsedType(declaringClass, node);
 						}
 					}
 				}
 			}
 
-			private void addUsedType(final ITypeBinding binding) {
+			private void addUsedType(final ITypeBinding binding, final ASTNode node) {
 				if (!binding.isAnonymous()) {
 					final IType type = (IType) binding.getJavaElement();
 					if (type != null) {
-						usedTypes.add(type);
+						final ICompilationUnit unit = type.getCompilationUnit();
+						if (!units.containsKey(unit)) {
+							usedTypes.add(type);
+						} else {
+							moveEntityType(node);
+						}
 					}
 				}
+			}
+
+			protected void moveEntityType(final ASTNode node) {
+
+				if (node instanceof SimpleName) {
+					final SimpleName simpleName = (SimpleName) node;
+
+					final IBinding binding = simpleName.resolveBinding();
+					switch (binding.getKind()) {
+					case IBinding.METHOD:
+						break;
+					case IBinding.TYPE:
+						simpleName.setIdentifier(simpleName.getIdentifier() + targetSuffix);
+						break;
+					case IBinding.VARIABLE:
+						break;
+					}
+
+				} else if (node instanceof ArrayType) {
+					final ArrayType arrayType = (ArrayType) node;
+					final Type componentType = arrayType.getComponentType();
+					if (componentType instanceof SimpleType) {
+						final SimpleType simpleType = (SimpleType) componentType;
+						final Name name = simpleType.getName();
+						if (node instanceof SimpleName) {
+							final SimpleName simpleName = (SimpleName) node;
+							simpleName.setIdentifier(simpleName.getIdentifier() + targetSuffix);
+						}
+					}
+				}
+
 			}
 
 		};
@@ -609,7 +646,7 @@ public class SplitRefactoring extends Refactoring {
 
 		sourceMethodNode.accept(visitor);
 
-		for (final IMethod invocedMethod : invocedMethods) {
+		for (final IMethod invocedMethod : invokedMethods) {
 			getAddMethodsAndImportPackages(sourceNode, invocedMethod, addMethods, usedTypes, usedFields);
 		}
 
