@@ -7,6 +7,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.eclipse.core.resources.IProject;
@@ -279,9 +280,8 @@ public class SplitRefactoring extends Refactoring {
 				@Override
 				public void acceptAST(ICompilationUnit source, CompilationUnit ast) {
 					try {
-						final Set<IMethod> sourceMethods = model.getUnits().get(source);
-						final SplitUnitModel unitModel = SplitUnitModel.getUnitModel(model, ast, sourceMethods);
-						applyUnitSplit(unitModel, source, sourceMethods, ast, status, subMonitor);
+						final SplitUnitModel unitModel = SplitUnitModel.getUnitModel(source, ast, model);
+						model.getUnitModels().put(source, unitModel);
 					} catch (Exception exception) {
 						log(exception);
 					}
@@ -295,6 +295,14 @@ public class SplitRefactoring extends Refactoring {
 			final ICompilationUnit[] array = collection.toArray(new ICompilationUnit[collection.size()]);
 			parser.createASTs(array, new String[0], requestor, new SubProgressMonitor(progressMonitor, 1));
 
+			for (final Map.Entry<ICompilationUnit, SplitUnitModel> entry : model.getUnitModels().entrySet()) {
+				try {
+					applyUnitSplit(entry.getKey(), entry.getValue(), status, subMonitor);
+				} catch (Exception exception) {
+					log(exception);
+				}
+			}
+
 		} finally {
 			progressMonitor.done();
 		}
@@ -302,9 +310,12 @@ public class SplitRefactoring extends Refactoring {
 		return status;
 	}
 
-	private void applyUnitSplit(final SplitUnitModel unitModel, final ICompilationUnit sourceUnit,
-			final Set<IMethod> sourceMethods, final CompilationUnit sourceNode, final RefactoringStatus status,
-			final IProgressMonitor monitor) throws CoreException, MalformedTreeException, BadLocationException {
+	private void applyUnitSplit(final ICompilationUnit sourceUnit, final SplitUnitModel unitModel,
+			final RefactoringStatus status, final IProgressMonitor monitor) throws CoreException,
+			MalformedTreeException, BadLocationException {
+
+		final CompilationUnit sourceNode = unitModel.getSourceAst();
+		final Set<IMethod> sourceMethods = model.getUnits().get(sourceUnit);
 
 		final IType sourceType = sourceNode.getTypeRoot().findPrimaryType();
 		final String sourceTypeName = sourceType.getElementName();
