@@ -1,6 +1,3 @@
-/**
- * 
- */
 package org.tmatesoft.refactoring.split.core;
 
 import java.util.HashSet;
@@ -231,9 +228,6 @@ class SplitUnitModelBuilder extends ASTVisitor {
 							&& model.getUnits().containsKey(compilationUnit)) {
 						try {
 							final SplitUnitModel splitUnitModel = model.getUnitModels().get(compilationUnit);
-							final MethodDeclaration methodDeclaration = (MethodDeclaration) NodeFinder.perform(
-									splitUnitModel.getSourceAst(), method.getSourceRange());
-							splitUnitModel.getAddMethods().put(method, methodDeclaration);
 							buildSplitUnitModel(method, model, splitUnitModel);
 						} catch (Exception e) {
 							SplitRefactoring.log(e);
