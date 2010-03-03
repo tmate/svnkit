@@ -37,9 +37,11 @@ public class SplitRefactoringModel {
 	private IJavaSearchScope projectScope;
 
 	private final SearchEngine searchEngine = new SearchEngine();
-	private final Map<ICompilationUnit, Set<IMethod>> units = new LinkedHashMap<ICompilationUnit, Set<IMethod>>();
 	private final List<Change> changes = new LinkedList<Change>();
 	private final CodeFormatter codeFormatter = ToolFactory.createCodeFormatter(null);
+
+	private final Map<ICompilationUnit, Set<IMethod>> units = new LinkedHashMap<ICompilationUnit, Set<IMethod>>();
+	private final Map<ICompilationUnit, SplitUnitModel> unitModels = new LinkedHashMap<ICompilationUnit, SplitUnitModel>();
 
 	public SplitRefactoringModel(String sourcePackageName, String targetPackageName, String targetSuffix,
 			List<String> typesToHideNames) {
@@ -159,6 +161,10 @@ public class SplitRefactoringModel {
 
 	public CodeFormatter getCodeFormatter() {
 		return codeFormatter;
+	}
+	
+	public Map<ICompilationUnit, SplitUnitModel> getUnitModels() {
+		return unitModels;
 	}
 
 }

@@ -36,7 +36,7 @@ class SplitUnitModelBuilder extends ASTVisitor {
 
 	private final SplitRefactoringModel model;
 	private final SplitUnitModel unitModel;
-	private final CompilationUnit sourceNode;
+	private final CompilationUnit sourceAst;
 	private final IMethod sourceMethod;
 	private final Set<IMethod> invokedMethods = new HashSet<IMethod>();
 
@@ -46,15 +46,15 @@ class SplitUnitModelBuilder extends ASTVisitor {
 	private final ITypeBinding sourceMethodDeclaringClass;
 	private final ITypeBinding sourceMethodParentClass;
 
-	public SplitUnitModelBuilder(final SplitRefactoringModel model, final CompilationUnit sourceNode,
+	public SplitUnitModelBuilder(final SplitRefactoringModel model, final CompilationUnit sourceAst,
 			final IMethod sourceMethod, final SplitUnitModel splitModel) throws JavaModelException {
 
 		this.model = model;
-		this.sourceNode = sourceNode;
+		this.sourceAst = sourceAst;
 		this.sourceMethod = sourceMethod;
 		this.unitModel = splitModel;
 
-		sourceMethodNode = (MethodDeclaration) NodeFinder.perform(sourceNode, sourceMethod.getSourceRange());
+		sourceMethodNode = (MethodDeclaration) NodeFinder.perform(sourceAst, sourceMethod.getSourceRange());
 		sourceMethodDeclaringType = sourceMethod.getDeclaringType();
 		sourceMethodBinding = sourceMethodNode.resolveBinding();
 		sourceMethodDeclaringClass = sourceMethodBinding.getDeclaringClass();
@@ -80,8 +80,8 @@ class SplitUnitModelBuilder extends ASTVisitor {
 	/**
 	 * @return the sourceNode
 	 */
-	public CompilationUnit getSourceNode() {
-		return sourceNode;
+	public CompilationUnit getSourceAst() {
+		return sourceAst;
 	}
 
 	/**
@@ -278,7 +278,7 @@ class SplitUnitModelBuilder extends ASTVisitor {
 					if (varDeclaration.isField()) {
 						final IField field = (IField) javaElement;
 						try {
-							final ASTNode nodeFound = NodeFinder.perform(sourceNode, field.getSourceRange());
+							final ASTNode nodeFound = NodeFinder.perform(sourceAst, field.getSourceRange());
 							if (nodeFound != null) {
 								if (nodeFound instanceof FieldDeclaration) {
 									final FieldDeclaration fieldNode = (FieldDeclaration) nodeFound;
@@ -299,6 +299,7 @@ class SplitUnitModelBuilder extends ASTVisitor {
 				break;
 
 			case IBinding.METHOD:
+				// TODO method
 				break;
 
 			}
@@ -350,7 +351,7 @@ class SplitUnitModelBuilder extends ASTVisitor {
 				nestedTypes.add(nestedType);
 				try {
 
-					final TypeDeclaration typeDeclaration = (TypeDeclaration) NodeFinder.perform(sourceNode, nestedType
+					final TypeDeclaration typeDeclaration = (TypeDeclaration) NodeFinder.perform(sourceAst, nestedType
 							.getSourceRange());
 					if (!typeDeclaration.isInterface()) {
 						final Type superclassType = typeDeclaration.getSuperclassType();
@@ -367,9 +368,9 @@ class SplitUnitModelBuilder extends ASTVisitor {
 					}
 
 					for (final IMethod method : nestedType.getMethods()) {
-						buildSplitUnitModel(model, sourceNode, method, unitModel);
+						buildSplitUnitModel(method, model, unitModel);
 					}
-					
+
 				} catch (JavaModelException e) {
 					SplitRefactoring.log(e);
 				}
@@ -377,12 +378,14 @@ class SplitUnitModelBuilder extends ASTVisitor {
 		}
 	}
 
-	static void buildSplitUnitModel(final SplitRefactoringModel model, final CompilationUnit sourceNode,
-			final IMethod sourceMethod, final SplitUnitModel unitModel) throws JavaModelException {
+	static void buildSplitUnitModel(final IMethod sourceMethod, final SplitRefactoringModel model,
+			final SplitUnitModel unitModel) throws JavaModelException {
 
 		if (unitModel.getAddMethods().containsKey(sourceMethod)) {
 			return;
 		}
+
+		final CompilationUnit sourceNode = unitModel.getSourceAst();
 
 		final SplitUnitModelBuilder builder = new SplitUnitModelBuilder(model, sourceNode, sourceMethod, unitModel);
 
@@ -409,7 +412,7 @@ class SplitUnitModelBuilder extends ASTVisitor {
 		builder.buildUnitModel();
 
 		for (final IMethod invokedMethod : builder.getInvokedMethods()) {
-			buildSplitUnitModel(model, sourceNode, invokedMethod, unitModel);
+			buildSplitUnitModel(invokedMethod, model, unitModel);
 		}
 
 	}
