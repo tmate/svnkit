@@ -33,7 +33,7 @@ import org.eclipse.jdt.core.dom.Type;
 import org.eclipse.jdt.core.dom.TypeDeclaration;
 import org.eclipse.jdt.core.dom.TypeLiteral;
 
-class BuildSplitModelVisitor extends ASTVisitor {
+class SplitRefactoringModelBuildVisitor extends ASTVisitor {
 
 	private Map<ICompilationUnit, Set<IMethod>> units;
 	private CompilationUnit sourceNode;
@@ -48,7 +48,7 @@ class BuildSplitModelVisitor extends ASTVisitor {
 	private ITypeBinding sourceMethodParentClass;
 	private String targetSuffix;
 
-	public BuildSplitModelVisitor(final String targetSuffix, final Map<ICompilationUnit, Set<IMethod>> units,
+	public SplitRefactoringModelBuildVisitor(final String targetSuffix, final Map<ICompilationUnit, Set<IMethod>> units,
 			final CompilationUnit sourceNode, final IMethod sourceMethod, final SplitRefactoringModel splitModel)
 			throws JavaModelException {
 
@@ -386,7 +386,7 @@ class BuildSplitModelVisitor extends ASTVisitor {
 		if (splitModel.getAddMethods().containsKey(sourceMethod))
 			return;
 
-		final BuildSplitModelVisitor visitor = new BuildSplitModelVisitor(targetSuffix, units, sourceNode,
+		final SplitRefactoringModelBuildVisitor visitor = new SplitRefactoringModelBuildVisitor(targetSuffix, units, sourceNode,
 				sourceMethod, splitModel);
 
 		if (visitor.getSourceMethodDeclaringClass().isAnonymous()) {
