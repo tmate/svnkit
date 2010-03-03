@@ -295,6 +295,14 @@ public class SplitRefactoring extends Refactoring {
 			final ICompilationUnit[] array = collection.toArray(new ICompilationUnit[collection.size()]);
 			parser.createASTs(array, new String[0], requestor, new SubProgressMonitor(progressMonitor, 1));
 
+			for (final SplitUnitModel unitModel : model.getUnitModels().values()) {
+				try {
+					unitModel.buildModel(model);
+				} catch (Exception exception) {
+					log(exception);
+				}
+			}
+
 			for (final Map.Entry<ICompilationUnit, SplitUnitModel> entry : model.getUnitModels().entrySet()) {
 				try {
 					applyUnitSplit(entry.getKey(), entry.getValue(), status, subMonitor);
