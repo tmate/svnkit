@@ -33,12 +33,12 @@ import org.eclipse.jdt.core.dom.Type;
 import org.eclipse.jdt.core.dom.TypeDeclaration;
 import org.eclipse.jdt.core.dom.TypeLiteral;
 
-class SplitRefactoringModelBuildVisitor extends ASTVisitor {
+class SplitUnitModelBuilder extends ASTVisitor {
 
 	private Map<ICompilationUnit, Set<IMethod>> units;
 	private CompilationUnit sourceNode;
 	private IMethod sourceMethod;
-	private SplitRefactoringModel splitModel;
+	private SplitUnitModel splitModel;
 	private Set<IMethod> invokedMethods = new HashSet<IMethod>();
 
 	private MethodDeclaration sourceMethodNode;
@@ -48,8 +48,8 @@ class SplitRefactoringModelBuildVisitor extends ASTVisitor {
 	private ITypeBinding sourceMethodParentClass;
 	private String targetSuffix;
 
-	public SplitRefactoringModelBuildVisitor(final String targetSuffix, final Map<ICompilationUnit, Set<IMethod>> units,
-			final CompilationUnit sourceNode, final IMethod sourceMethod, final SplitRefactoringModel splitModel)
+	public SplitUnitModelBuilder(final String targetSuffix, final Map<ICompilationUnit, Set<IMethod>> units,
+			final CompilationUnit sourceNode, final IMethod sourceMethod, final SplitUnitModel splitModel)
 			throws JavaModelException {
 
 		this.targetSuffix = targetSuffix;
@@ -98,7 +98,7 @@ class SplitRefactoringModelBuildVisitor extends ASTVisitor {
 	/**
 	 * @return the splitModel
 	 */
-	public SplitRefactoringModel getSplitModel() {
+	public SplitUnitModel getSplitModel() {
 		return splitModel;
 	}
 
@@ -380,14 +380,14 @@ class SplitRefactoringModelBuildVisitor extends ASTVisitor {
 	}
 
 	static void buildSplitRefactoringModel(final String targetSuffix, final Map<ICompilationUnit, Set<IMethod>> units,
-			final CompilationUnit sourceNode, final IMethod sourceMethod, final SplitRefactoringModel splitModel)
+			final CompilationUnit sourceNode, final IMethod sourceMethod, final SplitUnitModel splitModel)
 			throws JavaModelException {
 
 		if (splitModel.getAddMethods().containsKey(sourceMethod))
 			return;
 
-		final SplitRefactoringModelBuildVisitor visitor = new SplitRefactoringModelBuildVisitor(targetSuffix, units, sourceNode,
-				sourceMethod, splitModel);
+		final SplitUnitModelBuilder visitor = new SplitUnitModelBuilder(targetSuffix, units, sourceNode, sourceMethod,
+				splitModel);
 
 		if (visitor.getSourceMethodDeclaringClass().isAnonymous()) {
 			// TODO anonymous class
