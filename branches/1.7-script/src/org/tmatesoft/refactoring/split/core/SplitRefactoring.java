@@ -359,7 +359,7 @@ public class SplitRefactoring extends Refactoring {
 
 		final SplitRefactoringModel splitModel = new SplitRefactoringModel();
 		for (final IMethod sourceMethod : sourceMethods) {
-			BuildSplitModelVisitor
+			SplitRefactoringModelBuildVisitor
 					.buildSplitRefactoringModel(targetSuffix, units, sourceNode, sourceMethod, splitModel);
 		}
 
