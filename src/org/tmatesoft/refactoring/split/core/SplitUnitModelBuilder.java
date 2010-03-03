@@ -234,6 +234,7 @@ class SplitUnitModelBuilder extends ASTVisitor {
 							final MethodDeclaration methodDeclaration = (MethodDeclaration) NodeFinder.perform(
 									splitUnitModel.getSourceAst(), method.getSourceRange());
 							splitUnitModel.getAddMethods().put(method, methodDeclaration);
+							buildSplitUnitModel(method, model, splitUnitModel);
 						} catch (Exception e) {
 							SplitRefactoring.log(e);
 						}
