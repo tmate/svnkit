@@ -1,5 +1,7 @@
 package org.tmatesoft.refactoring.split.core;
 
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
@@ -9,18 +11,10 @@ import org.eclipse.jdt.core.IType;
 import org.eclipse.jdt.core.dom.MethodDeclaration;
 
 public class SplitRefactoringModel {
-	private Map<IMethod, MethodDeclaration> addMethods;
-	private Set<IType> usedTypes;
-	private Set<IField> usedFields;
-	private Set<IType> nestedTypes;
-
-	public SplitRefactoringModel(Map<IMethod, MethodDeclaration> addMethods, Set<IType> usedTypes,
-			Set<IField> usedFields, Set<IType> nestedTypes) {
-		this.addMethods = addMethods;
-		this.usedTypes = usedTypes;
-		this.usedFields = usedFields;
-		this.nestedTypes = nestedTypes;
-	}
+	private Map<IMethod, MethodDeclaration> addMethods = new HashMap<IMethod, MethodDeclaration>();
+	private Set<IType> usedTypes = new HashSet<IType>();
+	private Set<IField> usedFields = new HashSet<IField>();
+	private Set<IType> nestedTypes = new HashSet<IType>();
 
 	public Map<IMethod, MethodDeclaration> getAddMethods() {
 		return addMethods;
