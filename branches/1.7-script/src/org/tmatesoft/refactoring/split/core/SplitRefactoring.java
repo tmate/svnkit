@@ -35,36 +35,27 @@ import org.eclipse.jdt.core.dom.AST;
 import org.eclipse.jdt.core.dom.ASTNode;
 import org.eclipse.jdt.core.dom.ASTParser;
 import org.eclipse.jdt.core.dom.ASTRequestor;
-import org.eclipse.jdt.core.dom.ASTVisitor;
-import org.eclipse.jdt.core.dom.ArrayType;
 import org.eclipse.jdt.core.dom.BlockComment;
 import org.eclipse.jdt.core.dom.CompilationUnit;
 import org.eclipse.jdt.core.dom.Expression;
 import org.eclipse.jdt.core.dom.FieldAccess;
 import org.eclipse.jdt.core.dom.FieldDeclaration;
-import org.eclipse.jdt.core.dom.IBinding;
 import org.eclipse.jdt.core.dom.IMethodBinding;
 import org.eclipse.jdt.core.dom.IPackageBinding;
 import org.eclipse.jdt.core.dom.ITypeBinding;
-import org.eclipse.jdt.core.dom.IVariableBinding;
 import org.eclipse.jdt.core.dom.ImportDeclaration;
 import org.eclipse.jdt.core.dom.Javadoc;
 import org.eclipse.jdt.core.dom.LineComment;
 import org.eclipse.jdt.core.dom.MethodDeclaration;
 import org.eclipse.jdt.core.dom.MethodInvocation;
 import org.eclipse.jdt.core.dom.Modifier;
-import org.eclipse.jdt.core.dom.Name;
 import org.eclipse.jdt.core.dom.NodeFinder;
 import org.eclipse.jdt.core.dom.PackageDeclaration;
-import org.eclipse.jdt.core.dom.QualifiedName;
-import org.eclipse.jdt.core.dom.SimpleName;
-import org.eclipse.jdt.core.dom.SimpleType;
 import org.eclipse.jdt.core.dom.TagElement;
 import org.eclipse.jdt.core.dom.TextElement;
 import org.eclipse.jdt.core.dom.ThisExpression;
 import org.eclipse.jdt.core.dom.Type;
 import org.eclipse.jdt.core.dom.TypeDeclaration;
-import org.eclipse.jdt.core.dom.TypeLiteral;
 import org.eclipse.jdt.core.dom.VariableDeclaration;
 import org.eclipse.jdt.core.formatter.CodeFormatter;
 import org.eclipse.jdt.core.search.IJavaSearchConstants;
@@ -111,7 +102,7 @@ public class SplitRefactoring extends Refactoring {
 	private SearchEngine searchEngine = new SearchEngine();
 	private IJavaSearchScope projectScope;
 
-	private Map<ICompilationUnit, Set<IMethod>> units = new LinkedHashMap<ICompilationUnit, Set<IMethod>>();
+	Map<ICompilationUnit, Set<IMethod>> units = new LinkedHashMap<ICompilationUnit, Set<IMethod>>();
 
 	private List<Change> changes = new LinkedList<Change>();
 
@@ -129,7 +120,7 @@ public class SplitRefactoring extends Refactoring {
 	/**
 	 * @param exception
 	 */
-	private void log(Exception exception) {
+	static public void log(Exception exception) {
 		SplitRefactoringActivator.getDefault().getLog().log(
 				new Status(IStatus.ERROR, SplitRefactoringActivator.PLUGIN_ID, 0, exception.getMessage(), exception));
 	}
@@ -368,7 +359,8 @@ public class SplitRefactoring extends Refactoring {
 
 		final SplitRefactoringModel splitModel = new SplitRefactoringModel();
 		for (final IMethod sourceMethod : sourceMethods) {
-			buildSplitRefactoringModel(sourceNode, sourceMethod, splitModel);
+			BuildSplitModelVisitor
+					.buildSplitRefactoringModel(targetSuffix, units, sourceNode, sourceMethod, splitModel);
 		}
 
 		final IType sourceType = sourceNode.getTypeRoot().findPrimaryType();
@@ -535,303 +527,12 @@ public class SplitRefactoring extends Refactoring {
 	 * @param sourceTypeName
 	 * @return
 	 */
-	private String addSuffix(final String str) {
+	String addSuffix(final String str) {
 		if (!str.endsWith(targetSuffix)) {
 			return str + targetSuffix;
 		} else {
 			return str;
 		}
-	}
-
-	private void buildSplitRefactoringModel(final CompilationUnit sourceNode, final IMethod sourceMethod,
-			final SplitRefactoringModel splitModel) throws JavaModelException {
-
-		if (splitModel.getAddMethods().containsKey(sourceMethod))
-			return;
-
-		final Set<IMethod> invokedMethods = new HashSet<IMethod>();
-
-		final MethodDeclaration sourceMethodNode = (MethodDeclaration) NodeFinder.perform(sourceNode, sourceMethod
-				.getSourceRange());
-
-		final IType sourceMethodDeclaringType = sourceMethod.getDeclaringType();
-
-		final IMethodBinding sourceMethodBinding = sourceMethodNode.resolveBinding();
-		final ITypeBinding sourceMethodDeclaringClass = sourceMethodBinding.getDeclaringClass();
-		final ITypeBinding sourceMethodParentClass = sourceMethodDeclaringClass.getDeclaringClass();
-
-		class ASTVisitorImpl extends ASTVisitor {
-
-			@Override
-			public boolean visit(QualifiedName node) {
-				determineEntity(node);
-				return super.visit(node);
-			}
-
-			@Override
-			public boolean visit(SimpleName node) {
-				determineEntity(node);
-				return super.visit(node);
-			}
-
-			public boolean visit(final ArrayType node) {
-				addUsedType(node.getComponentType().resolveBinding(), node);
-				return super.visit(node);
-			}
-
-			@Override
-			public boolean visit(TypeLiteral node) {
-				addUsedType(node.getType().resolveBinding(), node);
-				return super.visit(node);
-			}
-
-			private void determineEntity(Name node) {
-				final IBinding binding = node.resolveBinding();
-				switch (binding.getKind()) {
-				case IBinding.METHOD:
-					addInvokedMethod((IMethodBinding) binding, node);
-					break;
-				case IBinding.TYPE:
-					addUsedType((ITypeBinding) binding, node);
-					break;
-				case IBinding.VARIABLE:
-					addUsedField((IVariableBinding) binding, node);
-					break;
-				}
-
-			}
-
-			private void addUsedField(IVariableBinding binding, final ASTNode node) {
-				if (binding.isField()) {
-					final ITypeBinding declaringClass = binding.getDeclaringClass();
-					if (declaringClass != null) {
-						if (!declaringClass.isAnonymous()) {
-							final IField field = (IField) binding.getJavaElement();
-							final IType declaringType = (IType) declaringClass.getJavaElement();
-							if (declaringType != null) {
-								if (sourceMethodDeclaringType.equals(declaringType)) {
-									final ITypeBinding parentClass = declaringClass.getDeclaringClass();
-									if (parentClass == null) {
-										splitModel.getUsedFields().add(field);
-										final ITypeBinding type = binding.getType();
-										if (type != null) {
-											if (!type.isArray()) {
-												addUsedType(type, node);
-											} else {
-												addUsedType(type.getComponentType(), node);
-											}
-										}
-									} else {
-										addNestedType(declaringType);
-									}
-								} else {
-									addUsedType(declaringClass, node);
-								}
-							}
-						} else {
-							// TODO anonymous class
-						}
-					}
-				}
-			}
-
-			private void addInvokedMethod(final IMethodBinding binding, final ASTNode node) {
-				final ITypeBinding declaringClass = binding.getDeclaringClass();
-				if (!declaringClass.isAnonymous()) {
-					final IMethod method = (IMethod) binding.getJavaElement();
-					final IType declaringType = (IType) declaringClass.getJavaElement();
-					if (declaringType != null) {
-						if (sourceMethodDeclaringType.equals(declaringType)) {
-							final ITypeBinding parentClass = declaringClass.getDeclaringClass();
-							if (parentClass == null) {
-								invokedMethods.add(method);
-							} else {
-								addNestedType(declaringType);
-							}
-						} else {
-							addUsedType(declaringClass, node);
-						}
-					}
-				} else {
-					// TODO anonymous class
-				}
-			}
-
-			private void addUsedType(final ITypeBinding binding, final ASTNode node) {
-				if (!binding.isAnonymous()) {
-					final IType type = (IType) binding.getJavaElement();
-					if (type != null) {
-						final ITypeBinding parentClass = binding.getDeclaringClass();
-						if (parentClass == null) {
-							final ICompilationUnit unit = type.getCompilationUnit();
-							if (!units.containsKey(unit)) {
-								splitModel.getUsedTypes().add(type);
-							} else {
-								moveEntityType(node);
-							}
-						} else if (sourceMethodDeclaringClass.equals(parentClass)) {
-							addNestedType(type);
-						}
-					}
-				} else {
-					// TODO anonymous class
-				}
-			}
-
-			protected void moveEntityType(final ASTNode node) {
-
-				if (node instanceof SimpleName) {
-					final SimpleName simpleName = (SimpleName) node;
-
-					final IBinding binding = simpleName.resolveBinding();
-					final int kind = binding.getKind();
-
-					switch (kind) {
-
-					case IBinding.TYPE:
-
-						simpleName.setIdentifier(addSuffix(simpleName.getIdentifier()));
-						break;
-
-					case IBinding.VARIABLE:
-
-						final IVariableBinding var = (IVariableBinding) binding;
-						final ITypeBinding varType = var.getType();
-						if (varType != null) {
-							final IVariableBinding varDeclaration = var.getVariableDeclaration();
-							final IJavaElement javaElement = varDeclaration.getJavaElement();
-							if (varDeclaration.isField()) {
-								final IField field = (IField) javaElement;
-								try {
-									final ASTNode nodeFound = NodeFinder.perform(sourceNode, field.getSourceRange());
-									if (nodeFound != null) {
-										if (nodeFound instanceof FieldDeclaration) {
-											final FieldDeclaration fieldNode = (FieldDeclaration) nodeFound;
-											final Type fieldType = fieldNode.getType();
-											moveTypeToTarget(fieldType);
-										} else {
-											// TODO why?
-										}
-									}
-								} catch (JavaModelException e) {
-									log(e);
-								}
-							} else {
-								// TODO local var
-							}
-						}
-
-						break;
-
-					case IBinding.METHOD:
-						break;
-
-					}
-
-				} else if (node instanceof ArrayType) {
-					final ArrayType arrayType = (ArrayType) node;
-					final Type componentType = arrayType.getComponentType();
-					if (componentType instanceof SimpleType) {
-						if (node instanceof SimpleName) {
-							final SimpleName simpleName = (SimpleName) node;
-							simpleName.setIdentifier(addSuffix(simpleName.getIdentifier()));
-						}
-					}
-				}
-
-			}
-
-			/**
-			 * @param type
-			 */
-			private void moveTypeToTarget(final Type type) {
-				if (!type.isArrayType()) {
-					addTargetSuffixToType(type);
-				} else {
-					final ArrayType fieldArrayType = (ArrayType) type;
-					final Type componentType = fieldArrayType.getComponentType();
-					if (componentType.isSimpleType() && componentType instanceof SimpleType) {
-						addTargetSuffixToType(componentType);
-					}
-				}
-			}
-
-			/**
-			 * @param type
-			 */
-			private void addTargetSuffixToType(final Type type) {
-				final SimpleType simpleType = (SimpleType) type;
-				final Name name = simpleType.getName();
-				if (name.isSimpleName() && name instanceof SimpleName) {
-					final SimpleName typeSimpleName = (SimpleName) name;
-					typeSimpleName.setIdentifier(addSuffix(typeSimpleName.getIdentifier()));
-				}
-			}
-
-			private void addNestedType(IType nestedType) {
-				if (nestedType != null) {
-					if (!splitModel.getNestedTypes().contains(nestedType)) {
-						splitModel.getNestedTypes().add(nestedType);
-						try {
-
-							final TypeDeclaration typeDeclaration = (TypeDeclaration) NodeFinder.perform(sourceNode,
-									nestedType.getSourceRange());
-							if (!typeDeclaration.isInterface()) {
-								final Type superclassType = typeDeclaration.getSuperclassType();
-								if (superclassType != null) {
-									addUsedType(superclassType.resolveBinding(), typeDeclaration);
-								}
-							}
-
-							final List<Type> superInterfaceTypes = typeDeclaration.superInterfaceTypes();
-							if (superInterfaceTypes != null) {
-								for (final Type superInterface : superInterfaceTypes) {
-									addUsedType(superInterface.resolveBinding(), typeDeclaration);
-								}
-							}
-
-							for (final IMethod method : nestedType.getMethods()) {
-								buildSplitRefactoringModel(sourceNode, method, splitModel);
-							}
-						} catch (JavaModelException e) {
-							log(e);
-						}
-					}
-				}
-			}
-
-		}
-
-		final ASTVisitorImpl visitor = new ASTVisitorImpl();
-
-		if (sourceMethodDeclaringClass.isAnonymous()) {
-			// TODO anonymous class
-		} else if (sourceMethodParentClass != null) {
-			visitor.addNestedType(sourceMethodDeclaringType);
-		} else {
-			splitModel.getAddMethods().put(sourceMethod, sourceMethodNode);
-
-			final IMethodBinding[] declaredMethods = sourceMethodDeclaringClass.getDeclaredMethods();
-			for (final IMethodBinding methodBinding : declaredMethods) {
-				if (methodBinding.isConstructor()) {
-					final IMethod constructor = (IMethod) methodBinding.getJavaElement();
-					if (constructor != null) {
-						final MethodDeclaration constructorNode = (MethodDeclaration) NodeFinder.perform(sourceNode,
-								constructor.getSourceRange());
-						splitModel.getAddMethods().put(constructor, constructorNode);
-						constructorNode.accept(visitor);
-					}
-				}
-			}
-
-		}
-
-		sourceMethodNode.accept(visitor);
-
-		for (final IMethod invokedMethod : invokedMethods) {
-			buildSplitRefactoringModel(sourceNode, invokedMethod, splitModel);
-		}
-
 	}
 
 	@Override
