@@ -11,6 +11,7 @@ import org.eclipse.jdt.core.ICompilationUnit;
 import org.eclipse.jdt.core.IField;
 import org.eclipse.jdt.core.IJavaElement;
 import org.eclipse.jdt.core.IMethod;
+import org.eclipse.jdt.core.IPackageFragment;
 import org.eclipse.jdt.core.IType;
 import org.eclipse.jdt.core.JavaModelException;
 import org.eclipse.jdt.core.dom.ASTNode;
@@ -224,7 +225,21 @@ class SplitUnitModelBuilder extends ASTVisitor {
 						addNestedType(declaringType);
 					}
 				} else {
-					addUsedType(declaringClass, node);
+					final IPackageFragment packageFragment = declaringType.getPackageFragment();
+					final ICompilationUnit compilationUnit = declaringType.getCompilationUnit();
+					if (model.getSourcePackage().equals(packageFragment)
+							&& model.getUnits().containsKey(compilationUnit)) {
+						try {
+							final SplitUnitModel splitUnitModel = model.getUnitModels().get(compilationUnit);
+							final MethodDeclaration methodDeclaration = (MethodDeclaration) NodeFinder.perform(
+									splitUnitModel.getSourceAst(), method.getSourceRange());
+							splitUnitModel.getAddMethods().put(method, methodDeclaration);
+						} catch (Exception e) {
+							SplitRefactoring.log(e);
+						}
+					} else {
+						addUsedType(declaringClass, node);
+					}
 				}
 			}
 		} else {
@@ -381,13 +396,9 @@ class SplitUnitModelBuilder extends ASTVisitor {
 	static void buildSplitUnitModel(final IMethod sourceMethod, final SplitRefactoringModel model,
 			final SplitUnitModel unitModel) throws JavaModelException {
 
-		if (unitModel.getAddMethods().containsKey(sourceMethod)) {
-			return;
-		}
+		final CompilationUnit sourceAst = unitModel.getSourceAst();
 
-		final CompilationUnit sourceNode = unitModel.getSourceAst();
-
-		final SplitUnitModelBuilder builder = new SplitUnitModelBuilder(model, sourceNode, sourceMethod, unitModel);
+		final SplitUnitModelBuilder builder = new SplitUnitModelBuilder(model, sourceAst, sourceMethod, unitModel);
 
 		if (builder.getSourceMethodDeclaringClass().isAnonymous()) {
 			// TODO anonymous class
@@ -400,7 +411,7 @@ class SplitUnitModelBuilder extends ASTVisitor {
 				if (methodBinding.isConstructor()) {
 					final IMethod constructor = (IMethod) methodBinding.getJavaElement();
 					if (constructor != null) {
-						final MethodDeclaration constructorNode = (MethodDeclaration) NodeFinder.perform(sourceNode,
+						final MethodDeclaration constructorNode = (MethodDeclaration) NodeFinder.perform(sourceAst,
 								constructor.getSourceRange());
 						unitModel.getAddMethods().put(constructor, constructorNode);
 						constructorNode.accept(builder);
@@ -412,7 +423,9 @@ class SplitUnitModelBuilder extends ASTVisitor {
 		builder.buildUnitModel();
 
 		for (final IMethod invokedMethod : builder.getInvokedMethods()) {
-			buildSplitUnitModel(invokedMethod, model, unitModel);
+			if (!unitModel.getAddMethods().containsKey(invokedMethod)) {
+				buildSplitUnitModel(invokedMethod, model, unitModel);
+			}
 		}
 
 	}

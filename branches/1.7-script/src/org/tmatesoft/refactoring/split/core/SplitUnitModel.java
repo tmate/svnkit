@@ -63,12 +63,19 @@ public class SplitUnitModel {
 			final SplitRefactoringModel model) throws JavaModelException {
 		final Set<IMethod> sourceMethods = model.getUnits().get(sourceUnit);
 		final SplitUnitModel unitModel = new SplitUnitModel(sourceUnit, sourceMethods, sourceAst);
-		for (final IMethod sourceMethod : sourceMethods) {
-			if (!unitModel.getAddMethods().containsKey(sourceMethod)) {
-				SplitUnitModelBuilder.buildSplitUnitModel(sourceMethod, model, unitModel);
-			}
-		}
 		return unitModel;
+	}
+
+	/**
+	 * @param model
+	 * @param sourceMethods
+	 * @param unitModel
+	 * @throws JavaModelException
+	 */
+	public void buildModel(final SplitRefactoringModel model) throws JavaModelException {
+		for (final IMethod sourceMethod : sourceMethods) {
+			SplitUnitModelBuilder.buildSplitUnitModel(sourceMethod, model, this);
+		}
 	}
 
 }
