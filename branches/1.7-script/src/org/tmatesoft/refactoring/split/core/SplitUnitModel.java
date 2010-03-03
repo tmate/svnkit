@@ -5,12 +5,16 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
+import org.eclipse.jdt.core.ICompilationUnit;
 import org.eclipse.jdt.core.IField;
 import org.eclipse.jdt.core.IMethod;
 import org.eclipse.jdt.core.IType;
+import org.eclipse.jdt.core.JavaModelException;
+import org.eclipse.jdt.core.dom.CompilationUnit;
 import org.eclipse.jdt.core.dom.MethodDeclaration;
 
-public class SplitRefactoringModel {
+public class SplitUnitModel {
+
 	private Map<IMethod, MethodDeclaration> addMethods = new HashMap<IMethod, MethodDeclaration>();
 	private Set<IType> usedTypes = new HashSet<IType>();
 	private Set<IField> usedFields = new HashSet<IField>();
@@ -31,4 +35,16 @@ public class SplitRefactoringModel {
 	public Set<IType> getNestedTypes() {
 		return nestedTypes;
 	}
+
+	public static SplitUnitModel getModel(final String targetSuffix, final Map<ICompilationUnit, Set<IMethod>> units,
+			final CompilationUnit ast, final Set<IMethod> sourceMethods) throws JavaModelException {
+
+		final SplitUnitModel splitModel = new SplitUnitModel();
+		for (final IMethod sourceMethod : sourceMethods) {
+			SplitUnitModelBuilder.buildSplitRefactoringModel(targetSuffix, units, ast, sourceMethod,
+					splitModel);
+		}
+		return splitModel;
+	}
+
 }

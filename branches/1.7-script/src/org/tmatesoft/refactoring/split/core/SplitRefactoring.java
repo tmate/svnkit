@@ -102,7 +102,7 @@ public class SplitRefactoring extends Refactoring {
 	private SearchEngine searchEngine = new SearchEngine();
 	private IJavaSearchScope projectScope;
 
-	Map<ICompilationUnit, Set<IMethod>> units = new LinkedHashMap<ICompilationUnit, Set<IMethod>>();
+	private Map<ICompilationUnit, Set<IMethod>> units = new LinkedHashMap<ICompilationUnit, Set<IMethod>>();
 
 	private List<Change> changes = new LinkedList<Change>();
 
@@ -332,7 +332,10 @@ public class SplitRefactoring extends Refactoring {
 				@Override
 				public void acceptAST(ICompilationUnit source, CompilationUnit ast) {
 					try {
-						splitCompilationUnit(source, units.get(source), ast, status, subMonitor);
+						final Set<IMethod> sourceMethods = units.get(source);
+						final SplitUnitModel splitModel = SplitUnitModel.getModel(targetSuffix, units, ast,
+								sourceMethods);
+						applyUnitSplit(splitModel, source, sourceMethods, ast, status, subMonitor);
 					} catch (Exception exception) {
 						log(exception);
 					}
@@ -353,15 +356,9 @@ public class SplitRefactoring extends Refactoring {
 		return status;
 	}
 
-	public void splitCompilationUnit(final ICompilationUnit sourceUnit, final Set<IMethod> sourceMethods,
-			final CompilationUnit sourceNode, final RefactoringStatus status, final IProgressMonitor monitor)
-			throws CoreException, MalformedTreeException, BadLocationException {
-
-		final SplitRefactoringModel splitModel = new SplitRefactoringModel();
-		for (final IMethod sourceMethod : sourceMethods) {
-			SplitRefactoringModelBuildVisitor
-					.buildSplitRefactoringModel(targetSuffix, units, sourceNode, sourceMethod, splitModel);
-		}
+	private void applyUnitSplit(final SplitUnitModel splitModel, final ICompilationUnit sourceUnit,
+			final Set<IMethod> sourceMethods, final CompilationUnit sourceNode, final RefactoringStatus status,
+			final IProgressMonitor monitor) throws CoreException, MalformedTreeException, BadLocationException {
 
 		final IType sourceType = sourceNode.getTypeRoot().findPrimaryType();
 		final String sourceTypeName = sourceType.getElementName();
@@ -527,7 +524,7 @@ public class SplitRefactoring extends Refactoring {
 	 * @param sourceTypeName
 	 * @return
 	 */
-	String addSuffix(final String str) {
+	private String addSuffix(final String str) {
 		if (!str.endsWith(targetSuffix)) {
 			return str + targetSuffix;
 		} else {
