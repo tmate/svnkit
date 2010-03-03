@@ -23,6 +23,7 @@ import org.eclipse.jdt.core.ICompilationUnit;
 import org.eclipse.jdt.core.IField;
 import org.eclipse.jdt.core.IJavaElement;
 import org.eclipse.jdt.core.IJavaProject;
+import org.eclipse.jdt.core.ILocalVariable;
 import org.eclipse.jdt.core.IMethod;
 import org.eclipse.jdt.core.IPackageFragment;
 import org.eclipse.jdt.core.IPackageFragmentRoot;
@@ -63,6 +64,7 @@ import org.eclipse.jdt.core.dom.ThisExpression;
 import org.eclipse.jdt.core.dom.Type;
 import org.eclipse.jdt.core.dom.TypeDeclaration;
 import org.eclipse.jdt.core.dom.TypeLiteral;
+import org.eclipse.jdt.core.dom.VariableDeclaration;
 import org.eclipse.jdt.core.formatter.CodeFormatter;
 import org.eclipse.jdt.core.search.IJavaSearchConstants;
 import org.eclipse.jdt.core.search.IJavaSearchScope;
@@ -612,7 +614,11 @@ public class SplitRefactoring extends Refactoring {
 										usedFields.add(field);
 										final ITypeBinding type = binding.getType();
 										if (type != null) {
-											addUsedType(type, node);
+											if (!type.isArray()) {
+												addUsedType(type, node);
+											} else {
+												addUsedType(type.getComponentType(), node);
+											}
 										}
 									} else {
 										addNestedType(declaringType);
@@ -677,14 +683,42 @@ public class SplitRefactoring extends Refactoring {
 					final SimpleName simpleName = (SimpleName) node;
 
 					final IBinding binding = simpleName.resolveBinding();
-					switch (binding.getKind()) {
-					case IBinding.METHOD:
-						break;
+					final int kind = binding.getKind();
+
+					switch (kind) {
+
 					case IBinding.TYPE:
+
 						simpleName.setIdentifier(addSuffix(simpleName.getIdentifier()));
 						break;
+
 					case IBinding.VARIABLE:
+
+						final IVariableBinding var = (IVariableBinding) binding;
+						final ITypeBinding varType = var.getType();
+						if (varType != null) {
+							final IVariableBinding varDeclaration = var.getVariableDeclaration();
+							final IJavaElement javaElement = varDeclaration.getJavaElement();
+							if (varDeclaration.isField()) {
+								final IField field = (IField) javaElement;
+								try {
+									final FieldDeclaration fieldNode = (FieldDeclaration) NodeFinder.perform(
+											sourceNode, field.getSourceRange());
+									final Type fieldType = fieldNode.getType();
+									moveTypeToTarget(fieldType);
+								} catch (JavaModelException e) {
+									log(e);
+								}
+							} else {
+								// TODO local var
+							}
+						}
+
 						break;
+
+					case IBinding.METHOD:
+						break;
+
 					}
 
 				} else if (node instanceof ArrayType) {
@@ -699,6 +733,33 @@ public class SplitRefactoring extends Refactoring {
 					}
 				}
 
+			}
+
+			/**
+			 * @param type
+			 */
+			private void moveTypeToTarget(final Type type) {
+				if (type.isArrayType()) {
+					addTargetSuffixToType(type);
+				} else {
+					final ArrayType fieldArrayType = (ArrayType) type;
+					final Type componentType = fieldArrayType.getComponentType();
+					if (componentType.isSimpleType() && componentType instanceof SimpleType) {
+						addTargetSuffixToType(componentType);
+					}
+				}
+			}
+
+			/**
+			 * @param type
+			 */
+			private void addTargetSuffixToType(final Type type) {
+				final SimpleType simpleType = (SimpleType) type;
+				final Name name = simpleType.getName();
+				if (name.isSimpleName() && name instanceof SimpleName) {
+					final SimpleName typeSimpleName = (SimpleName) name;
+					typeSimpleName.setIdentifier(addSuffix(typeSimpleName.getIdentifier()));
+				}
 			}
 
 			private void addNestedType(IType nestedType) {
