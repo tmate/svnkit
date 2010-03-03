@@ -56,6 +56,7 @@ import org.eclipse.jdt.core.dom.Modifier;
 import org.eclipse.jdt.core.dom.Name;
 import org.eclipse.jdt.core.dom.NodeFinder;
 import org.eclipse.jdt.core.dom.PackageDeclaration;
+import org.eclipse.jdt.core.dom.QualifiedName;
 import org.eclipse.jdt.core.dom.SimpleName;
 import org.eclipse.jdt.core.dom.SimpleType;
 import org.eclipse.jdt.core.dom.TagElement;
@@ -365,9 +366,18 @@ public class SplitRefactoring extends Refactoring {
 			final CompilationUnit sourceNode, final RefactoringStatus status, final IProgressMonitor monitor)
 			throws CoreException, MalformedTreeException, BadLocationException {
 
+		final Map<IMethod, MethodDeclaration> addMethods = new HashMap<IMethod, MethodDeclaration>();
+		final Set<IType> usedTypes = new HashSet<IType>();
+		final Set<IField> usedFields = new HashSet<IField>();
+		final Set<IType> nestedTypes = new HashSet<IType>();
+		final SplitRefactoringModel splitModel = new SplitRefactoringModel(addMethods, usedTypes, usedFields,
+				nestedTypes);
+		for (final IMethod sourceMethod : sourceMethods) {
+			buildSplitRefactoringModel(sourceNode, sourceMethod, splitModel);
+		}
+
 		final IType sourceType = sourceNode.getTypeRoot().findPrimaryType();
 		final String sourceTypeName = sourceType.getElementName();
-
 		final String typeName = addSuffix(sourceTypeName);
 		final String unitName = typeName + ".java";
 
@@ -392,8 +402,6 @@ public class SplitRefactoring extends Refactoring {
 				modifiers.add(ast.newModifier(Modifier.ModifierKeyword.ABSTRACT_KEYWORD));
 			}
 			type.setName(ast.newSimpleName(typeName));
-
-			final Set<IType> usedTypes = new HashSet<IType>();
 
 			final TypeDeclaration sourceTypeNode = (TypeDeclaration) NodeFinder.perform(sourceNode, sourceType
 					.getSourceRange());
@@ -458,13 +466,6 @@ public class SplitRefactoring extends Refactoring {
 						}
 					}
 				}
-			}
-
-			final Map<IMethod, MethodDeclaration> addMethods = new HashMap<IMethod, MethodDeclaration>();
-			final Set<IField> usedFields = new HashSet<IField>();
-			final Set<IType> nestedTypes = new HashSet<IType>();
-			for (final IMethod sourceMethod : sourceMethods) {
-				buildSplitRefactoringModel(sourceNode, sourceMethod, addMethods, usedTypes, usedFields, nestedTypes);
 			}
 
 			final List imports = node.imports();
@@ -548,10 +549,9 @@ public class SplitRefactoring extends Refactoring {
 	}
 
 	private void buildSplitRefactoringModel(final CompilationUnit sourceNode, final IMethod sourceMethod,
-			final Map<IMethod, MethodDeclaration> addMethods, final Set<IType> usedTypes, final Set<IField> usedFields,
-			final Set<IType> nestedTypes) throws JavaModelException {
+			final SplitRefactoringModel splitModel) throws JavaModelException {
 
-		if (addMethods.containsKey(sourceMethod))
+		if (splitModel.getAddMethods().containsKey(sourceMethod))
 			return;
 
 		final Set<IMethod> invokedMethods = new HashSet<IMethod>();
@@ -566,6 +566,12 @@ public class SplitRefactoring extends Refactoring {
 		final ITypeBinding sourceMethodParentClass = sourceMethodDeclaringClass.getDeclaringClass();
 
 		class ASTVisitorImpl extends ASTVisitor {
+
+			@Override
+			public boolean visit(QualifiedName node) {
+				determineEntity(node);
+				return super.visit(node);
+			}
 
 			@Override
 			public boolean visit(SimpleName node) {
@@ -584,7 +590,7 @@ public class SplitRefactoring extends Refactoring {
 				return super.visit(node);
 			}
 
-			private void determineEntity(SimpleName node) {
+			private void determineEntity(Name node) {
 				final IBinding binding = node.resolveBinding();
 				switch (binding.getKind()) {
 				case IBinding.METHOD:
@@ -611,7 +617,7 @@ public class SplitRefactoring extends Refactoring {
 								if (sourceMethodDeclaringType.equals(declaringType)) {
 									final ITypeBinding parentClass = declaringClass.getDeclaringClass();
 									if (parentClass == null) {
-										usedFields.add(field);
+										splitModel.getUsedFields().add(field);
 										final ITypeBinding type = binding.getType();
 										if (type != null) {
 											if (!type.isArray()) {
@@ -664,7 +670,7 @@ public class SplitRefactoring extends Refactoring {
 						if (parentClass == null) {
 							final ICompilationUnit unit = type.getCompilationUnit();
 							if (!units.containsKey(unit)) {
-								usedTypes.add(type);
+								splitModel.getUsedTypes().add(type);
 							} else {
 								moveEntityType(node);
 							}
@@ -702,10 +708,16 @@ public class SplitRefactoring extends Refactoring {
 							if (varDeclaration.isField()) {
 								final IField field = (IField) javaElement;
 								try {
-									final FieldDeclaration fieldNode = (FieldDeclaration) NodeFinder.perform(
-											sourceNode, field.getSourceRange());
-									final Type fieldType = fieldNode.getType();
-									moveTypeToTarget(fieldType);
+									final ASTNode nodeFound = NodeFinder.perform(sourceNode, field.getSourceRange());
+									if (nodeFound != null) {
+										if (nodeFound instanceof FieldDeclaration) {
+											final FieldDeclaration fieldNode = (FieldDeclaration) nodeFound;
+											final Type fieldType = fieldNode.getType();
+											moveTypeToTarget(fieldType);
+										} else {
+											// TODO why?
+										}
+									}
 								} catch (JavaModelException e) {
 									log(e);
 								}
@@ -725,7 +737,6 @@ public class SplitRefactoring extends Refactoring {
 					final ArrayType arrayType = (ArrayType) node;
 					final Type componentType = arrayType.getComponentType();
 					if (componentType instanceof SimpleType) {
-						final SimpleType simpleType = (SimpleType) componentType;
 						if (node instanceof SimpleName) {
 							final SimpleName simpleName = (SimpleName) node;
 							simpleName.setIdentifier(addSuffix(simpleName.getIdentifier()));
@@ -739,7 +750,7 @@ public class SplitRefactoring extends Refactoring {
 			 * @param type
 			 */
 			private void moveTypeToTarget(final Type type) {
-				if (type.isArrayType()) {
+				if (!type.isArrayType()) {
 					addTargetSuffixToType(type);
 				} else {
 					final ArrayType fieldArrayType = (ArrayType) type;
@@ -764,8 +775,8 @@ public class SplitRefactoring extends Refactoring {
 
 			private void addNestedType(IType nestedType) {
 				if (nestedType != null) {
-					if (!nestedTypes.contains(nestedType)) {
-						nestedTypes.add(nestedType);
+					if (!splitModel.getNestedTypes().contains(nestedType)) {
+						splitModel.getNestedTypes().add(nestedType);
 						try {
 
 							final TypeDeclaration typeDeclaration = (TypeDeclaration) NodeFinder.perform(sourceNode,
@@ -785,8 +796,9 @@ public class SplitRefactoring extends Refactoring {
 							}
 
 							for (final IMethod method : nestedType.getMethods()) {
-								buildSplitRefactoringModel(sourceNode, method, addMethods, usedTypes, usedFields,
-										nestedTypes);
+								buildSplitRefactoringModel(sourceNode, method, new SplitRefactoringModel(splitModel
+										.getAddMethods(), splitModel.getUsedTypes(), splitModel.getUsedFields(),
+										splitModel.getNestedTypes()));
 							}
 						} catch (JavaModelException e) {
 							log(e);
@@ -796,7 +808,6 @@ public class SplitRefactoring extends Refactoring {
 			}
 
 		}
-		;
 
 		final ASTVisitorImpl visitor = new ASTVisitorImpl();
 
@@ -805,7 +816,7 @@ public class SplitRefactoring extends Refactoring {
 		} else if (sourceMethodParentClass != null) {
 			visitor.addNestedType(sourceMethodDeclaringType);
 		} else {
-			addMethods.put(sourceMethod, sourceMethodNode);
+			splitModel.getAddMethods().put(sourceMethod, sourceMethodNode);
 
 			final IMethodBinding[] declaredMethods = sourceMethodDeclaringClass.getDeclaredMethods();
 			for (final IMethodBinding methodBinding : declaredMethods) {
@@ -814,7 +825,7 @@ public class SplitRefactoring extends Refactoring {
 					if (constructor != null) {
 						final MethodDeclaration constructorNode = (MethodDeclaration) NodeFinder.perform(sourceNode,
 								constructor.getSourceRange());
-						addMethods.put(constructor, constructorNode);
+						splitModel.getAddMethods().put(constructor, constructorNode);
 						constructorNode.accept(visitor);
 					}
 				}
@@ -825,7 +836,8 @@ public class SplitRefactoring extends Refactoring {
 		sourceMethodNode.accept(visitor);
 
 		for (final IMethod invokedMethod : invokedMethods) {
-			buildSplitRefactoringModel(sourceNode, invokedMethod, addMethods, usedTypes, usedFields, nestedTypes);
+			buildSplitRefactoringModel(sourceNode, invokedMethod, new SplitRefactoringModel(splitModel.getAddMethods(),
+					splitModel.getUsedTypes(), splitModel.getUsedFields(), splitModel.getNestedTypes()));
 		}
 
 	}
