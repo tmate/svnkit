@@ -5,7 +5,6 @@ package org.tmatesoft.refactoring.split.core;
 
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 import org.eclipse.jdt.core.ICompilationUnit;
@@ -35,28 +34,25 @@ import org.eclipse.jdt.core.dom.TypeLiteral;
 
 class SplitUnitModelBuilder extends ASTVisitor {
 
-	private Map<ICompilationUnit, Set<IMethod>> units;
-	private CompilationUnit sourceNode;
-	private IMethod sourceMethod;
-	private SplitUnitModel splitModel;
-	private Set<IMethod> invokedMethods = new HashSet<IMethod>();
+	private final SplitRefactoringModel model;
+	private final SplitUnitModel unitModel;
+	private final CompilationUnit sourceNode;
+	private final IMethod sourceMethod;
+	private final Set<IMethod> invokedMethods = new HashSet<IMethod>();
 
-	private MethodDeclaration sourceMethodNode;
-	private IType sourceMethodDeclaringType;
-	private IMethodBinding sourceMethodBinding;
-	private ITypeBinding sourceMethodDeclaringClass;
-	private ITypeBinding sourceMethodParentClass;
-	private String targetSuffix;
+	private final MethodDeclaration sourceMethodNode;
+	private final IType sourceMethodDeclaringType;
+	private final IMethodBinding sourceMethodBinding;
+	private final ITypeBinding sourceMethodDeclaringClass;
+	private final ITypeBinding sourceMethodParentClass;
 
-	public SplitUnitModelBuilder(final String targetSuffix, final Map<ICompilationUnit, Set<IMethod>> units,
-			final CompilationUnit sourceNode, final IMethod sourceMethod, final SplitUnitModel splitModel)
-			throws JavaModelException {
+	public SplitUnitModelBuilder(final SplitRefactoringModel model, final CompilationUnit sourceNode,
+			final IMethod sourceMethod, final SplitUnitModel splitModel) throws JavaModelException {
 
-		this.targetSuffix = targetSuffix;
-		this.units = units;
+		this.model = model;
 		this.sourceNode = sourceNode;
 		this.sourceMethod = sourceMethod;
-		this.splitModel = splitModel;
+		this.unitModel = splitModel;
 
 		sourceMethodNode = (MethodDeclaration) NodeFinder.perform(sourceNode, sourceMethod.getSourceRange());
 		sourceMethodDeclaringType = sourceMethod.getDeclaringType();
@@ -70,14 +66,14 @@ class SplitUnitModelBuilder extends ASTVisitor {
 	 * @return
 	 */
 	private String addSuffix(final String str) {
-		if (!str.endsWith(targetSuffix)) {
-			return str + targetSuffix;
+		if (!str.endsWith(model.getTargetSuffix())) {
+			return str + model.getTargetSuffix();
 		} else {
 			return str;
 		}
 	}
 
-	public void visitSourceMethod() {
+	public void buildUnitModel() {
 		sourceMethodNode.accept(this);
 	}
 
@@ -99,7 +95,7 @@ class SplitUnitModelBuilder extends ASTVisitor {
 	 * @return the splitModel
 	 */
 	public SplitUnitModel getSplitModel() {
-		return splitModel;
+		return unitModel;
 	}
 
 	/**
@@ -191,7 +187,7 @@ class SplitUnitModelBuilder extends ASTVisitor {
 						if (sourceMethodDeclaringType.equals(declaringType)) {
 							final ITypeBinding parentClass = declaringClass.getDeclaringClass();
 							if (parentClass == null) {
-								splitModel.getUsedFields().add(field);
+								unitModel.getUsedFields().add(field);
 								final ITypeBinding type = binding.getType();
 								if (type != null) {
 									if (!type.isArray()) {
@@ -243,8 +239,8 @@ class SplitUnitModelBuilder extends ASTVisitor {
 				final ITypeBinding parentClass = binding.getDeclaringClass();
 				if (parentClass == null) {
 					final ICompilationUnit unit = type.getCompilationUnit();
-					if (!units.containsKey(unit)) {
-						splitModel.getUsedTypes().add(type);
+					if (!model.getUnits().containsKey(unit)) {
+						unitModel.getUsedTypes().add(type);
 					} else {
 						moveEntityType(node);
 					}
@@ -349,8 +345,9 @@ class SplitUnitModelBuilder extends ASTVisitor {
 
 	void addNestedType(IType nestedType) {
 		if (nestedType != null) {
-			if (!splitModel.getNestedTypes().contains(nestedType)) {
-				splitModel.getNestedTypes().add(nestedType);
+			final Set<IType> nestedTypes = unitModel.getNestedTypes();
+			if (!nestedTypes.contains(nestedType)) {
+				nestedTypes.add(nestedType);
 				try {
 
 					final TypeDeclaration typeDeclaration = (TypeDeclaration) NodeFinder.perform(sourceNode, nestedType
@@ -370,8 +367,9 @@ class SplitUnitModelBuilder extends ASTVisitor {
 					}
 
 					for (final IMethod method : nestedType.getMethods()) {
-						buildSplitRefactoringModel(targetSuffix, units, sourceNode, method, splitModel);
+						buildSplitUnitModel(model, sourceNode, method, unitModel);
 					}
+					
 				} catch (JavaModelException e) {
 					SplitRefactoring.log(e);
 				}
@@ -379,42 +377,39 @@ class SplitUnitModelBuilder extends ASTVisitor {
 		}
 	}
 
-	static void buildSplitRefactoringModel(final String targetSuffix, final Map<ICompilationUnit, Set<IMethod>> units,
-			final CompilationUnit sourceNode, final IMethod sourceMethod, final SplitUnitModel splitModel)
-			throws JavaModelException {
+	static void buildSplitUnitModel(final SplitRefactoringModel model, final CompilationUnit sourceNode,
+			final IMethod sourceMethod, final SplitUnitModel unitModel) throws JavaModelException {
 
-		if (splitModel.getAddMethods().containsKey(sourceMethod))
+		if (unitModel.getAddMethods().containsKey(sourceMethod)) {
 			return;
+		}
 
-		final SplitUnitModelBuilder visitor = new SplitUnitModelBuilder(targetSuffix, units, sourceNode, sourceMethod,
-				splitModel);
+		final SplitUnitModelBuilder builder = new SplitUnitModelBuilder(model, sourceNode, sourceMethod, unitModel);
 
-		if (visitor.getSourceMethodDeclaringClass().isAnonymous()) {
+		if (builder.getSourceMethodDeclaringClass().isAnonymous()) {
 			// TODO anonymous class
-		} else if (visitor.getSourceMethodParentClass() != null) {
-			visitor.addNestedType(visitor.getSourceMethodDeclaringType());
+		} else if (builder.getSourceMethodParentClass() != null) {
+			builder.addNestedType(builder.getSourceMethodDeclaringType());
 		} else {
-			splitModel.getAddMethods().put(sourceMethod, visitor.getSourceMethodNode());
-
-			final IMethodBinding[] declaredMethods = visitor.getSourceMethodDeclaringClass().getDeclaredMethods();
+			unitModel.getAddMethods().put(sourceMethod, builder.getSourceMethodNode());
+			final IMethodBinding[] declaredMethods = builder.getSourceMethodDeclaringClass().getDeclaredMethods();
 			for (final IMethodBinding methodBinding : declaredMethods) {
 				if (methodBinding.isConstructor()) {
 					final IMethod constructor = (IMethod) methodBinding.getJavaElement();
 					if (constructor != null) {
 						final MethodDeclaration constructorNode = (MethodDeclaration) NodeFinder.perform(sourceNode,
 								constructor.getSourceRange());
-						splitModel.getAddMethods().put(constructor, constructorNode);
-						constructorNode.accept(visitor);
+						unitModel.getAddMethods().put(constructor, constructorNode);
+						constructorNode.accept(builder);
 					}
 				}
 			}
-
 		}
 
-		visitor.visitSourceMethod();
+		builder.buildUnitModel();
 
-		for (final IMethod invokedMethod : visitor.getInvokedMethods()) {
-			buildSplitRefactoringModel(targetSuffix, units, sourceNode, invokedMethod, splitModel);
+		for (final IMethod invokedMethod : builder.getInvokedMethods()) {
+			buildSplitUnitModel(model, sourceNode, invokedMethod, unitModel);
 		}
 
 	}

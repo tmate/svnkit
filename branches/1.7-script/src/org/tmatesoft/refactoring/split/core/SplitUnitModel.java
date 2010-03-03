@@ -5,7 +5,6 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
-import org.eclipse.jdt.core.ICompilationUnit;
 import org.eclipse.jdt.core.IField;
 import org.eclipse.jdt.core.IMethod;
 import org.eclipse.jdt.core.IType;
@@ -36,15 +35,13 @@ public class SplitUnitModel {
 		return nestedTypes;
 	}
 
-	public static SplitUnitModel getModel(final String targetSuffix, final Map<ICompilationUnit, Set<IMethod>> units,
-			final CompilationUnit ast, final Set<IMethod> sourceMethods) throws JavaModelException {
-
-		final SplitUnitModel splitModel = new SplitUnitModel();
+	public static SplitUnitModel getUnitModel(final SplitRefactoringModel model, final CompilationUnit ast,
+			final Set<IMethod> sourceMethods) throws JavaModelException {
+		final SplitUnitModel unitModel = new SplitUnitModel();
 		for (final IMethod sourceMethod : sourceMethods) {
-			SplitUnitModelBuilder.buildSplitRefactoringModel(targetSuffix, units, ast, sourceMethod,
-					splitModel);
+			SplitUnitModelBuilder.buildSplitUnitModel(model, ast, sourceMethod, unitModel);
 		}
-		return splitModel;
+		return unitModel;
 	}
 
 }

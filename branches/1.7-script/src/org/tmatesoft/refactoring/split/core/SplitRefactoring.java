@@ -3,12 +3,10 @@ package org.tmatesoft.refactoring.split.core;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 import org.eclipse.core.resources.IProject;
@@ -22,41 +20,31 @@ import org.eclipse.jdt.core.Flags;
 import org.eclipse.jdt.core.ICompilationUnit;
 import org.eclipse.jdt.core.IField;
 import org.eclipse.jdt.core.IJavaElement;
-import org.eclipse.jdt.core.IJavaProject;
-import org.eclipse.jdt.core.ILocalVariable;
 import org.eclipse.jdt.core.IMethod;
 import org.eclipse.jdt.core.IPackageFragment;
 import org.eclipse.jdt.core.IPackageFragmentRoot;
 import org.eclipse.jdt.core.IType;
 import org.eclipse.jdt.core.JavaCore;
-import org.eclipse.jdt.core.JavaModelException;
 import org.eclipse.jdt.core.ToolFactory;
 import org.eclipse.jdt.core.dom.AST;
 import org.eclipse.jdt.core.dom.ASTNode;
 import org.eclipse.jdt.core.dom.ASTParser;
 import org.eclipse.jdt.core.dom.ASTRequestor;
-import org.eclipse.jdt.core.dom.BlockComment;
 import org.eclipse.jdt.core.dom.CompilationUnit;
-import org.eclipse.jdt.core.dom.Expression;
-import org.eclipse.jdt.core.dom.FieldAccess;
 import org.eclipse.jdt.core.dom.FieldDeclaration;
 import org.eclipse.jdt.core.dom.IMethodBinding;
 import org.eclipse.jdt.core.dom.IPackageBinding;
 import org.eclipse.jdt.core.dom.ITypeBinding;
 import org.eclipse.jdt.core.dom.ImportDeclaration;
 import org.eclipse.jdt.core.dom.Javadoc;
-import org.eclipse.jdt.core.dom.LineComment;
 import org.eclipse.jdt.core.dom.MethodDeclaration;
-import org.eclipse.jdt.core.dom.MethodInvocation;
 import org.eclipse.jdt.core.dom.Modifier;
 import org.eclipse.jdt.core.dom.NodeFinder;
 import org.eclipse.jdt.core.dom.PackageDeclaration;
 import org.eclipse.jdt.core.dom.TagElement;
 import org.eclipse.jdt.core.dom.TextElement;
-import org.eclipse.jdt.core.dom.ThisExpression;
 import org.eclipse.jdt.core.dom.Type;
 import org.eclipse.jdt.core.dom.TypeDeclaration;
-import org.eclipse.jdt.core.dom.VariableDeclaration;
 import org.eclipse.jdt.core.formatter.CodeFormatter;
 import org.eclipse.jdt.core.search.IJavaSearchConstants;
 import org.eclipse.jdt.core.search.IJavaSearchScope;
@@ -82,31 +70,10 @@ public class SplitRefactoring extends Refactoring {
 
 	public static final String TITLE = "Split refactoring";
 
-	private String sourcePackageName = "org.tmatesoft.svn.core.wc";
-	private String targetPackageName = "org.tmatesoft.svn.core.internal.wc.v16";
-	private String targetSuffix = "16";
-
-	private List<String> typesToHideNames = Arrays.asList(new String[] {
-			"org.tmatesoft.svn.core.internal.wc.admin.SVNWCAccess",
-			"org.tmatesoft.svn.core.internal.wc.admin.SVNAdminArea" });
-
-	private IStructuredSelection selection;
-	private IProject project;
-	private IJavaProject javaProject;
-	private IPackageFragmentRoot packageRoot;
-
-	private IPackageFragment sourcePackage;
-	private IPackageFragment targetPackage;
-	private List<IType> typesToHide;
-
-	private SearchEngine searchEngine = new SearchEngine();
-	private IJavaSearchScope projectScope;
-
-	private Map<ICompilationUnit, Set<IMethod>> units = new LinkedHashMap<ICompilationUnit, Set<IMethod>>();
-
-	private List<Change> changes = new LinkedList<Change>();
-
-	private CodeFormatter codeFormatter = ToolFactory.createCodeFormatter(null);
+	private SplitRefactoringModel model = new SplitRefactoringModel("org.tmatesoft.svn.core.wc",
+			"org.tmatesoft.svn.core.internal.wc.v16", "16", Arrays.asList(new String[] {
+					"org.tmatesoft.svn.core.internal.wc.admin.SVNWCAccess",
+					"org.tmatesoft.svn.core.internal.wc.admin.SVNAdminArea" }));
 
 	@Override
 	public String getName() {
@@ -114,7 +81,7 @@ public class SplitRefactoring extends Refactoring {
 	}
 
 	public void setSelection(IStructuredSelection selection) {
-		this.selection = selection;
+		this.model.setSelection(selection);
 	}
 
 	/**
@@ -134,51 +101,52 @@ public class SplitRefactoring extends Refactoring {
 		try {
 			progressMonitor.beginTask("Checking preconditions...", 1);
 
-			if (selection != null) {
-				final Object element = selection.getFirstElement();
+			if (model.getSelection() != null) {
+				final Object element = model.getSelection().getFirstElement();
 				if (element != null && element instanceof IProject) {
-					project = (IProject) element;
+					model.setProject((IProject) element);
 				}
 			}
 
-			if (project == null) {
+			if (model.getProject() == null) {
 				status.merge(RefactoringStatus.createFatalErrorStatus("Please select project"));
 				return status;
 			}
 
-			javaProject = JavaCore.create(project);
+			model.setJavaProject(JavaCore.create(model.getProject()));
 
-			if (javaProject == null || !javaProject.exists()) {
+			if (model.getJavaProject() == null || !model.getJavaProject().exists()) {
 				status.merge(RefactoringStatus.createFatalErrorStatus("Please select Java project"));
 				return status;
 			}
 
-			if (targetPackageName == null) {
+			if (model.getTargetPackageName() == null) {
 				status.merge(RefactoringStatus.createFatalErrorStatus("Target package has not been specified."));
 				return status;
 			}
 
-			projectScope = SearchEngine.createJavaSearchScope(new IJavaElement[] { javaProject },
-					IJavaSearchScope.SOURCES);
+			model.setProjectScope(SearchEngine.createJavaSearchScope(new IJavaElement[] { model.getJavaProject() },
+					IJavaSearchScope.SOURCES));
 
-			if (sourcePackageName == null) {
+			if (model.getSourcePackageName() == null) {
 				status.merge(RefactoringStatus.createFatalErrorStatus("Source package has not been specified."));
 				return status;
 			} else {
-				sourcePackage = searchPackage(sourcePackageName, projectScope, progressMonitor, status);
+				model.setSourcePackage(searchPackage(model.getSourcePackageName(), model.getProjectScope(),
+						progressMonitor, status));
 			}
-			if (typesToHideNames == null || typesToHideNames.isEmpty()) {
+			if (model.getTypesToHideNames() == null || model.getTypesToHideNames().isEmpty()) {
 				status.merge(RefactoringStatus.createFatalErrorStatus("Types to hide have not been specified."));
 				return status;
 			} else {
-				typesToHide = new ArrayList<IType>();
-				for (final String typeName : typesToHideNames) {
-					final IType type = searchType(typeName, projectScope, progressMonitor, status);
+				model.setTypesToHide(new ArrayList<IType>());
+				for (final String typeName : model.getTypesToHideNames()) {
+					final IType type = searchType(typeName, model.getProjectScope(), progressMonitor, status);
 					if (type != null) {
-						typesToHide.add(type);
+						model.getTypesToHide().add(type);
 					}
 				}
-				if (typesToHide.isEmpty()) {
+				if (model.getTypesToHide().isEmpty()) {
 					status.merge(RefactoringStatus.createFatalErrorStatus("Types to hide have not been found."));
 					return status;
 				}
@@ -190,13 +158,6 @@ public class SplitRefactoring extends Refactoring {
 		return status;
 	}
 
-	/**
-	 * @param packageName
-	 * @param scope
-	 * @param progressMonitor
-	 * @param status
-	 * @throws CoreException
-	 */
 	private IPackageFragment searchPackage(String packageName, final IJavaSearchScope scope,
 			IProgressMonitor progressMonitor, final RefactoringStatus status) throws CoreException {
 		final SearchPattern pattern = SearchPattern.createPattern(packageName, IJavaSearchConstants.PACKAGE,
@@ -209,13 +170,6 @@ public class SplitRefactoring extends Refactoring {
 		return found;
 	}
 
-	/**
-	 * @param typeName
-	 * @param scope
-	 * @param progressMonitor
-	 * @param status
-	 * @throws CoreException
-	 */
 	private IType searchType(String typeName, final IJavaSearchScope scope, IProgressMonitor progressMonitor,
 			final RefactoringStatus status) throws CoreException {
 		final SearchPattern pattern = SearchPattern.createPattern(typeName, IJavaSearchConstants.TYPE,
@@ -228,13 +182,6 @@ public class SplitRefactoring extends Refactoring {
 		return found;
 	}
 
-	/**
-	 * @param class1
-	 * @param pattern
-	 * @param scope
-	 * @param progressMonitor
-	 * @throws CoreException
-	 */
 	private <T extends IJavaElement> T searchOneElement(final Class<T> type, final SearchPattern pattern,
 			final IJavaSearchScope scope, final IProgressMonitor progressMonitor) throws CoreException {
 
@@ -253,8 +200,8 @@ public class SplitRefactoring extends Refactoring {
 		}
 
 		final SearchRequestorImpl requestor = new SearchRequestorImpl();
-		searchEngine.search(pattern, new SearchParticipant[] { SearchEngine.getDefaultSearchParticipant() }, scope,
-				requestor, new SubProgressMonitor(progressMonitor, 1));
+		model.getSearchEngine().search(pattern, new SearchParticipant[] { SearchEngine.getDefaultSearchParticipant() },
+				scope, requestor, new SubProgressMonitor(progressMonitor, 1));
 		return requestor.found;
 	}
 
@@ -276,8 +223,8 @@ public class SplitRefactoring extends Refactoring {
 		}
 
 		final SearchRequestorImpl requestor = new SearchRequestorImpl();
-		searchEngine.search(pattern, new SearchParticipant[] { SearchEngine.getDefaultSearchParticipant() }, scope,
-				requestor, new SubProgressMonitor(progressMonitor, 1));
+		model.getSearchEngine().search(pattern, new SearchParticipant[] { SearchEngine.getDefaultSearchParticipant() },
+				scope, requestor, new SubProgressMonitor(progressMonitor, 1));
 		return requestor.found;
 	}
 
@@ -290,25 +237,25 @@ public class SplitRefactoring extends Refactoring {
 		try {
 			progressMonitor.beginTask("Checking preconditions...", 1);
 
-			final IJavaElement ancestor = sourcePackage.getAncestor(IJavaElement.PACKAGE_FRAGMENT_ROOT);
+			final IJavaElement ancestor = model.getSourcePackage().getAncestor(IJavaElement.PACKAGE_FRAGMENT_ROOT);
 			if (ancestor != null && ancestor instanceof IPackageFragmentRoot) {
-				packageRoot = (IPackageFragmentRoot) ancestor;
+				model.setPackageRoot((IPackageFragmentRoot) ancestor);
 			}
-			if (packageRoot == null) {
+			if (model.getPackageRoot() == null) {
 				status.merge(RefactoringStatus.createFatalErrorStatus(String.format("Can't find package root for '%s'",
-						sourcePackage)));
+						model.getSourcePackage())));
 				return status;
 			}
 
-			targetPackage = packageRoot.getPackageFragment(targetPackageName);
-			if (!targetPackage.exists()) {
-				changes.add(new CreatePackageChange(targetPackage));
+			model.setTargetPackage(model.getPackageRoot().getPackageFragment(model.getTargetPackageName()));
+			if (!model.getTargetPackage().exists()) {
+				model.getChanges().add(new CreatePackageChange(model.getTargetPackage()));
 			}
 
-			final IJavaSearchScope sourcePackageScope = SearchEngine.createJavaSearchScope(
-					new IJavaElement[] { sourcePackage }, IJavaSearchScope.SOURCES);
+			final IJavaSearchScope sourcePackageScope = SearchEngine.createJavaSearchScope(new IJavaElement[] { model
+					.getSourcePackage() }, IJavaSearchScope.SOURCES);
 
-			for (final IType typeToHide : typesToHide) {
+			for (final IType typeToHide : model.getTypesToHide()) {
 				final SearchPattern referencesPattern = SearchPattern.createPattern(typeToHide,
 						IJavaSearchConstants.REFERENCES);
 				final List<IMethod> methods = searchManyElements(IMethod.class, referencesPattern, sourcePackageScope,
@@ -316,10 +263,10 @@ public class SplitRefactoring extends Refactoring {
 				if (methods != null && !methods.isEmpty()) {
 					for (final IMethod method : methods) {
 						final ICompilationUnit unit = method.getCompilationUnit();
-						if (!units.containsKey(unit)) {
-							units.put(unit, new HashSet<IMethod>());
+						if (!model.getUnits().containsKey(unit)) {
+							model.getUnits().put(unit, new HashSet<IMethod>());
 						}
-						final Set<IMethod> set = units.get(unit);
+						final Set<IMethod> set = model.getUnits().get(unit);
 						if (!set.contains(method)) {
 							set.add(method);
 						}
@@ -332,10 +279,9 @@ public class SplitRefactoring extends Refactoring {
 				@Override
 				public void acceptAST(ICompilationUnit source, CompilationUnit ast) {
 					try {
-						final Set<IMethod> sourceMethods = units.get(source);
-						final SplitUnitModel splitModel = SplitUnitModel.getModel(targetSuffix, units, ast,
-								sourceMethods);
-						applyUnitSplit(splitModel, source, sourceMethods, ast, status, subMonitor);
+						final Set<IMethod> sourceMethods = model.getUnits().get(source);
+						final SplitUnitModel unitModel = SplitUnitModel.getUnitModel(model, ast, sourceMethods);
+						applyUnitSplit(unitModel, source, sourceMethods, ast, status, subMonitor);
 					} catch (Exception exception) {
 						log(exception);
 					}
@@ -344,8 +290,8 @@ public class SplitRefactoring extends Refactoring {
 
 			final ASTParser parser = ASTParser.newParser(AST.JLS3);
 			parser.setResolveBindings(true);
-			parser.setProject(javaProject);
-			final Collection<ICompilationUnit> collection = units.keySet();
+			parser.setProject(model.getJavaProject());
+			final Collection<ICompilationUnit> collection = model.getUnits().keySet();
 			final ICompilationUnit[] array = collection.toArray(new ICompilationUnit[collection.size()]);
 			parser.createASTs(array, new String[0], requestor, new SubProgressMonitor(progressMonitor, 1));
 
@@ -356,7 +302,7 @@ public class SplitRefactoring extends Refactoring {
 		return status;
 	}
 
-	private void applyUnitSplit(final SplitUnitModel splitModel, final ICompilationUnit sourceUnit,
+	private void applyUnitSplit(final SplitUnitModel unitModel, final ICompilationUnit sourceUnit,
 			final Set<IMethod> sourceMethods, final CompilationUnit sourceNode, final RefactoringStatus status,
 			final IProgressMonitor monitor) throws CoreException, MalformedTreeException, BadLocationException {
 
@@ -365,14 +311,14 @@ public class SplitRefactoring extends Refactoring {
 		final String typeName = addSuffix(sourceTypeName);
 		final String unitName = typeName + ".java";
 
-		final ICompilationUnit unit = targetPackage.getCompilationUnit(unitName);
+		final ICompilationUnit unit = model.getTargetPackage().getCompilationUnit(unitName);
 		if (!unit.exists()) {
 
 			final AST ast = AST.newAST(AST.JLS3);
 			final CompilationUnit node = ast.newCompilationUnit();
 
 			final PackageDeclaration packageDeclaration = ast.newPackageDeclaration();
-			packageDeclaration.setName(ast.newName(targetPackage.getElementName()));
+			packageDeclaration.setName(ast.newName(model.getTargetPackage().getElementName()));
 			node.setPackage(packageDeclaration);
 
 			final TypeDeclaration type = ast.newTypeDeclaration();
@@ -402,8 +348,9 @@ public class SplitRefactoring extends Refactoring {
 					final IType sourceSuperclass = (IType) sourceSuperclassBinding.getJavaElement();
 					if (sourceSuperclass != null) {
 						final ICompilationUnit sourceSuperclassUnit = sourceSuperclass.getCompilationUnit();
-						if (!sourcePackage.equals(sourceSuperclassPackage) || !units.containsKey(sourceSuperclassUnit)) {
-							splitModel.getUsedTypes().add(sourceSuperclass);
+						if (!model.getSourcePackage().equals(sourceSuperclassPackage)
+								|| !model.getUnits().containsKey(sourceSuperclassUnit)) {
+							unitModel.getUsedTypes().add(sourceSuperclass);
 							type.setSuperclassType((Type) ASTNode.copySubtree(ast, sourceSuperclassType));
 						} else {
 							final String sourceSuperclassName = sourceSuperclass.getElementName();
@@ -427,9 +374,9 @@ public class SplitRefactoring extends Refactoring {
 						final IType sourceSuperInterface = (IType) sourceSuperInterfaceBinding.getJavaElement();
 						if (sourceSuperInterface != null) {
 							final ICompilationUnit sourceSuperInterfaceUnit = sourceSuperInterface.getCompilationUnit();
-							if (!sourcePackage.equals(sourceSuperInterfacePackage)
-									|| !units.containsKey(sourceSuperInterfaceUnit)) {
-								splitModel.getUsedTypes().add(sourceSuperInterface);
+							if (!model.getSourcePackage().equals(sourceSuperInterfacePackage)
+									|| !model.getUnits().containsKey(sourceSuperInterfaceUnit)) {
+								unitModel.getUsedTypes().add(sourceSuperInterface);
 								superInterfaceTypes.add((Type) ASTNode.copySubtree(ast, sourceSuperInterfaceType));
 							} else {
 								final String sourceSuperInterfaceName = sourceSuperInterface.getElementName();
@@ -453,7 +400,7 @@ public class SplitRefactoring extends Refactoring {
 			}
 
 			final List imports = node.imports();
-			for (final IType usedType : splitModel.getUsedTypes()) {
+			for (final IType usedType : unitModel.getUsedTypes()) {
 				final IPackageFragment usedPackage = usedType.getPackageFragment();
 				if (!"java.lang".equals(usedPackage.getElementName())) {
 					final ImportDeclaration importDeclaration = ast.newImportDeclaration();
@@ -466,7 +413,7 @@ public class SplitRefactoring extends Refactoring {
 
 			final List bodyDeclarations = type.bodyDeclarations();
 
-			for (final IField sourceField : splitModel.getUsedFields()) {
+			for (final IField sourceField : unitModel.getUsedFields()) {
 				final FieldDeclaration sourceFieldNode = (FieldDeclaration) NodeFinder.perform(sourceNode, sourceField
 						.getSourceRange());
 				final FieldDeclaration fieldDeclarationCopy = (FieldDeclaration) ASTNode.copySubtree(ast,
@@ -474,7 +421,7 @@ public class SplitRefactoring extends Refactoring {
 				bodyDeclarations.add(fieldDeclarationCopy);
 			}
 
-			for (final MethodDeclaration sourceMethodDeclaration : splitModel.getAddMethods().values()) {
+			for (final MethodDeclaration sourceMethodDeclaration : unitModel.getAddMethods().values()) {
 
 				final MethodDeclaration methodCopy = (MethodDeclaration) ASTNode.copySubtree(ast,
 						sourceMethodDeclaration);
@@ -501,7 +448,7 @@ public class SplitRefactoring extends Refactoring {
 				bodyDeclarations.add(methodCopy);
 			}
 
-			for (final IType sourceNestedType : splitModel.getNestedTypes()) {
+			for (final IType sourceNestedType : unitModel.getNestedTypes()) {
 				final TypeDeclaration sourceNestedTypeNode = (TypeDeclaration) NodeFinder.perform(sourceNode,
 						sourceNestedType.getSourceRange());
 				final TypeDeclaration sourceNestedTypeCopy = (TypeDeclaration) ASTNode.copySubtree(ast,
@@ -511,11 +458,11 @@ public class SplitRefactoring extends Refactoring {
 
 			final String source = node.toString();
 			final Document document = new Document(source);
-			final TextEdit formatEdit = codeFormatter.format(CodeFormatter.K_COMPILATION_UNIT, source, 0, source
-					.length(), 0, javaProject.findRecommendedLineSeparator());
+			final TextEdit formatEdit = model.getCodeFormatter().format(CodeFormatter.K_COMPILATION_UNIT, source, 0,
+					source.length(), 0, model.getJavaProject().findRecommendedLineSeparator());
 			formatEdit.apply(document);
 
-			changes.add(new CreateCompilationUnitChange(unit, document.get(), null));
+			model.getChanges().add(new CreateCompilationUnitChange(unit, document.get(), null));
 
 		}
 	}
@@ -525,8 +472,8 @@ public class SplitRefactoring extends Refactoring {
 	 * @return
 	 */
 	private String addSuffix(final String str) {
-		if (!str.endsWith(targetSuffix)) {
-			return str + targetSuffix;
+		if (!str.endsWith(model.getTargetSuffix())) {
+			return str + model.getTargetSuffix();
 		} else {
 			return str;
 		}
@@ -536,7 +483,8 @@ public class SplitRefactoring extends Refactoring {
 	public Change createChange(IProgressMonitor progressMonitor) throws CoreException, OperationCanceledException {
 		try {
 			progressMonitor.beginTask("Creating change...", 1);
-			final CompositeChange change = new CompositeChange(getName(), changes.toArray(new Change[changes.size()]));
+			final CompositeChange change = new CompositeChange(getName(), model.getChanges().toArray(
+					new Change[model.getChanges().size()]));
 			return change;
 		} finally {
 			progressMonitor.done();
