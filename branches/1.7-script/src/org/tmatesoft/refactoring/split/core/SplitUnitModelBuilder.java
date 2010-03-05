@@ -59,18 +59,6 @@ class SplitUnitModelBuilder extends ASTVisitor {
 		sourceMethodParentClass = sourceMethodDeclaringClass.getDeclaringClass();
 	}
 
-	/**
-	 * @param sourceTypeName
-	 * @return
-	 */
-	private String addSuffix(final String str) {
-		if (!str.endsWith(model.getTargetSuffix())) {
-			return str + model.getTargetSuffix();
-		} else {
-			return str;
-		}
-	}
-
 	public void buildUnitModel() {
 		sourceMethodNode.accept(this);
 	}
@@ -275,7 +263,7 @@ class SplitUnitModelBuilder extends ASTVisitor {
 
 			case IBinding.TYPE:
 
-				simpleName.setIdentifier(addSuffix(simpleName.getIdentifier()));
+				simpleName.setIdentifier(model.addTargetSuffix(simpleName.getIdentifier()));
 				break;
 
 			case IBinding.VARIABLE:
@@ -320,7 +308,7 @@ class SplitUnitModelBuilder extends ASTVisitor {
 			if (componentType instanceof SimpleType) {
 				if (node instanceof SimpleName) {
 					final SimpleName simpleName = (SimpleName) node;
-					simpleName.setIdentifier(addSuffix(simpleName.getIdentifier()));
+					simpleName.setIdentifier(model.addTargetSuffix(simpleName.getIdentifier()));
 				}
 			}
 		}
@@ -350,7 +338,7 @@ class SplitUnitModelBuilder extends ASTVisitor {
 		final Name name = simpleType.getName();
 		if (name.isSimpleName() && name instanceof SimpleName) {
 			final SimpleName typeSimpleName = (SimpleName) name;
-			typeSimpleName.setIdentifier(addSuffix(typeSimpleName.getIdentifier()));
+			typeSimpleName.setIdentifier(model.addTargetSuffix(typeSimpleName.getIdentifier()));
 		}
 	}
 
