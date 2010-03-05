@@ -61,6 +61,10 @@ public class SplitUnitModel {
 		this.sourceAst = sourceAst;
 	}
 
+	public SplitRefactoringModel getModel() {
+		return model;
+	}
+
 	public ICompilationUnit getSourceUnit() {
 		return sourceUnit;
 	}
@@ -94,18 +98,6 @@ public class SplitUnitModel {
 		final Set<IMethod> sourceMethods = model.getUnits().get(sourceUnit);
 		final SplitUnitModel unitModel = new SplitUnitModel(model, sourceUnit, sourceMethods, sourceAst);
 		return unitModel;
-	}
-
-	/**
-	 * @param model
-	 * @param sourceMethods
-	 * @param unitModel
-	 * @throws JavaModelException
-	 */
-	public void buildModel(final SplitRefactoringModel model) throws JavaModelException {
-		for (final IMethod sourceMethod : sourceMethods) {
-			addMethodToUnitModel(sourceMethod);
-		}
 	}
 
 	public void applyUnitSplit(final RefactoringStatus status, final IProgressMonitor monitor) throws CoreException,
@@ -275,38 +267,15 @@ public class SplitUnitModel {
 		}
 	}
 
+	public void buildModel(final SplitRefactoringModel model) throws JavaModelException {
+		for (final IMethod sourceMethod : sourceMethods) {
+			addMethodToUnitModel(sourceMethod);
+		}
+	}
+
 	public void addMethodToUnitModel(final IMethod sourceMethod) throws JavaModelException {
-
-		final SplitUnitModelBuilder builder = new SplitUnitModelBuilder(model, sourceAst, sourceMethod, this);
-
-		if (builder.getSourceMethodDeclaringClass().isAnonymous()) {
-			// TODO anonymous class
-		} else if (builder.getSourceMethodParentClass() != null) {
-			builder.addNestedType(builder.getSourceMethodDeclaringType());
-		} else {
-			getAddMethods().put(sourceMethod, builder.getSourceMethodNode());
-			final IMethodBinding[] declaredMethods = builder.getSourceMethodDeclaringClass().getDeclaredMethods();
-			for (final IMethodBinding methodBinding : declaredMethods) {
-				if (methodBinding.isConstructor()) {
-					final IMethod constructor = (IMethod) methodBinding.getJavaElement();
-					if (constructor != null) {
-						final MethodDeclaration constructorNode = (MethodDeclaration) NodeFinder.perform(sourceAst,
-								constructor.getSourceRange());
-						getAddMethods().put(constructor, constructorNode);
-						constructorNode.accept(builder);
-					}
-				}
-			}
-		}
-
-		builder.buildUnitModel();
-
-		for (final IMethod invokedMethod : builder.getInvokedMethods()) {
-			if (!getAddMethods().containsKey(invokedMethod)) {
-				addMethodToUnitModel(invokedMethod);
-			}
-		}
-
+		final SplitUnitAddMethodBuilder builder = new SplitUnitAddMethodBuilder(this, sourceMethod);
+		builder.addMethodToUnit();
 	}
 
 }

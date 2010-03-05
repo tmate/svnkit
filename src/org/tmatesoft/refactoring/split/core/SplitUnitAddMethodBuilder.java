@@ -30,7 +30,7 @@ import org.eclipse.jdt.core.dom.Type;
 import org.eclipse.jdt.core.dom.TypeDeclaration;
 import org.eclipse.jdt.core.dom.TypeLiteral;
 
-class SplitUnitModelBuilder extends ASTVisitor {
+class SplitUnitAddMethodBuilder extends ASTVisitor {
 
 	private final SplitRefactoringModel model;
 	private final SplitUnitModel unitModel;
@@ -55,13 +55,12 @@ class SplitUnitModelBuilder extends ASTVisitor {
 		return super.visit(node);
 	}
 
-	public SplitUnitModelBuilder(final SplitRefactoringModel model, final CompilationUnit sourceAst,
-			final IMethod sourceMethod, final SplitUnitModel splitModel) throws JavaModelException {
+	public SplitUnitAddMethodBuilder(final SplitUnitModel splitModel, final IMethod sourceMethod) throws JavaModelException {
 
-		this.model = model;
-		this.sourceAst = sourceAst;
-		this.sourceMethod = sourceMethod;
 		this.unitModel = splitModel;
+		this.model = splitModel.getModel();
+		this.sourceAst = splitModel.getSourceAst();
+		this.sourceMethod = sourceMethod;
 
 		sourceMethodNode = (MethodDeclaration) NodeFinder.perform(sourceAst, sourceMethod.getSourceRange());
 		sourceMethodDeclaringType = sourceMethod.getDeclaringType();
@@ -70,8 +69,36 @@ class SplitUnitModelBuilder extends ASTVisitor {
 		sourceMethodParentClass = sourceMethodDeclaringClass.getDeclaringClass();
 	}
 
-	public void buildUnitModel() {
+	public void addMethodToUnit() throws JavaModelException {
+
+		if (getSourceMethodDeclaringClass().isAnonymous()) {
+			// TODO anonymous class
+		} else if (getSourceMethodParentClass() != null) {
+			addNestedType(getSourceMethodDeclaringType());
+		} else {
+			unitModel.getAddMethods().put(sourceMethod, getSourceMethodNode());
+			final IMethodBinding[] declaredMethods = getSourceMethodDeclaringClass().getDeclaredMethods();
+			for (final IMethodBinding methodBinding : declaredMethods) {
+				if (methodBinding.isConstructor()) {
+					final IMethod constructor = (IMethod) methodBinding.getJavaElement();
+					if (constructor != null) {
+						final MethodDeclaration constructorNode = (MethodDeclaration) NodeFinder.perform(sourceAst,
+								constructor.getSourceRange());
+						unitModel.getAddMethods().put(constructor, constructorNode);
+						constructorNode.accept(this);
+					}
+				}
+			}
+		}
+
 		sourceMethodNode.accept(this);
+		
+		for (final IMethod invokedMethod : getInvokedMethods()) {
+			if (!unitModel.getAddMethods().containsKey(invokedMethod)) {
+				unitModel.addMethodToUnitModel(invokedMethod);
+			}
+		}
+
 	}
 
 	/**
