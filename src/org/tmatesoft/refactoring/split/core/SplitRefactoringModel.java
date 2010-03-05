@@ -167,4 +167,17 @@ public class SplitRefactoringModel {
 		return unitModels;
 	}
 
+	/**
+	 * @param sourceTypeName
+	 * @return
+	 */
+	public String addTargetSuffix(final String str) {
+		if (!str.endsWith(getTargetSuffix())) {
+			return str + getTargetSuffix();
+		} else {
+			return str;
+		}
+	}
+
+
 }
