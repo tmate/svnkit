@@ -57,7 +57,7 @@ public class SplitUnitModel {
 	private String sourceTypeName;
 
 	private boolean isSourceInterface;
-	private boolean isAbstractClass;
+	private boolean isSourceAbstractClass;
 
 	private TypeDeclaration sourceTypeNode;
 	private ITypeBinding sourceTypeBinding;
@@ -191,7 +191,7 @@ public class SplitUnitModel {
 		sourceTypeName = sourceType.getElementName();
 		isSourceInterface = sourceType.isInterface();
 		if (!isSourceInterface) {
-			isAbstractClass = Flags.isAbstract(sourceType.getFlags());
+			isSourceAbstractClass = Flags.isAbstract(sourceType.getFlags());
 		}
 
 		sourceTypeNode = (TypeDeclaration) NodeFinder.perform(sourceAst, sourceType.getSourceRange());
@@ -222,11 +222,6 @@ public class SplitUnitModel {
 	public void applyUnitSplit(final RefactoringStatus status, final IProgressMonitor monitor) throws CoreException,
 			MalformedTreeException, BadLocationException {
 
-		final CompilationUnit sourceNode = getSourceAst();
-		final Set<IMethod> sourceMethods = model.getUnits().get(sourceUnit);
-
-		final IType sourceType = sourceNode.getTypeRoot().findPrimaryType();
-		final String sourceTypeName = sourceType.getElementName();
 		final String typeName = model.addTargetSuffix(sourceTypeName);
 		final String unitName = typeName + ".java";
 
@@ -243,76 +238,44 @@ public class SplitUnitModel {
 			final TypeDeclaration type = ast.newTypeDeclaration();
 			node.types().add(type);
 
-			type.setInterface(sourceType.isInterface());
+			type.setInterface(isSourceInterface);
 			final List modifiers = type.modifiers();
 			modifiers.add(ast.newModifier(Modifier.ModifierKeyword.PUBLIC_KEYWORD));
-			final int sourceFlags = sourceType.getFlags();
-			if (Flags.isAbstract(sourceFlags)) {
+			if (isSourceAbstractClass) {
 				modifiers.add(ast.newModifier(Modifier.ModifierKeyword.ABSTRACT_KEYWORD));
 			}
 			type.setName(ast.newSimpleName(typeName));
 
-			final TypeDeclaration sourceTypeNode = (TypeDeclaration) NodeFinder.perform(sourceNode, sourceType
-					.getSourceRange());
-			final ITypeBinding sourceTypeBinding = sourceTypeNode.resolveBinding();
-			final IMethodBinding[] sourceTypeDeclaredMethods = sourceTypeBinding.getDeclaredMethods();
-
-			if (!type.isInterface()) {
-				final Type sourceSuperclassType = sourceTypeNode.getSuperclassType();
-				if (sourceSuperclassType != null) {
-					final ITypeBinding sourceSuperclassBinding = sourceSuperclassType.resolveBinding();
-					final IPackageBinding sourceSuperclassPackageBinding = sourceSuperclassBinding.getPackage();
-					final IPackageFragment sourceSuperclassPackage = (IPackageFragment) sourceSuperclassPackageBinding
-							.getJavaElement();
-					final IType sourceSuperclass = (IType) sourceSuperclassBinding.getJavaElement();
-					if (sourceSuperclass != null) {
-						final ICompilationUnit sourceSuperclassUnit = sourceSuperclass.getCompilationUnit();
-						if (!model.getSourcePackage().equals(sourceSuperclassPackage)
-								|| !model.getUnits().containsKey(sourceSuperclassUnit)) {
-							getUsedTypes().add(sourceSuperclass);
-							type.setSuperclassType((Type) ASTNode.copySubtree(ast, sourceSuperclassType));
-						} else {
-							final String sourceSuperclassName = sourceSuperclass.getElementName();
-							final String targetSuperclassName = model.addTargetSuffix(sourceSuperclassName);
-							type.setSuperclassType(ast.newSimpleType(ast.newName(targetSuperclassName)));
-						}
+			if (sourceSuperClassMetadata != null) {
+				final IType sourceSuperClassType = sourceSuperClassMetadata.getType();
+				if (sourceSuperClassType != null) {
+					final Type sourceSuperClassNode = sourceSuperClassMetadata.getTypeNode();
+					final ICompilationUnit sourceSuperClassUnit = sourceSuperClassMetadata.getUnit();
+					if (model.getUnits().containsKey(sourceSuperClassUnit)) {
+						final String sourceSuperClassName = sourceSuperClassMetadata.getName();
+						final String targetSuperclassName = model.addTargetSuffix(sourceSuperClassName);
+						type.setSuperclassType(ast.newSimpleType(ast.newName(targetSuperclassName)));
+					} else {
+						getUsedTypes().add(sourceSuperClassType);
+						type.setSuperclassType((Type) ASTNode.copySubtree(ast, sourceSuperClassNode));
 					}
 				}
 			}
 
-			final List<Type> sourceSuperInterfaceTypes = sourceTypeNode.superInterfaceTypes();
 			final List<Type> superInterfaceTypes = type.superInterfaceTypes();
-			if (sourceSuperInterfaceTypes != null && !sourceSuperInterfaceTypes.isEmpty()) {
-				for (final Type sourceSuperInterfaceType : sourceSuperInterfaceTypes) {
+			if (!sourceSuperInterfacesMetadata.isEmpty()) {
+				for (final TypeMetadata sourceSuperInterface : sourceSuperInterfacesMetadata.values()) {
+					final IType sourceSuperInterfaceType = sourceSuperInterface.getType();
 					if (sourceSuperInterfaceType != null) {
-						final ITypeBinding sourceSuperInterfaceBinding = sourceSuperInterfaceType.resolveBinding();
-						final IPackageBinding sourceSuperInterfacePackageBinding = sourceSuperInterfaceBinding
-								.getPackage();
-						final IPackageFragment sourceSuperInterfacePackage = (IPackageFragment) sourceSuperInterfacePackageBinding
-								.getJavaElement();
-						final IType sourceSuperInterface = (IType) sourceSuperInterfaceBinding.getJavaElement();
-						if (sourceSuperInterface != null) {
-							final ICompilationUnit sourceSuperInterfaceUnit = sourceSuperInterface.getCompilationUnit();
-							if (!model.getSourcePackage().equals(sourceSuperInterfacePackage)
-									|| !model.getUnits().containsKey(sourceSuperInterfaceUnit)) {
-								getUsedTypes().add(sourceSuperInterface);
-								superInterfaceTypes.add((Type) ASTNode.copySubtree(ast, sourceSuperInterfaceType));
-							} else {
-								final String sourceSuperInterfaceName = sourceSuperInterface.getElementName();
-								final String targetSuperInterfaceName = model.addTargetSuffix(sourceSuperInterfaceName);
-								superInterfaceTypes.add(ast.newSimpleType(ast.newName(targetSuperInterfaceName)));
-							}
-
-							final IMethodBinding[] sourceSuperInterfaceMethods = sourceSuperInterfaceBinding
-									.getDeclaredMethods();
-							for (IMethodBinding sourceTypeDeclaredMethod : sourceTypeDeclaredMethods) {
-								for (final IMethodBinding sourceSuperInterfaceMethodBinding : sourceSuperInterfaceMethods) {
-									if (sourceTypeDeclaredMethod.overrides(sourceSuperInterfaceMethodBinding)) {
-										sourceMethods.add((IMethod) sourceTypeDeclaredMethod.getJavaElement());
-									}
-								}
-							}
-
+						final Type sourceSuperInterfaceNode = sourceSuperInterface.getTypeNode();
+						final ICompilationUnit sourceSuperInterfaceUnit = sourceSuperInterface.getUnit();
+						if (model.getUnits().containsKey(sourceSuperInterfaceUnit)) {
+							final String sourceSuperInterfaceName = sourceSuperInterface.getName();
+							final String targetSuperInterfaceName = model.addTargetSuffix(sourceSuperInterfaceName);
+							superInterfaceTypes.add(ast.newSimpleType(ast.newName(targetSuperInterfaceName)));
+						} else {
+							getUsedTypes().add(sourceSuperInterfaceType);
+							superInterfaceTypes.add((Type) ASTNode.copySubtree(ast, sourceSuperInterfaceNode));
 						}
 					}
 				}
@@ -333,7 +296,7 @@ public class SplitUnitModel {
 			final List bodyDeclarations = type.bodyDeclarations();
 
 			for (final IField sourceField : getUsedFields()) {
-				final FieldDeclaration sourceFieldNode = (FieldDeclaration) NodeFinder.perform(sourceNode, sourceField
+				final FieldDeclaration sourceFieldNode = (FieldDeclaration) NodeFinder.perform(sourceAst, sourceField
 						.getSourceRange());
 				final FieldDeclaration fieldDeclarationCopy = (FieldDeclaration) ASTNode.copySubtree(ast,
 						sourceFieldNode);
@@ -368,7 +331,7 @@ public class SplitUnitModel {
 			}
 
 			for (final IType sourceNestedType : getNestedTypes()) {
-				final TypeDeclaration sourceNestedTypeNode = (TypeDeclaration) NodeFinder.perform(sourceNode,
+				final TypeDeclaration sourceNestedTypeNode = (TypeDeclaration) NodeFinder.perform(sourceAst,
 						sourceNestedType.getSourceRange());
 				final TypeDeclaration sourceNestedTypeCopy = (TypeDeclaration) ASTNode.copySubtree(ast,
 						sourceNestedTypeNode);
@@ -427,14 +390,16 @@ public class SplitUnitModel {
 			}
 		}
 
-		for (final TypeMetadata interfaceMetadata : sourceSuperInterfacesMetadata.values()) {
-			if (interfaceMetadata.getDeclaredMethods() != null) {
-				for (final IMethodBinding superMethodBinding : interfaceMetadata.getDeclaredMethods()) {
-					for (final IMethodBinding methodBinding : sourceTypeDeclaredMethods) {
-						if (methodBinding.overrides(superMethodBinding)) {
-							final IMethod method = (IMethod) methodBinding.getJavaElement();
-							if (method != null && method.exists()) {
-								sourceMethods.add(method);
+		if (!sourceSuperInterfacesMetadata.isEmpty()) {
+			for (final TypeMetadata interfaceMetadata : sourceSuperInterfacesMetadata.values()) {
+				if (interfaceMetadata.getDeclaredMethods() != null) {
+					for (final IMethodBinding superMethodBinding : interfaceMetadata.getDeclaredMethods()) {
+						for (final IMethodBinding methodBinding : sourceTypeDeclaredMethods) {
+							if (methodBinding.overrides(superMethodBinding)) {
+								final IMethod method = (IMethod) methodBinding.getJavaElement();
+								if (method != null && method.exists()) {
+									sourceMethods.add(method);
+								}
 							}
 						}
 					}
