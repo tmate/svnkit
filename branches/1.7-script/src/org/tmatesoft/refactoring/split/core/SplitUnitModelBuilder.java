@@ -204,7 +204,7 @@ class SplitUnitModelBuilder extends ASTVisitor {
 							&& model.getUnits().containsKey(compilationUnit)) {
 						try {
 							final SplitUnitModel splitUnitModel = model.getUnitModels().get(compilationUnit);
-							addMethodToUnitModel(method, model, splitUnitModel);
+							splitUnitModel.addMethodToUnitModel(method);
 						} catch (Exception e) {
 							SplitRefactoring.log(e);
 						}
@@ -355,7 +355,7 @@ class SplitUnitModelBuilder extends ASTVisitor {
 					}
 
 					for (final IMethod method : nestedType.getMethods()) {
-						addMethodToUnitModel(method, model, unitModel);
+						unitModel.addMethodToUnitModel(method);
 					}
 
 				} catch (JavaModelException e) {
@@ -363,43 +363,6 @@ class SplitUnitModelBuilder extends ASTVisitor {
 				}
 			}
 		}
-	}
-
-	static void addMethodToUnitModel(final IMethod sourceMethod, final SplitRefactoringModel model,
-			final SplitUnitModel unitModel) throws JavaModelException {
-
-		final CompilationUnit sourceAst = unitModel.getSourceAst();
-
-		final SplitUnitModelBuilder builder = new SplitUnitModelBuilder(model, sourceAst, sourceMethod, unitModel);
-
-		if (builder.getSourceMethodDeclaringClass().isAnonymous()) {
-			// TODO anonymous class
-		} else if (builder.getSourceMethodParentClass() != null) {
-			builder.addNestedType(builder.getSourceMethodDeclaringType());
-		} else {
-			unitModel.getAddMethods().put(sourceMethod, builder.getSourceMethodNode());
-			final IMethodBinding[] declaredMethods = builder.getSourceMethodDeclaringClass().getDeclaredMethods();
-			for (final IMethodBinding methodBinding : declaredMethods) {
-				if (methodBinding.isConstructor()) {
-					final IMethod constructor = (IMethod) methodBinding.getJavaElement();
-					if (constructor != null) {
-						final MethodDeclaration constructorNode = (MethodDeclaration) NodeFinder.perform(sourceAst,
-								constructor.getSourceRange());
-						unitModel.getAddMethods().put(constructor, constructorNode);
-						constructorNode.accept(builder);
-					}
-				}
-			}
-		}
-
-		builder.buildUnitModel();
-
-		for (final IMethod invokedMethod : builder.getInvokedMethods()) {
-			if (!unitModel.getAddMethods().containsKey(invokedMethod)) {
-				addMethodToUnitModel(invokedMethod, model, unitModel);
-			}
-		}
-
 	}
 
 }

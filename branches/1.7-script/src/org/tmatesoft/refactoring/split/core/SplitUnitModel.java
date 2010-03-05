@@ -42,6 +42,8 @@ import org.eclipse.text.edits.TextEdit;
 
 public class SplitUnitModel {
 
+	private final SplitRefactoringModel model;
+
 	private final ICompilationUnit sourceUnit;
 	private final Set<IMethod> sourceMethods;
 	private final CompilationUnit sourceAst;
@@ -51,8 +53,9 @@ public class SplitUnitModel {
 	private Set<IField> usedFields = new HashSet<IField>();
 	private Set<IType> nestedTypes = new HashSet<IType>();
 
-	public SplitUnitModel(final ICompilationUnit sourceUnit, final Set<IMethod> sourceMethods,
-			final CompilationUnit sourceAst) {
+	public SplitUnitModel(final SplitRefactoringModel model, final ICompilationUnit sourceUnit,
+			final Set<IMethod> sourceMethods, final CompilationUnit sourceAst) {
+		this.model = model;
 		this.sourceUnit = sourceUnit;
 		this.sourceMethods = sourceMethods;
 		this.sourceAst = sourceAst;
@@ -89,7 +92,7 @@ public class SplitUnitModel {
 	public static SplitUnitModel getUnitModel(final ICompilationUnit sourceUnit, final CompilationUnit sourceAst,
 			final SplitRefactoringModel model) throws JavaModelException {
 		final Set<IMethod> sourceMethods = model.getUnits().get(sourceUnit);
-		final SplitUnitModel unitModel = new SplitUnitModel(sourceUnit, sourceMethods, sourceAst);
+		final SplitUnitModel unitModel = new SplitUnitModel(model, sourceUnit, sourceMethods, sourceAst);
 		return unitModel;
 	}
 
@@ -101,7 +104,7 @@ public class SplitUnitModel {
 	 */
 	public void buildModel(final SplitRefactoringModel model) throws JavaModelException {
 		for (final IMethod sourceMethod : sourceMethods) {
-			SplitUnitModelBuilder.addMethodToUnitModel(sourceMethod, model, this);
+			addMethodToUnitModel(sourceMethod);
 		}
 	}
 
@@ -270,6 +273,40 @@ public class SplitUnitModel {
 			model.getChanges().add(new CreateCompilationUnitChange(unit, document.get(), null));
 
 		}
+	}
+
+	public void addMethodToUnitModel(final IMethod sourceMethod) throws JavaModelException {
+
+		final SplitUnitModelBuilder builder = new SplitUnitModelBuilder(model, sourceAst, sourceMethod, this);
+
+		if (builder.getSourceMethodDeclaringClass().isAnonymous()) {
+			// TODO anonymous class
+		} else if (builder.getSourceMethodParentClass() != null) {
+			builder.addNestedType(builder.getSourceMethodDeclaringType());
+		} else {
+			getAddMethods().put(sourceMethod, builder.getSourceMethodNode());
+			final IMethodBinding[] declaredMethods = builder.getSourceMethodDeclaringClass().getDeclaredMethods();
+			for (final IMethodBinding methodBinding : declaredMethods) {
+				if (methodBinding.isConstructor()) {
+					final IMethod constructor = (IMethod) methodBinding.getJavaElement();
+					if (constructor != null) {
+						final MethodDeclaration constructorNode = (MethodDeclaration) NodeFinder.perform(sourceAst,
+								constructor.getSourceRange());
+						getAddMethods().put(constructor, constructorNode);
+						constructorNode.accept(builder);
+					}
+				}
+			}
+		}
+
+		builder.buildUnitModel();
+
+		for (final IMethod invokedMethod : builder.getInvokedMethods()) {
+			if (!getAddMethods().containsKey(invokedMethod)) {
+				addMethodToUnitModel(invokedMethod);
+			}
+		}
+
 	}
 
 }
