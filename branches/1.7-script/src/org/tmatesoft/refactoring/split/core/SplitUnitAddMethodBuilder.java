@@ -55,7 +55,8 @@ class SplitUnitAddMethodBuilder extends ASTVisitor {
 		return super.visit(node);
 	}
 
-	public SplitUnitAddMethodBuilder(final SplitUnitModel splitModel, final IMethod sourceMethod) throws JavaModelException {
+	public SplitUnitAddMethodBuilder(final SplitUnitModel splitModel, final IMethod sourceMethod)
+			throws JavaModelException {
 
 		this.unitModel = splitModel;
 		this.model = splitModel.getModel();
@@ -92,7 +93,7 @@ class SplitUnitAddMethodBuilder extends ASTVisitor {
 		}
 
 		sourceMethodNode.accept(this);
-		
+
 		for (final IMethod invokedMethod : getInvokedMethods()) {
 			if (!unitModel.getAddMethods().containsKey(invokedMethod)) {
 				unitModel.addMethodToUnitModel(invokedMethod);
@@ -254,8 +255,6 @@ class SplitUnitAddMethodBuilder extends ASTVisitor {
 					final ICompilationUnit unit = type.getCompilationUnit();
 					if (!model.getUnits().containsKey(unit)) {
 						unitModel.getUsedTypes().add(type);
-					} else {
-						moveEntityType(node);
 					}
 				} else if (sourceMethodDeclaringClass.equals(parentClass)) {
 					addNestedType(type);
@@ -263,98 +262,6 @@ class SplitUnitAddMethodBuilder extends ASTVisitor {
 			}
 		} else {
 			// TODO anonymous class
-		}
-	}
-
-	protected void moveEntityType(final ASTNode node) {
-
-		if (node instanceof SimpleName) {
-			final SimpleName simpleName = (SimpleName) node;
-
-			final IBinding binding = simpleName.resolveBinding();
-			final int kind = binding.getKind();
-
-			switch (kind) {
-
-			case IBinding.TYPE:
-
-				simpleName.setIdentifier(model.addTargetSuffix(simpleName.getIdentifier()));
-				break;
-
-			case IBinding.VARIABLE:
-
-				final IVariableBinding var = (IVariableBinding) binding;
-				final ITypeBinding varType = var.getType();
-				if (varType != null) {
-					final IVariableBinding varDeclaration = var.getVariableDeclaration();
-					final IJavaElement javaElement = varDeclaration.getJavaElement();
-					if (varDeclaration.isField()) {
-						final IField field = (IField) javaElement;
-						final ICompilationUnit unit = field.getCompilationUnit();
-						final SplitUnitModel splitUnitModel = model.getUnitModels().get(unit);
-						if (splitUnitModel != null) {
-							try {
-								final ASTNode nodeFound = NodeFinder.perform(splitUnitModel.getSourceAst(), field
-										.getSourceRange());
-								if (nodeFound != null) {
-									final FieldDeclaration fieldNode = (FieldDeclaration) nodeFound;
-									final Type fieldType = fieldNode.getType();
-									moveTypeToTarget(fieldType);
-								}
-							} catch (JavaModelException e) {
-								SplitRefactoring.log(e);
-							}
-						}
-					} else {
-						// TODO local var
-					}
-				}
-
-				break;
-
-			case IBinding.METHOD:
-				// TODO method
-				break;
-
-			}
-
-		} else if (node instanceof ArrayType) {
-			final ArrayType arrayType = (ArrayType) node;
-			final Type componentType = arrayType.getComponentType();
-			if (componentType instanceof SimpleType) {
-				if (node instanceof SimpleName) {
-					final SimpleName simpleName = (SimpleName) node;
-					simpleName.setIdentifier(model.addTargetSuffix(simpleName.getIdentifier()));
-				}
-			}
-		}
-
-	}
-
-	/**
-	 * @param type
-	 */
-	private void moveTypeToTarget(final Type type) {
-		if (!type.isArrayType()) {
-			addTargetSuffixToType(type);
-		} else {
-			final ArrayType fieldArrayType = (ArrayType) type;
-			final Type componentType = fieldArrayType.getComponentType();
-			if (componentType.isSimpleType() && componentType instanceof SimpleType) {
-				addTargetSuffixToType(componentType);
-			}
-		}
-	}
-
-	/**
-	 * @param type
-	 */
-	private void addTargetSuffixToType(final Type type) {
-		final SimpleType simpleType = (SimpleType) type;
-		final Name name = simpleType.getName();
-		if (name.isSimpleName() && name instanceof SimpleName) {
-			final SimpleName typeSimpleName = (SimpleName) name;
-			typeSimpleName.setIdentifier(model.addTargetSuffix(typeSimpleName.getIdentifier()));
 		}
 	}
 

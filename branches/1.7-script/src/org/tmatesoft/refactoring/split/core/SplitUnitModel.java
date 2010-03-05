@@ -271,6 +271,15 @@ public class SplitUnitModel {
 		for (final IMethod sourceMethod : sourceMethods) {
 			addMethodToUnitModel(sourceMethod);
 		}
+		moveTypes();
+	}
+
+	/**
+	 * @throws JavaModelException
+	 */
+	private void moveTypes() throws JavaModelException {
+		final SplitUnitMoveTypeBuilder builder = new SplitUnitMoveTypeBuilder(this);
+		builder.moveTypes();
 	}
 
 	public void addMethodToUnitModel(final IMethod sourceMethod) throws JavaModelException {
