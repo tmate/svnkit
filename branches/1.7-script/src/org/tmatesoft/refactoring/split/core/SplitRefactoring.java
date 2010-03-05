@@ -304,7 +304,7 @@ public class SplitRefactoring extends Refactoring {
 			for (final Map.Entry<ICompilationUnit, SplitUnitModel> entry : model.getUnitModels().entrySet()) {
 				try {
 					final SplitUnitModel unitModel = entry.getValue();
-					unitModel.applyUnitSplit(model, status, subMonitor);
+					unitModel.applyUnitSplit(status, subMonitor);
 				} catch (Exception exception) {
 					log(exception);
 				}

@@ -108,8 +108,8 @@ public class SplitUnitModel {
 		}
 	}
 
-	public void applyUnitSplit(final SplitRefactoringModel model, final RefactoringStatus status,
-			final IProgressMonitor monitor) throws CoreException, MalformedTreeException, BadLocationException {
+	public void applyUnitSplit(final RefactoringStatus status, final IProgressMonitor monitor) throws CoreException,
+			MalformedTreeException, BadLocationException {
 
 		final CompilationUnit sourceNode = getSourceAst();
 		final Set<IMethod> sourceMethods = model.getUnits().get(sourceUnit);
