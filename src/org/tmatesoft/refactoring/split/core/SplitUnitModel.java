@@ -101,7 +101,7 @@ public class SplitUnitModel {
 	 */
 	public void buildModel(final SplitRefactoringModel model) throws JavaModelException {
 		for (final IMethod sourceMethod : sourceMethods) {
-			SplitUnitModelBuilder.buildSplitUnitModel(sourceMethod, model, this);
+			SplitUnitModelBuilder.addMethodToUnitModel(sourceMethod, model, this);
 		}
 	}
 

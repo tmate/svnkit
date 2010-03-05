@@ -45,12 +45,6 @@ class SplitUnitModelBuilder extends ASTVisitor {
 	private final ITypeBinding sourceMethodParentClass;
 
 	@Override
-	public boolean visit(QualifiedName node) {
-		// determineEntity(node);
-		return super.visit(node);
-	}
-
-	@Override
 	public boolean visit(SimpleName node) {
 		determineEntity(node);
 		return super.visit(node);
@@ -58,12 +52,6 @@ class SplitUnitModelBuilder extends ASTVisitor {
 
 	public boolean visit(final ArrayType node) {
 		addUsedType(node.getComponentType().resolveBinding(), node);
-		return super.visit(node);
-	}
-
-	@Override
-	public boolean visit(TypeLiteral node) {
-		// addUsedType(node.getType().resolveBinding(), node);
 		return super.visit(node);
 	}
 
@@ -216,7 +204,7 @@ class SplitUnitModelBuilder extends ASTVisitor {
 							&& model.getUnits().containsKey(compilationUnit)) {
 						try {
 							final SplitUnitModel splitUnitModel = model.getUnitModels().get(compilationUnit);
-							buildSplitUnitModel(method, model, splitUnitModel);
+							addMethodToUnitModel(method, model, splitUnitModel);
 						} catch (Exception e) {
 							SplitRefactoring.log(e);
 						}
@@ -367,7 +355,7 @@ class SplitUnitModelBuilder extends ASTVisitor {
 					}
 
 					for (final IMethod method : nestedType.getMethods()) {
-						buildSplitUnitModel(method, model, unitModel);
+						addMethodToUnitModel(method, model, unitModel);
 					}
 
 				} catch (JavaModelException e) {
@@ -377,7 +365,7 @@ class SplitUnitModelBuilder extends ASTVisitor {
 		}
 	}
 
-	static void buildSplitUnitModel(final IMethod sourceMethod, final SplitRefactoringModel model,
+	static void addMethodToUnitModel(final IMethod sourceMethod, final SplitRefactoringModel model,
 			final SplitUnitModel unitModel) throws JavaModelException {
 
 		final CompilationUnit sourceAst = unitModel.getSourceAst();
@@ -408,7 +396,7 @@ class SplitUnitModelBuilder extends ASTVisitor {
 
 		for (final IMethod invokedMethod : builder.getInvokedMethods()) {
 			if (!unitModel.getAddMethods().containsKey(invokedMethod)) {
-				buildSplitUnitModel(invokedMethod, model, unitModel);
+				addMethodToUnitModel(invokedMethod, model, unitModel);
 			}
 		}
 
