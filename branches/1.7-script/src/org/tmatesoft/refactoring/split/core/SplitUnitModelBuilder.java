@@ -44,6 +44,29 @@ class SplitUnitModelBuilder extends ASTVisitor {
 	private final ITypeBinding sourceMethodDeclaringClass;
 	private final ITypeBinding sourceMethodParentClass;
 
+	@Override
+	public boolean visit(QualifiedName node) {
+		// determineEntity(node);
+		return super.visit(node);
+	}
+
+	@Override
+	public boolean visit(SimpleName node) {
+		determineEntity(node);
+		return super.visit(node);
+	}
+
+	public boolean visit(final ArrayType node) {
+		addUsedType(node.getComponentType().resolveBinding(), node);
+		return super.visit(node);
+	}
+
+	@Override
+	public boolean visit(TypeLiteral node) {
+		// addUsedType(node.getType().resolveBinding(), node);
+		return super.visit(node);
+	}
+
 	public SplitUnitModelBuilder(final SplitRefactoringModel model, final CompilationUnit sourceAst,
 			final IMethod sourceMethod, final SplitUnitModel splitModel) throws JavaModelException {
 
@@ -121,29 +144,6 @@ class SplitUnitModelBuilder extends ASTVisitor {
 
 	public Set<IMethod> getInvokedMethods() {
 		return invokedMethods;
-	}
-
-	@Override
-	public boolean visit(QualifiedName node) {
-		determineEntity(node);
-		return super.visit(node);
-	}
-
-	@Override
-	public boolean visit(SimpleName node) {
-		determineEntity(node);
-		return super.visit(node);
-	}
-
-	public boolean visit(final ArrayType node) {
-		addUsedType(node.getComponentType().resolveBinding(), node);
-		return super.visit(node);
-	}
-
-	@Override
-	public boolean visit(TypeLiteral node) {
-		addUsedType(node.getType().resolveBinding(), node);
-		return super.visit(node);
 	}
 
 	private void determineEntity(Name node) {
@@ -275,19 +275,20 @@ class SplitUnitModelBuilder extends ASTVisitor {
 					final IJavaElement javaElement = varDeclaration.getJavaElement();
 					if (varDeclaration.isField()) {
 						final IField field = (IField) javaElement;
-						try {
-							final ASTNode nodeFound = NodeFinder.perform(sourceAst, field.getSourceRange());
-							if (nodeFound != null) {
-								if (nodeFound instanceof FieldDeclaration) {
+						final ICompilationUnit unit = field.getCompilationUnit();
+						final SplitUnitModel splitUnitModel = model.getUnitModels().get(unit);
+						if (splitUnitModel != null) {
+							try {
+								final ASTNode nodeFound = NodeFinder.perform(splitUnitModel.getSourceAst(), field
+										.getSourceRange());
+								if (nodeFound != null) {
 									final FieldDeclaration fieldNode = (FieldDeclaration) nodeFound;
 									final Type fieldType = fieldNode.getType();
 									moveTypeToTarget(fieldType);
-								} else {
-									// TODO why?
 								}
+							} catch (JavaModelException e) {
+								SplitRefactoring.log(e);
 							}
-						} catch (JavaModelException e) {
-							SplitRefactoring.log(e);
 						}
 					} else {
 						// TODO local var
