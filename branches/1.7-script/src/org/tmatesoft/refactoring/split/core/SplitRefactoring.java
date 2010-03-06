@@ -51,6 +51,9 @@ public class SplitRefactoring extends Refactoring {
 					"org.tmatesoft.svn.core.internal.wc.admin.SVNWCAccess",
 					"org.tmatesoft.svn.core.internal.wc.admin.SVNAdminArea" }));
 
+	private List<ISplitChanges> splitChanges = new ArrayList<ISplitChanges>(Arrays
+			.asList(new ISplitChanges[] { new SplitMoveChanges() }));
+
 	@Override
 	public String getName() {
 		return TITLE;
@@ -278,13 +281,8 @@ public class SplitRefactoring extends Refactoring {
 				}
 			}
 
-			for (final Map.Entry<ICompilationUnit, SplitUnitModel> entry : model.getUnitModels().entrySet()) {
-				try {
-					final SplitUnitModel unitModel = entry.getValue();
-					unitModel.applyUnitSplit(status, subMonitor);
-				} catch (Exception exception) {
-					log(exception);
-				}
+			for (final ISplitChanges splitChange : splitChanges) {
+				splitChange.doChanges(model, status, subMonitor);
 			}
 
 		} finally {
