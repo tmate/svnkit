@@ -46,13 +46,12 @@ public class SplitRefactoring extends Refactoring {
 
 	public static final String TITLE = "Split refactoring";
 
-	private SplitRefactoringModel model = new SplitRefactoringModel("org.tmatesoft.svn.core.wc",
-			"org.tmatesoft.svn.core.internal.wc.v16", "16", Arrays.asList(new String[] {
-					"org.tmatesoft.svn.core.internal.wc.admin.SVNWCAccess",
+	private SplitRefactoringModel model = new SplitRefactoringModel("org.tmatesoft.svn.core.wc", Arrays
+			.asList(new String[] { "org.tmatesoft.svn.core.internal.wc.admin.SVNWCAccess",
 					"org.tmatesoft.svn.core.internal.wc.admin.SVNAdminArea" }));
 
 	private List<ISplitChanges> splitChanges = new ArrayList<ISplitChanges>(Arrays
-			.asList(new ISplitChanges[] { new SplitMoveChanges() }));
+			.asList(new ISplitChanges[] { new SplitMoveChanges("org.tmatesoft.svn.core.internal.wc.v16", "16") }));
 
 	@Override
 	public String getName() {
@@ -99,11 +98,6 @@ public class SplitRefactoring extends Refactoring {
 				return status;
 			}
 
-			if (model.getTargetPackageName() == null) {
-				status.merge(RefactoringStatus.createFatalErrorStatus("Target package has not been specified."));
-				return status;
-			}
-
 			model.setProjectScope(SearchEngine.createJavaSearchScope(new IJavaElement[] { model.getJavaProject() },
 					IJavaSearchScope.SOURCES));
 
@@ -141,7 +135,7 @@ public class SplitRefactoring extends Refactoring {
 			IProgressMonitor progressMonitor, final RefactoringStatus status) throws CoreException {
 		final SearchPattern pattern = SearchPattern.createPattern(packageName, IJavaSearchConstants.PACKAGE,
 				IJavaSearchConstants.DECLARATIONS, SearchPattern.R_EXACT_MATCH);
-		IPackageFragment found = searchOneElement(IPackageFragment.class, pattern, scope, progressMonitor);
+		IPackageFragment found = SplitUtils.searchOneElement(IPackageFragment.class, pattern, scope, progressMonitor);
 		if (found == null) {
 			status.merge(RefactoringStatus.createFatalErrorStatus(String.format(
 					"Package '%s' has not been found in selected project", packageName)));
@@ -153,58 +147,12 @@ public class SplitRefactoring extends Refactoring {
 			final RefactoringStatus status) throws CoreException {
 		final SearchPattern pattern = SearchPattern.createPattern(typeName, IJavaSearchConstants.TYPE,
 				IJavaSearchConstants.DECLARATIONS, SearchPattern.R_EXACT_MATCH);
-		final IType found = searchOneElement(IType.class, pattern, scope, progressMonitor);
+		final IType found = SplitUtils.searchOneElement(IType.class, pattern, scope, progressMonitor);
 		if (found == null) {
 			status.merge(RefactoringStatus.createFatalErrorStatus(String.format(
 					"Type '%s' has not been found in selected project", typeName)));
 		}
 		return found;
-	}
-
-	private <T extends IJavaElement> T searchOneElement(final Class<T> type, final SearchPattern pattern,
-			final IJavaSearchScope scope, final IProgressMonitor progressMonitor) throws CoreException {
-
-		class SearchRequestorImpl extends SearchRequestor {
-			T found;
-
-			@Override
-			public void acceptSearchMatch(SearchMatch match) throws CoreException {
-				if (match.getAccuracy() == SearchMatch.A_ACCURATE && !match.isInsideDocComment()) {
-					final Object element = match.getElement();
-					if (element != null && type.isAssignableFrom(element.getClass())) {
-						found = type.cast(element);
-					}
-				}
-			}
-		}
-
-		final SearchRequestorImpl requestor = new SearchRequestorImpl();
-		model.getSearchEngine().search(pattern, new SearchParticipant[] { SearchEngine.getDefaultSearchParticipant() },
-				scope, requestor, new SubProgressMonitor(progressMonitor, 1));
-		return requestor.found;
-	}
-
-	private <T extends IJavaElement> List<T> searchManyElements(final Class<T> type, final SearchPattern pattern,
-			final IJavaSearchScope scope, final IProgressMonitor progressMonitor) throws CoreException {
-
-		class SearchRequestorImpl extends SearchRequestor {
-			List<T> found = new LinkedList<T>();
-
-			@Override
-			public void acceptSearchMatch(SearchMatch match) throws CoreException {
-				if (match.getAccuracy() == SearchMatch.A_ACCURATE && !match.isInsideDocComment()) {
-					final Object element = match.getElement();
-					if (element != null && type.isAssignableFrom(element.getClass())) {
-						found.add(type.cast(element));
-					}
-				}
-			}
-		}
-
-		final SearchRequestorImpl requestor = new SearchRequestorImpl();
-		model.getSearchEngine().search(pattern, new SearchParticipant[] { SearchEngine.getDefaultSearchParticipant() },
-				scope, requestor, new SubProgressMonitor(progressMonitor, 1));
-		return requestor.found;
 	}
 
 	@Override
@@ -226,19 +174,14 @@ public class SplitRefactoring extends Refactoring {
 				return status;
 			}
 
-			model.setTargetPackage(model.getPackageRoot().getPackageFragment(model.getTargetPackageName()));
-			if (!model.getTargetPackage().exists()) {
-				model.getChanges().add(new CreatePackageChange(model.getTargetPackage()));
-			}
-
 			final IJavaSearchScope sourcePackageScope = SearchEngine.createJavaSearchScope(new IJavaElement[] { model
 					.getSourcePackage() }, IJavaSearchScope.SOURCES);
 
 			for (final IType typeToHide : model.getTypesToHide()) {
 				final SearchPattern referencesPattern = SearchPattern.createPattern(typeToHide,
 						IJavaSearchConstants.REFERENCES);
-				final List<IMethod> methods = searchManyElements(IMethod.class, referencesPattern, sourcePackageScope,
-						progressMonitor);
+				final List<IMethod> methods = SplitUtils.searchManyElements(IMethod.class, referencesPattern,
+						sourcePackageScope, progressMonitor);
 				if (methods != null && !methods.isEmpty()) {
 					for (final IMethod method : methods) {
 						final ICompilationUnit unit = method.getCompilationUnit();
@@ -282,7 +225,9 @@ public class SplitRefactoring extends Refactoring {
 			}
 
 			for (final ISplitChanges splitChange : splitChanges) {
-				splitChange.doChanges(model, status, subMonitor);
+				if (!splitChange.doChanges(model, status, subMonitor)) {
+					return status;
+				}
 			}
 
 		} finally {

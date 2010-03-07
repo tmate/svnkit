@@ -19,22 +19,30 @@ class SplitUnitMoveTypeBuilder extends ASTVisitor {
 	private final SplitRefactoringModel model;
 	private final SplitUnitModel unitModel;
 
+	private final String targetSuffix;
+
 	@Override
 	public boolean visit(SimpleName node) {
 		moveSimpleName(node);
 		return super.visit(node);
 	}
 
-	public SplitUnitMoveTypeBuilder(final SplitUnitModel splitModel) throws JavaModelException {
+	public SplitUnitMoveTypeBuilder(final SplitUnitModel splitModel, final String targetSuffix)
+			throws JavaModelException {
 		this.unitModel = splitModel;
 		this.model = splitModel.getModel();
+		this.targetSuffix = targetSuffix;
 	}
 
 	/**
 	 * @return the splitModel
 	 */
-	public SplitUnitModel getSplitModel() {
+	public SplitUnitModel getUnitModel() {
 		return unitModel;
+	}
+
+	public String getTargetSuffix() {
+		return targetSuffix;
 	}
 
 	public void moveTypes() throws JavaModelException {
@@ -64,7 +72,7 @@ class SplitUnitMoveTypeBuilder extends ASTVisitor {
 				final int kind = binding.getKind();
 				if (kind == IBinding.TYPE) {
 					if (isTypeToMove((ITypeBinding) binding)) {
-						simpleName.setIdentifier(model.addTargetSuffix(simpleName.getIdentifier()));
+						simpleName.setIdentifier(SplitUtils.addSuffix(simpleName.getIdentifier(), getTargetSuffix()));
 					}
 				}
 			}

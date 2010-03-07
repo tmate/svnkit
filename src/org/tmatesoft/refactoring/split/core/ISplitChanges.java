@@ -5,6 +5,6 @@ import org.eclipse.ltk.core.refactoring.RefactoringStatus;
 
 public interface ISplitChanges {
 
-	void doChanges(SplitRefactoringModel model, RefactoringStatus status, SubProgressMonitor subMonitor);
+	boolean doChanges(SplitRefactoringModel model, RefactoringStatus status, SubProgressMonitor subMonitor);
 
 }
