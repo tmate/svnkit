@@ -82,4 +82,6 @@ public class SplitUtils {
 		}
 	}
 
+	static final String ORIGINAL_NAME = "org.tmatesoft.refactoring.split.originalName";
+
 }
