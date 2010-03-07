@@ -49,14 +49,12 @@ public class SplitMoveChanges extends SplitTargetChanges {
 	protected void doUnitChange(SplitUnitModel unitModel, RefactoringStatus status, SubProgressMonitor monitor)
 			throws MalformedTreeException, CoreException, BadLocationException {
 
-		moveTypes(unitModel);
+		final SplitUnitMoveTypeBuilder builder = new SplitUnitMoveTypeBuilder(unitModel, getTargetSuffix());
+		builder.moveTypes();
+
 		applyUnitSplit(unitModel, status, monitor);
 
-	}
-
-	private void moveTypes(final SplitUnitModel unitModel) throws JavaModelException {
-
-		final SplitUnitMoveTypeBuilder builder = new SplitUnitMoveTypeBuilder(unitModel, getTargetSuffix());
+		builder.setRestore(true);
 		builder.moveTypes();
 
 	}

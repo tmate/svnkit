@@ -21,6 +21,16 @@ class SplitUnitMoveTypeBuilder extends ASTVisitor {
 
 	private final String targetSuffix;
 
+	private boolean restore;
+
+	public boolean isRestore() {
+		return restore;
+	}
+
+	public void setRestore(boolean restore) {
+		this.restore = restore;
+	}
+
 	@Override
 	public boolean visit(SimpleName node) {
 		moveSimpleName(node);
@@ -72,7 +82,17 @@ class SplitUnitMoveTypeBuilder extends ASTVisitor {
 				final int kind = binding.getKind();
 				if (kind == IBinding.TYPE) {
 					if (isTypeToMove((ITypeBinding) binding)) {
-						simpleName.setIdentifier(SplitUtils.addSuffix(simpleName.getIdentifier(), getTargetSuffix()));
+						if (restore) {
+							final Object property = simpleName.getProperty(SplitUtils.ORIGINAL_NAME);
+							if (property != null && property instanceof String) {
+								final String identifier = (String) property;
+								simpleName.setIdentifier(identifier);
+							}
+						} else {
+							final String identifier = simpleName.getIdentifier();
+							simpleName.setIdentifier(SplitUtils.addSuffix(identifier, getTargetSuffix()));
+							simpleName.setProperty(SplitUtils.ORIGINAL_NAME, identifier);
+						}
 					}
 				}
 			}
