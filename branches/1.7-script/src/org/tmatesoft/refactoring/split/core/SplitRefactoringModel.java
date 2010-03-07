@@ -23,15 +23,12 @@ import org.eclipse.ltk.core.refactoring.Change;
 public class SplitRefactoringModel {
 
 	private String sourcePackageName;
-	private String targetPackageName;
-	private String targetSuffix;
 	private List<String> typesToHideNames;
 	private IStructuredSelection selection;
 	private IProject project;
 	private IJavaProject javaProject;
 	private IPackageFragmentRoot packageRoot;
 	private IPackageFragment sourcePackage;
-	private IPackageFragment targetPackage;
 	private List<IType> typesToHide;
 
 	private IJavaSearchScope projectScope;
@@ -43,11 +40,8 @@ public class SplitRefactoringModel {
 	private final Map<ICompilationUnit, Set<IMethod>> units = new LinkedHashMap<ICompilationUnit, Set<IMethod>>();
 	private final Map<ICompilationUnit, SplitUnitModel> unitModels = new LinkedHashMap<ICompilationUnit, SplitUnitModel>();
 
-	public SplitRefactoringModel(String sourcePackageName, String targetPackageName, String targetSuffix,
-			List<String> typesToHideNames) {
+	public SplitRefactoringModel(final String sourcePackageName, final List<String> typesToHideNames) {
 		this.sourcePackageName = sourcePackageName;
-		this.targetPackageName = targetPackageName;
-		this.targetSuffix = targetSuffix;
 		this.typesToHideNames = typesToHideNames;
 	}
 
@@ -57,22 +51,6 @@ public class SplitRefactoringModel {
 
 	public void setSourcePackageName(String sourcePackageName) {
 		this.sourcePackageName = sourcePackageName;
-	}
-
-	public String getTargetPackageName() {
-		return targetPackageName;
-	}
-
-	public void setTargetPackageName(String targetPackageName) {
-		this.targetPackageName = targetPackageName;
-	}
-
-	public String getTargetSuffix() {
-		return targetSuffix;
-	}
-
-	public void setTargetSuffix(String targetSuffix) {
-		this.targetSuffix = targetSuffix;
 	}
 
 	public List<String> getTypesToHideNames() {
@@ -123,14 +101,6 @@ public class SplitRefactoringModel {
 		this.sourcePackage = sourcePackage;
 	}
 
-	public IPackageFragment getTargetPackage() {
-		return targetPackage;
-	}
-
-	public void setTargetPackage(IPackageFragment targetPackage) {
-		this.targetPackage = targetPackage;
-	}
-
 	public List<IType> getTypesToHide() {
 		return typesToHide;
 	}
@@ -162,22 +132,9 @@ public class SplitRefactoringModel {
 	public CodeFormatter getCodeFormatter() {
 		return codeFormatter;
 	}
-	
+
 	public Map<ICompilationUnit, SplitUnitModel> getUnitModels() {
 		return unitModels;
 	}
-
-	/**
-	 * @param sourceTypeName
-	 * @return
-	 */
-	public String addTargetSuffix(final String str) {
-		if (!str.endsWith(getTargetSuffix())) {
-			return str + getTargetSuffix();
-		} else {
-			return str;
-		}
-	}
-
 
 }

@@ -31,6 +31,7 @@ import org.eclipse.jdt.core.dom.Type;
 import org.eclipse.jdt.core.dom.TypeDeclaration;
 import org.eclipse.jdt.core.formatter.CodeFormatter;
 import org.eclipse.jdt.internal.corext.refactoring.changes.CreateCompilationUnitChange;
+import org.eclipse.jdt.internal.corext.refactoring.changes.CreatePackageChange;
 import org.eclipse.jface.text.BadLocationException;
 import org.eclipse.jface.text.Document;
 import org.eclipse.ltk.core.refactoring.RefactoringStatus;
@@ -40,8 +41,45 @@ import org.tmatesoft.refactoring.split.core.SplitUnitModel.TypeMetadata;
 
 public class SplitMoveChanges implements ISplitChanges {
 
+	private final String targetPackageName;
+	private final String targetSuffix;
+	private IPackageFragment targetPackage;
+
+	public SplitMoveChanges(final String targetPackageName, final String targetSuffix) {
+		this.targetPackageName = targetPackageName;
+		this.targetSuffix = targetSuffix;
+	}
+
+	public String getTargetPackageName() {
+		return targetPackageName;
+	}
+
+	public String getTargetSuffix() {
+		return targetSuffix;
+	}
+
+	public IPackageFragment getTargetPackage() {
+		return targetPackage;
+	}
+
+	private void setTargetPackage(IPackageFragment targetPackage) {
+		this.targetPackage = targetPackage;
+	}
+
+	private String addTargetSuffix(final String str) {
+		return SplitUtils.addSuffix(str, getTargetSuffix());
+	}
+
 	@Override
-	public void doChanges(SplitRefactoringModel model, RefactoringStatus status, SubProgressMonitor subMonitor) {
+	public boolean doChanges(SplitRefactoringModel model, RefactoringStatus status, SubProgressMonitor subMonitor) {
+
+		setTargetPackage(model.getPackageRoot().getPackageFragment(getTargetPackageName()));
+		if (getTargetPackage() == null) {
+			status.merge(RefactoringStatus.createFatalErrorStatus("Can't get target package."));
+			return false;
+		} else if (!getTargetPackage().exists()) {
+			model.getChanges().add(new CreatePackageChange(getTargetPackage()));
+		}
 
 		for (final Map.Entry<ICompilationUnit, SplitUnitModel> entry : model.getUnitModels().entrySet()) {
 			try {
@@ -50,13 +88,16 @@ public class SplitMoveChanges implements ISplitChanges {
 				applyUnitSplit(model, unitModel, status, subMonitor);
 			} catch (Exception exception) {
 				SplitRefactoring.log(exception);
+				return false;
 			}
 		}
+
+		return true;
 
 	}
 
 	private void moveTypes(final SplitUnitModel unitModel) throws JavaModelException {
-		final SplitUnitMoveTypeBuilder builder = new SplitUnitMoveTypeBuilder(unitModel);
+		final SplitUnitMoveTypeBuilder builder = new SplitUnitMoveTypeBuilder(unitModel, getTargetSuffix());
 		builder.moveTypes();
 	}
 
@@ -64,9 +105,9 @@ public class SplitMoveChanges implements ISplitChanges {
 			final RefactoringStatus status, final IProgressMonitor monitor) throws CoreException,
 			MalformedTreeException, BadLocationException {
 
-		final String typeName = model.addTargetSuffix(unitModel.getSourceTypeName());
+		final String typeName = addTargetSuffix(unitModel.getSourceTypeName());
 		final String unitName = typeName + ".java";
-		final ICompilationUnit targetUnit = model.getTargetPackage().getCompilationUnit(unitName);
+		final ICompilationUnit targetUnit = getTargetPackage().getCompilationUnit(unitName);
 		if (!targetUnit.exists()) {
 			buildTargetUnit(model, unitModel, typeName, targetUnit);
 		}
@@ -79,7 +120,7 @@ public class SplitMoveChanges implements ISplitChanges {
 		final CompilationUnit node = ast.newCompilationUnit();
 
 		final PackageDeclaration packageDeclaration = ast.newPackageDeclaration();
-		packageDeclaration.setName(ast.newName(model.getTargetPackage().getElementName()));
+		packageDeclaration.setName(ast.newName(getTargetPackage().getElementName()));
 		node.setPackage(packageDeclaration);
 
 		final TypeDeclaration type = ast.newTypeDeclaration();
@@ -100,7 +141,7 @@ public class SplitMoveChanges implements ISplitChanges {
 				final ICompilationUnit sourceSuperClassUnit = unitModel.getSourceSuperClassMetadata().getUnit();
 				if (model.getUnits().containsKey(sourceSuperClassUnit)) {
 					final String sourceSuperClassName = unitModel.getSourceSuperClassMetadata().getName();
-					final String targetSuperclassName = model.addTargetSuffix(sourceSuperClassName);
+					final String targetSuperclassName = addTargetSuffix(sourceSuperClassName);
 					type.setSuperclassType(ast.newSimpleType(ast.newName(targetSuperclassName)));
 				} else {
 					unitModel.getUsedTypes().add(sourceSuperClassType);
@@ -118,7 +159,7 @@ public class SplitMoveChanges implements ISplitChanges {
 					final ICompilationUnit sourceSuperInterfaceUnit = sourceSuperInterface.getUnit();
 					if (model.getUnits().containsKey(sourceSuperInterfaceUnit)) {
 						final String sourceSuperInterfaceName = sourceSuperInterface.getName();
-						final String targetSuperInterfaceName = model.addTargetSuffix(sourceSuperInterfaceName);
+						final String targetSuperInterfaceName = addTargetSuffix(sourceSuperInterfaceName);
 						superInterfaceTypes.add(ast.newSimpleType(ast.newName(targetSuperInterfaceName)));
 					} else {
 						unitModel.getUsedTypes().add(sourceSuperInterfaceType);
@@ -167,7 +208,7 @@ public class SplitMoveChanges implements ISplitChanges {
 			final MethodDeclaration methodCopy = (MethodDeclaration) ASTNode.copySubtree(ast, sourceMethodDeclaration);
 
 			if (sourceMethodDeclaration.isConstructor()) {
-				methodCopy.setName(ast.newSimpleName(model.addTargetSuffix(unitModel.getSourceTypeName())));
+				methodCopy.setName(ast.newSimpleName(addTargetSuffix(unitModel.getSourceTypeName())));
 			}
 
 			final IMethodBinding sourceMethodBinding = sourceMethodDeclaration.resolveBinding();
