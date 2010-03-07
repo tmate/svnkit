@@ -39,46 +39,17 @@ import org.eclipse.text.edits.MalformedTreeException;
 import org.eclipse.text.edits.TextEdit;
 import org.tmatesoft.refactoring.split.core.SplitUnitModel.TypeMetadata;
 
-public class SplitMoveChanges implements ISplitChanges {
-
-	private final String targetPackageName;
-	private final String targetSuffix;
-	private IPackageFragment targetPackage;
+public class SplitMoveChanges extends SplitTargetChanges {
 
 	public SplitMoveChanges(final String targetPackageName, final String targetSuffix) {
-		this.targetPackageName = targetPackageName;
-		this.targetSuffix = targetSuffix;
-	}
-
-	public String getTargetPackageName() {
-		return targetPackageName;
-	}
-
-	public String getTargetSuffix() {
-		return targetSuffix;
-	}
-
-	public IPackageFragment getTargetPackage() {
-		return targetPackage;
-	}
-
-	private void setTargetPackage(IPackageFragment targetPackage) {
-		this.targetPackage = targetPackage;
-	}
-
-	private String addTargetSuffix(final String str) {
-		return SplitUtils.addSuffix(str, getTargetSuffix());
+		super(targetPackageName, targetSuffix);
 	}
 
 	@Override
 	public boolean doChanges(SplitRefactoringModel model, RefactoringStatus status, SubProgressMonitor subMonitor) {
 
-		setTargetPackage(model.getPackageRoot().getPackageFragment(getTargetPackageName()));
-		if (getTargetPackage() == null) {
-			status.merge(RefactoringStatus.createFatalErrorStatus("Can't get target package."));
+		if (!super.doChanges(model, status, subMonitor)) {
 			return false;
-		} else if (!getTargetPackage().exists()) {
-			model.getChanges().add(new CreatePackageChange(getTargetPackage()));
 		}
 
 		for (final Map.Entry<ICompilationUnit, SplitUnitModel> entry : model.getUnitModels().entrySet()) {
