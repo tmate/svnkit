@@ -46,35 +46,25 @@ public class SplitMoveChanges extends SplitTargetChanges {
 	}
 
 	@Override
-	public boolean doChanges(SplitRefactoringModel model, RefactoringStatus status, SubProgressMonitor subMonitor) {
+	protected void doUnitChange(SplitUnitModel unitModel, RefactoringStatus status, SubProgressMonitor monitor)
+			throws MalformedTreeException, CoreException, BadLocationException {
 
-		if (!super.doChanges(model, status, subMonitor)) {
-			return false;
-		}
-
-		for (final Map.Entry<ICompilationUnit, SplitUnitModel> entry : model.getUnitModels().entrySet()) {
-			try {
-				final SplitUnitModel unitModel = entry.getValue();
-				moveTypes(unitModel);
-				applyUnitSplit(model, unitModel, status, subMonitor);
-			} catch (Exception exception) {
-				SplitRefactoring.log(exception);
-				return false;
-			}
-		}
-
-		return true;
+		moveTypes(unitModel);
+		applyUnitSplit(unitModel, status, monitor);
 
 	}
 
 	private void moveTypes(final SplitUnitModel unitModel) throws JavaModelException {
+
 		final SplitUnitMoveTypeBuilder builder = new SplitUnitMoveTypeBuilder(unitModel, getTargetSuffix());
 		builder.moveTypes();
+
 	}
 
-	public void applyUnitSplit(final SplitRefactoringModel model, final SplitUnitModel unitModel,
-			final RefactoringStatus status, final IProgressMonitor monitor) throws CoreException,
-			MalformedTreeException, BadLocationException {
+	public void applyUnitSplit(final SplitUnitModel unitModel, final RefactoringStatus status,
+			final IProgressMonitor monitor) throws CoreException, MalformedTreeException, BadLocationException {
+
+		final SplitRefactoringModel model = unitModel.getModel();
 
 		final String typeName = addTargetSuffix(unitModel.getSourceTypeName());
 		final String unitName = typeName + ".java";
