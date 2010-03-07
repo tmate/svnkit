@@ -33,7 +33,6 @@ public class SplitRefactoringModel {
 
 	private IJavaSearchScope projectScope;
 
-	private final SearchEngine searchEngine = new SearchEngine();
 	private final List<Change> changes = new LinkedList<Change>();
 	private final CodeFormatter codeFormatter = ToolFactory.createCodeFormatter(null);
 
@@ -107,10 +106,6 @@ public class SplitRefactoringModel {
 
 	public void setTypesToHide(List<IType> typesToHide) {
 		this.typesToHide = typesToHide;
-	}
-
-	public SearchEngine getSearchEngine() {
-		return searchEngine;
 	}
 
 	public IJavaSearchScope getProjectScope() {
