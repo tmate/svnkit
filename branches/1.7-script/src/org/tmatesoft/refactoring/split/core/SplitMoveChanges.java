@@ -164,7 +164,7 @@ public class SplitMoveChanges extends SplitTargetChanges {
 
 		for (final MethodDeclaration sourceMethodDeclaration : unitModel.getAddMethods().values()) {
 
-			final MethodDeclaration methodCopy = (MethodDeclaration) ASTNode.copySubtree(ast, sourceMethodDeclaration);
+			final MethodDeclaration methodCopy = getMethodCopy(ast, sourceMethodDeclaration);
 
 			if (sourceMethodDeclaration.isConstructor()) {
 				methodCopy.setName(ast.newSimpleName(addTargetSuffix(unitModel.getSourceTypeName())));
@@ -203,6 +203,11 @@ public class SplitMoveChanges extends SplitTargetChanges {
 		formatEdit.apply(document);
 
 		model.getChanges().add(new CreateCompilationUnitChange(unit, document.get(), null));
+	}
+
+	protected MethodDeclaration getMethodCopy(final AST ast, final MethodDeclaration sourceMethodDeclaration) {
+		final MethodDeclaration methodCopy = (MethodDeclaration) ASTNode.copySubtree(ast, sourceMethodDeclaration);
+		return methodCopy;
 	}
 
 }
