@@ -72,7 +72,7 @@ public class SplitMoveChanges extends SplitTargetChanges {
 		}
 	}
 
-	private void buildTargetUnit(final SplitRefactoringModel model, final SplitUnitModel unitModel,
+	protected void buildTargetUnit(final SplitRefactoringModel model, final SplitUnitModel unitModel,
 			final String typeName, final ICompilationUnit unit) throws JavaModelException, BadLocationException {
 
 		final AST ast = AST.newAST(AST.JLS3);
@@ -156,36 +156,11 @@ public class SplitMoveChanges extends SplitTargetChanges {
 		final List bodyDeclarations = type.bodyDeclarations();
 
 		for (final IField sourceField : unitModel.getUsedFields()) {
-			final FieldDeclaration sourceFieldNode = (FieldDeclaration) NodeFinder.perform(unitModel.getSourceAst(),
-					sourceField.getSourceRange());
-			final FieldDeclaration fieldDeclarationCopy = (FieldDeclaration) ASTNode.copySubtree(ast, sourceFieldNode);
-			bodyDeclarations.add(fieldDeclarationCopy);
+			addField(unitModel, ast, bodyDeclarations, sourceField);
 		}
 
 		for (final MethodDeclaration sourceMethodDeclaration : unitModel.getAddMethods().values()) {
-
-			final MethodDeclaration methodCopy = getMethodCopy(ast, sourceMethodDeclaration);
-
-			if (sourceMethodDeclaration.isConstructor()) {
-				methodCopy.setName(ast.newSimpleName(addTargetSuffix(unitModel.getSourceTypeName())));
-			}
-
-			final IMethodBinding sourceMethodBinding = sourceMethodDeclaration.resolveBinding();
-			final String from = sourceMethodBinding.getDeclaringClass().getQualifiedName();
-
-			Javadoc javadoc = methodCopy.getJavadoc();
-			if (javadoc == null) {
-				javadoc = ast.newJavadoc();
-				methodCopy.setJavadoc(javadoc);
-			}
-			final TagElement tag = ast.newTagElement();
-			tag.setTagName("@from ");
-			final TextElement text = ast.newTextElement();
-			text.setText(from);
-			tag.fragments().add(text);
-			javadoc.tags().add(tag);
-
-			bodyDeclarations.add(methodCopy);
+			addMethod(unitModel, ast, bodyDeclarations, sourceMethodDeclaration);
 		}
 
 		for (final IType sourceNestedType : unitModel.getNestedTypes()) {
@@ -203,6 +178,45 @@ public class SplitMoveChanges extends SplitTargetChanges {
 		formatEdit.apply(document);
 
 		model.getChanges().add(new CreateCompilationUnitChange(unit, document.get(), null));
+	}
+
+	protected void addField(final SplitUnitModel unitModel, final AST ast, final List bodyDeclarations,
+			final IField sourceField) throws JavaModelException {
+		final FieldDeclaration sourceFieldNode = (FieldDeclaration) NodeFinder.perform(unitModel.getSourceAst(),
+				sourceField.getSourceRange());
+		final FieldDeclaration fieldDeclarationCopy = getFieldCopy(ast, sourceFieldNode);
+		bodyDeclarations.add(fieldDeclarationCopy);
+	}
+
+	protected FieldDeclaration getFieldCopy(final AST ast, final FieldDeclaration sourceFieldNode) {
+		final FieldDeclaration fieldDeclarationCopy = (FieldDeclaration) ASTNode.copySubtree(ast, sourceFieldNode);
+		return fieldDeclarationCopy;
+	}
+
+	protected void addMethod(final SplitUnitModel unitModel, final AST ast, final List bodyDeclarations,
+			final MethodDeclaration sourceMethodDeclaration) {
+		final MethodDeclaration methodCopy = getMethodCopy(ast, sourceMethodDeclaration);
+
+		if (sourceMethodDeclaration.isConstructor()) {
+			methodCopy.setName(ast.newSimpleName(addTargetSuffix(unitModel.getSourceTypeName())));
+		}
+
+		final IMethodBinding sourceMethodBinding = sourceMethodDeclaration.resolveBinding();
+		final String from = sourceMethodBinding.getDeclaringClass().getQualifiedName();
+
+		Javadoc javadoc = methodCopy.getJavadoc();
+		if (javadoc == null) {
+			javadoc = ast.newJavadoc();
+			methodCopy.setJavadoc(javadoc);
+		}
+		final TagElement tag = ast.newTagElement();
+		tag.setTagName("@from ");
+		final TextElement text = ast.newTextElement();
+		text.setText(from);
+		tag.fragments().add(text);
+		javadoc.tags().add(tag);
+
+		bodyDeclarations.add(methodCopy);
 	}
 
 	protected MethodDeclaration getMethodCopy(final AST ast, final MethodDeclaration sourceMethodDeclaration) {

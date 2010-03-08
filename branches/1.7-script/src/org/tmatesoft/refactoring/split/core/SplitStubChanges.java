@@ -3,23 +3,27 @@ package org.tmatesoft.refactoring.split.core;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.eclipse.jdt.core.dom.PrimitiveType;
-
+import org.eclipse.jdt.core.IField;
+import org.eclipse.jdt.core.JavaModelException;
 import org.eclipse.jdt.core.dom.AST;
 import org.eclipse.jdt.core.dom.Block;
-import org.eclipse.jdt.core.dom.Expression;
 import org.eclipse.jdt.core.dom.MethodDeclaration;
+import org.eclipse.jdt.core.dom.PrimitiveType;
 import org.eclipse.jdt.core.dom.ReturnStatement;
 import org.eclipse.jdt.core.dom.Statement;
 import org.eclipse.jdt.core.dom.SuperConstructorInvocation;
 import org.eclipse.jdt.core.dom.Type;
-import org.eclipse.jdt.core.dom.TypeLiteral;
 import org.eclipse.jdt.core.dom.PrimitiveType.Code;
 
 public class SplitStubChanges extends SplitMoveChanges {
 
 	public SplitStubChanges(String targetPackageName, String targetSuffix) {
 		super(targetPackageName, targetSuffix);
+	}
+
+	@Override
+	protected void addField(SplitUnitModel unitModel, AST ast, List bodyDeclarations, IField sourceField)
+			throws JavaModelException {
 	}
 
 	@Override
