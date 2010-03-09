@@ -140,13 +140,7 @@ public class SplitMoveChanges extends SplitTargetChanges {
 			addMethod(unitModel, ast, bodyDeclarations, sourceMethodDeclaration);
 		}
 
-		for (final IType sourceNestedType : unitModel.getNestedTypes()) {
-			final TypeDeclaration sourceNestedTypeNode = (TypeDeclaration) NodeFinder.perform(unitModel.getSourceAst(),
-					sourceNestedType.getSourceRange());
-			final TypeDeclaration sourceNestedTypeCopy = (TypeDeclaration) ASTNode.copySubtree(ast,
-					sourceNestedTypeNode);
-			bodyDeclarations.add(sourceNestedTypeCopy);
-		}
+		addNestedTypes(unitModel, ast, bodyDeclarations);
 
 		final String source = node.toString();
 		final Document document = new Document(source);
@@ -155,6 +149,22 @@ public class SplitMoveChanges extends SplitTargetChanges {
 		formatEdit.apply(document);
 
 		model.getChanges().add(new CreateCompilationUnitChange(unit, document.get(), null));
+	}
+
+	protected void addNestedTypes(final SplitUnitModel unitModel, final AST ast, final List bodyDeclarations)
+			throws JavaModelException {
+		for (final IType sourceNestedType : unitModel.getNestedTypes()) {
+			addNestedType(unitModel, ast, bodyDeclarations, sourceNestedType);
+		}
+	}
+
+	protected void addNestedType(final SplitUnitModel unitModel, final AST ast, final List bodyDeclarations,
+			final IType sourceNestedType) throws JavaModelException {
+		final TypeDeclaration sourceNestedTypeNode = (TypeDeclaration) NodeFinder.perform(unitModel.getSourceAst(),
+				sourceNestedType.getSourceRange());
+		final TypeDeclaration sourceNestedTypeCopy = (TypeDeclaration) ASTNode.copySubtree(ast,
+				sourceNestedTypeNode);
+		bodyDeclarations.add(sourceNestedTypeCopy);
 	}
 
 	protected void addImports(final SplitUnitModel unitModel, final AST ast, final CompilationUnit node) {

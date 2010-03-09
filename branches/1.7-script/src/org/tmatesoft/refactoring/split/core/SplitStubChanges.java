@@ -3,6 +3,7 @@ package org.tmatesoft.refactoring.split.core;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.eclipse.jdt.core.Flags;
 import org.eclipse.jdt.core.IField;
 import org.eclipse.jdt.core.IPackageFragment;
 import org.eclipse.jdt.core.IPackageFragmentRoot;
@@ -15,6 +16,7 @@ import org.eclipse.jdt.core.dom.Expression;
 import org.eclipse.jdt.core.dom.ImportDeclaration;
 import org.eclipse.jdt.core.dom.MethodDeclaration;
 import org.eclipse.jdt.core.dom.MethodInvocation;
+import org.eclipse.jdt.core.dom.Modifier;
 import org.eclipse.jdt.core.dom.Name;
 import org.eclipse.jdt.core.dom.PrimitiveType;
 import org.eclipse.jdt.core.dom.QualifiedName;
@@ -210,6 +212,22 @@ public class SplitStubChanges extends SplitMoveChanges {
 		importDeclaration.setOnDemand(false);
 		importDeclaration.setName(name);
 		imports.add(importDeclaration);
+	}
+
+	@Override
+	protected void addMethod(SplitUnitModel unitModel, AST ast, List bodyDeclarations,
+			MethodDeclaration sourceMethodDeclaration) {
+		if (Modifier.isPublic(sourceMethodDeclaration.getModifiers()) || sourceMethodDeclaration.isConstructor()) {
+			super.addMethod(unitModel, ast, bodyDeclarations, sourceMethodDeclaration);
+		}
+	}
+
+	@Override
+	protected void addNestedType(SplitUnitModel unitModel, AST ast, List bodyDeclarations, IType sourceNestedType)
+			throws JavaModelException {
+		if (Flags.isPublic(sourceNestedType.getFlags())) {
+			super.addNestedType(unitModel, ast, bodyDeclarations, sourceNestedType);
+		}
 	}
 
 }
