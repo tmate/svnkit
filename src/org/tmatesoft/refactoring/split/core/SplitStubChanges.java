@@ -98,13 +98,14 @@ public class SplitStubChanges extends SplitMoveChanges {
 		boolean found = false;
 		final List<Name> thrownExceptions = methodCopy.thrownExceptions();
 		for (final Name name : thrownExceptions) {
-			if ("org.tmatesoft.svn.core.SVNException".equals(name.getFullyQualifiedName())) {
+			if (name.getFullyQualifiedName().endsWith("SVNException")) {
 				found = true;
 				break;
 			}
 		}
 		if (!found) {
-			thrownExceptions.add(ast.newSimpleName("SVNException"));
+			// thrownExceptions.add(ast.newSimpleName("SVNException"));
+			return;
 		}
 
 		final MethodInvocation invoc1 = ast.newMethodInvocation();
