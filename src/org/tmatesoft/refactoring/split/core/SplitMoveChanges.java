@@ -128,30 +128,7 @@ public class SplitMoveChanges extends SplitTargetChanges {
 			}
 		}
 
-		final List imports = node.imports();
-		final List<IType> usedTypesList = new ArrayList<IType>(unitModel.getUsedTypes());
-		Collections.sort(usedTypesList, new Comparator<IType>() {
-			@Override
-			public int compare(IType t1, IType t2) {
-				final IPackageFragment p1 = t1.getPackageFragment();
-				final IPackageFragment p2 = t2.getPackageFragment();
-				final int p = p1.getElementName().compareTo(p2.getElementName());
-				if (p != 0) {
-					return p;
-				}
-				return t1.getElementName().compareTo(t2.getElementName());
-			}
-		});
-		for (final IType usedType : usedTypesList) {
-			final IPackageFragment usedPackage = usedType.getPackageFragment();
-			if (!"java.lang".equals(usedPackage.getElementName())) {
-				final ImportDeclaration importDeclaration = ast.newImportDeclaration();
-				importDeclaration.setOnDemand(false);
-				importDeclaration.setName(ast.newQualifiedName(ast.newName(usedPackage.getElementName()), ast
-						.newSimpleName(usedType.getElementName())));
-				imports.add(importDeclaration);
-			}
-		}
+		addImports(unitModel, ast, node);
 
 		final List bodyDeclarations = type.bodyDeclarations();
 
@@ -178,6 +155,33 @@ public class SplitMoveChanges extends SplitTargetChanges {
 		formatEdit.apply(document);
 
 		model.getChanges().add(new CreateCompilationUnitChange(unit, document.get(), null));
+	}
+
+	protected void addImports(final SplitUnitModel unitModel, final AST ast, final CompilationUnit node) {
+		final List<ImportDeclaration> imports = node.imports();
+		final List<IType> usedTypesList = new ArrayList<IType>(unitModel.getUsedTypes());
+		Collections.sort(usedTypesList, new Comparator<IType>() {
+			@Override
+			public int compare(IType t1, IType t2) {
+				final IPackageFragment p1 = t1.getPackageFragment();
+				final IPackageFragment p2 = t2.getPackageFragment();
+				final int p = p1.getElementName().compareTo(p2.getElementName());
+				if (p != 0) {
+					return p;
+				}
+				return t1.getElementName().compareTo(t2.getElementName());
+			}
+		});
+		for (final IType usedType : usedTypesList) {
+			final IPackageFragment usedPackage = usedType.getPackageFragment();
+			if (!"java.lang".equals(usedPackage.getElementName())) {
+				final ImportDeclaration importDeclaration = ast.newImportDeclaration();
+				importDeclaration.setOnDemand(false);
+				importDeclaration.setName(ast.newQualifiedName(ast.newName(usedPackage.getElementName()), ast
+						.newSimpleName(usedType.getElementName())));
+				imports.add(importDeclaration);
+			}
+		}
 	}
 
 	protected void addField(final SplitUnitModel unitModel, final AST ast, final List bodyDeclarations,
