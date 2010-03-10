@@ -1,10 +1,11 @@
 package org.tmatesoft.refactoring.split.core;
 
 import org.eclipse.core.runtime.SubProgressMonitor;
+import org.eclipse.jdt.core.JavaModelException;
 import org.eclipse.ltk.core.refactoring.RefactoringStatus;
 
 public interface ISplitChanges {
 
-	boolean doChanges(SplitRefactoringModel model, RefactoringStatus status, SubProgressMonitor subMonitor);
+	boolean doChanges(SplitRefactoringModel model, RefactoringStatus status, SubProgressMonitor subMonitor) throws JavaModelException;
 
 }
