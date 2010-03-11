@@ -17,8 +17,12 @@ import org.eclipse.jdt.core.IType;
 import org.eclipse.jdt.core.JavaModelException;
 import org.eclipse.jdt.core.dom.AST;
 import org.eclipse.jdt.core.dom.ASTNode;
+import org.eclipse.jdt.core.dom.Assignment;
 import org.eclipse.jdt.core.dom.Block;
+import org.eclipse.jdt.core.dom.ClassInstanceCreation;
 import org.eclipse.jdt.core.dom.CompilationUnit;
+import org.eclipse.jdt.core.dom.ConstructorInvocation;
+import org.eclipse.jdt.core.dom.FieldAccess;
 import org.eclipse.jdt.core.dom.FieldDeclaration;
 import org.eclipse.jdt.core.dom.IExtendedModifier;
 import org.eclipse.jdt.core.dom.IMethodBinding;
@@ -30,10 +34,14 @@ import org.eclipse.jdt.core.dom.NodeFinder;
 import org.eclipse.jdt.core.dom.PackageDeclaration;
 import org.eclipse.jdt.core.dom.ReturnStatement;
 import org.eclipse.jdt.core.dom.SingleVariableDeclaration;
+import org.eclipse.jdt.core.dom.Statement;
 import org.eclipse.jdt.core.dom.TagElement;
 import org.eclipse.jdt.core.dom.TextElement;
+import org.eclipse.jdt.core.dom.ThisExpression;
 import org.eclipse.jdt.core.dom.Type;
 import org.eclipse.jdt.core.dom.TypeDeclaration;
+import org.eclipse.jdt.core.dom.VariableDeclarationFragment;
+import org.eclipse.jdt.core.dom.VariableDeclarationStatement;
 import org.eclipse.jdt.core.formatter.CodeFormatter;
 import org.eclipse.jdt.internal.corext.refactoring.changes.CreateCompilationUnitChange;
 import org.eclipse.jdt.internal.corext.refactoring.changes.CreatePackageChange;
@@ -161,15 +169,44 @@ public class SplitMoveChanges extends SplitTargetChanges {
 	}
 
 	private void addDelegateMethod(SplitUnitModel unitModel, AST ast, List bodyDeclarations) {
+
+		final String sourceTypeName = unitModel.getSourceTypeName();
+		final String targetTypeName = addTargetSuffix(sourceTypeName);
+
+		final VariableDeclarationFragment varF = ast.newVariableDeclarationFragment();
+		varF.setName(ast.newSimpleName("dispatcher"));
+		final FieldDeclaration fieldDecl = ast.newFieldDeclaration(varF);
+		fieldDecl.modifiers().add(ast.newModifier(Modifier.ModifierKeyword.PRIVATE_KEYWORD));
+		fieldDecl.setType(ast.newSimpleType(ast.newSimpleName(sourceTypeName)));
+		bodyDeclarations.add(fieldDecl);
+
+		final MethodDeclaration constructorDecl = ast.newMethodDeclaration();
+		bodyDeclarations.add(constructorDecl);
+		constructorDecl.setConstructor(true);
+		constructorDecl.setName(ast.newSimpleName(targetTypeName));
+		constructorDecl.modifiers().add(ast.newModifier(Modifier.ModifierKeyword.PRIVATE_KEYWORD));
+		final SingleVariableDeclaration constructorParam = ast.newSingleVariableDeclaration();
+		constructorParam.setType(ast.newSimpleType(ast.newSimpleName(sourceTypeName)));
+		constructorParam.setName(ast.newSimpleName("dispatcher"));
+		constructorDecl.parameters().add(constructorParam);
+		final Block constructorBody = ast.newBlock();
+		constructorDecl.setBody(constructorBody);
+
+		final Assignment assign = ast.newAssignment();
+		constructorBody.statements().add(ast.newExpressionStatement(assign));
+		final FieldAccess fieldAccess = ast.newFieldAccess();
+		fieldAccess.setExpression(ast.newThisExpression());
+		fieldAccess.setName(ast.newSimpleName("dispatcher"));
+		assign.setLeftHandSide(fieldAccess);
+		assign.setRightHandSide(ast.newName("dispatcher"));
+
 		final MethodDeclaration methodDecl = ast.newMethodDeclaration();
 		bodyDeclarations.add(methodDecl);
 		final List<IExtendedModifier> modifiers = methodDecl.modifiers();
 		modifiers.add(ast.newModifier(Modifier.ModifierKeyword.PUBLIC_KEYWORD));
 		modifiers.add(ast.newModifier(Modifier.ModifierKeyword.STATIC_KEYWORD));
 
-		final String sourceTypeName = unitModel.getSourceTypeName();
-
-		methodDecl.setReturnType2(ast.newSimpleType(ast.newSimpleName(addTargetSuffix(sourceTypeName))));
+		methodDecl.setReturnType2(ast.newSimpleType(ast.newSimpleName(targetTypeName)));
 
 		methodDecl.setName(ast.newSimpleName("delegate"));
 		final SingleVariableDeclaration param = ast.newSingleVariableDeclaration();
@@ -180,10 +217,23 @@ public class SplitMoveChanges extends SplitTargetChanges {
 		final Block body = ast.newBlock();
 		methodDecl.setBody(body);
 
+		final List<Statement> bodyStatements = body.statements();
+
+		final VariableDeclarationFragment varDeclF = ast.newVariableDeclarationFragment();
+		final VariableDeclarationStatement varDecl = ast.newVariableDeclarationStatement(varDeclF);
+		varDecl.setType(ast.newSimpleType(ast.newSimpleName(targetTypeName)));
+		varDeclF.setName(ast.newSimpleName("delegate"));
+
+		final ClassInstanceCreation instanceCreate = ast.newClassInstanceCreation();
+		instanceCreate.setType(ast.newSimpleType(ast.newSimpleName(targetTypeName)));
+		instanceCreate.arguments().add(ast.newName("dispatcher"));
+
+		varDeclF.setInitializer(instanceCreate);
+		bodyStatements.add(varDecl);
+
 		final ReturnStatement returnStatement = ast.newReturnStatement();
-		body.statements().add(returnStatement);
-		// TODO
-		returnStatement.setExpression(ast.newNullLiteral());
+		bodyStatements.add(returnStatement);
+		returnStatement.setExpression(ast.newSimpleName("delegate"));
 
 	}
 
