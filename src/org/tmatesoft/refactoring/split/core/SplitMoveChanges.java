@@ -9,6 +9,7 @@ import java.util.Map;
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.core.runtime.SubProgressMonitor;
+import org.eclipse.jdt.core.Flags;
 import org.eclipse.jdt.core.ICompilationUnit;
 import org.eclipse.jdt.core.IField;
 import org.eclipse.jdt.core.IPackageFragment;
@@ -16,8 +17,10 @@ import org.eclipse.jdt.core.IType;
 import org.eclipse.jdt.core.JavaModelException;
 import org.eclipse.jdt.core.dom.AST;
 import org.eclipse.jdt.core.dom.ASTNode;
+import org.eclipse.jdt.core.dom.Block;
 import org.eclipse.jdt.core.dom.CompilationUnit;
 import org.eclipse.jdt.core.dom.FieldDeclaration;
+import org.eclipse.jdt.core.dom.IExtendedModifier;
 import org.eclipse.jdt.core.dom.IMethodBinding;
 import org.eclipse.jdt.core.dom.ImportDeclaration;
 import org.eclipse.jdt.core.dom.Javadoc;
@@ -25,6 +28,8 @@ import org.eclipse.jdt.core.dom.MethodDeclaration;
 import org.eclipse.jdt.core.dom.Modifier;
 import org.eclipse.jdt.core.dom.NodeFinder;
 import org.eclipse.jdt.core.dom.PackageDeclaration;
+import org.eclipse.jdt.core.dom.ReturnStatement;
+import org.eclipse.jdt.core.dom.SingleVariableDeclaration;
 import org.eclipse.jdt.core.dom.TagElement;
 import org.eclipse.jdt.core.dom.TextElement;
 import org.eclipse.jdt.core.dom.Type;
@@ -136,6 +141,10 @@ public class SplitMoveChanges extends SplitTargetChanges {
 			addField(unitModel, ast, bodyDeclarations, sourceField);
 		}
 
+		if (!unitModel.isSourceInterface()) {
+			addDelegateMethod(unitModel, ast, bodyDeclarations);
+		}
+
 		for (final MethodDeclaration sourceMethodDeclaration : unitModel.getAddMethods().values()) {
 			addMethod(unitModel, ast, bodyDeclarations, sourceMethodDeclaration);
 		}
@@ -151,6 +160,33 @@ public class SplitMoveChanges extends SplitTargetChanges {
 		model.getChanges().add(new CreateCompilationUnitChange(unit, document.get(), null));
 	}
 
+	private void addDelegateMethod(SplitUnitModel unitModel, AST ast, List bodyDeclarations) {
+		final MethodDeclaration methodDecl = ast.newMethodDeclaration();
+		bodyDeclarations.add(methodDecl);
+		final List<IExtendedModifier> modifiers = methodDecl.modifiers();
+		modifiers.add(ast.newModifier(Modifier.ModifierKeyword.PUBLIC_KEYWORD));
+		modifiers.add(ast.newModifier(Modifier.ModifierKeyword.STATIC_KEYWORD));
+
+		final String sourceTypeName = unitModel.getSourceTypeName();
+
+		methodDecl.setReturnType2(ast.newSimpleType(ast.newSimpleName(addTargetSuffix(sourceTypeName))));
+
+		methodDecl.setName(ast.newSimpleName("delegate"));
+		final SingleVariableDeclaration param = ast.newSingleVariableDeclaration();
+		param.setType(ast.newSimpleType(ast.newSimpleName(sourceTypeName)));
+		param.setName(ast.newSimpleName("dispatcher"));
+		methodDecl.parameters().add(param);
+
+		final Block body = ast.newBlock();
+		methodDecl.setBody(body);
+
+		final ReturnStatement returnStatement = ast.newReturnStatement();
+		body.statements().add(returnStatement);
+		// TODO
+		returnStatement.setExpression(ast.newNullLiteral());
+
+	}
+
 	protected void addNestedTypes(final SplitUnitModel unitModel, final AST ast, final List bodyDeclarations)
 			throws JavaModelException {
 		for (final IType sourceNestedType : unitModel.getNestedTypes()) {
@@ -162,14 +198,14 @@ public class SplitMoveChanges extends SplitTargetChanges {
 			final IType sourceNestedType) throws JavaModelException {
 		final TypeDeclaration sourceNestedTypeNode = (TypeDeclaration) NodeFinder.perform(unitModel.getSourceAst(),
 				sourceNestedType.getSourceRange());
-		final TypeDeclaration sourceNestedTypeCopy = (TypeDeclaration) ASTNode.copySubtree(ast,
-				sourceNestedTypeNode);
+		final TypeDeclaration sourceNestedTypeCopy = (TypeDeclaration) ASTNode.copySubtree(ast, sourceNestedTypeNode);
 		bodyDeclarations.add(sourceNestedTypeCopy);
 	}
 
 	protected void addImports(final SplitUnitModel unitModel, final AST ast, final CompilationUnit node) {
 		final List<ImportDeclaration> imports = node.imports();
 		final List<IType> usedTypesList = new ArrayList<IType>(unitModel.getUsedTypes());
+		usedTypesList.add(unitModel.getSourceType());
 		Collections.sort(usedTypesList, new Comparator<IType>() {
 			@Override
 			public int compare(IType t1, IType t2) {
