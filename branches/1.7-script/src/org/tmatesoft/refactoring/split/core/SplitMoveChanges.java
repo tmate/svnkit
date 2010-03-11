@@ -35,6 +35,7 @@ import org.eclipse.jdt.core.dom.PackageDeclaration;
 import org.eclipse.jdt.core.dom.ReturnStatement;
 import org.eclipse.jdt.core.dom.SingleVariableDeclaration;
 import org.eclipse.jdt.core.dom.Statement;
+import org.eclipse.jdt.core.dom.SuperConstructorInvocation;
 import org.eclipse.jdt.core.dom.TagElement;
 import org.eclipse.jdt.core.dom.TextElement;
 import org.eclipse.jdt.core.dom.ThisExpression;
@@ -184,13 +185,24 @@ public class SplitMoveChanges extends SplitTargetChanges {
 		bodyDeclarations.add(constructorDecl);
 		constructorDecl.setConstructor(true);
 		constructorDecl.setName(ast.newSimpleName(targetTypeName));
-		constructorDecl.modifiers().add(ast.newModifier(Modifier.ModifierKeyword.PRIVATE_KEYWORD));
+		constructorDecl.modifiers().add(ast.newModifier(Modifier.ModifierKeyword.PROTECTED_KEYWORD));
 		final SingleVariableDeclaration constructorParam = ast.newSingleVariableDeclaration();
 		constructorParam.setType(ast.newSimpleType(ast.newSimpleName(sourceTypeName)));
 		constructorParam.setName(ast.newSimpleName("dispatcher"));
 		constructorDecl.parameters().add(constructorParam);
 		final Block constructorBody = ast.newBlock();
 		constructorDecl.setBody(constructorBody);
+
+		final TypeMetadata superMeta = unitModel.getSourceSuperClassMetadata();
+		if (superMeta != null) {
+			final ICompilationUnit superUnit = superMeta.getUnit();
+			final SplitRefactoringModel model = unitModel.getModel();
+			if (model.getUnitModels().containsKey(superUnit)) {
+				final SuperConstructorInvocation superInvoke = ast.newSuperConstructorInvocation();
+				superInvoke.arguments().add(ast.newName("dispatcher"));
+				constructorBody.statements().add(superInvoke);
+			}
+		}
 
 		final Assignment assign = ast.newAssignment();
 		constructorBody.statements().add(ast.newExpressionStatement(assign));
