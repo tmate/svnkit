@@ -52,8 +52,9 @@ public class SplitRefactoring extends Refactoring {
 
 	private List<ISplitChanges> splitChanges = new ArrayList<ISplitChanges>(Arrays.asList(new ISplitChanges[] {
 			new SplitMoveChanges("org.tmatesoft.svn.core.internal.wc.v16", "16"),
-			new SplitStubChanges("org.tmatesoft.svn.core.internal.wc.v17", "17"), 
-			new SplitDelegateChanges() }));
+			new SplitStubChanges("org.tmatesoft.svn.core.internal.wc.v17", "17"),
+			new SplitDelegateChanges("org.tmatesoft.svn.core.internal.wc.v17", "17",
+					"org.tmatesoft.svn.core.internal.wc.v16", "16") }));
 
 	@Override
 	public String getName() {
