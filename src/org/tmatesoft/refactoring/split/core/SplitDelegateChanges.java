@@ -101,18 +101,16 @@ public class SplitDelegateChanges implements ISplitChanges {
 				importsRewrite.insertLast(imp, null);
 			}
 
-			{
-
-			}
-
 			final Map<IMethod, MethodDeclaration> methods = unitModel.getAddMethods();
 			for (final Entry<IMethod, MethodDeclaration> methodsEntry : methods.entrySet()) {
 				final IMethod method = methodsEntry.getKey();
 				final MethodDeclaration methodDeclaration = methodsEntry.getValue();
-				if (Flags.isPublic(method.getFlags())) {
-					doDelegation(unitModel, rewrite, methodDeclaration, status, subMonitor);
-				} else {
-					rewrite.remove(methodDeclaration, null);
+				if (!method.isConstructor()) {
+					if (Flags.isPublic(method.getFlags())) {
+						doDelegation(unitModel, rewrite, methodDeclaration, status, subMonitor);
+					} else {
+						rewrite.remove(methodDeclaration, null);
+					}
 				}
 			}
 
