@@ -20,9 +20,13 @@ import org.eclipse.jdt.core.dom.ImportDeclaration;
 import org.eclipse.jdt.core.dom.MethodDeclaration;
 import org.eclipse.jdt.core.dom.MethodInvocation;
 import org.eclipse.jdt.core.dom.Modifier;
+import org.eclipse.jdt.core.dom.PrimitiveType;
+import org.eclipse.jdt.core.dom.ReturnStatement;
 import org.eclipse.jdt.core.dom.SingleVariableDeclaration;
 import org.eclipse.jdt.core.dom.Statement;
 import org.eclipse.jdt.core.dom.TryStatement;
+import org.eclipse.jdt.core.dom.Type;
+import org.eclipse.jdt.core.dom.PrimitiveType.Code;
 import org.eclipse.jdt.core.dom.rewrite.ASTRewrite;
 import org.eclipse.jdt.core.dom.rewrite.ListRewrite;
 import org.eclipse.jface.text.Document;
@@ -131,6 +135,16 @@ public class SplitDelegateChanges implements ISplitChanges {
 			return;
 		}
 
+		boolean isReturn = true;
+		final Type returnType = methodDeclaration.getReturnType2();
+		if (returnType.isPrimitiveType()) {
+			final PrimitiveType primitiveType = (PrimitiveType) returnType;
+			final Code code = primitiveType.getPrimitiveTypeCode();
+			if (PrimitiveType.VOID.equals(code)) {
+				isReturn = false;
+			}
+		}
+
 		final AST ast = methodDeclaration.getAST();
 
 		final Block block = ast.newBlock();
@@ -168,7 +182,13 @@ public class SplitDelegateChanges implements ISplitChanges {
 				arguments.add(ast.newSimpleName(parameter.getName().getIdentifier()));
 			}
 
-			tryStatements.add(ast.newExpressionStatement(invoc1));
+			if (isReturn) {
+				final ReturnStatement returnStatement = ast.newReturnStatement();
+				returnStatement.setExpression(invoc1);
+				tryStatements.add(returnStatement);
+			} else {
+				tryStatements.add(ast.newExpressionStatement(invoc1));
+			}
 		}
 
 		{
@@ -194,7 +214,13 @@ public class SplitDelegateChanges implements ISplitChanges {
 				arguments.add(ast.newSimpleName(parameter.getName().getIdentifier()));
 			}
 
-			catchStatements.add(ast.newExpressionStatement(invoc1));
+			if (isReturn) {
+				final ReturnStatement returnStatement = ast.newReturnStatement();
+				returnStatement.setExpression(invoc1);
+				catchStatements.add(returnStatement);
+			} else {
+				catchStatements.add(ast.newExpressionStatement(invoc1));
+			}
 		}
 
 		rewrite.replace(methodDeclaration.getBody(), block, null);
