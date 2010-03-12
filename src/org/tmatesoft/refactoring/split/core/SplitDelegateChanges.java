@@ -20,6 +20,7 @@ import org.eclipse.jdt.core.dom.ImportDeclaration;
 import org.eclipse.jdt.core.dom.MethodDeclaration;
 import org.eclipse.jdt.core.dom.MethodInvocation;
 import org.eclipse.jdt.core.dom.Modifier;
+import org.eclipse.jdt.core.dom.Name;
 import org.eclipse.jdt.core.dom.PrimitiveType;
 import org.eclipse.jdt.core.dom.ReturnStatement;
 import org.eclipse.jdt.core.dom.SingleVariableDeclaration;
@@ -132,6 +133,21 @@ public class SplitDelegateChanges implements ISplitChanges {
 			RefactoringStatus status, SubProgressMonitor subMonitor) {
 
 		if (methodDeclaration.getBody() == null) {
+			return;
+		}
+
+		final List<Name> thrownExceptions = methodDeclaration.thrownExceptions();
+		if (thrownExceptions == null || thrownExceptions.isEmpty()) {
+			return;
+		}
+		boolean foundSVNException = false;
+		for (final Name name : thrownExceptions) {
+			if ("SVNException".equals(name.getFullyQualifiedName())) {
+				foundSVNException = true;
+				break;
+			}
+		}
+		if (!foundSVNException) {
 			return;
 		}
 
