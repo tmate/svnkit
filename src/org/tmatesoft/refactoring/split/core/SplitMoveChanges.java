@@ -328,6 +328,28 @@ public class SplitMoveChanges extends SplitTargetChanges {
 		tag.fragments().add(text);
 		javadoc.tags().add(tag);
 
+		boolean foundPublic = false;
+		final List<IExtendedModifier> modifiers = methodCopy.modifiers();
+		final List<IExtendedModifier> newModifiers = new ArrayList<IExtendedModifier>();
+		for (final IExtendedModifier extmodifier : modifiers) {
+			if (extmodifier.isModifier()) {
+				final Modifier modifier = (Modifier) extmodifier;
+				if (modifier.isPublic()) {
+					foundPublic = true;
+					break;
+				} else if (!modifier.isPrivate() && !modifier.isProtected()) {
+					newModifiers.add(extmodifier);
+				}
+			} else {
+				newModifiers.add(extmodifier);
+			}
+		}
+		if (!foundPublic) {
+			newModifiers.add(ast.newModifier(Modifier.ModifierKeyword.PUBLIC_KEYWORD));
+			modifiers.clear();
+			modifiers.addAll(newModifiers);
+		}
+
 		bodyDeclarations.add(methodCopy);
 	}
 

@@ -36,11 +36,6 @@ public class SplitStubChanges extends SplitMoveChanges {
 	}
 
 	@Override
-	protected void addField(SplitUnitModel unitModel, AST ast, List bodyDeclarations, IField sourceField)
-			throws JavaModelException {
-	}
-
-	@Override
 	protected MethodDeclaration getMethodCopy(final AST ast, final MethodDeclaration sourceMethodDeclaration) {
 		final MethodDeclaration methodCopy = super.getMethodCopy(ast, sourceMethodDeclaration);
 		final Block methodBody = methodCopy.getBody();
@@ -106,7 +101,6 @@ public class SplitStubChanges extends SplitMoveChanges {
 			}
 		}
 		if (!found) {
-			// thrownExceptions.add(ast.newSimpleName("SVNException"));
 			return;
 		}
 
@@ -212,22 +206,6 @@ public class SplitStubChanges extends SplitMoveChanges {
 		importDeclaration.setOnDemand(false);
 		importDeclaration.setName(name);
 		imports.add(importDeclaration);
-	}
-
-	@Override
-	protected void addMethod(SplitUnitModel unitModel, AST ast, List bodyDeclarations,
-			MethodDeclaration sourceMethodDeclaration) {
-		if (Modifier.isPublic(sourceMethodDeclaration.getModifiers()) || sourceMethodDeclaration.isConstructor()) {
-			super.addMethod(unitModel, ast, bodyDeclarations, sourceMethodDeclaration);
-		}
-	}
-
-	@Override
-	protected void addNestedType(SplitUnitModel unitModel, AST ast, List bodyDeclarations, IType sourceNestedType)
-			throws JavaModelException {
-		if (Flags.isPublic(sourceNestedType.getFlags())) {
-			super.addNestedType(unitModel, ast, bodyDeclarations, sourceNestedType);
-		}
 	}
 
 }
