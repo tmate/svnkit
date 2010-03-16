@@ -15,6 +15,7 @@ import org.eclipse.jdt.core.IMethod;
 import org.eclipse.jdt.core.IType;
 import org.eclipse.jdt.core.JavaModelException;
 import org.eclipse.jdt.core.dom.AST;
+import org.eclipse.jdt.core.dom.ASTNode;
 import org.eclipse.jdt.core.dom.Block;
 import org.eclipse.jdt.core.dom.CatchClause;
 import org.eclipse.jdt.core.dom.CompilationUnit;
@@ -24,6 +25,7 @@ import org.eclipse.jdt.core.dom.MethodDeclaration;
 import org.eclipse.jdt.core.dom.MethodInvocation;
 import org.eclipse.jdt.core.dom.Modifier;
 import org.eclipse.jdt.core.dom.Name;
+import org.eclipse.jdt.core.dom.NodeFinder;
 import org.eclipse.jdt.core.dom.PrimitiveType;
 import org.eclipse.jdt.core.dom.ReturnStatement;
 import org.eclipse.jdt.core.dom.SingleVariableDeclaration;
@@ -37,6 +39,7 @@ import org.eclipse.jdt.core.search.IJavaSearchConstants;
 import org.eclipse.jdt.core.search.IJavaSearchScope;
 import org.eclipse.jdt.core.search.SearchEngine;
 import org.eclipse.jdt.core.search.SearchPattern;
+import org.eclipse.jdt.internal.core.util.ASTNodeFinder;
 import org.eclipse.jface.text.Document;
 import org.eclipse.ltk.core.refactoring.Change;
 import org.eclipse.ltk.core.refactoring.RefactoringStatus;
@@ -113,6 +116,9 @@ public class SplitDelegateChanges implements ISplitChanges {
 				importsRewrite.insertLast(imp, null);
 			}
 
+			final IJavaSearchScope unitScope = SearchEngine.createJavaSearchScope(new IJavaElement[] { unitModel
+					.getSourceUnit() }, IJavaSearchScope.SOURCES);
+
 			final Map<IMethod, MethodDeclaration> methods = unitModel.getAddMethods();
 			for (final Entry<IMethod, MethodDeclaration> methodsEntry : methods.entrySet()) {
 				final IMethod method = methodsEntry.getKey();
@@ -121,8 +127,6 @@ public class SplitDelegateChanges implements ISplitChanges {
 					if (!Flags.isPrivate(method.getFlags())) {
 						doDelegation(unitModel, rewrite, methodDeclaration, status, subMonitor);
 					} else {
-						final IJavaSearchScope unitScope = SearchEngine.createJavaSearchScope(
-								new IJavaElement[] { unitModel.getSourceUnit() }, IJavaSearchScope.SOURCES);
 						final SearchPattern methodPattern = SearchPattern.createPattern(method,
 								IJavaSearchConstants.REFERENCES);
 						final List<IMethod> references = SplitUtils.searchManyElements(IMethod.class, methodPattern,
@@ -139,6 +143,30 @@ public class SplitDelegateChanges implements ISplitChanges {
 							doDelegation(unitModel, rewrite, methodDeclaration, status, subMonitor);
 						} else {
 							rewrite.remove(methodDeclaration, null);
+						}
+					}
+				}
+			}
+
+			final Set<IType> nestedTypes = unitModel.getNestedTypes();
+			for (final IType nestedType : nestedTypes) {
+				if (Flags.isPrivate(nestedType.getFlags())) {
+					final SearchPattern typePattern = SearchPattern.createPattern(nestedType,
+							IJavaSearchConstants.REFERENCES);
+					final List<IMethod> references = SplitUtils.searchManyElements(IMethod.class, typePattern,
+							unitScope, subMonitor);
+					boolean delegate = false;
+					for (final IMethod reference : references) {
+						final MethodDeclaration referenceDecl = methods.get(reference);
+						if (referenceDecl == null || !isShouldDelegate(referenceDecl)) {
+							delegate = true;
+							break;
+						}
+					}
+					if (!delegate) {
+						final ASTNode node = NodeFinder.perform(sourceAst, nestedType.getSourceRange());
+						if (node != null) {
+							rewrite.remove(node, null);
 						}
 					}
 				}
