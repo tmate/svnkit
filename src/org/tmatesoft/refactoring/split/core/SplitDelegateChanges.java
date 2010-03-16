@@ -2,12 +2,15 @@ package org.tmatesoft.refactoring.split.core;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.Map.Entry;
 
 import org.eclipse.core.resources.IFile;
+import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.SubProgressMonitor;
 import org.eclipse.jdt.core.Flags;
 import org.eclipse.jdt.core.ICompilationUnit;
+import org.eclipse.jdt.core.IJavaElement;
 import org.eclipse.jdt.core.IMethod;
 import org.eclipse.jdt.core.IType;
 import org.eclipse.jdt.core.JavaModelException;
@@ -30,6 +33,10 @@ import org.eclipse.jdt.core.dom.Type;
 import org.eclipse.jdt.core.dom.PrimitiveType.Code;
 import org.eclipse.jdt.core.dom.rewrite.ASTRewrite;
 import org.eclipse.jdt.core.dom.rewrite.ListRewrite;
+import org.eclipse.jdt.core.search.IJavaSearchConstants;
+import org.eclipse.jdt.core.search.IJavaSearchScope;
+import org.eclipse.jdt.core.search.SearchEngine;
+import org.eclipse.jdt.core.search.SearchPattern;
 import org.eclipse.jface.text.Document;
 import org.eclipse.ltk.core.refactoring.Change;
 import org.eclipse.ltk.core.refactoring.RefactoringStatus;
@@ -53,7 +60,7 @@ public class SplitDelegateChanges implements ISplitChanges {
 
 	@Override
 	public boolean doChanges(final SplitRefactoringModel model, final RefactoringStatus status,
-			final SubProgressMonitor subMonitor) throws JavaModelException {
+			final SubProgressMonitor subMonitor) throws CoreException {
 
 		final List<Change> changes = model.getChanges();
 
@@ -111,11 +118,29 @@ public class SplitDelegateChanges implements ISplitChanges {
 				final IMethod method = methodsEntry.getKey();
 				final MethodDeclaration methodDeclaration = methodsEntry.getValue();
 				if (!method.isConstructor()) {
-					//if (!Flags.isPrivate(method.getFlags())) {
+					if (!Flags.isPrivate(method.getFlags())) {
 						doDelegation(unitModel, rewrite, methodDeclaration, status, subMonitor);
-					//} else {
-					//	rewrite.remove(methodDeclaration, null);
-					//}
+					} else {
+						final IJavaSearchScope unitScope = SearchEngine.createJavaSearchScope(
+								new IJavaElement[] { unitModel.getSourceUnit() }, IJavaSearchScope.SOURCES);
+						final SearchPattern methodPattern = SearchPattern.createPattern(method,
+								IJavaSearchConstants.REFERENCES);
+						final List<IMethod> references = SplitUtils.searchManyElements(IMethod.class, methodPattern,
+								unitScope, subMonitor);
+						boolean delegate = false;
+						for (final IMethod reference : references) {
+							final MethodDeclaration referenceDecl = methods.get(reference);
+							if (referenceDecl == null || !isShouldDelegate(referenceDecl)) {
+								delegate = true;
+								break;
+							}
+						}
+						if (delegate) {
+							doDelegation(unitModel, rewrite, methodDeclaration, status, subMonitor);
+						} else {
+							rewrite.remove(methodDeclaration, null);
+						}
+					}
 				}
 			}
 
@@ -129,16 +154,15 @@ public class SplitDelegateChanges implements ISplitChanges {
 		return true;
 	}
 
-	private void doDelegation(SplitUnitModel unitModel, ASTRewrite rewrite, MethodDeclaration methodDeclaration,
-			RefactoringStatus status, SubProgressMonitor subMonitor) {
+	private boolean isShouldDelegate(MethodDeclaration methodDeclaration) {
 
 		if (methodDeclaration.getBody() == null) {
-			return;
+			return false;
 		}
 
 		final List<Name> thrownExceptions = methodDeclaration.thrownExceptions();
 		if (thrownExceptions == null || thrownExceptions.isEmpty()) {
-			return;
+			return false;
 		}
 		boolean foundSVNException = false;
 		for (final Name name : thrownExceptions) {
@@ -148,6 +172,17 @@ public class SplitDelegateChanges implements ISplitChanges {
 			}
 		}
 		if (!foundSVNException) {
+			return false;
+		}
+
+		return true;
+
+	}
+
+	private void doDelegation(SplitUnitModel unitModel, ASTRewrite rewrite, MethodDeclaration methodDeclaration,
+			RefactoringStatus status, SubProgressMonitor subMonitor) {
+
+		if (!isShouldDelegate(methodDeclaration)) {
 			return;
 		}
 
