@@ -122,6 +122,7 @@ public class SplitMoveChanges extends SplitTargetChanges {
 				}
 			}
 		} else {
+			unitModel.getUsedTypes().add(unitModel.getSourceType());
 			type.setSuperclassType(ast.newSimpleType(ast.newName(unitModel.getSourceTypeName())));
 		}
 
@@ -144,8 +145,6 @@ public class SplitMoveChanges extends SplitTargetChanges {
 			}
 		}
 
-		addImports(unitModel, ast, node);
-
 		final List bodyDeclarations = type.bodyDeclarations();
 
 		for (final IField sourceField : unitModel.getUsedFields()) {
@@ -161,6 +160,8 @@ public class SplitMoveChanges extends SplitTargetChanges {
 		}
 
 		addNestedTypes(unitModel, ast, bodyDeclarations);
+
+		addImports(unitModel, ast, node);
 
 		final String source = node.toString();
 		final Document document = new Document(source);
@@ -263,6 +264,10 @@ public class SplitMoveChanges extends SplitTargetChanges {
 		final TypeDeclaration sourceNestedTypeNode = (TypeDeclaration) NodeFinder.perform(unitModel.getSourceAst(),
 				sourceNestedType.getSourceRange());
 		final TypeDeclaration sourceNestedTypeCopy = (TypeDeclaration) ASTNode.copySubtree(ast, sourceNestedTypeNode);
+		if (!Flags.isPrivate(sourceNestedType.getFlags()) && null == sourceNestedTypeNode.getSuperclassType()) {
+			sourceNestedTypeCopy.setSuperclassType(ast.newSimpleType(ast.newName(sourceNestedType
+					.getTypeQualifiedName('.'))));
+		}
 		bodyDeclarations.add(sourceNestedTypeCopy);
 	}
 
