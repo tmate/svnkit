@@ -121,6 +121,8 @@ public class SplitMoveChanges extends SplitTargetChanges {
 					type.setSuperclassType((Type) ASTNode.copySubtree(ast, sourceSuperClassNode));
 				}
 			}
+		} else {
+			type.setSuperclassType(ast.newSimpleType(ast.newName(unitModel.getSourceTypeName())));
 		}
 
 		final List<Type> superInterfaceTypes = type.superInterfaceTypes();
