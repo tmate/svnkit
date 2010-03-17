@@ -1,5 +1,6 @@
 package org.tmatesoft.refactoring.split.core;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -116,37 +117,12 @@ public class SplitDelegateChanges implements ISplitChanges {
 				importsRewrite.insertLast(imp, null);
 			}
 
-			final IJavaSearchScope unitScope = SearchEngine.createJavaSearchScope(new IJavaElement[] { unitModel
-					.getSourceUnit() }, IJavaSearchScope.SOURCES);
+			final Set<IType> removeNestedTypes = new HashSet<IType>();
 
 			final Map<IMethod, MethodDeclaration> methods = unitModel.getAddMethods();
-			for (final Entry<IMethod, MethodDeclaration> methodsEntry : methods.entrySet()) {
-				final IMethod method = methodsEntry.getKey();
-				final MethodDeclaration methodDeclaration = methodsEntry.getValue();
-				if (!method.isConstructor()) {
-					if (!Flags.isPrivate(method.getFlags())) {
-						doDelegation(unitModel, rewrite, methodDeclaration, status, subMonitor);
-					} else {
-						final SearchPattern methodPattern = SearchPattern.createPattern(method,
-								IJavaSearchConstants.REFERENCES);
-						final List<IMethod> references = SplitUtils.searchManyElements(IMethod.class, methodPattern,
-								unitScope, subMonitor);
-						boolean delegate = false;
-						for (final IMethod reference : references) {
-							final MethodDeclaration referenceDecl = methods.get(reference);
-							if (referenceDecl == null || !isShouldDelegate(referenceDecl)) {
-								delegate = true;
-								break;
-							}
-						}
-						if (delegate) {
-							doDelegation(unitModel, rewrite, methodDeclaration, status, subMonitor);
-						} else {
-							rewrite.remove(methodDeclaration, null);
-						}
-					}
-				}
-			}
+
+			final IJavaSearchScope unitScope = SearchEngine.createJavaSearchScope(new IJavaElement[] { unitModel
+					.getSourceUnit() }, IJavaSearchScope.SOURCES);
 
 			final Set<IType> nestedTypes = unitModel.getNestedTypes();
 			for (final IType nestedType : nestedTypes) {
@@ -164,11 +140,50 @@ public class SplitDelegateChanges implements ISplitChanges {
 						}
 					}
 					if (!delegate) {
+						removeNestedTypes.add(nestedType);
 						final ASTNode node = NodeFinder.perform(sourceAst, nestedType.getSourceRange());
 						if (node != null) {
 							rewrite.remove(node, null);
 						}
 					}
+				}
+			}
+
+			for (final Entry<IMethod, MethodDeclaration> methodsEntry : methods.entrySet()) {
+				final IMethod method = methodsEntry.getKey();
+				final MethodDeclaration methodDeclaration = methodsEntry.getValue();
+				if (!method.isConstructor()) {
+					if (!Flags.isPrivate(method.getFlags())) {
+						doDelegation(unitModel, rewrite, methodDeclaration, status, subMonitor);
+					} else {
+						final SearchPattern methodPattern = SearchPattern.createPattern(method,
+								IJavaSearchConstants.REFERENCES);
+						final List<IMethod> references = SplitUtils.searchManyElements(IMethod.class, methodPattern,
+								unitScope, subMonitor);
+						boolean delegate = false;
+						for (final IMethod reference : references) {
+							final MethodDeclaration referenceDecl = methods.get(reference);
+							if (referenceDecl == null || !isShouldDelegate(referenceDecl)) {
+								final IType declaringType = reference.getDeclaringType();
+								if (declaringType == null || !removeNestedTypes.contains(declaringType)) {
+									delegate = true;
+									break;
+								}
+							}
+						}
+						if (delegate) {
+							doDelegation(unitModel, rewrite, methodDeclaration, status, subMonitor);
+						} else {
+							rewrite.remove(methodDeclaration, null);
+						}
+					}
+				}
+			}
+
+			for (final IType nestedType : removeNestedTypes) {
+				final ASTNode node = NodeFinder.perform(sourceAst, nestedType.getSourceRange());
+				if (node != null) {
+					rewrite.remove(node, null);
 				}
 			}
 
