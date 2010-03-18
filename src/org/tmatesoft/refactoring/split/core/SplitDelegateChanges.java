@@ -1,5 +1,6 @@
 package org.tmatesoft.refactoring.split.core;
 
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -17,10 +18,16 @@ import org.eclipse.jdt.core.IType;
 import org.eclipse.jdt.core.JavaModelException;
 import org.eclipse.jdt.core.dom.AST;
 import org.eclipse.jdt.core.dom.ASTNode;
+import org.eclipse.jdt.core.dom.Assignment;
 import org.eclipse.jdt.core.dom.Block;
 import org.eclipse.jdt.core.dom.CatchClause;
 import org.eclipse.jdt.core.dom.CompilationUnit;
 import org.eclipse.jdt.core.dom.Expression;
+import org.eclipse.jdt.core.dom.FieldAccess;
+import org.eclipse.jdt.core.dom.FieldDeclaration;
+import org.eclipse.jdt.core.dom.IExtendedModifier;
+import org.eclipse.jdt.core.dom.ITypeBinding;
+import org.eclipse.jdt.core.dom.IVariableBinding;
 import org.eclipse.jdt.core.dom.ImportDeclaration;
 import org.eclipse.jdt.core.dom.MethodDeclaration;
 import org.eclipse.jdt.core.dom.MethodInvocation;
@@ -31,8 +38,12 @@ import org.eclipse.jdt.core.dom.PrimitiveType;
 import org.eclipse.jdt.core.dom.ReturnStatement;
 import org.eclipse.jdt.core.dom.SingleVariableDeclaration;
 import org.eclipse.jdt.core.dom.Statement;
+import org.eclipse.jdt.core.dom.SuperConstructorInvocation;
 import org.eclipse.jdt.core.dom.TryStatement;
 import org.eclipse.jdt.core.dom.Type;
+import org.eclipse.jdt.core.dom.TypeDeclaration;
+import org.eclipse.jdt.core.dom.VariableDeclarationFragment;
+import org.eclipse.jdt.core.dom.Modifier.ModifierKeyword;
 import org.eclipse.jdt.core.dom.PrimitiveType.Code;
 import org.eclipse.jdt.core.dom.rewrite.ASTRewrite;
 import org.eclipse.jdt.core.dom.rewrite.ListRewrite;
@@ -46,6 +57,7 @@ import org.eclipse.ltk.core.refactoring.Change;
 import org.eclipse.ltk.core.refactoring.RefactoringStatus;
 import org.eclipse.ltk.core.refactoring.TextFileChange;
 import org.eclipse.text.edits.TextEdit;
+import org.tmatesoft.refactoring.split.core.SplitUnitModel.TypeMetadata;
 
 public class SplitDelegateChanges implements ISplitChanges {
 
@@ -116,6 +128,8 @@ public class SplitDelegateChanges implements ISplitChanges {
 				imp.setName(ast.newName(targetPackage2 + "." + sourceTypeName + targetSuffix2));
 				importsRewrite.insertLast(imp, null);
 			}
+
+			addDelegationConstructor(unitModel, rewrite);
 
 			final Set<IType> removeNestedTypes = new HashSet<IType>();
 
@@ -195,6 +209,94 @@ public class SplitDelegateChanges implements ISplitChanges {
 		}
 
 		return true;
+	}
+
+	private void addDelegationConstructor(final SplitUnitModel unitModel, final ASTRewrite rewrite) {
+
+		final String sourceTypeName = unitModel.getSourceTypeName();
+
+		final TypeDeclaration typeNode = unitModel.getSourceTypeNode();
+		final ListRewrite bodyRewrite = rewrite.getListRewrite(typeNode, typeNode.getBodyDeclarationsProperty());
+
+		final CompilationUnit sourceAst = unitModel.getSourceAst();
+		final AST ast = sourceAst.getAST();
+
+		final FieldDeclaration[] fields = typeNode.getFields();
+		final FieldDeclaration lastField = fields.length > 0 ? fields[fields.length - 1] : null;
+
+		final List<FieldDeclaration> delegateFields = new ArrayList<FieldDeclaration>();
+
+		if (fields.length > 0) {
+			for (final FieldDeclaration field : fields) {
+				boolean isStatic = false;
+				boolean isFinal = false;
+				Modifier privateModifier = null;
+				final List<IExtendedModifier> modifiers = field.modifiers();
+				for (final IExtendedModifier extMod : modifiers) {
+					if (extMod.isModifier()) {
+						final Modifier mod = (Modifier) extMod;
+						if (mod.isPrivate()) {
+							privateModifier = mod;
+						} else if (mod.isFinal()) {
+							isFinal = true;
+						} else if (mod.isStatic()) {
+							isStatic = true;
+						}
+					}
+				}
+				if (privateModifier != null) {
+					final ListRewrite modRewrite = rewrite.getListRewrite(field, field.getModifiersProperty());
+					modRewrite.replace(privateModifier, ast.newModifier(ModifierKeyword.PROTECTED_KEYWORD), null);
+				}
+				if (!isFinal && !isStatic) {
+					delegateFields.add(field);
+				}
+			}
+		}
+
+		final MethodDeclaration constructorDecl = ast.newMethodDeclaration();
+		if (lastField != null) {
+			bodyRewrite.insertAfter(constructorDecl, lastField, null);
+		} else {
+			bodyRewrite.insertFirst(constructorDecl, null);
+		}
+
+		constructorDecl.setConstructor(true);
+		constructorDecl.setName(ast.newSimpleName(sourceTypeName));
+		constructorDecl.modifiers().add(ast.newModifier(Modifier.ModifierKeyword.PROTECTED_KEYWORD));
+
+		final SingleVariableDeclaration constructorParam = ast.newSingleVariableDeclaration();
+		constructorParam.setType(ast.newSimpleType(ast.newSimpleName(sourceTypeName)));
+		constructorParam.setName(ast.newSimpleName("from"));
+		constructorDecl.parameters().add(constructorParam);
+		final Block constructorBody = ast.newBlock();
+		constructorDecl.setBody(constructorBody);
+
+		final TypeMetadata superMeta = unitModel.getSourceSuperClassMetadata();
+		if (superMeta != null) {
+			final SuperConstructorInvocation superInvoke = ast.newSuperConstructorInvocation();
+			superInvoke.arguments().add(ast.newName("from"));
+			constructorBody.statements().add(superInvoke);
+		}
+
+		if (!delegateFields.isEmpty()) {
+			for (final FieldDeclaration field : delegateFields) {
+				final List<VariableDeclarationFragment> fragments = field.fragments();
+				for (VariableDeclarationFragment var : fragments) {
+					final Assignment assign = ast.newAssignment();
+					constructorBody.statements().add(ast.newExpressionStatement(assign));
+					final FieldAccess thisAccess = ast.newFieldAccess();
+					thisAccess.setExpression(ast.newThisExpression());
+					thisAccess.setName(ast.newSimpleName(var.getName().getIdentifier()));
+					assign.setLeftHandSide(thisAccess);
+					final FieldAccess fromAccess = ast.newFieldAccess();
+					fromAccess.setExpression(ast.newName("from"));
+					fromAccess.setName(ast.newSimpleName(var.getName().getIdentifier()));
+					assign.setRightHandSide(fromAccess);
+				}
+			}
+		}
+
 	}
 
 	private boolean isShouldDelegate(MethodDeclaration methodDeclaration) {
