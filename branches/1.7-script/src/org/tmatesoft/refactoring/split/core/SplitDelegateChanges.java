@@ -129,7 +129,9 @@ public class SplitDelegateChanges implements ISplitChanges {
 				importsRewrite.insertLast(imp, null);
 			}
 
-			addDelegationConstructor(unitModel, rewrite);
+			if (!unitModel.isSourceInterface()) {
+				addDelegationConstructor(unitModel, rewrite);
+			}
 
 			final Set<IType> removeNestedTypes = new HashSet<IType>();
 
