@@ -259,14 +259,13 @@ public class SplitMoveChanges extends SplitTargetChanges {
 
 	protected void addNestedType(final SplitUnitModel unitModel, final AST ast, final List bodyDeclarations,
 			final IType sourceNestedType) throws JavaModelException {
-		final TypeDeclaration sourceNestedTypeNode = (TypeDeclaration) NodeFinder.perform(unitModel.getSourceAst(),
-				sourceNestedType.getSourceRange());
-		final TypeDeclaration sourceNestedTypeCopy = (TypeDeclaration) ASTNode.copySubtree(ast, sourceNestedTypeNode);
-		if (!Flags.isPrivate(sourceNestedType.getFlags()) && null == sourceNestedTypeNode.getSuperclassType()) {
-			sourceNestedTypeCopy.setSuperclassType(ast.newSimpleType(ast.newName(sourceNestedType
-					.getTypeQualifiedName('.'))));
+		if (Flags.isPrivate(sourceNestedType.getFlags())) {
+			final TypeDeclaration sourceNestedTypeNode = (TypeDeclaration) NodeFinder.perform(unitModel.getSourceAst(),
+					sourceNestedType.getSourceRange());
+			final TypeDeclaration sourceNestedTypeCopy = (TypeDeclaration) ASTNode.copySubtree(ast,
+					sourceNestedTypeNode);
+			bodyDeclarations.add(sourceNestedTypeCopy);
 		}
-		bodyDeclarations.add(sourceNestedTypeCopy);
 	}
 
 	protected void addImports(final SplitUnitModel unitModel, final AST ast, final CompilationUnit node) {
