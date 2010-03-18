@@ -3,8 +3,10 @@ package org.tmatesoft.refactoring.split.core;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.IProgressMonitor;
@@ -12,6 +14,7 @@ import org.eclipse.core.runtime.SubProgressMonitor;
 import org.eclipse.jdt.core.Flags;
 import org.eclipse.jdt.core.ICompilationUnit;
 import org.eclipse.jdt.core.IField;
+import org.eclipse.jdt.core.IMethod;
 import org.eclipse.jdt.core.IPackageFragment;
 import org.eclipse.jdt.core.IType;
 import org.eclipse.jdt.core.JavaModelException;
@@ -133,6 +136,7 @@ public class SplitMoveChanges extends SplitTargetChanges {
 
 		if (!unitModel.isSourceInterface()) {
 			addDelegateMethod(unitModel, ast, bodyDeclarations);
+			addConstructors(unitModel, ast, bodyDeclarations);
 		}
 
 		for (final MethodDeclaration sourceMethodDeclaration : unitModel.getAddMethods().values()) {
@@ -150,6 +154,27 @@ public class SplitMoveChanges extends SplitTargetChanges {
 		formatEdit.apply(document);
 
 		model.getChanges().add(new CreateCompilationUnitChange(unit, document.get(), null));
+	}
+
+	private void addConstructors(SplitUnitModel unitModel, AST ast, List bodyDeclarations) throws JavaModelException {
+
+		final Set<IMethod> constructors = new HashSet<IMethod>();
+
+		final Map<IMethod, MethodDeclaration> addMethods = unitModel.getAddMethods();
+
+		for (final IMethod method : addMethods.keySet()) {
+			if (method.isConstructor()) {
+				constructors.add(method);
+			}
+		}
+
+		if (!constructors.isEmpty()) {
+			for (final IMethod constructor : constructors) {
+				addMethod(unitModel, ast, bodyDeclarations, addMethods.get(constructor));
+				addMethods.remove(constructor);
+			}
+		}
+
 	}
 
 	private void addDelegateMethod(SplitUnitModel unitModel, AST ast, List bodyDeclarations) {
@@ -287,10 +312,31 @@ public class SplitMoveChanges extends SplitTargetChanges {
 
 	protected void addMethod(final SplitUnitModel unitModel, final AST ast, final List bodyDeclarations,
 			final MethodDeclaration sourceMethodDeclaration) {
+
 		final MethodDeclaration methodCopy = getMethodCopy(ast, sourceMethodDeclaration);
 
 		if (sourceMethodDeclaration.isConstructor()) {
 			methodCopy.setName(ast.newSimpleName(addTargetSuffix(unitModel.getSourceTypeName())));
+			final List<SingleVariableDeclaration> sourceParameters = sourceMethodDeclaration.parameters();
+			if (!sourceParameters.isEmpty()) {
+				boolean constructorInvoke = false;
+				final List<Statement> sourceStatements = sourceMethodDeclaration.getBody().statements();
+				for (final Statement statement : sourceStatements) {
+					if (statement instanceof ConstructorInvocation) {
+						constructorInvoke = true;
+						break;
+					}
+				}
+				if (!constructorInvoke) {
+					final Block body = methodCopy.getBody();
+					final SuperConstructorInvocation superInvoke = ast.newSuperConstructorInvocation();
+					body.statements().clear();
+					body.statements().add(superInvoke);
+					for (final SingleVariableDeclaration var : sourceParameters) {
+						superInvoke.arguments().add(ast.newName(var.getName().getIdentifier()));
+					}
+				}
+			}
 		}
 
 		final IMethodBinding sourceMethodBinding = sourceMethodDeclaration.resolveBinding();
