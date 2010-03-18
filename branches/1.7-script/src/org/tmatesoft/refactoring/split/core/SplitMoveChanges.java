@@ -107,24 +107,8 @@ public class SplitMoveChanges extends SplitTargetChanges {
 		}
 		type.setName(ast.newSimpleName(typeName));
 
-		if (unitModel.getSourceSuperClassMetadata() != null) {
-			final IType sourceSuperClassType = unitModel.getSourceSuperClassMetadata().getType();
-			if (sourceSuperClassType != null) {
-				final Type sourceSuperClassNode = unitModel.getSourceSuperClassMetadata().getTypeNode();
-				final ICompilationUnit sourceSuperClassUnit = unitModel.getSourceSuperClassMetadata().getUnit();
-				if (model.getUnits().containsKey(sourceSuperClassUnit)) {
-					final String sourceSuperClassName = unitModel.getSourceSuperClassMetadata().getName();
-					final String targetSuperclassName = addTargetSuffix(sourceSuperClassName);
-					type.setSuperclassType(ast.newSimpleType(ast.newName(targetSuperclassName)));
-				} else {
-					unitModel.getUsedTypes().add(sourceSuperClassType);
-					type.setSuperclassType((Type) ASTNode.copySubtree(ast, sourceSuperClassNode));
-				}
-			}
-		} else {
-			unitModel.getUsedTypes().add(unitModel.getSourceType());
-			type.setSuperclassType(ast.newSimpleType(ast.newName(unitModel.getSourceTypeName())));
-		}
+		unitModel.getUsedTypes().add(unitModel.getSourceType());
+		type.setSuperclassType(ast.newSimpleType(ast.newName(unitModel.getSourceTypeName())));
 
 		final List<Type> superInterfaceTypes = type.superInterfaceTypes();
 		if (!unitModel.getSourceSuperInterfacesMetadata().isEmpty()) {
@@ -146,10 +130,6 @@ public class SplitMoveChanges extends SplitTargetChanges {
 		}
 
 		final List bodyDeclarations = type.bodyDeclarations();
-
-		for (final IField sourceField : unitModel.getUsedFields()) {
-			addField(unitModel, ast, bodyDeclarations, sourceField);
-		}
 
 		if (!unitModel.isSourceInterface()) {
 			addDelegateMethod(unitModel, ast, bodyDeclarations);
@@ -180,7 +160,7 @@ public class SplitMoveChanges extends SplitTargetChanges {
 		final VariableDeclarationFragment varF = ast.newVariableDeclarationFragment();
 		varF.setName(ast.newSimpleName("dispatcher"));
 		final FieldDeclaration fieldDecl = ast.newFieldDeclaration(varF);
-		fieldDecl.modifiers().add(ast.newModifier(Modifier.ModifierKeyword.PRIVATE_KEYWORD));
+		fieldDecl.modifiers().add(ast.newModifier(Modifier.ModifierKeyword.PROTECTED_KEYWORD));
 		fieldDecl.setType(ast.newSimpleType(ast.newSimpleName(sourceTypeName)));
 		bodyDeclarations.add(fieldDecl);
 
@@ -191,21 +171,14 @@ public class SplitMoveChanges extends SplitTargetChanges {
 		constructorDecl.modifiers().add(ast.newModifier(Modifier.ModifierKeyword.PROTECTED_KEYWORD));
 		final SingleVariableDeclaration constructorParam = ast.newSingleVariableDeclaration();
 		constructorParam.setType(ast.newSimpleType(ast.newSimpleName(sourceTypeName)));
-		constructorParam.setName(ast.newSimpleName("dispatcher"));
+		constructorParam.setName(ast.newSimpleName("from"));
 		constructorDecl.parameters().add(constructorParam);
 		final Block constructorBody = ast.newBlock();
 		constructorDecl.setBody(constructorBody);
 
-		final TypeMetadata superMeta = unitModel.getSourceSuperClassMetadata();
-		if (superMeta != null) {
-			final ICompilationUnit superUnit = superMeta.getUnit();
-			final SplitRefactoringModel model = unitModel.getModel();
-			if (model.getUnitModels().containsKey(superUnit)) {
-				final SuperConstructorInvocation superInvoke = ast.newSuperConstructorInvocation();
-				superInvoke.arguments().add(ast.newName("dispatcher"));
-				constructorBody.statements().add(superInvoke);
-			}
-		}
+		final SuperConstructorInvocation superInvoke = ast.newSuperConstructorInvocation();
+		superInvoke.arguments().add(ast.newName("from"));
+		constructorBody.statements().add(superInvoke);
 
 		final Assignment assign = ast.newAssignment();
 		constructorBody.statements().add(ast.newExpressionStatement(assign));
