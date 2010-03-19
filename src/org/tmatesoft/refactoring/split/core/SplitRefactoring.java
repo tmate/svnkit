@@ -48,7 +48,8 @@ public class SplitRefactoring extends Refactoring {
 
 	private SplitRefactoringModel model = new SplitRefactoringModel("org.tmatesoft.svn.core.wc", Arrays
 			.asList(new String[] { "org.tmatesoft.svn.core.internal.wc.admin.SVNWCAccess",
-					"org.tmatesoft.svn.core.internal.wc.admin.SVNAdminArea" }));
+					"org.tmatesoft.svn.core.internal.wc.admin.SVNAdminArea" }), Arrays.asList(new String[] {
+			"SVNCommitPacket", "SVNCommitItem" }));
 
 	private List<ISplitChanges> splitChanges = new ArrayList<ISplitChanges>(Arrays.asList(new ISplitChanges[] {
 			new SplitDelegateChanges("org.tmatesoft.svn.core.internal.wc.v17", "17",
@@ -188,12 +189,15 @@ public class SplitRefactoring extends Refactoring {
 				if (methods != null && !methods.isEmpty()) {
 					for (final IMethod method : methods) {
 						final ICompilationUnit unit = method.getCompilationUnit();
-						if (!model.getUnits().containsKey(unit)) {
-							model.getUnits().put(unit, new HashSet<IMethod>());
-						}
-						final Set<IMethod> set = model.getUnits().get(unit);
-						if (!set.contains(method)) {
-							set.add(method);
+						final IType primaryType = unit.findPrimaryType();
+						if (!model.getBlackListTypesNames().contains(primaryType.getElementName())) {
+							if (!model.getUnits().containsKey(unit)) {
+								model.getUnits().put(unit, new HashSet<IMethod>());
+							}
+							final Set<IMethod> set = model.getUnits().get(unit);
+							if (!set.contains(method)) {
+								set.add(method);
+							}
 						}
 					}
 				}

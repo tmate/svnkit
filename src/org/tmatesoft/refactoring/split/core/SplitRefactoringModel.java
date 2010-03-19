@@ -31,6 +31,8 @@ public class SplitRefactoringModel {
 	private IPackageFragment sourcePackage;
 	private List<IType> typesToHide;
 
+	private List<String> blackListTypesNames;
+
 	private IJavaSearchScope projectScope;
 
 	private final List<Change> changes = new LinkedList<Change>();
@@ -39,9 +41,11 @@ public class SplitRefactoringModel {
 	private final Map<ICompilationUnit, Set<IMethod>> units = new LinkedHashMap<ICompilationUnit, Set<IMethod>>();
 	private final Map<ICompilationUnit, SplitUnitModel> unitModels = new LinkedHashMap<ICompilationUnit, SplitUnitModel>();
 
-	public SplitRefactoringModel(final String sourcePackageName, final List<String> typesToHideNames) {
+	public SplitRefactoringModel(final String sourcePackageName, final List<String> typesToHideNames,
+			final List<String> blackListTypesNames) {
 		this.sourcePackageName = sourcePackageName;
 		this.typesToHideNames = typesToHideNames;
+		this.blackListTypesNames = blackListTypesNames;
 	}
 
 	public String getSourcePackageName() {
@@ -130,6 +134,10 @@ public class SplitRefactoringModel {
 
 	public Map<ICompilationUnit, SplitUnitModel> getUnitModels() {
 		return unitModels;
+	}
+
+	public List<String> getBlackListTypesNames() {
+		return blackListTypesNames;
 	}
 
 }
