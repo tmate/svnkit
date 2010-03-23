@@ -1,5 +1,6 @@
 package org.tmatesoft.refactoring.split.core;
 
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -32,6 +33,7 @@ public class SplitRefactoringModel {
 	private List<IType> typesToHide;
 
 	private List<String> blackListTypesNames;
+	private List<String> whiteListTypesNames;
 
 	private IJavaSearchScope projectScope;
 
@@ -40,12 +42,13 @@ public class SplitRefactoringModel {
 
 	private final Map<ICompilationUnit, Set<IMethod>> units = new LinkedHashMap<ICompilationUnit, Set<IMethod>>();
 	private final Map<ICompilationUnit, SplitUnitModel> unitModels = new LinkedHashMap<ICompilationUnit, SplitUnitModel>();
-
+	
 	public SplitRefactoringModel(final String sourcePackageName, final List<String> typesToHideNames,
-			final List<String> blackListTypesNames) {
+			final List<String> blackListTypesNames, final List<String> whiteListTypesNames) {
 		this.sourcePackageName = sourcePackageName;
 		this.typesToHideNames = typesToHideNames;
 		this.blackListTypesNames = blackListTypesNames;
+		this.whiteListTypesNames = whiteListTypesNames;
 	}
 
 	public String getSourcePackageName() {
@@ -138,6 +141,10 @@ public class SplitRefactoringModel {
 
 	public List<String> getBlackListTypesNames() {
 		return blackListTypesNames;
+	}
+
+	public List<String> getWhiteListTypesNames() {
+		return whiteListTypesNames;
 	}
 
 }

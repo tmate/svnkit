@@ -49,7 +49,8 @@ public class SplitRefactoring extends Refactoring {
 	private SplitRefactoringModel model = new SplitRefactoringModel("org.tmatesoft.svn.core.wc", Arrays
 			.asList(new String[] { "org.tmatesoft.svn.core.internal.wc.admin.SVNWCAccess",
 					"org.tmatesoft.svn.core.internal.wc.admin.SVNAdminArea" }), Arrays.asList(new String[] {
-			"SVNCommitPacket", "SVNCommitItem" }));
+			"SVNCommitPacket", "SVNCommitItem" }), Arrays.asList(new String[] {
+			"org.tmatesoft.svn.core.internal.wc.SVNCopyDriver", "org.tmatesoft.svn.core.internal.wc.SVNMergeDriver" }));
 
 	private List<ISplitChanges> splitChanges = new ArrayList<ISplitChanges>(Arrays.asList(new ISplitChanges[] {
 			new SplitDelegateChanges("org.tmatesoft.svn.core.internal.wc.v17", "17",
@@ -200,6 +201,14 @@ public class SplitRefactoring extends Refactoring {
 							}
 						}
 					}
+				}
+			}
+
+			for (final String typeName : model.getWhiteListTypesNames()) {
+				final IType type = model.getJavaProject().findType(typeName);
+				if (type != null && type.exists()) {
+					final ICompilationUnit unit = type.getCompilationUnit();
+					model.getUnits().put(unit, new HashSet<IMethod>());
 				}
 			}
 
