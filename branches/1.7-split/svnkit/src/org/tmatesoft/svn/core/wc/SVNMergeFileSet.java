@@ -24,6 +24,8 @@ import org.tmatesoft.svn.core.internal.wc.SVNAdminUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 import org.tmatesoft.svn.core.internal.wc.admin.SVNAdminArea;
 import org.tmatesoft.svn.core.internal.wc.admin.SVNLog;
+import org.tmatesoft.svn.core.internal.wc.v17.SVNMergeFileSet17;
+import org.tmatesoft.svn.core.internal.wc.v16.SVNMergeFileSet16;
 
 
 /**
@@ -38,27 +40,47 @@ import org.tmatesoft.svn.core.internal.wc.admin.SVNLog;
  */
 public class SVNMergeFileSet {
     
-    private String myLocalFilePath;
-    private String myBaseFilePath;
-    private String myRepositoryFilePath;
-    private String myWCFilePath;
-    private String myMergeResultFilePath;
+    protected String myLocalFilePath;
+    protected String myBaseFilePath;
+    protected String myRepositoryFilePath;
+    protected String myWCFilePath;
+    protected String myMergeResultFilePath;
     
-    private String myMimeType;
-    private SVNAdminArea myAdminArea;
-    private SVNLog myLog;
+    protected String myMimeType;
+    protected SVNAdminArea myAdminArea;
+    protected SVNLog myLog;
     
-    private String myLocalLabel;
-    private String myBaseLabel;
-    private String myRepositoryLabel;
+    protected String myLocalLabel;
+    protected String myBaseLabel;
+    protected String myRepositoryLabel;
 
-    private File myLocalFile;
-    private File myBaseFile;
-    private File myRepositoryFile;
-    private File myMergeResultFile;
-    private File myCopyFromFile;
+    protected File myLocalFile;
+    protected File myBaseFile;
+    protected File myRepositoryFile;
+    protected File myMergeResultFile;
+    protected File myCopyFromFile;
     
-    private Collection myTmpPaths = new ArrayList();
+    protected Collection myTmpPaths = new ArrayList();
+
+    protected SVNMergeFileSet(SVNMergeFileSet from) {
+        this.myLocalFilePath = from.myLocalFilePath;
+        this.myBaseFilePath = from.myBaseFilePath;
+        this.myRepositoryFilePath = from.myRepositoryFilePath;
+        this.myWCFilePath = from.myWCFilePath;
+        this.myMergeResultFilePath = from.myMergeResultFilePath;
+        this.myMimeType = from.myMimeType;
+        this.myAdminArea = from.myAdminArea;
+        this.myLog = from.myLog;
+        this.myLocalLabel = from.myLocalLabel;
+        this.myBaseLabel = from.myBaseLabel;
+        this.myRepositoryLabel = from.myRepositoryLabel;
+        this.myLocalFile = from.myLocalFile;
+        this.myBaseFile = from.myBaseFile;
+        this.myRepositoryFile = from.myRepositoryFile;
+        this.myMergeResultFile = from.myMergeResultFile;
+        this.myCopyFromFile = from.myCopyFromFile;
+        this.myTmpPaths = from.myTmpPaths;
+    }
 
     /**
      * Creates a new <code>SVNMergeFileSet</code> object given the data prepared for 

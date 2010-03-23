@@ -51,6 +51,8 @@ import org.tmatesoft.svn.core.io.SVNRepositoryFactory;
 import org.tmatesoft.svn.util.ISVNDebugLog;
 import org.tmatesoft.svn.util.SVNDebugLog;
 import org.tmatesoft.svn.util.SVNLogType;
+import org.tmatesoft.svn.core.internal.wc.v17.SVNBasicClient17;
+import org.tmatesoft.svn.core.internal.wc.v16.SVNBasicClient16;
 
 
 /**
@@ -72,14 +74,25 @@ import org.tmatesoft.svn.util.SVNLogType;
  */
 public class SVNBasicClient implements ISVNEventHandler {
 
-    private ISVNRepositoryPool myRepositoryPool;
-    private ISVNOptions myOptions;
-    private ISVNEventHandler myEventDispatcher;
-    private List myPathPrefixesStack;
-    private boolean myIsIgnoreExternals;
-    private boolean myIsLeaveConflictsUnresolved;
-    private ISVNDebugLog myDebugLog;
-    private ISVNPathListHandler myPathListHandler;
+    protected ISVNRepositoryPool myRepositoryPool;
+    protected ISVNOptions myOptions;
+    protected ISVNEventHandler myEventDispatcher;
+    protected List myPathPrefixesStack;
+    protected boolean myIsIgnoreExternals;
+    protected boolean myIsLeaveConflictsUnresolved;
+    protected ISVNDebugLog myDebugLog;
+    protected ISVNPathListHandler myPathListHandler;
+
+    protected SVNBasicClient(SVNBasicClient from) {
+        this.myRepositoryPool = from.myRepositoryPool;
+        this.myOptions = from.myOptions;
+        this.myEventDispatcher = from.myEventDispatcher;
+        this.myPathPrefixesStack = from.myPathPrefixesStack;
+        this.myIsIgnoreExternals = from.myIsIgnoreExternals;
+        this.myIsLeaveConflictsUnresolved = from.myIsLeaveConflictsUnresolved;
+        this.myDebugLog = from.myDebugLog;
+        this.myPathListHandler = from.myPathListHandler;
+    }
 
     protected SVNBasicClient(final ISVNAuthenticationManager authManager, ISVNOptions options) {
         this(new DefaultSVNRepositoryPool(authManager == null ? SVNWCUtil.createDefaultAuthenticationManager() : authManager, options, 0, false), options);
@@ -276,42 +289,12 @@ public class SVNBasicClient implements ISVNEventHandler {
      */
     public SVNURL getReposRoot(File path, SVNURL url, SVNRevision pegRevision, SVNAdminArea adminArea, 
             SVNWCAccess access) throws SVNException {
-        SVNURL reposRoot = null;
-        if (path != null && (pegRevision == SVNRevision.WORKING || pegRevision == SVNRevision.BASE)) {
-            if (access == null) {
-                access = createWCAccess();
-            } 
-            
-            boolean needCleanUp = false; 
-            try {
-                if (adminArea == null) {
-                    adminArea = access.probeOpen(path, false, 0);
-                    needCleanUp = true;
-                }
-                SVNEntry entry = access.getVersionedEntry(path, false);
-                url = getEntryLocation(path, entry, null, SVNRevision.UNDEFINED);
-                reposRoot = entry.getRepositoryRootURL();
-            } finally {
-                if (needCleanUp) {
-                    access.closeAdminArea(path);
+                try {
+                    return SVNBasicClient17.delegate(this).getReposRoot(path, url, pegRevision, adminArea, access);
+                } catch (SVNException e) {
+                    return SVNBasicClient16.delegate(this).getReposRoot(path, url, pegRevision, adminArea, access);
                 }
             }
-        }
-       
-        if (reposRoot == null) {
-        	SVNRepository repos = null;
-        	try {
-            	repos = createRepository(url, path, null, pegRevision, pegRevision, null);
-            	reposRoot = repos.getRepositoryRoot(true); 
-            } finally {
-                if (repos != null) {
-                    repos.closeSession();
-                }
-            }
-        }
-        
-        return reposRoot;
-    }
     
     protected void sleepForTimeStamp() {
         if (myPathPrefixesStack == null || myPathPrefixesStack.isEmpty()) {
@@ -320,37 +303,19 @@ public class SVNBasicClient implements ISVNEventHandler {
     }
 
     protected SVNRepository createRepository(SVNURL url, File path, SVNWCAccess access, boolean mayReuse) throws SVNException {
-        String uuid = null;
-        if (access != null) {
-            SVNEntry entry = access.getEntry(path, false);
-            if (entry != null) {
-                uuid = entry.getUUID();
-            }
+        try {
+            return SVNBasicClient17.delegate(this).createRepository(url, path, access, mayReuse);
+        } catch (SVNException e) {
+            return SVNBasicClient16.delegate(this).createRepository(url, path, access, mayReuse);
         }
-        return createRepository(url, uuid, mayReuse);
     }
     
     protected SVNRepository createRepository(SVNURL url, String uuid, boolean mayReuse) throws SVNException {
-        SVNRepository repository = null;
-        if (myRepositoryPool == null) {
-            repository = SVNRepositoryFactory.create(url, null);
-        } else {
-            repository = myRepositoryPool.createRepository(url, mayReuse);
+        try {
+            return SVNBasicClient17.delegate(this).createRepository(url, uuid, mayReuse);
+        } catch (SVNException e) {
+            return SVNBasicClient16.delegate(this).createRepository(url, uuid, mayReuse);
         }
-        
-        if (uuid != null) {
-            String reposUUID = repository.getRepositoryUUID(true);
-            if (!uuid.equals(reposUUID)) {
-                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.RA_UUID_MISMATCH, 
-                        "Repository UUID ''{0}'' doesn''t match expected UUID ''{1}''", 
-                        new Object[] { reposUUID, uuid });
-                SVNErrorManager.error(err, SVNLogType.WC);
-            }
-        }
-        
-        repository.setDebugLog(getDebugLog());
-        repository.setCanceller(getEventDispatcher());
-        return repository;
     }
     
     protected ISVNRepositoryPool getRepositoryPool() {
@@ -358,23 +323,18 @@ public class SVNBasicClient implements ISVNEventHandler {
     }
 
     protected void dispatchEvent(SVNEvent event) throws SVNException {
-        dispatchEvent(event, ISVNEventHandler.UNKNOWN);
-
+        try {
+            SVNBasicClient17.delegate(this).dispatchEvent(event);
+        } catch (SVNException e) {
+            SVNBasicClient16.delegate(this).dispatchEvent(event);
+        }
     }
 
     protected void dispatchEvent(SVNEvent event, double progress) throws SVNException {
-        if (myEventDispatcher != null) {
-            try {
-                myEventDispatcher.handleEvent(event, progress);
-            } catch (SVNException e) {
-                throw e;
-            } catch (Throwable th) {
-                SVNDebugLog.getDefaultLog().logSevere(SVNLogType.WC, th);
-                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.UNKNOWN, 
-                        "Error while dispatching event: {0}", new Object[] { th.getMessage() }, 
-                        SVNErrorMessage.TYPE_ERROR, th);
-                SVNErrorManager.error(err, th, SVNLogType.DEFAULT);
-            }
+        try {
+            SVNBasicClient17.delegate(this).dispatchEvent(event, progress);
+        } catch (SVNException e) {
+            SVNBasicClient16.delegate(this).dispatchEvent(event, progress);
         }
     }
     
@@ -428,7 +388,11 @@ public class SVNBasicClient implements ISVNEventHandler {
      * @throws SVNException
      */
     public void handleEvent(SVNEvent event, double progress) throws SVNException {
-        dispatchEvent(event, progress);
+        try {
+            SVNBasicClient17.delegate(this).handleEvent(event, progress);
+        } catch (SVNException e) {
+            SVNBasicClient16.delegate(this).handleEvent(event, progress);
+        }
     }
     
     /**
@@ -462,90 +426,30 @@ public class SVNBasicClient implements ISVNEventHandler {
     }
     
     protected long getRevisionNumber(SVNRevision revision, SVNRepository repository, File path) throws SVNException {
-        return getRevisionNumber(revision, null, repository, path);
+        try {
+            return SVNBasicClient17.delegate(this).getRevisionNumber(revision, repository, path);
+        } catch (SVNException e) {
+            return SVNBasicClient16.delegate(this).getRevisionNumber(revision, repository, path);
+        }
     }
 
     protected long getRevisionNumber(SVNRevision revision, long[] latestRevisionNumber, SVNRepository repository, 
             File path) throws SVNException {
-        if (repository == null && (revision == SVNRevision.HEAD || revision.getDate() != null)) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.CLIENT_RA_ACCESS_REQUIRED);
-            SVNErrorManager.error(err, SVNLogType.WC);
-        }
-        if (revision.getNumber() >= 0) {
-            return revision.getNumber();
-        } else if (revision.getDate() != null) {
-            return repository.getDatedRevision(revision.getDate());
-        } else if (revision == SVNRevision.HEAD) {
-            if (latestRevisionNumber != null && latestRevisionNumber.length > 0 && SVNRevision.isValidRevisionNumber(latestRevisionNumber[0])) {
-                return latestRevisionNumber[0]; 
+                try {
+                    return SVNBasicClient17.delegate(this).getRevisionNumber(revision, latestRevisionNumber, repository, path);
+                } catch (SVNException e) {
+                    return SVNBasicClient16.delegate(this).getRevisionNumber(revision, latestRevisionNumber, repository, path);
+                }
             }
-            long latestRevision = repository.getLatestRevision(); 
-            if (latestRevisionNumber != null && latestRevisionNumber.length > 0) {
-                latestRevisionNumber[0] = latestRevision;
-            }
-            return latestRevision;
-        } else if (!revision.isValid()) {
-            return -1;
-        } else if (revision == SVNRevision.COMMITTED || revision == SVNRevision.WORKING || 
-                revision == SVNRevision.BASE || revision == SVNRevision.PREVIOUS) {
-            if (path == null) {
-                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.CLIENT_VERSIONED_PATH_REQUIRED);
-                SVNErrorManager.error(err, SVNLogType.WC);
-            }
-            SVNWCAccess wcAccess = createWCAccess();
-            wcAccess.probeOpen(path, false, 0);
-            SVNEntry entry = null;
-            try {
-                entry = wcAccess.getVersionedEntry(path, false);
-            } finally {
-                wcAccess.close();
-            }
-            
-            if (revision == SVNRevision.WORKING || revision == SVNRevision.BASE) {
-                return entry.getRevision();
-            }
-            if (entry.getCommittedRevision() < 0) {
-                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.CLIENT_BAD_REVISION, "Path ''{0}'' has no committed revision", path);
-                SVNErrorManager.error(err, SVNLogType.WC);
-            }
-            return revision == SVNRevision.PREVIOUS ? entry.getCommittedRevision() - 1 : entry.getCommittedRevision();            
-        } else {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.CLIENT_BAD_REVISION, "Unrecognized revision type requested for ''{0}''", path != null ? path : (Object) repository.getLocation());
-            SVNErrorManager.error(err, SVNLogType.WC);
-        }
-        return -1;
-    }
 
     protected SVNRepository createRepository(SVNURL url, File path, SVNAdminArea area, SVNRevision pegRevision, 
             SVNRevision revision, long[] pegRev) throws SVNException {
-        if (url == null) {
-            SVNURL pathURL = getURL(path);
-            if (pathURL == null) {
-                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_MISSING_URL, 
-                        "''{0}'' has no URL", path);
-                SVNErrorManager.error(err, SVNLogType.WC);
+                try {
+                    return SVNBasicClient17.delegate(this).createRepository(url, path, area, pegRevision, revision, pegRev);
+                } catch (SVNException e) {
+                    return SVNBasicClient16.delegate(this).createRepository(url, path, area, pegRevision, revision, pegRev);
+                }
             }
-        }
-
-        SVNRevision startRevision = revision;
-        SVNRevision[] resolvedRevisions = resolveRevisions(pegRevision, startRevision, url != null, true);
-        pegRevision = resolvedRevisions[0];
-        startRevision = resolvedRevisions[1];
-        SVNRepositoryLocation[] locations = getLocations(url, path, null, pegRevision, startRevision, 
-                SVNRevision.UNDEFINED);
-        url = locations[0].getURL();
-        long actualRevision = locations[0].getRevisionNumber();
-        SVNRepository repository = createRepository(url, area != null ? area.getRoot() : null, 
-                area != null ? area.getWCAccess() : null, true);
-        actualRevision = getRevisionNumber(SVNRevision.create(actualRevision), repository, path);
-        if (actualRevision < 0) {
-            actualRevision = repository.getLatestRevision();
-        }
-        if (pegRev != null && pegRev.length > 0) {
-            pegRev[0] = actualRevision;
-        }
-        return repository;
-    }
 
     protected SVNRevision[] resolveRevisions(SVNRevision pegRevision, SVNRevision revision, boolean isURL,
             boolean noticeLocalModifications) {
@@ -569,188 +473,46 @@ public class SVNBasicClient implements ISVNEventHandler {
     
     protected void elideMergeInfo(SVNWCAccess access, File path, SVNEntry entry,
             File wcElisionLimitPath) throws SVNException {
-        if (wcElisionLimitPath == null || !wcElisionLimitPath.equals(path)) {
-            Map mergeInfo = null;
-            Map targetMergeInfo = null;
-
-            boolean[] inherited = new boolean[1];
-                
-            targetMergeInfo = getWCMergeInfo(path, entry, wcElisionLimitPath, 
-                    SVNMergeInfoInheritance.INHERITED, false, inherited);
-                
-            if (inherited[0] || targetMergeInfo == null) {
-                return;
+                try {
+                    SVNBasicClient17.delegate(this).elideMergeInfo(access, path, entry, wcElisionLimitPath);
+                } catch (SVNException e) {
+                    SVNBasicClient16.delegate(this).elideMergeInfo(access, path, entry, wcElisionLimitPath);
+                }
             }
-                
-            mergeInfo = getWCMergeInfo(path, entry, wcElisionLimitPath, 
-                    SVNMergeInfoInheritance.NEAREST_ANCESTOR, false, inherited);
-                
-            if (mergeInfo == null && wcElisionLimitPath == null) {
-                mergeInfo = getWCOrRepositoryMergeInfo(path, entry, SVNMergeInfoInheritance.NEAREST_ANCESTOR, 
-                        inherited, true, null);
-            }
-                
-            if (mergeInfo == null && wcElisionLimitPath != null) {
-                return;
-            }
-                
-            SVNMergeInfoUtil.elideMergeInfo(mergeInfo, targetMergeInfo, path, null, access);
-        }
-    }
 
     /**
      * @param path path relative to the repository location.
      */
     protected Map getReposMergeInfo(SVNRepository repository, String path, long revision, 
     		SVNMergeInfoInheritance inheritance, boolean squelchIncapable) throws SVNException {
-    	Map reposMergeInfo = null;
-    	try {
-    		reposMergeInfo = repository.getMergeInfo(new String[] { path }, revision, inheritance, false);
-    	} catch (SVNException svne) {
-    		if (!squelchIncapable || svne.getErrorMessage().getErrorCode() != SVNErrorCode.UNSUPPORTED_FEATURE) {
-    			throw svne;
-    		}
-    	}
-    	String rootRelativePath = getPathRelativeToRoot(null, repository.getLocation(), repository.getRepositoryRoot(false), null, repository);
-    	Map targetMergeInfo = null;
-    	if (reposMergeInfo != null) {
-    		SVNMergeInfo mergeInfo = (SVNMergeInfo) reposMergeInfo.get(rootRelativePath);
-    		if (mergeInfo != null) {
-    			targetMergeInfo = mergeInfo.getMergeSourcesToMergeLists();
-    		}
-    	}
-    	return targetMergeInfo;
-    }
+                try {
+                    return SVNBasicClient17.delegate(this).getReposMergeInfo(repository, path, revision, inheritance, squelchIncapable);
+                } catch (SVNException e) {
+                    return SVNBasicClient16.delegate(this).getReposMergeInfo(repository, path, revision, inheritance, squelchIncapable);
+                }
+            }
     
     protected Map getWCOrRepositoryMergeInfo(File path, SVNEntry entry, 
             SVNMergeInfoInheritance inherit, boolean[] indirect, boolean reposOnly, 
             SVNRepository repository) throws SVNException {
-        Map mergeInfo = null;
-        long targetRev[] = { -1 };
-        SVNURL url = getEntryLocation(path, entry, targetRev, SVNRevision.WORKING);
-        long revision = targetRev[0];
-
-        if (!reposOnly) {
-            mergeInfo = getWCMergeInfo(path, entry, null, inherit, false, indirect);
-        }
-        
-        if (mergeInfo == null) {            
-            if (!entry.isScheduledForAddition()) {
-                Map fileToProp = SVNPropertiesManager.getWorkingCopyPropertyValues(path, entry, 
-                        SVNProperty.MERGE_INFO, SVNDepth.EMPTY, true);
-                SVNPropertyValue mergeInfoProp = (SVNPropertyValue) fileToProp.get(path);
-                if (mergeInfoProp == null) {
-                    SVNURL oldLocation = null;
-                    boolean closeRepository = false;
-                    Map reposMergeInfo = null;
-                    String repositoryPath = null;
-                    try {
-                        if (repository == null) {
-                            repository = createRepository(url, null, null, false);
-                            closeRepository = true;
-                        }
-                        repositoryPath = getPathRelativeToSession(url, null, repository);
-                        oldLocation = repository.getLocation();
-                        if (repositoryPath == null) {
-                            repositoryPath = "";
-                            repository.setLocation(url, false);
-                        }
-                        reposMergeInfo = getReposMergeInfo(repository, repositoryPath, revision, inherit, true);
-                    } finally {
-                        if (closeRepository) {
-                            repository.closeSession();
-                        } else if (oldLocation != null) {
-                            repository.setLocation(oldLocation, false);
-                        }
-                    }
-                    
-                    if (reposMergeInfo != null) {
-                        indirect[0] = true;
-                        mergeInfo = reposMergeInfo;
-                    } 
+                try {
+                    return SVNBasicClient17.delegate(this).getWCOrRepositoryMergeInfo(path, entry, inherit, indirect, reposOnly, repository);
+                } catch (SVNException e) {
+                    return SVNBasicClient16.delegate(this).getWCOrRepositoryMergeInfo(path, entry, inherit, indirect, reposOnly, repository);
                 }
             }
-        }
-        return mergeInfo;
-    }
     
     /**
      * mergeInfo must not be null!
      */
     protected Map getWCMergeInfo(File path, SVNEntry entry, File limitPath, SVNMergeInfoInheritance inherit, 
             boolean base, boolean[] inherited) throws SVNException {
-        String walkPath = "";
-        Map wcMergeInfo = null;
-        SVNWCAccess wcAccess = createWCAccess();
-        Map mergeInfo = null;
-        if (limitPath != null) {
-        	limitPath = new File(SVNPathUtil.validateFilePath(limitPath.getAbsolutePath())).getAbsoluteFile();
-        }
-        
-        try {
-            while (true) {
-                if (inherit == SVNMergeInfoInheritance.NEAREST_ANCESTOR) {
-                    wcMergeInfo = null;
-                    inherit = SVNMergeInfoInheritance.INHERITED;
-                } else {
-                    wcMergeInfo = SVNPropertiesManager.parseMergeInfo(path, entry, base);
+                try {
+                    return SVNBasicClient17.delegate(this).getWCMergeInfo(path, entry, limitPath, inherit, base, inherited);
+                } catch (SVNException e) {
+                    return SVNBasicClient16.delegate(this).getWCMergeInfo(path, entry, limitPath, inherit, base, inherited);
                 }
-
-                if (SVNWCManager.isEntrySwitched(path, entry)) {
-                    break;
-                }
-    
-                path = new File(SVNPathUtil.validateFilePath(path.getAbsolutePath())).getAbsoluteFile();
-                if (wcMergeInfo == null && inherit != SVNMergeInfoInheritance.EXPLICIT &&
-                		path.getParentFile() != null) {
-                    
-                    if (limitPath != null && limitPath.equals(path)) {
-                        break;
-                    }
-                    
-                    walkPath = SVNPathUtil.append(path.getName(), walkPath);
-                    path = path.getParentFile();
-                    try {
-                        wcAccess.open(path, false, 0);
-                    } catch (SVNException svne) {
-                        if (svne.getErrorMessage().getErrorCode() == SVNErrorCode.WC_NOT_DIRECTORY) {
-                            mergeInfo = wcMergeInfo;
-                            inherited[0] = false;
-                            return mergeInfo;
-                        }
-                        throw svne;
-                    } 
-    
-                    entry = wcAccess.getEntry(path, false);
-                    if (entry != null) {
-                        continue;
-                    }
-                }
-                break;
             }
-        } finally {
-            wcAccess.close();
-        }
-        
-        inherited[0] = false;
-        if (walkPath.length() == 0) {
-            mergeInfo = wcMergeInfo;
-        } else {
-            if (wcMergeInfo != null) {
-                mergeInfo = SVNMergeInfoUtil.adjustMergeInfoSourcePaths(null, walkPath, wcMergeInfo);
-                inherited[0] = true;
-            } else {
-                mergeInfo = null;
-            }
-        }
-        
-        if (inherited[0]) {
-            mergeInfo = SVNMergeInfoUtil.getInheritableMergeInfo(mergeInfo, null, 
-            		SVNRepository.INVALID_REVISION, SVNRepository.INVALID_REVISION);
-            SVNMergeInfoUtil.removeEmptyRangeLists(mergeInfo);
-        }
-        return mergeInfo;
-    }
 
     protected long getPathLastChangeRevision(String relPath, long revision, SVNRepository repository) throws SVNException {
         final long[] rev = new long[1];
@@ -767,311 +529,61 @@ public class SVNBasicClient implements ISVNEventHandler {
     
     protected String getPathRelativeToRoot(File path, SVNURL url, SVNURL reposRootURL, SVNWCAccess wcAccess,
             SVNRepository repos) throws SVNException {
-        if (path != null) {
-            boolean cleanUp = false;
-            try {
-                if (wcAccess == null) {
-                    wcAccess = createWCAccess();
-                    wcAccess.probeOpen(path, false, 0);
-                    cleanUp = true;
-                }
-                SVNEntry entry = wcAccess.getVersionedEntry(path, false);
-                url = getEntryLocation(path, entry, null, SVNRevision.UNDEFINED);
-                if (reposRootURL == null) {
-                    reposRootURL = entry.getRepositoryRootURL();
-                }
-            } finally {
-                if (cleanUp) {
-                    wcAccess.closeAdminArea(path);
+                try {
+                    return SVNBasicClient17.delegate(this).getPathRelativeToRoot(path, url, reposRootURL, wcAccess, repos);
+                } catch (SVNException e) {
+                    return SVNBasicClient16.delegate(this).getPathRelativeToRoot(path, url, reposRootURL, wcAccess, repos);
                 }
             }
-        }
-        
-        if (reposRootURL == null) {
-            reposRootURL = repos.getRepositoryRoot(true);
-        }
-        
-        String reposRootPath = reposRootURL.getPath();
-        String absPath = url.getPath();
-        if (!absPath.startsWith(reposRootPath)) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.CLIENT_UNRELATED_RESOURCES, 
-                    "URL ''{0}'' is not a child of repository root URL ''{1}''", new Object[] { url, 
-                    reposRootURL});
-            SVNErrorManager.error(err, SVNLogType.WC);
-        }
-        absPath = absPath.substring(reposRootPath.length());
-        if (!absPath.startsWith("/")) {
-            absPath = "/" + absPath;
-        }
-        return absPath;
-    }
 
     protected String getPathRelativeToSession(SVNURL url, SVNURL sessionURL, SVNRepository repos) throws SVNException {
-        if (sessionURL == null) {
-            sessionURL = repos.getLocation();
+        try {
+            return SVNBasicClient17.delegate(this).getPathRelativeToSession(url, sessionURL, repos);
+        } catch (SVNException e) {
+            return SVNBasicClient16.delegate(this).getPathRelativeToSession(url, sessionURL, repos);
         }
-        
-        String reposPath = sessionURL.getPath();
-        String absPath = url.getPath();
-        if (!absPath.startsWith(reposPath + "/") && !absPath.equals(reposPath)) {
-            return null;
-        }
-        absPath = absPath.substring(reposPath.length());
-        if (absPath.startsWith("/")) {
-            absPath = absPath.substring(1);
-        }
-        return absPath;
     }
     
     protected SVNRepositoryLocation[] getLocations(SVNURL url, File path, SVNRepository repository, 
     		SVNRevision revision, SVNRevision start, SVNRevision end) throws SVNException {
-        if (!revision.isValid() || !start.isValid()) {
-            SVNErrorManager.error(SVNErrorMessage.create(SVNErrorCode.CLIENT_BAD_REVISION), SVNLogType.DEFAULT);
-        }
-        long pegRevisionNumber = -1;
-        long startRevisionNumber;
-        long endRevisionNumber;
-        long youngestRevNumber[] = { SVNRepository.INVALID_REVISION };
-        
-        if (path != null) {
-            SVNWCAccess wcAccess = SVNWCAccess.newInstance(null);
-            try {
-                wcAccess.openAnchor(path, false, 0);
-                SVNEntry entry = wcAccess.getVersionedEntry(path, false);
-                if (entry.getCopyFromURL() != null && revision == SVNRevision.WORKING) {
-                    url = entry.getCopyFromSVNURL();
-                    pegRevisionNumber = entry.getCopyFromRevision();
-                    if (entry.getURL() == null || !entry.getURL().equals(entry.getCopyFromURL())) {
-                    	repository = null;
-                    }
-                } else if (entry.getURL() != null){
-                    url = entry.getSVNURL();
-                } else {
-                    SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_MISSING_URL, 
-                    		"''{0}'' has no URL", path);
-                    SVNErrorManager.error(err, SVNLogType.WC);
-                }
-            } finally {
-                wcAccess.close();
-            }
-        }
-        String repoPath = "";
-        Map locations = null;
-        SVNURL rootURL = null;
-
-        if (repository == null) {
-            repository = createRepository(url, null, null, true);
-        } else {
-            // path relative to repository location.
-            repoPath = SVNPathUtil.getPathAsChild(repository.getLocation().toString(), url.toString());
-            if (repoPath == null) {
-                repoPath = "";
-            }
-        }
-
-        if (pegRevisionNumber < 0) {
-            pegRevisionNumber = getRevisionNumber(revision, youngestRevNumber, repository, path);
-        }
-
-        if (revision == start && revision == SVNRevision.HEAD) {
-            startRevisionNumber = pegRevisionNumber;
-        } else {
-            startRevisionNumber = getRevisionNumber(start, youngestRevNumber, repository, path);
-        }
-
-        if (!end.isValid()) {
-            endRevisionNumber = startRevisionNumber;
-        } else {
-            endRevisionNumber = getRevisionNumber(end, youngestRevNumber, repository, path);
-        }
-
-        if (endRevisionNumber == pegRevisionNumber && startRevisionNumber == pegRevisionNumber) {
-            SVNRepositoryLocation[] result = new SVNRepositoryLocation[2];
-            result[0] = new SVNRepositoryLocation(url, startRevisionNumber);
-            result[1] = new SVNRepositoryLocation(url, endRevisionNumber);
-            return result;
-        }
-
-        rootURL = repository.getRepositoryRoot(true);
-        long[] revisionsRange = startRevisionNumber == endRevisionNumber ? new long[] { startRevisionNumber } : 
-            new long[] {startRevisionNumber, endRevisionNumber};
-
-        try {
-            locations = repository.getLocations(repoPath, (Map) null, pegRevisionNumber, revisionsRange);
-        } catch (SVNException e) {
-            if (e.getErrorMessage() != null && e.getErrorMessage().getErrorCode() == SVNErrorCode.RA_NOT_IMPLEMENTED) {
-                locations = getLocations10(repository, pegRevisionNumber, startRevisionNumber, endRevisionNumber);
-            } else {
-                throw e;
-            }
-        }
-
-        // try to get locations with 'log' method.
-        SVNLocationEntry startPath = (SVNLocationEntry) locations.get(new Long(startRevisionNumber));
-        SVNLocationEntry endPath = (SVNLocationEntry) locations.get(new Long(endRevisionNumber));
-        
-        if (startPath == null) {
-            Object source = path != null ? (Object) path : (Object) url;
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.CLIENT_UNRELATED_RESOURCES, "Unable to find repository location for ''{0}'' in revision ''{1}''", new Object[] {source, new Long(startRevisionNumber)});
-            SVNErrorManager.error(err, SVNLogType.WC);
-        }
-        if (endPath == null) {
-            Object source = path != null ? (Object) path : (Object) url;
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.CLIENT_UNRELATED_RESOURCES, "The location for ''{0}'' for revision {1} does not exist in the " +
-                    "repository or refers to an unrelated object", new Object[] {source, new Long(endRevisionNumber)});
-            SVNErrorManager.error(err, SVNLogType.WC);
-        }
-        
-        SVNRepositoryLocation[] result = new SVNRepositoryLocation[2];
-        SVNURL startURL = SVNURL.parseURIEncoded(SVNPathUtil.append(rootURL.toString(), SVNEncodingUtil.uriEncode(startPath.getPath())));
-        result[0] = new SVNRepositoryLocation(startURL, startRevisionNumber);
-        if (end.isValid()) {
-            SVNURL endURL = SVNURL.parseURIEncoded(SVNPathUtil.append(rootURL.toString(), SVNEncodingUtil.uriEncode(endPath.getPath())));
-            result[1] = new SVNRepositoryLocation(endURL, endRevisionNumber);
-        }
-        return result;
-    }
-    
-    private Map getLocations10(SVNRepository repos, final long pegRevision, final long startRevision, final long endRevision) throws SVNException {
-        final String path = repos.getRepositoryPath("");
-        final SVNNodeKind kind = repos.checkPath("", pegRevision);
-        if (kind == SVNNodeKind.NONE) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_NOT_FOUND, "path ''{0}'' doesn't exist at revision {1}", new Object[] {path, new Long(pegRevision)});
-            SVNErrorManager.error(err, SVNLogType.WC);
-        }
-        long logStart = pegRevision;
-        logStart = Math.max(startRevision, logStart);
-        logStart = Math.max(endRevision, logStart);
-        long logEnd = pegRevision;
-        logStart = Math.min(startRevision, logStart);
-        logStart = Math.min(endRevision, logStart);
-        
-        LocationsLogEntryHandler handler = new LocationsLogEntryHandler(path, startRevision, endRevision, pegRevision, kind, getEventDispatcher());
-        repos.log(new String[] {""}, logStart, logEnd, true, false, handler);
-        
-        String pegPath = handler.myPegPath == null ? handler.myCurrentPath : handler.myPegPath;
-        String startPath = handler.myStartPath == null ? handler.myCurrentPath : handler.myStartPath;
-        String endPath = handler.myEndPath == null ? handler.myCurrentPath : handler.myEndPath;
-        
-        if (pegPath == null) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_NOT_FOUND, "path ''{0}'' in revision {1} is an unrelated object", new Object[] {path, new Long(logStart)});
-            SVNErrorManager.error(err, SVNLogType.WC);
-        }
-        Map result = new SVNHashMap();
-        result.put(new Long(startRevision), new SVNLocationEntry(-1, startPath));
-        result.put(new Long(endRevision), new SVNLocationEntry(-1, endPath));
-        return result;
-    }
-    
-    private static String getPreviousLogPath(String path, SVNLogEntry logEntry, SVNNodeKind kind) throws SVNException {
-        String prevPath = null;
-        SVNLogEntryPath logPath = (SVNLogEntryPath) logEntry.getChangedPaths().get(path);
-        if (logPath != null) {
-            if (logPath.getType() != SVNLogEntryPath.TYPE_ADDED && logPath.getType() != SVNLogEntryPath.TYPE_REPLACED) {
-                return logPath.getPath();
-            }
-            if (logPath.getCopyPath() != null) {
-                return logPath.getCopyPath();
-            } 
-            return null;
-        } else if (!logEntry.getChangedPaths().isEmpty()){
-            Map sortedMap = new SVNHashMap();
-            sortedMap.putAll(logEntry.getChangedPaths());
-            List pathsList = new ArrayList(sortedMap.keySet());
-            Collections.sort(pathsList, SVNPathUtil.PATH_COMPARATOR);
-            Collections.reverse(pathsList);
-            for(Iterator paths = pathsList.iterator(); paths.hasNext();) {
-                String p = (String) paths.next();
-                if (path.startsWith(p + "/")) {
-                    SVNLogEntryPath lPath = (SVNLogEntryPath) sortedMap.get(p);
-                    if (lPath.getCopyPath() != null) {
-                        prevPath = SVNPathUtil.append(lPath.getCopyPath(), path.substring(p.length()));
-                        break;
-                    }
+                try {
+                    return SVNBasicClient17.delegate(this).getLocations(url, path, repository, revision, start, end);
+                } catch (SVNException e) {
+                    return SVNBasicClient16.delegate(this).getLocations(url, path, repository, revision, start, end);
                 }
             }
-        }
-        if (prevPath == null) {
-            if (kind == SVNNodeKind.DIR) {
-                prevPath = path;
-            } else {
-                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.CLIENT_UNRELATED_RESOURCES, "Missing changed-path information for ''{0}'' in revision {1}", new Object[] {path, new Long(logEntry.getRevision())});
-                SVNErrorManager.error(err, SVNLogType.WC);
-            }            
-        }
-        return prevPath;
-    }
     
     protected SVNURL getURL(File path) throws SVNException {
-        return deriveLocation(path, null, null, SVNRevision.UNDEFINED, null, null);
+        try {
+            return SVNBasicClient17.delegate(this).getURL(path);
+        } catch (SVNException e) {
+            return SVNBasicClient16.delegate(this).getURL(path);
+        }
     }
     
     protected SVNURL deriveLocation(File path, SVNURL url, long[] pegRevisionNumber, SVNRevision pegRevision, 
             SVNRepository repos, SVNWCAccess access) throws SVNException {
-        if (path != null) {
-            SVNEntry entry = null;
-            if (access != null) {
-                entry = access.getVersionedEntry(path, false);
-            } else {
-                SVNWCAccess wcAccess = createWCAccess();
                 try {
-                    wcAccess.probeOpen(path, false, 0);
-                    entry = wcAccess.getVersionedEntry(path, false);
-                } finally {
-                    wcAccess.close();
+                    return SVNBasicClient17.delegate(this).deriveLocation(path, url, pegRevisionNumber, pegRevision, repos, access);
+                } catch (SVNException e) {
+                    return SVNBasicClient16.delegate(this).deriveLocation(path, url, pegRevisionNumber, pegRevision, repos, access);
                 }
             }
-            url = getEntryLocation(path, entry, pegRevisionNumber, pegRevision);
-        }
-        
-        if (pegRevisionNumber != null && pegRevisionNumber.length > 0 && 
-                !SVNRevision.isValidRevisionNumber(pegRevisionNumber[0])) {
-            boolean closeRepository = false;
-            try {
-                if (repos == null) {
-                    repos = createRepository(url, null, null, false);
-                    closeRepository = true;
-                }
-                pegRevisionNumber[0] = getRevisionNumber(pegRevision, null, repos, path);
-            } finally {
-                if (closeRepository) {
-                    repos.closeSession();
-                }
-            }
-        }
-        return url;
-    }
     
     protected SVNURL getEntryLocation(File path, SVNEntry entry, long[] revNum, SVNRevision pegRevision) throws SVNException {
-        SVNURL url = null;
-        if (entry.getCopyFromURL() != null && pegRevision == SVNRevision.WORKING) {
-            url = entry.getCopyFromSVNURL();
-            if (revNum != null && revNum.length > 0) {
-                revNum[0] = entry.getCopyFromRevision();
-            } 
-        } else if (entry.getURL() != null) {
-            url = entry.getSVNURL();
-            if (revNum != null && revNum.length > 0) {
-                revNum[0] = entry.getRevision();
-            } 
-        } else {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_MISSING_URL, 
-                    "Entry for ''{0}'' has no URL", path);
-            SVNErrorManager.error(err, SVNLogType.WC);
+        try {
+            return SVNBasicClient17.delegate(this).getEntryLocation(path, entry, revNum, pegRevision);
+        } catch (SVNException e) {
+            return SVNBasicClient16.delegate(this).getEntryLocation(path, entry, revNum, pegRevision);
         }
-        return url;
     }
     
     protected SVNURL ensureSessionURL(SVNRepository repository, SVNURL url) throws SVNException {
-    	SVNURL oldURL = repository.getLocation();
-    	if (url == null) {
-    		url = repository.getRepositoryRoot(true);
-    	}
-    	if (!url.equals(oldURL)) {
-    		repository.setLocation(url, false);
-        	return oldURL;
-    	}
-    	return null;
+        try {
+            return SVNBasicClient17.delegate(this).ensureSessionURL(repository, url);
+        } catch (SVNException e) {
+            return SVNBasicClient16.delegate(this).ensureSessionURL(repository, url);
+        }
     }
     
     protected int getLevelsToLockFromDepth(SVNDepth depth) {
@@ -1092,52 +604,6 @@ public class SVNBasicClient implements ISVNEventHandler {
         item.setPropertiesModified(propertiesModified);
     }
     
-    private static final class LocationsLogEntryHandler implements ISVNLogEntryHandler {
-        
-        private String myCurrentPath = null;
-        private String myStartPath = null;
-        private String myEndPath = null;
-        private String myPegPath = null;
-
-        private long myStartRevision;
-        private long myEndRevision;
-        private long myPegRevision;
-        private SVNNodeKind myKind;
-        private ISVNEventHandler myEventHandler;
-
-        private LocationsLogEntryHandler(String path, long startRevision, long endRevision, long pegRevision, SVNNodeKind kind,
-                ISVNEventHandler eventHandler) {
-            myCurrentPath = path;
-            myStartRevision = startRevision;
-            myEndRevision = endRevision;
-            myPegRevision = pegRevision;
-            myEventHandler = eventHandler;
-            myKind = kind;
-        }
-
-        public void handleLogEntry(SVNLogEntry logEntry) throws SVNException {
-            if (myEventHandler != null) {
-                myEventHandler.checkCancelled();
-            }
-            if (logEntry.getChangedPaths() == null) {
-                return;
-            }
-            if (myCurrentPath == null) {
-                return;
-            }
-            if (myStartPath == null && logEntry.getRevision() <= myStartRevision) { 
-                myStartPath = myCurrentPath;                    
-            }
-            if (myEndPath == null && logEntry.getRevision() <= myEndRevision) { 
-                myEndPath = myCurrentPath;                    
-            }
-            if (myPegPath == null && logEntry.getRevision() <= myPegRevision) { 
-                myPegPath = myCurrentPath;                    
-            }
-            myCurrentPath = getPreviousLogPath(myCurrentPath, logEntry, myKind);
-        }
-    }
-
     protected static class RepositoryReference {
 
         public RepositoryReference(String url, long rev) {

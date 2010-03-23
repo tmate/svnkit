@@ -69,8 +69,14 @@ import org.tmatesoft.svn.util.SVNLogType;
 
 public class SVNCopyDriver extends SVNBasicClient {
 
-    private SVNWCAccess myWCAccess;
-    private boolean myIsDisableLocalModificationsCopying;
+    protected SVNWCAccess myWCAccess;
+    protected boolean myIsDisableLocalModificationsCopying;
+
+    protected SVNCopyDriver(SVNCopyDriver from) {
+        super(from);
+        this.myWCAccess = from.myWCAccess;
+        this.myIsDisableLocalModificationsCopying = from.myIsDisableLocalModificationsCopying;
+    }
     
     public void setDisableLocalModificationCopying(boolean disable) {
         myIsDisableLocalModificationsCopying = disable;

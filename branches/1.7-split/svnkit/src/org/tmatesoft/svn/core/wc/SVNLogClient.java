@@ -49,6 +49,8 @@ import org.tmatesoft.svn.core.internal.wc.admin.SVNEntry;
 import org.tmatesoft.svn.core.internal.wc.admin.SVNWCAccess;
 import org.tmatesoft.svn.core.io.SVNRepository;
 import org.tmatesoft.svn.util.SVNLogType;
+import org.tmatesoft.svn.core.internal.wc.v17.SVNLogClient17;
+import org.tmatesoft.svn.core.internal.wc.v16.SVNLogClient16;
 
 /**
  * The <b>SVNLogClient</b> class is intended for such purposes as getting
@@ -81,7 +83,12 @@ import org.tmatesoft.svn.util.SVNLogType;
  */
 public class SVNLogClient extends SVNBasicClient {
 
-    private SVNDiffOptions myDiffOptions;
+    protected SVNDiffOptions myDiffOptions;
+
+    protected SVNLogClient(SVNLogClient from) {
+        super(from);
+        this.myDiffOptions = from.myDiffOptions;
+    }
 
     /**
      * Constructs and initializes an <b>SVNLogClient</b> object
@@ -613,139 +620,12 @@ public class SVNLogClient extends SVNBasicClient {
     public void doLog(File[] paths, Collection revisionRanges, SVNRevision pegRevision, boolean stopOnCopy, 
             boolean discoverChangedPaths, boolean includeMergedRevisions, long limit, String[] revisionProperties, 
             final ISVNLogEntryHandler handler) throws SVNException {
-        if (paths == null || paths.length == 0 || handler == null) {
-            return;
-        }
-        
-        SVNRevision sessionRevision = SVNRevision.UNDEFINED;
-        List editedRevisionRanges = new LinkedList();
-        for (Iterator revRangesIter = revisionRanges.iterator(); revRangesIter.hasNext();) {
-            SVNRevisionRange revRange = (SVNRevisionRange) revRangesIter.next();
-            if (revRange.getStartRevision().isValid() && !revRange.getEndRevision().isValid()) {
-                revRange = new SVNRevisionRange(revRange.getStartRevision(), revRange.getStartRevision());   
-            } else if (!revRange.getStartRevision().isValid()) {
-                SVNRevision start = SVNRevision.UNDEFINED;
-                SVNRevision end = SVNRevision.UNDEFINED;
-                if (!pegRevision.isValid()) {
-                    start = SVNRevision.BASE;
-                } else {
-                    start = pegRevision;
-                }
-                
-                if (!revRange.getEndRevision().isValid()) {
-                    end = SVNRevision.create(0);
-                }
-                revRange = new SVNRevisionRange(start, end);
-            }
-            
-            if (!revRange.getStartRevision().isValid() || !revRange.getEndRevision().isValid()) {
-                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.CLIENT_BAD_REVISION, "Missing required revision specification");
-                SVNErrorManager.error(err, SVNLogType.WC);
-            }
-            
-            editedRevisionRanges.add(revRange);
-            if (!sessionRevision.isValid()) {
-                SVNRevision start = revRange.getStartRevision();
-                SVNRevision end = revRange.getEndRevision();
-                if (SVNRevision.isValidRevisionNumber(start.getNumber()) && SVNRevision.isValidRevisionNumber(end.getNumber())) {
-                    sessionRevision = start.getNumber() > end.getNumber() ? start : end;
-                } else if (start.getDate() != null && end.getDate() != null) {
-                    sessionRevision = start.getDate().compareTo(end.getDate()) > 0 ? start : end;
+                try {
+                    SVNLogClient17.delegate(this).doLog(paths, revisionRanges, pegRevision, stopOnCopy, discoverChangedPaths, includeMergedRevisions, limit, revisionProperties, handler);
+                } catch (SVNException e) {
+                    SVNLogClient16.delegate(this).doLog(paths, revisionRanges, pegRevision, stopOnCopy, discoverChangedPaths, includeMergedRevisions, limit, revisionProperties, handler);
                 }
             }
-        }
-        
-        if (limit > Integer.MAX_VALUE) {
-            limit = Integer.MAX_VALUE;
-        }
-        
-        ISVNLogEntryHandler wrappingHandler = new ISVNLogEntryHandler() {
-            public void handleLogEntry(SVNLogEntry logEntry) throws SVNException {
-                checkCancelled();
-                handler.handleLogEntry(logEntry);
-            }
-        };
-        
-        SVNURL[] urls = new SVNURL[paths.length];
-        SVNWCAccess wcAccess = createWCAccess();
-        Collection wcPaths = new ArrayList();
-        for (int i = 0; i < paths.length; i++) {
-            checkCancelled();
-            File path = paths[i];
-            wcPaths.add(path.getAbsolutePath().replace(File.separatorChar, '/'));
-            SVNAdminArea area = wcAccess.probeOpen(path, false, 0); 
-            SVNEntry entry = wcAccess.getVersionedEntry(path, false); 
-            if (entry.getURL() == null) {
-                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_MISSING_URL, 
-                        "Entry ''{0}'' has no URL", path);
-                SVNErrorManager.error(err, SVNLogType.WC);
-            }
-            urls[i] = entry.getSVNURL();
-            if (area != null) {
-                wcAccess.closeAdminArea(area.getRoot());
-            }
-        }
-        
-        if (urls.length == 0) {
-            return;
-        }
-        
-        String[] wcPathsArray = (String[]) wcPaths.toArray(new String[wcPaths.size()]);
-        String rootWCPath = SVNPathUtil.condencePaths(wcPathsArray, null, true);
-        Collection targets = new TreeSet();
-        SVNURL baseURL = SVNURLUtil.condenceURLs(urls, targets, true);
-        if (baseURL == null) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ILLEGAL_TARGET, 
-                    "target log paths belong to different repositories");
-            SVNErrorManager.error(err, SVNLogType.WC);
-        }
-        if (targets.isEmpty()) {
-            targets.add("");
-        }
-        
-        SVNRepository repos = null;
-        if (rootWCPath != null && needsWC(pegRevision)) {
-            // open and use wc to create repository.
-            File root = new File(rootWCPath);
-            SVNAdminArea area = wcAccess.probeOpen(root, false, 0);
-            repos = createRepository(null, root, area, pegRevision, sessionRevision, null);
-            if (area != null) {
-                wcAccess.closeAdminArea(area.getRoot());
-            }
-        } else {
-            repos = createRepository(baseURL, null, null, pegRevision, sessionRevision, null);
-        }
-        
-        String[] targetPaths = (String[]) targets.toArray(new String[targets.size()]);
-        
-        for (int i = 0; i < targetPaths.length; i++) {
-            targetPaths[i] = SVNEncodingUtil.uriDecode(targetPaths[i]);
-        }
-
-        for (Iterator revRangesIter = editedRevisionRanges.iterator(); revRangesIter.hasNext();) {
-            checkCancelled();
-            
-            SVNRevisionRange revRange = (SVNRevisionRange) revRangesIter.next();
-            SVNRevision startRevision = revRange.getStartRevision();
-            SVNRevision endRevision = revRange.getEndRevision();
-            
-            if (startRevision.isLocal() || endRevision.isLocal()) {
-                for (int i = 0; i < paths.length; i++) {
-                    checkCancelled();
-                    long startRev = getRevisionNumber(startRevision, repos, paths[i]);
-                    long endRev = getRevisionNumber(endRevision, repos, paths[i]);
-                    repos.log(targetPaths, startRev, endRev, discoverChangedPaths, stopOnCopy, limit, 
-                            includeMergedRevisions, revisionProperties, wrappingHandler);
-                }
-            } else {
-                long startRev = getRevisionNumber(startRevision, repos, null);
-                long endRev = getRevisionNumber(endRevision, repos, null);
-                repos.log(targetPaths, startRev, endRev, discoverChangedPaths, stopOnCopy, limit, 
-                        includeMergedRevisions, revisionProperties, wrappingHandler);
-            }
-        }
-        
-    }
     
     /**
      * Gets commit log messages with other revision specific information from a repository (using Working Copy 
