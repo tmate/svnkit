@@ -977,7 +977,11 @@ public class SVNCommitClient extends SVNBasicClient {
                 try {
                     return SVNCommitClient17.delegate(this).doCommit(commitPackets, keepLocks, keepChangelist, commitMessage, revisionProperties);
                 } catch (SVNException e) {
-                    return SVNCommitClient16.delegate(this).doCommit(commitPackets, keepLocks, keepChangelist, commitMessage, revisionProperties);
+                    if (e.getErrorMessage().getErrorCode() == SVNErrorCode.VERSION_MISMATCH) {
+                        return SVNCommitClient16.delegate(this).doCommit(commitPackets, keepLocks, keepChangelist, commitMessage, revisionProperties);
+                    } else {
+                        throw e;
+                    }
                 }
             }
     
@@ -1043,7 +1047,11 @@ public class SVNCommitClient extends SVNBasicClient {
                 try {
                     return SVNCommitClient17.delegate(this).doCollectCommitItems(paths, keepLocks, force, depth, changelists);
                 } catch (SVNException e) {
-                    return SVNCommitClient16.delegate(this).doCollectCommitItems(paths, keepLocks, force, depth, changelists);
+                    if (e.getErrorMessage().getErrorCode() == SVNErrorCode.VERSION_MISMATCH) {
+                        return SVNCommitClient16.delegate(this).doCollectCommitItems(paths, keepLocks, force, depth, changelists);
+                    } else {
+                        throw e;
+                    }
                 }
             }
     
@@ -1125,7 +1133,11 @@ public class SVNCommitClient extends SVNBasicClient {
                 try {
                     return SVNCommitClient17.delegate(this).doCollectCommitItems(paths, keepLocks, force, depth, combinePackets, changelists);
                 } catch (SVNException e) {
-                    return SVNCommitClient16.delegate(this).doCollectCommitItems(paths, keepLocks, force, depth, combinePackets, changelists);
+                    if (e.getErrorMessage().getErrorCode() == SVNErrorCode.VERSION_MISMATCH) {
+                        return SVNCommitClient16.delegate(this).doCollectCommitItems(paths, keepLocks, force, depth, combinePackets, changelists);
+                    } else {
+                        throw e;
+                    }
                 }
             }
 

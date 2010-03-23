@@ -409,7 +409,11 @@ public class SVNUpdateClient extends SVNBasicClient {
         try {
             return SVNUpdateClient17.delegate(this).doUpdate(path, revision, depth, allowUnversionedObstructions, depthIsSticky);
         } catch (SVNException e) {
-            return SVNUpdateClient16.delegate(this).doUpdate(path, revision, depth, allowUnversionedObstructions, depthIsSticky);
+            if (e.getErrorMessage().getErrorCode() == SVNErrorCode.VERSION_MISMATCH) {
+                return SVNUpdateClient16.delegate(this).doUpdate(path, revision, depth, allowUnversionedObstructions, depthIsSticky);
+            } else {
+                throw e;
+            }
         }
     }
 
@@ -594,7 +598,11 @@ public class SVNUpdateClient extends SVNBasicClient {
                 try {
                     return SVNUpdateClient17.delegate(this).doSwitch(path, url, pegRevision, revision, depth, allowUnversionedObstructions, depthIsSticky);
                 } catch (SVNException e) {
-                    return SVNUpdateClient16.delegate(this).doSwitch(path, url, pegRevision, revision, depth, allowUnversionedObstructions, depthIsSticky);
+                    if (e.getErrorMessage().getErrorCode() == SVNErrorCode.VERSION_MISMATCH) {
+                        return SVNUpdateClient16.delegate(this).doSwitch(path, url, pegRevision, revision, depth, allowUnversionedObstructions, depthIsSticky);
+                    } else {
+                        throw e;
+                    }
                 }
             }
     
@@ -718,7 +726,11 @@ public class SVNUpdateClient extends SVNBasicClient {
                 try {
                     return SVNUpdateClient17.delegate(this).doCheckout(url, dstPath, pegRevision, revision, depth, allowUnversionedObstructions);
                 } catch (SVNException e) {
-                    return SVNUpdateClient16.delegate(this).doCheckout(url, dstPath, pegRevision, revision, depth, allowUnversionedObstructions);
+                    if (e.getErrorMessage().getErrorCode() == SVNErrorCode.VERSION_MISMATCH) {
+                        return SVNUpdateClient16.delegate(this).doCheckout(url, dstPath, pegRevision, revision, depth, allowUnversionedObstructions);
+                    } else {
+                        throw e;
+                    }
                 }
             }
     
@@ -811,7 +823,11 @@ public class SVNUpdateClient extends SVNBasicClient {
                 try {
                     return SVNUpdateClient17.delegate(this).doExport(url, dstPath, pegRevision, revision, eolStyle, overwrite, depth);
                 } catch (SVNException e) {
-                    return SVNUpdateClient16.delegate(this).doExport(url, dstPath, pegRevision, revision, eolStyle, overwrite, depth);
+                    if (e.getErrorMessage().getErrorCode() == SVNErrorCode.VERSION_MISMATCH) {
+                        return SVNUpdateClient16.delegate(this).doExport(url, dstPath, pegRevision, revision, eolStyle, overwrite, depth);
+                    } else {
+                        throw e;
+                    }
                 }
             }
 
@@ -963,7 +979,11 @@ public class SVNUpdateClient extends SVNBasicClient {
         try {
             SVNUpdateClient17.delegate(this).doRelocate(dst, oldURL, newURL, recursive);
         } catch (SVNException e) {
-            SVNUpdateClient16.delegate(this).doRelocate(dst, oldURL, newURL, recursive);
+            if (e.getErrorMessage().getErrorCode() == SVNErrorCode.VERSION_MISMATCH) {
+                SVNUpdateClient16.delegate(this).doRelocate(dst, oldURL, newURL, recursive);
+            } else {
+                throw e;
+            }
         }
     }
 
@@ -981,7 +1001,11 @@ public class SVNUpdateClient extends SVNBasicClient {
         try {
             SVNUpdateClient17.delegate(this).doCanonicalizeURLs(dst, omitDefaultPort, recursive);
         } catch (SVNException e) {
-            SVNUpdateClient16.delegate(this).doCanonicalizeURLs(dst, omitDefaultPort, recursive);
+            if (e.getErrorMessage().getErrorCode() == SVNErrorCode.VERSION_MISMATCH) {
+                SVNUpdateClient16.delegate(this).doCanonicalizeURLs(dst, omitDefaultPort, recursive);
+            } else {
+                throw e;
+            }
         }
     }
     
@@ -1010,7 +1034,11 @@ public class SVNUpdateClient extends SVNBasicClient {
         try {
             SVNUpdateClient17.delegate(this).copyVersionedDir(from, to, revision, eolStyle, force, depth);
         } catch (SVNException e) {
-            SVNUpdateClient16.delegate(this).copyVersionedDir(from, to, revision, eolStyle, force, depth);
+            if (e.getErrorMessage().getErrorCode() == SVNErrorCode.VERSION_MISMATCH) {
+                SVNUpdateClient16.delegate(this).copyVersionedDir(from, to, revision, eolStyle, force, depth);
+            } else {
+                throw e;
+            }
         }
     }
 
@@ -1018,7 +1046,11 @@ public class SVNUpdateClient extends SVNBasicClient {
         try {
             return SVNUpdateClient17.delegate(this).doRemoteExport(repository, revNumber, dstPath, eolStyle, force, depth);
         } catch (SVNException e) {
-            return SVNUpdateClient16.delegate(this).doRemoteExport(repository, revNumber, dstPath, eolStyle, force, depth);
+            if (e.getErrorMessage().getErrorCode() == SVNErrorCode.VERSION_MISMATCH) {
+                return SVNUpdateClient16.delegate(this).doRemoteExport(repository, revNumber, dstPath, eolStyle, force, depth);
+            } else {
+                throw e;
+            }
         }
     }
 }

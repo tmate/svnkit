@@ -623,7 +623,11 @@ public class SVNLogClient extends SVNBasicClient {
                 try {
                     SVNLogClient17.delegate(this).doLog(paths, revisionRanges, pegRevision, stopOnCopy, discoverChangedPaths, includeMergedRevisions, limit, revisionProperties, handler);
                 } catch (SVNException e) {
-                    SVNLogClient16.delegate(this).doLog(paths, revisionRanges, pegRevision, stopOnCopy, discoverChangedPaths, includeMergedRevisions, limit, revisionProperties, handler);
+                    if (e.getErrorMessage().getErrorCode() == SVNErrorCode.VERSION_MISMATCH) {
+                        SVNLogClient16.delegate(this).doLog(paths, revisionRanges, pegRevision, stopOnCopy, discoverChangedPaths, includeMergedRevisions, limit, revisionProperties, handler);
+                    } else {
+                        throw e;
+                    }
                 }
             }
     

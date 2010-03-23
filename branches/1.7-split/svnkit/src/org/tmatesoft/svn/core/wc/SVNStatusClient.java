@@ -300,7 +300,11 @@ public class SVNStatusClient extends SVNBasicClient {
                 try {
                     return SVNStatusClient17.delegate(this).doStatus(path, revision, depth, remote, reportAll, includeIgnored, collectParentExternals, handler, changeLists);
                 } catch (SVNException e) {
-                    return SVNStatusClient16.delegate(this).doStatus(path, revision, depth, remote, reportAll, includeIgnored, collectParentExternals, handler, changeLists);
+                    if (e.getErrorMessage().getErrorCode() == SVNErrorCode.VERSION_MISMATCH) {
+                        return SVNStatusClient16.delegate(this).doStatus(path, revision, depth, remote, reportAll, includeIgnored, collectParentExternals, handler, changeLists);
+                    } else {
+                        throw e;
+                    }
                 }
             }
     

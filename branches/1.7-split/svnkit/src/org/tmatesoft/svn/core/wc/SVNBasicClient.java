@@ -292,7 +292,11 @@ public class SVNBasicClient implements ISVNEventHandler {
                 try {
                     return SVNBasicClient17.delegate(this).getReposRoot(path, url, pegRevision, adminArea, access);
                 } catch (SVNException e) {
-                    return SVNBasicClient16.delegate(this).getReposRoot(path, url, pegRevision, adminArea, access);
+                    if (e.getErrorMessage().getErrorCode() == SVNErrorCode.VERSION_MISMATCH) {
+                        return SVNBasicClient16.delegate(this).getReposRoot(path, url, pegRevision, adminArea, access);
+                    } else {
+                        throw e;
+                    }
                 }
             }
     
@@ -306,7 +310,11 @@ public class SVNBasicClient implements ISVNEventHandler {
         try {
             return SVNBasicClient17.delegate(this).createRepository(url, path, access, mayReuse);
         } catch (SVNException e) {
-            return SVNBasicClient16.delegate(this).createRepository(url, path, access, mayReuse);
+            if (e.getErrorMessage().getErrorCode() == SVNErrorCode.VERSION_MISMATCH) {
+                return SVNBasicClient16.delegate(this).createRepository(url, path, access, mayReuse);
+            } else {
+                throw e;
+            }
         }
     }
     
@@ -314,7 +322,11 @@ public class SVNBasicClient implements ISVNEventHandler {
         try {
             return SVNBasicClient17.delegate(this).createRepository(url, uuid, mayReuse);
         } catch (SVNException e) {
-            return SVNBasicClient16.delegate(this).createRepository(url, uuid, mayReuse);
+            if (e.getErrorMessage().getErrorCode() == SVNErrorCode.VERSION_MISMATCH) {
+                return SVNBasicClient16.delegate(this).createRepository(url, uuid, mayReuse);
+            } else {
+                throw e;
+            }
         }
     }
     
@@ -326,7 +338,11 @@ public class SVNBasicClient implements ISVNEventHandler {
         try {
             SVNBasicClient17.delegate(this).dispatchEvent(event);
         } catch (SVNException e) {
-            SVNBasicClient16.delegate(this).dispatchEvent(event);
+            if (e.getErrorMessage().getErrorCode() == SVNErrorCode.VERSION_MISMATCH) {
+                SVNBasicClient16.delegate(this).dispatchEvent(event);
+            } else {
+                throw e;
+            }
         }
     }
 
@@ -334,7 +350,11 @@ public class SVNBasicClient implements ISVNEventHandler {
         try {
             SVNBasicClient17.delegate(this).dispatchEvent(event, progress);
         } catch (SVNException e) {
-            SVNBasicClient16.delegate(this).dispatchEvent(event, progress);
+            if (e.getErrorMessage().getErrorCode() == SVNErrorCode.VERSION_MISMATCH) {
+                SVNBasicClient16.delegate(this).dispatchEvent(event, progress);
+            } else {
+                throw e;
+            }
         }
     }
     
@@ -391,7 +411,11 @@ public class SVNBasicClient implements ISVNEventHandler {
         try {
             SVNBasicClient17.delegate(this).handleEvent(event, progress);
         } catch (SVNException e) {
-            SVNBasicClient16.delegate(this).handleEvent(event, progress);
+            if (e.getErrorMessage().getErrorCode() == SVNErrorCode.VERSION_MISMATCH) {
+                SVNBasicClient16.delegate(this).handleEvent(event, progress);
+            } else {
+                throw e;
+            }
         }
     }
     
@@ -429,7 +453,11 @@ public class SVNBasicClient implements ISVNEventHandler {
         try {
             return SVNBasicClient17.delegate(this).getRevisionNumber(revision, repository, path);
         } catch (SVNException e) {
-            return SVNBasicClient16.delegate(this).getRevisionNumber(revision, repository, path);
+            if (e.getErrorMessage().getErrorCode() == SVNErrorCode.VERSION_MISMATCH) {
+                return SVNBasicClient16.delegate(this).getRevisionNumber(revision, repository, path);
+            } else {
+                throw e;
+            }
         }
     }
 
@@ -438,7 +466,11 @@ public class SVNBasicClient implements ISVNEventHandler {
                 try {
                     return SVNBasicClient17.delegate(this).getRevisionNumber(revision, latestRevisionNumber, repository, path);
                 } catch (SVNException e) {
-                    return SVNBasicClient16.delegate(this).getRevisionNumber(revision, latestRevisionNumber, repository, path);
+                    if (e.getErrorMessage().getErrorCode() == SVNErrorCode.VERSION_MISMATCH) {
+                        return SVNBasicClient16.delegate(this).getRevisionNumber(revision, latestRevisionNumber, repository, path);
+                    } else {
+                        throw e;
+                    }
                 }
             }
 
@@ -447,7 +479,11 @@ public class SVNBasicClient implements ISVNEventHandler {
                 try {
                     return SVNBasicClient17.delegate(this).createRepository(url, path, area, pegRevision, revision, pegRev);
                 } catch (SVNException e) {
-                    return SVNBasicClient16.delegate(this).createRepository(url, path, area, pegRevision, revision, pegRev);
+                    if (e.getErrorMessage().getErrorCode() == SVNErrorCode.VERSION_MISMATCH) {
+                        return SVNBasicClient16.delegate(this).createRepository(url, path, area, pegRevision, revision, pegRev);
+                    } else {
+                        throw e;
+                    }
                 }
             }
 
@@ -476,7 +512,11 @@ public class SVNBasicClient implements ISVNEventHandler {
                 try {
                     SVNBasicClient17.delegate(this).elideMergeInfo(access, path, entry, wcElisionLimitPath);
                 } catch (SVNException e) {
-                    SVNBasicClient16.delegate(this).elideMergeInfo(access, path, entry, wcElisionLimitPath);
+                    if (e.getErrorMessage().getErrorCode() == SVNErrorCode.VERSION_MISMATCH) {
+                        SVNBasicClient16.delegate(this).elideMergeInfo(access, path, entry, wcElisionLimitPath);
+                    } else {
+                        throw e;
+                    }
                 }
             }
 
@@ -488,7 +528,11 @@ public class SVNBasicClient implements ISVNEventHandler {
                 try {
                     return SVNBasicClient17.delegate(this).getReposMergeInfo(repository, path, revision, inheritance, squelchIncapable);
                 } catch (SVNException e) {
-                    return SVNBasicClient16.delegate(this).getReposMergeInfo(repository, path, revision, inheritance, squelchIncapable);
+                    if (e.getErrorMessage().getErrorCode() == SVNErrorCode.VERSION_MISMATCH) {
+                        return SVNBasicClient16.delegate(this).getReposMergeInfo(repository, path, revision, inheritance, squelchIncapable);
+                    } else {
+                        throw e;
+                    }
                 }
             }
     
@@ -498,7 +542,11 @@ public class SVNBasicClient implements ISVNEventHandler {
                 try {
                     return SVNBasicClient17.delegate(this).getWCOrRepositoryMergeInfo(path, entry, inherit, indirect, reposOnly, repository);
                 } catch (SVNException e) {
-                    return SVNBasicClient16.delegate(this).getWCOrRepositoryMergeInfo(path, entry, inherit, indirect, reposOnly, repository);
+                    if (e.getErrorMessage().getErrorCode() == SVNErrorCode.VERSION_MISMATCH) {
+                        return SVNBasicClient16.delegate(this).getWCOrRepositoryMergeInfo(path, entry, inherit, indirect, reposOnly, repository);
+                    } else {
+                        throw e;
+                    }
                 }
             }
     
@@ -510,7 +558,11 @@ public class SVNBasicClient implements ISVNEventHandler {
                 try {
                     return SVNBasicClient17.delegate(this).getWCMergeInfo(path, entry, limitPath, inherit, base, inherited);
                 } catch (SVNException e) {
-                    return SVNBasicClient16.delegate(this).getWCMergeInfo(path, entry, limitPath, inherit, base, inherited);
+                    if (e.getErrorMessage().getErrorCode() == SVNErrorCode.VERSION_MISMATCH) {
+                        return SVNBasicClient16.delegate(this).getWCMergeInfo(path, entry, limitPath, inherit, base, inherited);
+                    } else {
+                        throw e;
+                    }
                 }
             }
 
@@ -532,7 +584,11 @@ public class SVNBasicClient implements ISVNEventHandler {
                 try {
                     return SVNBasicClient17.delegate(this).getPathRelativeToRoot(path, url, reposRootURL, wcAccess, repos);
                 } catch (SVNException e) {
-                    return SVNBasicClient16.delegate(this).getPathRelativeToRoot(path, url, reposRootURL, wcAccess, repos);
+                    if (e.getErrorMessage().getErrorCode() == SVNErrorCode.VERSION_MISMATCH) {
+                        return SVNBasicClient16.delegate(this).getPathRelativeToRoot(path, url, reposRootURL, wcAccess, repos);
+                    } else {
+                        throw e;
+                    }
                 }
             }
 
@@ -540,7 +596,11 @@ public class SVNBasicClient implements ISVNEventHandler {
         try {
             return SVNBasicClient17.delegate(this).getPathRelativeToSession(url, sessionURL, repos);
         } catch (SVNException e) {
-            return SVNBasicClient16.delegate(this).getPathRelativeToSession(url, sessionURL, repos);
+            if (e.getErrorMessage().getErrorCode() == SVNErrorCode.VERSION_MISMATCH) {
+                return SVNBasicClient16.delegate(this).getPathRelativeToSession(url, sessionURL, repos);
+            } else {
+                throw e;
+            }
         }
     }
     
@@ -549,7 +609,11 @@ public class SVNBasicClient implements ISVNEventHandler {
                 try {
                     return SVNBasicClient17.delegate(this).getLocations(url, path, repository, revision, start, end);
                 } catch (SVNException e) {
-                    return SVNBasicClient16.delegate(this).getLocations(url, path, repository, revision, start, end);
+                    if (e.getErrorMessage().getErrorCode() == SVNErrorCode.VERSION_MISMATCH) {
+                        return SVNBasicClient16.delegate(this).getLocations(url, path, repository, revision, start, end);
+                    } else {
+                        throw e;
+                    }
                 }
             }
     
@@ -557,7 +621,11 @@ public class SVNBasicClient implements ISVNEventHandler {
         try {
             return SVNBasicClient17.delegate(this).getURL(path);
         } catch (SVNException e) {
-            return SVNBasicClient16.delegate(this).getURL(path);
+            if (e.getErrorMessage().getErrorCode() == SVNErrorCode.VERSION_MISMATCH) {
+                return SVNBasicClient16.delegate(this).getURL(path);
+            } else {
+                throw e;
+            }
         }
     }
     
@@ -566,7 +634,11 @@ public class SVNBasicClient implements ISVNEventHandler {
                 try {
                     return SVNBasicClient17.delegate(this).deriveLocation(path, url, pegRevisionNumber, pegRevision, repos, access);
                 } catch (SVNException e) {
-                    return SVNBasicClient16.delegate(this).deriveLocation(path, url, pegRevisionNumber, pegRevision, repos, access);
+                    if (e.getErrorMessage().getErrorCode() == SVNErrorCode.VERSION_MISMATCH) {
+                        return SVNBasicClient16.delegate(this).deriveLocation(path, url, pegRevisionNumber, pegRevision, repos, access);
+                    } else {
+                        throw e;
+                    }
                 }
             }
     
@@ -574,7 +646,11 @@ public class SVNBasicClient implements ISVNEventHandler {
         try {
             return SVNBasicClient17.delegate(this).getEntryLocation(path, entry, revNum, pegRevision);
         } catch (SVNException e) {
-            return SVNBasicClient16.delegate(this).getEntryLocation(path, entry, revNum, pegRevision);
+            if (e.getErrorMessage().getErrorCode() == SVNErrorCode.VERSION_MISMATCH) {
+                return SVNBasicClient16.delegate(this).getEntryLocation(path, entry, revNum, pegRevision);
+            } else {
+                throw e;
+            }
         }
     }
     
@@ -582,7 +658,11 @@ public class SVNBasicClient implements ISVNEventHandler {
         try {
             return SVNBasicClient17.delegate(this).ensureSessionURL(repository, url);
         } catch (SVNException e) {
-            return SVNBasicClient16.delegate(this).ensureSessionURL(repository, url);
+            if (e.getErrorMessage().getErrorCode() == SVNErrorCode.VERSION_MISMATCH) {
+                return SVNBasicClient16.delegate(this).ensureSessionURL(repository, url);
+            } else {
+                throw e;
+            }
         }
     }
     
