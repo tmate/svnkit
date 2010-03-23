@@ -269,7 +269,7 @@ public class SVNCommitItem {
         return myOutgoingProperties;
     }
     
-    void setWCAccess(SVNWCAccess wcAccess) {
+    public void setWCAccess(SVNWCAccess wcAccess) {
         myWCAccess = wcAccess;
     }
     
