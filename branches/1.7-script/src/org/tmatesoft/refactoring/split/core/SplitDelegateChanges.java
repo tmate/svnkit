@@ -22,13 +22,16 @@ import org.eclipse.jdt.core.dom.Assignment;
 import org.eclipse.jdt.core.dom.Block;
 import org.eclipse.jdt.core.dom.CatchClause;
 import org.eclipse.jdt.core.dom.CompilationUnit;
+import org.eclipse.jdt.core.dom.ConditionalExpression;
 import org.eclipse.jdt.core.dom.Expression;
 import org.eclipse.jdt.core.dom.FieldAccess;
 import org.eclipse.jdt.core.dom.FieldDeclaration;
 import org.eclipse.jdt.core.dom.IExtendedModifier;
 import org.eclipse.jdt.core.dom.ITypeBinding;
 import org.eclipse.jdt.core.dom.IVariableBinding;
+import org.eclipse.jdt.core.dom.IfStatement;
 import org.eclipse.jdt.core.dom.ImportDeclaration;
+import org.eclipse.jdt.core.dom.InfixExpression;
 import org.eclipse.jdt.core.dom.MethodDeclaration;
 import org.eclipse.jdt.core.dom.MethodInvocation;
 import org.eclipse.jdt.core.dom.Modifier;
@@ -39,10 +42,12 @@ import org.eclipse.jdt.core.dom.ReturnStatement;
 import org.eclipse.jdt.core.dom.SingleVariableDeclaration;
 import org.eclipse.jdt.core.dom.Statement;
 import org.eclipse.jdt.core.dom.SuperConstructorInvocation;
+import org.eclipse.jdt.core.dom.ThrowStatement;
 import org.eclipse.jdt.core.dom.TryStatement;
 import org.eclipse.jdt.core.dom.Type;
 import org.eclipse.jdt.core.dom.TypeDeclaration;
 import org.eclipse.jdt.core.dom.VariableDeclarationFragment;
+import org.eclipse.jdt.core.dom.InfixExpression.Operator;
 import org.eclipse.jdt.core.dom.Modifier.ModifierKeyword;
 import org.eclipse.jdt.core.dom.PrimitiveType.Code;
 import org.eclipse.jdt.core.dom.rewrite.ASTRewrite;
@@ -99,9 +104,9 @@ public class SplitDelegateChanges implements ISplitChanges {
 			final ASTRewrite rewrite = ASTRewrite.create(ast);
 
 			if (model.getWhiteListTypesNames().contains(sourceType.getFullyQualifiedName())) {
-				
+
 				addDelegationConstructor(unitModel, rewrite);
-				
+
 			} else {
 
 				final ListRewrite importsRewrite = rewrite.getListRewrite(sourceAst, sourceAst.IMPORTS_PROPERTY);
@@ -137,6 +142,7 @@ public class SplitDelegateChanges implements ISplitChanges {
 				}
 
 				if (!unitModel.isSourceInterface()) {
+					addImportErrorCode(unitModel, ast, sourceAst, importsRewrite);
 					addDelegationConstructor(unitModel, rewrite);
 				}
 
@@ -401,6 +407,32 @@ public class SplitDelegateChanges implements ISplitChanges {
 			final Block catchBody = catchClause.getBody();
 			final List<Statement> catchStatements = catchBody.statements();
 
+			final IfStatement ifStatement = ast.newIfStatement();
+			catchStatements.add(ifStatement);
+
+			final InfixExpression infix = ast.newInfixExpression();
+			ifStatement.setExpression(infix);
+
+			final MethodInvocation invocMessage = ast.newMethodInvocation();
+			invocMessage.setExpression(ast.newSimpleName("e"));
+			invocMessage.setName(ast.newSimpleName("getErrorMessage"));
+			final MethodInvocation invocCode = ast.newMethodInvocation();
+			invocCode.setExpression(invocMessage);
+			invocCode.setName(ast.newSimpleName("getErrorCode"));
+
+			infix.setLeftOperand(invocCode);
+			infix.setOperator(InfixExpression.Operator.EQUALS);
+
+			final FieldAccess fieldAccess = ast.newFieldAccess();
+			infix.setRightOperand(fieldAccess);
+			fieldAccess.setExpression(ast.newName("SVNErrorCode"));
+			fieldAccess.setName(ast.newSimpleName("VERSION_MISMATCH"));
+
+			final Block thenBlock = ast.newBlock();
+			final Block elseBlock = ast.newBlock();
+
+			ifStatement.setThenStatement(thenBlock);
+
 			final MethodInvocation invoc1 = ast.newMethodInvocation();
 
 			if (Modifier.isStatic(methodDeclaration.getModifiers())) {
@@ -423,14 +455,53 @@ public class SplitDelegateChanges implements ISplitChanges {
 			if (isReturn) {
 				final ReturnStatement returnStatement = ast.newReturnStatement();
 				returnStatement.setExpression(invoc1);
-				catchStatements.add(returnStatement);
+				thenBlock.statements().add(returnStatement);
 			} else {
-				catchStatements.add(ast.newExpressionStatement(invoc1));
+				thenBlock.statements().add(ast.newExpressionStatement(invoc1));
 			}
+
+			ifStatement.setElseStatement(elseBlock);
+
+			final ThrowStatement throwStatement = ast.newThrowStatement();
+			throwStatement.setExpression(ast.newSimpleName("e"));
+			elseBlock.statements().add(throwStatement);
+
 		}
 
 		rewrite.replace(methodDeclaration.getBody(), block, null);
 
+	}
+
+	protected void addImportErrorCode(final SplitUnitModel unitModel, final AST ast, final CompilationUnit sourceAst,
+			ListRewrite importsRewrite) {
+
+		boolean foundSVNErrorCode = false;
+
+		final List<ImportDeclaration> imports = sourceAst.imports();
+		for (final ImportDeclaration importDeclaration : imports) {
+
+			final String name = importDeclaration.getName().getFullyQualifiedName();
+
+			if (!foundSVNErrorCode) {
+				if ("org.tmatesoft.svn.core.SVNErrorCode".equals(name)) {
+					foundSVNErrorCode = true;
+					continue;
+				}
+			}
+
+		}
+
+		if (!foundSVNErrorCode) {
+			addImport(ast, importsRewrite, ast.newName("org.tmatesoft.svn.core.SVNErrorCode"));
+		}
+
+	}
+
+	private void addImport(final AST ast, final ListRewrite imports, final Name name) {
+		final ImportDeclaration importDeclaration = ast.newImportDeclaration();
+		importDeclaration.setOnDemand(false);
+		importDeclaration.setName(name);
+		imports.insertLast(importDeclaration, null);
 	}
 
 }
