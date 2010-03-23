@@ -98,108 +98,116 @@ public class SplitDelegateChanges implements ISplitChanges {
 			final AST ast = sourceAst.getAST();
 			final ASTRewrite rewrite = ASTRewrite.create(ast);
 
-			final ListRewrite importsRewrite = rewrite.getListRewrite(sourceAst, sourceAst.IMPORTS_PROPERTY);
-
-			boolean found = false;
-			final List<ImportDeclaration> imports = sourceAst.imports();
-			for (final ImportDeclaration importDeclaration : imports) {
-				if (importDeclaration.getName().getFullyQualifiedName().equals("org.tmatesoft.svn.core.SVNException")) {
-					found = true;
-					break;
-				}
-			}
-
-			if (!found) {
-				final ImportDeclaration imp = ast.newImportDeclaration();
-				imp.setName(ast.newName("org.tmatesoft.svn.core.SVNException"));
-				importsRewrite.insertLast(imp, null);
-			}
-
-			final String sourceTypeName = unitModel.getSourceTypeName();
-
-			{
-				final ImportDeclaration imp = ast.newImportDeclaration();
-				imp.setName(ast.newName(targetPackage1 + "." + sourceTypeName + targetSuffix1));
-				importsRewrite.insertLast(imp, null);
-			}
-
-			{
-				final ImportDeclaration imp = ast.newImportDeclaration();
-				imp.setName(ast.newName(targetPackage2 + "." + sourceTypeName + targetSuffix2));
-				importsRewrite.insertLast(imp, null);
-			}
-
-			if (!unitModel.isSourceInterface()) {
+			if (model.getWhiteListTypesNames().contains(sourceType.getFullyQualifiedName())) {
+				
 				addDelegationConstructor(unitModel, rewrite);
-			}
+				
+			} else {
 
-			final Set<IType> removeNestedTypes = new HashSet<IType>();
+				final ListRewrite importsRewrite = rewrite.getListRewrite(sourceAst, sourceAst.IMPORTS_PROPERTY);
 
-			final Map<IMethod, MethodDeclaration> methods = unitModel.getAddMethods();
-
-			final IJavaSearchScope unitScope = SearchEngine.createJavaSearchScope(new IJavaElement[] { unitModel
-					.getSourceUnit() }, IJavaSearchScope.SOURCES);
-
-			final Set<IType> nestedTypes = unitModel.getNestedTypes();
-			for (final IType nestedType : nestedTypes) {
-				if (Flags.isPrivate(nestedType.getFlags())) {
-					final SearchPattern typePattern = SearchPattern.createPattern(nestedType,
-							IJavaSearchConstants.REFERENCES);
-					final List<IMethod> references = SplitUtils.searchManyElements(IMethod.class, typePattern,
-							unitScope, subMonitor);
-					boolean delegate = false;
-					for (final IMethod reference : references) {
-						final MethodDeclaration referenceDecl = methods.get(reference);
-						if (referenceDecl == null || !isShouldDelegate(referenceDecl)) {
-							delegate = true;
-							break;
-						}
-					}
-					if (!delegate) {
-						removeNestedTypes.add(nestedType);
-						final ASTNode node = NodeFinder.perform(sourceAst, nestedType.getSourceRange());
-						if (node != null) {
-							rewrite.remove(node, null);
-						}
+				boolean found = false;
+				final List<ImportDeclaration> imports = sourceAst.imports();
+				for (final ImportDeclaration importDeclaration : imports) {
+					if (importDeclaration.getName().getFullyQualifiedName().equals(
+							"org.tmatesoft.svn.core.SVNException")) {
+						found = true;
+						break;
 					}
 				}
-			}
 
-			for (final Entry<IMethod, MethodDeclaration> methodsEntry : methods.entrySet()) {
-				final IMethod method = methodsEntry.getKey();
-				final MethodDeclaration methodDeclaration = methodsEntry.getValue();
-				if (!method.isConstructor()) {
-					if (!Flags.isPrivate(method.getFlags())) {
-						doDelegation(unitModel, rewrite, methodDeclaration, status, subMonitor);
-					} else {
-						final SearchPattern methodPattern = SearchPattern.createPattern(method,
+				if (!found) {
+					final ImportDeclaration imp = ast.newImportDeclaration();
+					imp.setName(ast.newName("org.tmatesoft.svn.core.SVNException"));
+					importsRewrite.insertLast(imp, null);
+				}
+
+				final String sourceTypeName = unitModel.getSourceTypeName();
+
+				{
+					final ImportDeclaration imp = ast.newImportDeclaration();
+					imp.setName(ast.newName(targetPackage1 + "." + sourceTypeName + targetSuffix1));
+					importsRewrite.insertLast(imp, null);
+				}
+
+				{
+					final ImportDeclaration imp = ast.newImportDeclaration();
+					imp.setName(ast.newName(targetPackage2 + "." + sourceTypeName + targetSuffix2));
+					importsRewrite.insertLast(imp, null);
+				}
+
+				if (!unitModel.isSourceInterface()) {
+					addDelegationConstructor(unitModel, rewrite);
+				}
+
+				final Set<IType> removeNestedTypes = new HashSet<IType>();
+
+				final Map<IMethod, MethodDeclaration> methods = unitModel.getAddMethods();
+
+				final IJavaSearchScope unitScope = SearchEngine.createJavaSearchScope(new IJavaElement[] { unitModel
+						.getSourceUnit() }, IJavaSearchScope.SOURCES);
+
+				final Set<IType> nestedTypes = unitModel.getNestedTypes();
+				for (final IType nestedType : nestedTypes) {
+					if (Flags.isPrivate(nestedType.getFlags())) {
+						final SearchPattern typePattern = SearchPattern.createPattern(nestedType,
 								IJavaSearchConstants.REFERENCES);
-						final List<IMethod> references = SplitUtils.searchManyElements(IMethod.class, methodPattern,
+						final List<IMethod> references = SplitUtils.searchManyElements(IMethod.class, typePattern,
 								unitScope, subMonitor);
 						boolean delegate = false;
 						for (final IMethod reference : references) {
 							final MethodDeclaration referenceDecl = methods.get(reference);
 							if (referenceDecl == null || !isShouldDelegate(referenceDecl)) {
-								final IType declaringType = reference.getDeclaringType();
-								if (declaringType == null || !removeNestedTypes.contains(declaringType)) {
-									delegate = true;
-									break;
-								}
+								delegate = true;
+								break;
 							}
 						}
-						if (delegate) {
-							doDelegation(unitModel, rewrite, methodDeclaration, status, subMonitor);
-						} else {
-							rewrite.remove(methodDeclaration, null);
+						if (!delegate) {
+							removeNestedTypes.add(nestedType);
+							final ASTNode node = NodeFinder.perform(sourceAst, nestedType.getSourceRange());
+							if (node != null) {
+								rewrite.remove(node, null);
+							}
 						}
 					}
 				}
-			}
 
-			for (final IType nestedType : removeNestedTypes) {
-				final ASTNode node = NodeFinder.perform(sourceAst, nestedType.getSourceRange());
-				if (node != null) {
-					rewrite.remove(node, null);
+				for (final Entry<IMethod, MethodDeclaration> methodsEntry : methods.entrySet()) {
+					final IMethod method = methodsEntry.getKey();
+					final MethodDeclaration methodDeclaration = methodsEntry.getValue();
+					if (!method.isConstructor()) {
+						if (!Flags.isPrivate(method.getFlags())) {
+							doDelegation(unitModel, rewrite, methodDeclaration, status, subMonitor);
+						} else {
+							final SearchPattern methodPattern = SearchPattern.createPattern(method,
+									IJavaSearchConstants.REFERENCES);
+							final List<IMethod> references = SplitUtils.searchManyElements(IMethod.class,
+									methodPattern, unitScope, subMonitor);
+							boolean delegate = false;
+							for (final IMethod reference : references) {
+								final MethodDeclaration referenceDecl = methods.get(reference);
+								if (referenceDecl == null || !isShouldDelegate(referenceDecl)) {
+									final IType declaringType = reference.getDeclaringType();
+									if (declaringType == null || !removeNestedTypes.contains(declaringType)) {
+										delegate = true;
+										break;
+									}
+								}
+							}
+							if (delegate) {
+								doDelegation(unitModel, rewrite, methodDeclaration, status, subMonitor);
+							} else {
+								rewrite.remove(methodDeclaration, null);
+							}
+						}
+					}
+				}
+
+				for (final IType nestedType : removeNestedTypes) {
+					final ASTNode node = NodeFinder.perform(sourceAst, nestedType.getSourceRange());
+					if (node != null) {
+						rewrite.remove(node, null);
+					}
 				}
 			}
 

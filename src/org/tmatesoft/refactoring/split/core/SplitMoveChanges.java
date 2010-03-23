@@ -41,14 +41,12 @@ import org.eclipse.jdt.core.dom.Statement;
 import org.eclipse.jdt.core.dom.SuperConstructorInvocation;
 import org.eclipse.jdt.core.dom.TagElement;
 import org.eclipse.jdt.core.dom.TextElement;
-import org.eclipse.jdt.core.dom.ThisExpression;
 import org.eclipse.jdt.core.dom.Type;
 import org.eclipse.jdt.core.dom.TypeDeclaration;
 import org.eclipse.jdt.core.dom.VariableDeclarationFragment;
 import org.eclipse.jdt.core.dom.VariableDeclarationStatement;
 import org.eclipse.jdt.core.formatter.CodeFormatter;
 import org.eclipse.jdt.internal.corext.refactoring.changes.CreateCompilationUnitChange;
-import org.eclipse.jdt.internal.corext.refactoring.changes.CreatePackageChange;
 import org.eclipse.jface.text.BadLocationException;
 import org.eclipse.jface.text.Document;
 import org.eclipse.ltk.core.refactoring.RefactoringStatus;
@@ -66,13 +64,17 @@ public class SplitMoveChanges extends SplitTargetChanges {
 	protected void doUnitChange(SplitUnitModel unitModel, RefactoringStatus status, SubProgressMonitor monitor)
 			throws MalformedTreeException, CoreException, BadLocationException {
 
-		final SplitUnitMoveTypeBuilder builder = new SplitUnitMoveTypeBuilder(unitModel, getTargetSuffix());
-		builder.moveTypes();
+		if (!unitModel.getModel().getWhiteListTypesNames().contains(unitModel.getSourceType().getFullyQualifiedName())) {
 
-		applyUnitSplit(unitModel, status, monitor);
+			final SplitUnitMoveTypeBuilder builder = new SplitUnitMoveTypeBuilder(unitModel, getTargetSuffix());
+			builder.moveTypes();
 
-		builder.setRestore(true);
-		builder.moveTypes();
+			applyUnitSplit(unitModel, status, monitor);
+
+			builder.setRestore(true);
+			builder.moveTypes();
+
+		}
 
 	}
 
