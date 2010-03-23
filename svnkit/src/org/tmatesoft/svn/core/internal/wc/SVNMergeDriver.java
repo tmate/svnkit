@@ -106,17 +106,52 @@ public abstract class SVNMergeDriver extends SVNBasicClient implements ISVNMerge
     protected Map myDryRunDeletions;
     protected SVNURL myURL;
     protected File myTarget;
-    private List myMergedPaths;
-    private List mySkippedPaths;
-    private List myChildrenWithMergeInfo;
-    private List myAddedPaths;
+    protected List myMergedPaths;
+    protected List mySkippedPaths;
+    protected List myChildrenWithMergeInfo;
+    protected List myAddedPaths;
     protected SVNWCAccess myWCAccess;
     protected SVNRepository myRepository1;
     protected SVNRepository myRepository2;
-    private SVNLogClient myLogClient;
-    private List myPathsWithNewMergeInfo;
-    private LinkedList myPathsWithDeletedMergeInfo;
-    private MergeSource myCurrentMergeSource;
+    protected SVNLogClient myLogClient;
+    protected List myPathsWithNewMergeInfo;
+    protected LinkedList myPathsWithDeletedMergeInfo;
+    protected MergeSource myCurrentMergeSource;
+
+    protected SVNMergeDriver(SVNMergeDriver from) {
+        super(from);
+        this.myAreSourcesAncestral = from.myAreSourcesAncestral;
+        this.myIsSameRepository = from.myIsSameRepository;
+        this.myIsDryRun = from.myIsDryRun;
+        this.myIsRecordOnly = from.myIsRecordOnly;
+        this.myIsForce = from.myIsForce;
+        this.myIsTargetMissingChild = from.myIsTargetMissingChild;
+        this.myHasExistingMergeInfo = from.myHasExistingMergeInfo;
+        this.myIsTargetHasDummyMergeRange = from.myIsTargetHasDummyMergeRange;
+        this.myIsIgnoreAncestry = from.myIsIgnoreAncestry;
+        this.myIsSingleFileMerge = from.myIsSingleFileMerge;
+        this.myIsMergeInfoCapable = from.myIsMergeInfoCapable;
+        this.myIsReIntegrateMerge = from.myIsReIntegrateMerge;
+        this.myIsAddNecessitatedMerge = from.myIsAddNecessitatedMerge;
+        this.myOperativeNotificationsNumber = from.myOperativeNotificationsNumber;
+        this.myNotificationsNumber = from.myNotificationsNumber;
+        this.myCurrentAncestorIndex = from.myCurrentAncestorIndex;
+        this.myConflictedPaths = from.myConflictedPaths;
+        this.myDryRunDeletions = from.myDryRunDeletions;
+        this.myURL = from.myURL;
+        this.myTarget = from.myTarget;
+        this.myMergedPaths = from.myMergedPaths;
+        this.mySkippedPaths = from.mySkippedPaths;
+        this.myChildrenWithMergeInfo = from.myChildrenWithMergeInfo;
+        this.myAddedPaths = from.myAddedPaths;
+        this.myWCAccess = from.myWCAccess;
+        this.myRepository1 = from.myRepository1;
+        this.myRepository2 = from.myRepository2;
+        this.myLogClient = from.myLogClient;
+        this.myPathsWithNewMergeInfo = from.myPathsWithNewMergeInfo;
+        this.myPathsWithDeletedMergeInfo = from.myPathsWithDeletedMergeInfo;
+        this.myCurrentMergeSource = from.myCurrentMergeSource;
+    }
     
     public SVNMergeDriver(ISVNAuthenticationManager authManager, ISVNOptions options) {
         super(authManager, options);
