@@ -284,7 +284,11 @@ public class SVNChangelistClient extends SVNBasicClient {
                 try {
                     SVNChangelistClient17.delegate(this).doGetChangeLists(path, changeLists, depth, handler);
                 } catch (SVNException e) {
-                    SVNChangelistClient16.delegate(this).doGetChangeLists(path, changeLists, depth, handler);
+                    if (e.getErrorMessage().getErrorCode() == SVNErrorCode.VERSION_MISMATCH) {
+                        SVNChangelistClient16.delegate(this).doGetChangeLists(path, changeLists, depth, handler);
+                    } else {
+                        throw e;
+                    }
                 }
             }
 
@@ -292,7 +296,11 @@ public class SVNChangelistClient extends SVNBasicClient {
         try {
             SVNChangelistClient17.delegate(this).setChangelist(paths, changelistName, changelists, depth);
         } catch (SVNException e) {
-            SVNChangelistClient16.delegate(this).setChangelist(paths, changelistName, changelists, depth);
+            if (e.getErrorMessage().getErrorCode() == SVNErrorCode.VERSION_MISMATCH) {
+                SVNChangelistClient16.delegate(this).setChangelist(paths, changelistName, changelists, depth);
+            } else {
+                throw e;
+            }
         }
     }
 

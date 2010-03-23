@@ -197,7 +197,11 @@ public class SVNMoveClient extends SVNCopyDriver {
         try {
             SVNMoveClient17.delegate(this).doMove(src, dst);
         } catch (SVNException e) {
-            SVNMoveClient16.delegate(this).doMove(src, dst);
+            if (e.getErrorMessage().getErrorCode() == SVNErrorCode.VERSION_MISMATCH) {
+                SVNMoveClient16.delegate(this).doMove(src, dst);
+            } else {
+                throw e;
+            }
         }
     }
 
@@ -272,7 +276,11 @@ public class SVNMoveClient extends SVNCopyDriver {
         try {
             SVNMoveClient17.delegate(this).undoMove(src, dst);
         } catch (SVNException e) {
-            SVNMoveClient16.delegate(this).undoMove(src, dst);
+            if (e.getErrorMessage().getErrorCode() == SVNErrorCode.VERSION_MISMATCH) {
+                SVNMoveClient16.delegate(this).undoMove(src, dst);
+            } else {
+                throw e;
+            }
         }
     }
     
@@ -314,7 +322,11 @@ public class SVNMoveClient extends SVNCopyDriver {
         try {
             SVNMoveClient17.delegate(this).doVirtualCopy(src, dst, move);
         } catch (SVNException e) {
-            SVNMoveClient16.delegate(this).doVirtualCopy(src, dst, move);
+            if (e.getErrorMessage().getErrorCode() == SVNErrorCode.VERSION_MISMATCH) {
+                SVNMoveClient16.delegate(this).doVirtualCopy(src, dst, move);
+            } else {
+                throw e;
+            }
         }
     }
 

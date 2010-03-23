@@ -26,6 +26,7 @@ import org.tmatesoft.svn.core.internal.wc.admin.SVNAdminArea;
 import org.tmatesoft.svn.core.internal.wc.admin.SVNLog;
 import org.tmatesoft.svn.core.internal.wc.v17.SVNMergeFileSet17;
 import org.tmatesoft.svn.core.internal.wc.v16.SVNMergeFileSet16;
+import org.tmatesoft.svn.core.SVNErrorCode;
 
 
 /**

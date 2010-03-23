@@ -515,7 +515,11 @@ public class SVNWCClient extends SVNBasicClient {
         try {
             SVNWCClient17.delegate(this).doCleanup(path, deleteWCProperties);
         } catch (SVNException e) {
-            SVNWCClient16.delegate(this).doCleanup(path, deleteWCProperties);
+            if (e.getErrorMessage().getErrorCode() == SVNErrorCode.VERSION_MISMATCH) {
+                SVNWCClient16.delegate(this).doCleanup(path, deleteWCProperties);
+            } else {
+                throw e;
+            }
         }
     }
 
@@ -579,7 +583,11 @@ public class SVNWCClient extends SVNBasicClient {
                 try {
                     SVNWCClient17.delegate(this).doSetProperty(path, propName, propValue, skipChecks, depth, handler, changeLists);
                 } catch (SVNException e) {
-                    SVNWCClient16.delegate(this).doSetProperty(path, propName, propValue, skipChecks, depth, handler, changeLists);
+                    if (e.getErrorMessage().getErrorCode() == SVNErrorCode.VERSION_MISMATCH) {
+                        SVNWCClient16.delegate(this).doSetProperty(path, propName, propValue, skipChecks, depth, handler, changeLists);
+                    } else {
+                        throw e;
+                    }
                 }
             }
 
@@ -636,7 +644,11 @@ public class SVNWCClient extends SVNBasicClient {
                 try {
                     SVNWCClient17.delegate(this).doSetProperty(path, propertyValueProvider, skipChecks, depth, handler, changeLists);
                 } catch (SVNException e) {
-                    SVNWCClient16.delegate(this).doSetProperty(path, propertyValueProvider, skipChecks, depth, handler, changeLists);
+                    if (e.getErrorMessage().getErrorCode() == SVNErrorCode.VERSION_MISMATCH) {
+                        SVNWCClient16.delegate(this).doSetProperty(path, propertyValueProvider, skipChecks, depth, handler, changeLists);
+                    } else {
+                        throw e;
+                    }
                 }
             }
 
@@ -1092,7 +1104,11 @@ public class SVNWCClient extends SVNBasicClient {
                 try {
                     SVNWCClient17.delegate(this).doGetProperty(path, propName, pegRevision, revision, depth, handler, changeLists);
                 } catch (SVNException e) {
-                    SVNWCClient16.delegate(this).doGetProperty(path, propName, pegRevision, revision, depth, handler, changeLists);
+                    if (e.getErrorMessage().getErrorCode() == SVNErrorCode.VERSION_MISMATCH) {
+                        SVNWCClient16.delegate(this).doGetProperty(path, propName, pegRevision, revision, depth, handler, changeLists);
+                    } else {
+                        throw e;
+                    }
                 }
             }
 
@@ -1285,7 +1301,11 @@ public class SVNWCClient extends SVNBasicClient {
         try {
             SVNWCClient17.delegate(this).doDelete(path, force, dryRun);
         } catch (SVNException e) {
-            SVNWCClient16.delegate(this).doDelete(path, force, dryRun);
+            if (e.getErrorMessage().getErrorCode() == SVNErrorCode.VERSION_MISMATCH) {
+                SVNWCClient16.delegate(this).doDelete(path, force, dryRun);
+            } else {
+                throw e;
+            }
         }
     }
 
@@ -1319,7 +1339,11 @@ public class SVNWCClient extends SVNBasicClient {
         try {
             SVNWCClient17.delegate(this).doDelete(path, force, deleteFiles, dryRun);
         } catch (SVNException e) {
-            SVNWCClient16.delegate(this).doDelete(path, force, deleteFiles, dryRun);
+            if (e.getErrorMessage().getErrorCode() == SVNErrorCode.VERSION_MISMATCH) {
+                SVNWCClient16.delegate(this).doDelete(path, force, deleteFiles, dryRun);
+            } else {
+                throw e;
+            }
         }
     }
 
@@ -1468,7 +1492,11 @@ public class SVNWCClient extends SVNBasicClient {
                 try {
                     SVNWCClient17.delegate(this).doAdd(path, force, mkdir, climbUnversionedParents, depth, includeIgnored, makeParents);
                 } catch (SVNException e) {
-                    SVNWCClient16.delegate(this).doAdd(path, force, mkdir, climbUnversionedParents, depth, includeIgnored, makeParents);
+                    if (e.getErrorMessage().getErrorCode() == SVNErrorCode.VERSION_MISMATCH) {
+                        SVNWCClient16.delegate(this).doAdd(path, force, mkdir, climbUnversionedParents, depth, includeIgnored, makeParents);
+                    } else {
+                        throw e;
+                    }
                 }
             }
 
@@ -1598,7 +1626,11 @@ public class SVNWCClient extends SVNBasicClient {
                 try {
                     SVNWCClient17.delegate(this).doAdd(path, force, mkdir, climbUnversionedParents, depth, depthIsSticky, includeIgnored, makeParents);
                 } catch (SVNException e) {
-                    SVNWCClient16.delegate(this).doAdd(path, force, mkdir, climbUnversionedParents, depth, depthIsSticky, includeIgnored, makeParents);
+                    if (e.getErrorMessage().getErrorCode() == SVNErrorCode.VERSION_MISMATCH) {
+                        SVNWCClient16.delegate(this).doAdd(path, force, mkdir, climbUnversionedParents, depth, depthIsSticky, includeIgnored, makeParents);
+                    } else {
+                        throw e;
+                    }
                 }
             }
 
@@ -1615,7 +1647,11 @@ public class SVNWCClient extends SVNBasicClient {
         try {
             SVNWCClient17.delegate(this).doMarkReplaced(path);
         } catch (SVNException e) {
-            SVNWCClient16.delegate(this).doMarkReplaced(path);
+            if (e.getErrorMessage().getErrorCode() == SVNErrorCode.VERSION_MISMATCH) {
+                SVNWCClient16.delegate(this).doMarkReplaced(path);
+            } else {
+                throw e;
+            }
         }
     }
 
@@ -1698,7 +1734,11 @@ public class SVNWCClient extends SVNBasicClient {
         try {
             SVNWCClient17.delegate(this).doRevert(paths, depth, changeLists);
         } catch (SVNException e) {
-            SVNWCClient16.delegate(this).doRevert(paths, depth, changeLists);
+            if (e.getErrorMessage().getErrorCode() == SVNErrorCode.VERSION_MISMATCH) {
+                SVNWCClient16.delegate(this).doRevert(paths, depth, changeLists);
+            } else {
+                throw e;
+            }
         }
     }
 
@@ -1839,7 +1879,11 @@ public class SVNWCClient extends SVNBasicClient {
                 try {
                     SVNWCClient17.delegate(this).doResolve(path, depth, resolveContents, resolveProperties, resolveTree, conflictChoice);
                 } catch (SVNException e) {
-                    SVNWCClient16.delegate(this).doResolve(path, depth, resolveContents, resolveProperties, resolveTree, conflictChoice);
+                    if (e.getErrorMessage().getErrorCode() == SVNErrorCode.VERSION_MISMATCH) {
+                        SVNWCClient16.delegate(this).doResolve(path, depth, resolveContents, resolveProperties, resolveTree, conflictChoice);
+                    } else {
+                        throw e;
+                    }
                 }
             }
 
@@ -1864,7 +1908,11 @@ public class SVNWCClient extends SVNBasicClient {
         try {
             SVNWCClient17.delegate(this).doLock(paths, stealLock, lockMessage);
         } catch (SVNException e) {
-            SVNWCClient16.delegate(this).doLock(paths, stealLock, lockMessage);
+            if (e.getErrorMessage().getErrorCode() == SVNErrorCode.VERSION_MISMATCH) {
+                SVNWCClient16.delegate(this).doLock(paths, stealLock, lockMessage);
+            } else {
+                throw e;
+            }
         }
     }
 
@@ -1930,7 +1978,11 @@ public class SVNWCClient extends SVNBasicClient {
         try {
             SVNWCClient17.delegate(this).doUnlock(paths, breakLock);
         } catch (SVNException e) {
-            SVNWCClient16.delegate(this).doUnlock(paths, breakLock);
+            if (e.getErrorMessage().getErrorCode() == SVNErrorCode.VERSION_MISMATCH) {
+                SVNWCClient16.delegate(this).doUnlock(paths, breakLock);
+            } else {
+                throw e;
+            }
         }
     }
 
@@ -2086,7 +2138,11 @@ public class SVNWCClient extends SVNBasicClient {
                 try {
                     SVNWCClient17.delegate(this).doInfo(path, pegRevision, revision, depth, changeLists, handler);
                 } catch (SVNException e) {
-                    SVNWCClient16.delegate(this).doInfo(path, pegRevision, revision, depth, changeLists, handler);
+                    if (e.getErrorMessage().getErrorCode() == SVNErrorCode.VERSION_MISMATCH) {
+                        SVNWCClient16.delegate(this).doInfo(path, pegRevision, revision, depth, changeLists, handler);
+                    } else {
+                        throw e;
+                    }
                 }
             }
 
@@ -2153,7 +2209,11 @@ public class SVNWCClient extends SVNBasicClient {
                 try {
                     SVNWCClient17.delegate(this).doInfo(url, pegRevision, revision, depth, handler);
                 } catch (SVNException e) {
-                    SVNWCClient16.delegate(this).doInfo(url, pegRevision, revision, depth, handler);
+                    if (e.getErrorMessage().getErrorCode() == SVNErrorCode.VERSION_MISMATCH) {
+                        SVNWCClient16.delegate(this).doInfo(url, pegRevision, revision, depth, handler);
+                    } else {
+                        throw e;
+                    }
                 }
             }
 
@@ -2223,7 +2283,11 @@ public class SVNWCClient extends SVNBasicClient {
         try {
             return SVNWCClient17.delegate(this).doGetWorkingCopyID(path, trailURL, committed);
         } catch (SVNException e) {
-            return SVNWCClient16.delegate(this).doGetWorkingCopyID(path, trailURL, committed);
+            if (e.getErrorMessage().getErrorCode() == SVNErrorCode.VERSION_MISMATCH) {
+                return SVNWCClient16.delegate(this).doGetWorkingCopyID(path, trailURL, committed);
+            } else {
+                throw e;
+            }
         }
     }
 
@@ -2305,7 +2369,11 @@ public class SVNWCClient extends SVNBasicClient {
         try {
             SVNWCClient17.delegate(this).doCleanupWCProperties(directory);
         } catch (SVNException e) {
-            SVNWCClient16.delegate(this).doCleanupWCProperties(directory);
+            if (e.getErrorMessage().getErrorCode() == SVNErrorCode.VERSION_MISMATCH) {
+                SVNWCClient16.delegate(this).doCleanupWCProperties(directory);
+            } else {
+                throw e;
+            }
         }
     }
     
@@ -2329,7 +2397,11 @@ public class SVNWCClient extends SVNBasicClient {
         try {
             SVNWCClient17.delegate(this).doSetWCFormat(directory, format);
         } catch (SVNException e) {
-            SVNWCClient16.delegate(this).doSetWCFormat(directory, format);
+            if (e.getErrorMessage().getErrorCode() == SVNErrorCode.VERSION_MISMATCH) {
+                SVNWCClient16.delegate(this).doSetWCFormat(directory, format);
+            } else {
+                throw e;
+            }
         }
     }
     
@@ -2383,7 +2455,11 @@ public class SVNWCClient extends SVNBasicClient {
         try {
             SVNWCClient17.delegate(this).reportEntry(path, entry, handler);
         } catch (SVNException e) {
-            SVNWCClient16.delegate(this).reportEntry(path, entry, handler);
+            if (e.getErrorMessage().getErrorCode() == SVNErrorCode.VERSION_MISMATCH) {
+                SVNWCClient16.delegate(this).reportEntry(path, entry, handler);
+            } else {
+                throw e;
+            }
         }
     }
 
@@ -2392,7 +2468,11 @@ public class SVNWCClient extends SVNBasicClient {
                 try {
                     SVNWCClient17.delegate(this).doGetRemoteProperty(url, path, repos, propName, rev, depth, handler);
                 } catch (SVNException e) {
-                    SVNWCClient16.delegate(this).doGetRemoteProperty(url, path, repos, propName, rev, depth, handler);
+                    if (e.getErrorMessage().getErrorCode() == SVNErrorCode.VERSION_MISMATCH) {
+                        SVNWCClient16.delegate(this).doGetRemoteProperty(url, path, repos, propName, rev, depth, handler);
+                    } else {
+                        throw e;
+                    }
                 }
             }
 
@@ -2415,7 +2495,11 @@ public class SVNWCClient extends SVNBasicClient {
         try {
             SVNWCClient17.delegate(this).doGetLocalFileContents(path, dst, revision, expandKeywords);
         } catch (SVNException e) {
-            SVNWCClient16.delegate(this).doGetLocalFileContents(path, dst, revision, expandKeywords);
+            if (e.getErrorMessage().getErrorCode() == SVNErrorCode.VERSION_MISMATCH) {
+                SVNWCClient16.delegate(this).doGetLocalFileContents(path, dst, revision, expandKeywords);
+            } else {
+                throw e;
+            }
         }
     }
 

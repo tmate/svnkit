@@ -29,6 +29,7 @@ import org.tmatesoft.svn.core.internal.wc.admin.SVNVersionedProperties;
 import org.tmatesoft.svn.core.internal.wc.admin.SVNWCAccess;
 import org.tmatesoft.svn.core.internal.wc.v17.SVNWCUtil17;
 import org.tmatesoft.svn.core.internal.wc.v16.SVNWCUtil16;
+import org.tmatesoft.svn.core.SVNErrorCode;
 
 /**
  * The <b>SVNWCUtil</b> is a utility class providing some common methods used
@@ -296,7 +297,11 @@ public class SVNWCUtil {
         try {
             return SVNWCUtil17.isWorkingCopyRoot(versionedDir);
         } catch (SVNException e) {
-            return SVNWCUtil16.isWorkingCopyRoot(versionedDir);
+            if (e.getErrorMessage().getErrorCode() == SVNErrorCode.VERSION_MISMATCH) {
+                return SVNWCUtil16.isWorkingCopyRoot(versionedDir);
+            } else {
+                throw e;
+            }
         }
     }
 
@@ -347,7 +352,11 @@ public class SVNWCUtil {
         try {
             return SVNWCUtil17.getWorkingCopyRoot(versionedDir, stopOnExtenrals);
         } catch (SVNException e) {
-            return SVNWCUtil16.getWorkingCopyRoot(versionedDir, stopOnExtenrals);
+            if (e.getErrorMessage().getErrorCode() == SVNErrorCode.VERSION_MISMATCH) {
+                return SVNWCUtil16.getWorkingCopyRoot(versionedDir, stopOnExtenrals);
+            } else {
+                throw e;
+            }
         }
     }
 

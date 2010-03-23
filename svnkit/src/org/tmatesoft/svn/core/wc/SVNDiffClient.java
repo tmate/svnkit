@@ -3201,7 +3201,11 @@ public class SVNDiffClient extends SVNMergeDriver {
                 try {
                     SVNDiffClient17.delegate(this).doDiffURLWC(url1, revision1, pegRevision, path2, revision2, reverse, depth, useAncestry, result, changeLists);
                 } catch (SVNException e) {
-                    SVNDiffClient16.delegate(this).doDiffURLWC(url1, revision1, pegRevision, path2, revision2, reverse, depth, useAncestry, result, changeLists);
+                    if (e.getErrorMessage().getErrorCode() == SVNErrorCode.VERSION_MISMATCH) {
+                        SVNDiffClient16.delegate(this).doDiffURLWC(url1, revision1, pegRevision, path2, revision2, reverse, depth, useAncestry, result, changeLists);
+                    } else {
+                        throw e;
+                    }
                 }
             }
 
@@ -3210,7 +3214,11 @@ public class SVNDiffClient extends SVNMergeDriver {
                 try {
                     SVNDiffClient17.delegate(this).doDiffURLWC(path1, revision1, pegRevision, path2, revision2, reverse, depth, useAncestry, result, changeLists);
                 } catch (SVNException e) {
-                    SVNDiffClient16.delegate(this).doDiffURLWC(path1, revision1, pegRevision, path2, revision2, reverse, depth, useAncestry, result, changeLists);
+                    if (e.getErrorMessage().getErrorCode() == SVNErrorCode.VERSION_MISMATCH) {
+                        SVNDiffClient16.delegate(this).doDiffURLWC(path1, revision1, pegRevision, path2, revision2, reverse, depth, useAncestry, result, changeLists);
+                    } else {
+                        throw e;
+                    }
                 }
             }
 
@@ -3218,7 +3226,11 @@ public class SVNDiffClient extends SVNMergeDriver {
         try {
             SVNDiffClient17.delegate(this).doDiffWCWC(path1, revision1, path2, revision2, depth, useAncestry, result, changeLists);
         } catch (SVNException e) {
-            SVNDiffClient16.delegate(this).doDiffWCWC(path1, revision1, path2, revision2, depth, useAncestry, result, changeLists);
+            if (e.getErrorMessage().getErrorCode() == SVNErrorCode.VERSION_MISMATCH) {
+                SVNDiffClient16.delegate(this).doDiffWCWC(path1, revision1, path2, revision2, depth, useAncestry, result, changeLists);
+            } else {
+                throw e;
+            }
         }
     }
 
@@ -3379,7 +3391,11 @@ public class SVNDiffClient extends SVNMergeDriver {
         try {
             return SVNDiffClient17.delegate(this).getLocationFromPathAndRevision(path, url, pegRevision);
         } catch (SVNException e) {
-            return SVNDiffClient16.delegate(this).getLocationFromPathAndRevision(path, url, pegRevision);
+            if (e.getErrorMessage().getErrorCode() == SVNErrorCode.VERSION_MISMATCH) {
+                return SVNDiffClient16.delegate(this).getLocationFromPathAndRevision(path, url, pegRevision);
+            } else {
+                throw e;
+            }
         }
     }
 
@@ -3475,7 +3491,11 @@ public class SVNDiffClient extends SVNMergeDriver {
         try {
             SVNDiffClient17.delegate(this).doPatch(absPatchPath, localAbsPath, dryRun, stripCount);
         } catch (SVNException e) {
-            SVNDiffClient16.delegate(this).doPatch(absPatchPath, localAbsPath, dryRun, stripCount);
+            if (e.getErrorMessage().getErrorCode() == SVNErrorCode.VERSION_MISMATCH) {
+                SVNDiffClient16.delegate(this).doPatch(absPatchPath, localAbsPath, dryRun, stripCount);
+            } else {
+                throw e;
+            }
         }
     }
 
