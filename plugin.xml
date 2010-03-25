@@ -1,38 +1,33 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<?eclipse version="3.0"?>
-<plugin
-   id="org.tmatesoft.svnkit"
-   name="SVNKit Library Plug-in"
-   version="1.4.0"
-   provider-name="TMate Software"
-   class="org.tmatesoft.svn.core.SVNKitActivator">
+<?eclipse version="3.4"?>
+<plugin>
 
-   <runtime>
-      <library name="svnkit.jar">
-         <export name="*"/>
-      </library>
-      <library name="contrib/trilead/trilead.jar"/>
-      <library name="contrib/junit/junit.jar"/>
-      <library name="contrib/jna/jna.jar">
-         <export
-               name="*">
-         </export>
-      </library>
-      <library name="contrib/sqljet/antlr-runtime-3.1.3.jar">
-         <export
-               name="*">
-         </export>
-      </library>
-      <library name="contrib/sqljet/sqljet.jar">
-         <export
-               name="*">
-         </export>
-      </library>
-   </runtime>
-   <requires>
-      <import plugin="org.eclipse.osgi.services"/>
-      <import plugin="org.eclipse.osgi"/>
-      <import plugin="org.eclipse.core.runtime"/>
-   </requires>
+   <extension
+         point="org.eclipse.ui.popupMenus">
+      <objectContribution
+            adaptable="true"
+            id="org.tmatesoft.projectContributions"
+            objectClass="org.eclipse.core.resources.IProject">
+         <filter
+               name="projectNature"
+               value="org.eclipse.jdt.core.javanature">
+         </filter>
+         <menu
+               label="TMate Software"
+               path="additions"
+               id="org.tmatesoft.projectMenu">
+            <groupMarker
+                  name="additions">
+            </groupMarker>
+         </menu>
+         <action
+               label="Split2 refactoring"
+               class="org.tmatesoft.refactoring.split2.actions.Split2RefactoringAction"
+               menubarPath="org.tmatesoft.projectMenu/additions"
+               enablesFor="1"
+               id="org.tmatesoft.refactoring.split2.action">
+         </action>
+      </objectContribution>
+   </extension>
 
 </plugin>
