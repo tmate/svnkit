@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?eclipse version="3.4"?>
+<plugin>
+
+   <extension
+         point="org.eclipse.ui.popupMenus">
+      <objectContribution
+            adaptable="true"
+            id="org.tmatesoft.projectContributions"
+            objectClass="org.eclipse.core.resources.IProject">
+         <filter
+               name="projectNature"
+               value="org.eclipse.jdt.core.javanature">
+         </filter>
+         <menu
+               label="TMate Software"
+               path="additions"
+               id="org.tmatesoft.projectMenu">
+            <groupMarker
+                  name="additions">
+            </groupMarker>
+         </menu>
+         <action
+               label="Split2 refactoring"
+               class="org.tmatesoft.refactoring.split2.actions.Split2RefactoringAction"
+               menubarPath="org.tmatesoft.projectMenu/additions"
+               enablesFor="1"
+               id="org.tmatesoft.refactoring.split2.action">
+         </action>
+      </objectContribution>
+   </extension>
+
+</plugin>
