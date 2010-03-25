@@ -5,19 +5,22 @@
 	<extension point="org.eclipse.ui.popupMenus">
 
 		<objectContribution objectClass="org.eclipse.core.resources.IProject"
-			adaptable="true" id="tmate.projectContributions">
+			adaptable="true" id="org.tmatesoft.projectContributions">
 
 			<filter name="projectNature" value="org.eclipse.jdt.core.javanature">
 			</filter>
 
-			<menu id="tmate.menu" label="TMateSoft Tools">
+			<menu
+         id="org.tmatesoft.projectMenu"
+         label="TMate Software"
+         path="additions">
 				<groupMarker name="additions">
 				</groupMarker>
 			</menu>
 
 			<action label="Split refactoring"
 				class="org.tmatesoft.refactoring.split.actions.SplitRefactoringAction"
-				menubarPath="tmate.menu/additions" id="tmate.SplitAction">
+				menubarPath="org.tmatesoft.projectMenu/additions" id="tmate.SplitAction">
 			</action>
 
 		</objectContribution>
