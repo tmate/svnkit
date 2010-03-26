@@ -7,22 +7,39 @@ import org.eclipse.core.resources.IProject;
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.core.runtime.OperationCanceledException;
+import org.eclipse.core.runtime.SubProgressMonitor;
 import org.eclipse.jdt.core.ICompilationUnit;
 import org.eclipse.jdt.core.IJavaElement;
 import org.eclipse.jdt.core.IPackageFragment;
 import org.eclipse.jdt.core.IPackageFragmentRoot;
+import org.eclipse.jdt.core.IType;
 import org.eclipse.jdt.core.JavaCore;
+import org.eclipse.jdt.core.dom.AST;
+import org.eclipse.jdt.core.dom.ASTNode;
+import org.eclipse.jdt.core.dom.ASTParser;
+import org.eclipse.jdt.core.dom.ASTRequestor;
+import org.eclipse.jdt.core.dom.ASTVisitor;
+import org.eclipse.jdt.core.dom.CompilationUnit;
+import org.eclipse.jdt.core.dom.ImportDeclaration;
+import org.eclipse.jdt.core.dom.NodeFinder;
+import org.eclipse.jdt.core.dom.PackageDeclaration;
+import org.eclipse.jdt.core.dom.SimpleName;
+import org.eclipse.jdt.core.dom.TypeDeclaration;
+import org.eclipse.jdt.core.formatter.CodeFormatter;
 import org.eclipse.jdt.core.search.IJavaSearchConstants;
 import org.eclipse.jdt.core.search.IJavaSearchScope;
 import org.eclipse.jdt.core.search.SearchPattern;
-import org.eclipse.jdt.internal.corext.refactoring.changes.CopyCompilationUnitChange;
+import org.eclipse.jdt.internal.corext.refactoring.changes.CreateCompilationUnitChange;
 import org.eclipse.jdt.internal.corext.refactoring.changes.CreatePackageChange;
-import org.eclipse.jdt.internal.corext.refactoring.reorg.INewNameQuery;
+import org.eclipse.jface.text.BadLocationException;
+import org.eclipse.jface.text.Document;
 import org.eclipse.jface.viewers.IStructuredSelection;
 import org.eclipse.ltk.core.refactoring.Change;
 import org.eclipse.ltk.core.refactoring.CompositeChange;
 import org.eclipse.ltk.core.refactoring.Refactoring;
 import org.eclipse.ltk.core.refactoring.RefactoringStatus;
+import org.eclipse.text.edits.MalformedTreeException;
+import org.eclipse.text.edits.TextEdit;
 
 public class Split2Refactoring extends Refactoring {
 
@@ -153,6 +170,8 @@ public class Split2Refactoring extends Refactoring {
 				return status;
 			}
 
+			parseSourceClasses(pm);
+
 		} finally {
 			pm.done();
 		}
@@ -160,50 +179,117 @@ public class Split2Refactoring extends Refactoring {
 		return status;
 	}
 
+	private void parseSourceClasses(IProgressMonitor pm) {
+
+		final ASTRequestor requestor = new ASTRequestor() {
+			@Override
+			public void acceptAST(ICompilationUnit source, CompilationUnit ast) {
+				try {
+					model.getParsedUnits().put(source, ast);
+				} catch (Exception exception) {
+					log(exception);
+				}
+			}
+		};
+
+		ASTParser parser = ASTParser.newParser(AST.JLS3);
+		final ICompilationUnit[] units = model.getSourceCompilationUnits().toArray(
+				new ICompilationUnit[model.getSourceCompilationUnits().size()]);
+		parser.createASTs(units, new String[0], requestor, new SubProgressMonitor(pm, 1));
+	}
+
 	@Override
 	public Change createChange(IProgressMonitor pm) throws CoreException, OperationCanceledException {
 
 		pm.beginTask("Creating change...", 1);
+		final CompositeChange changes = new CompositeChange(TITLE);
 
 		try {
-
-			final CompositeChange compositeChange = new CompositeChange(TITLE);
-
-			compositeChange.add(buildChangesMoveClasses());
-
-			return compositeChange;
-
+			changes.add(buildChangesMoveClasses());
+			return changes;
+		} catch (MalformedTreeException e) {
+			log(e);
+			return changes;
+		} catch (BadLocationException e) {
+			log(e);
+			return changes;
 		} finally {
 			pm.done();
 		}
 
 	}
 
-	private Change buildChangesMoveClasses() {
+	private Change buildChangesMoveClasses() throws CoreException, MalformedTreeException, BadLocationException {
 
-		final CompositeChange change = new CompositeChange(String.format("Move classes to package '%s'", model
+		final CompositeChange changes = new CompositeChange(String.format("Move classes to package '%s'", model
 				.getTargetMovePackageName()));
 
 		final IPackageFragment targetPackage = model.getPackageRoot().getPackageFragment(
 				model.getTargetMovePackageName());
 
 		if (!targetPackage.exists()) {
-			change.add(new CreatePackageChange(targetPackage));
+			changes.add(new CreatePackageChange(targetPackage));
 		}
 
 		final List<ICompilationUnit> sourceCompilationUnits = model.getSourceCompilationUnits();
-		for (final ICompilationUnit sourceCompilationUnit : sourceCompilationUnits) {
-			final String typeQualifiedName = sourceCompilationUnit.findPrimaryType().getTypeQualifiedName();
-			final String newName = typeQualifiedName + model.getTargetMoveSuffix();
-			final INewNameQuery newNameQuery = new INewNameQuery() {
+		for (final ICompilationUnit sourceUnit : sourceCompilationUnits) {
+
+			final IType sourcePrimaryType = sourceUnit.findPrimaryType();
+			final String sourceTypeName = sourcePrimaryType.getTypeQualifiedName();
+			final String targetTypeName = sourceTypeName + model.getTargetMoveSuffix();
+
+			final ICompilationUnit targetUnit = targetPackage.getCompilationUnit(targetTypeName + ".java");
+
+			final CompilationUnit sourceParsedUnit = model.getParsedUnits().get(sourceUnit);
+
+			final AST targetAST = AST.newAST(AST.JLS3);
+			final CompilationUnit targetUnitNode = targetAST.newCompilationUnit();
+
+			final PackageDeclaration packageDeclaration = targetAST.newPackageDeclaration();
+			packageDeclaration.setName(targetAST.newName(model.getTargetMovePackageName()));
+			targetUnitNode.setPackage(packageDeclaration);
+
+			final List<ImportDeclaration> targetImports = targetUnitNode.imports();
+
+			final List<ImportDeclaration> sourceImports = sourceParsedUnit.imports();
+			for (final ImportDeclaration sourceImportDeclaration : sourceImports) {
+				ImportDeclaration targetImportDeclaration = (ImportDeclaration) ASTNode.copySubtree(targetAST,
+						sourceImportDeclaration);
+				targetImports.add(targetImportDeclaration);
+			}
+
+			final ImportDeclaration targetImportDeclaration = targetAST.newImportDeclaration();
+			targetImportDeclaration.setOnDemand(true);
+			targetImportDeclaration.setName(targetAST.newName(model.getSourcePackageName()));
+			targetImports.add(targetImportDeclaration);
+
+			final TypeDeclaration sourceTypeDeclaration = (TypeDeclaration) NodeFinder.perform(sourceParsedUnit,
+					sourcePrimaryType.getSourceRange());
+			final TypeDeclaration targetTypeDeclaration = (TypeDeclaration) ASTNode.copySubtree(targetAST,
+					sourceTypeDeclaration);
+			targetUnitNode.types().add(targetTypeDeclaration);
+
+			targetUnitNode.accept(new ASTVisitor() {
 				@Override
-				public String getNewName() throws OperationCanceledException {
-					return newName + ".java";
+				public boolean visit(SimpleName node) {
+					if (sourceTypeName.equals(node.getIdentifier())) {
+						node.setIdentifier(targetTypeName);
+					}
+					return super.visit(node);
 				}
-			};
-			change.add(new CopyCompilationUnitChange(sourceCompilationUnit, targetPackage, newNameQuery));
+			});
+
+			final String targetUnitText = targetUnitNode.toString();
+			final Document targetUnitDocument = new Document(targetUnitText);
+			final TextEdit formatEdit = model.getCodeFormatter().format(CodeFormatter.K_COMPILATION_UNIT,
+					targetUnitText, 0, targetUnitText.length(), 0,
+					model.getJavaProject().findRecommendedLineSeparator());
+			formatEdit.apply(targetUnitDocument);
+
+			changes.add(new CreateCompilationUnitChange(targetUnit, targetUnitDocument.get(), null));
+
 		}
 
-		return change;
+		return changes;
 	}
 }

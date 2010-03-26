@@ -1,16 +1,23 @@
 package org.tmatesoft.refactoring.split2.core;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.eclipse.core.resources.IProject;
 import org.eclipse.jdt.core.ICompilationUnit;
 import org.eclipse.jdt.core.IJavaProject;
 import org.eclipse.jdt.core.IPackageFragment;
 import org.eclipse.jdt.core.IPackageFragmentRoot;
+import org.eclipse.jdt.core.ToolFactory;
+import org.eclipse.jdt.core.dom.CompilationUnit;
+import org.eclipse.jdt.core.formatter.CodeFormatter;
 import org.eclipse.jface.viewers.IStructuredSelection;
 
 public class Split2RefactoringModel {
+
+	final CodeFormatter codeFormatter = ToolFactory.createCodeFormatter(null);
 
 	private IStructuredSelection selection;
 	private String sourcePackageName;
@@ -20,9 +27,10 @@ public class Split2RefactoringModel {
 	private IProject project;
 	private IJavaProject javaProject;
 	private IPackageFragment sourcePackage;
+	private IPackageFragmentRoot packageRoot;
 
 	private final List<ICompilationUnit> sourceCompilationUnits = new ArrayList<ICompilationUnit>();
-	private IPackageFragmentRoot packageRoot;
+	private Map<ICompilationUnit, CompilationUnit> parsedUnits = new HashMap<ICompilationUnit, CompilationUnit>();
 
 	public IStructuredSelection getSelection() {
 		return selection;
@@ -98,6 +106,14 @@ public class Split2RefactoringModel {
 
 	public IPackageFragmentRoot getPackageRoot() {
 		return packageRoot;
+	}
+
+	public Map<ICompilationUnit, CompilationUnit> getParsedUnits() {
+		return parsedUnits;
+	}
+
+	public CodeFormatter getCodeFormatter() {
+		return codeFormatter;
 	}
 
 }
