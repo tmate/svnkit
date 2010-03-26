@@ -8,8 +8,8 @@ import org.eclipse.ltk.ui.refactoring.RefactoringWizardOpenOperation;
 import org.eclipse.swt.widgets.Shell;
 import org.eclipse.ui.IObjectActionDelegate;
 import org.eclipse.ui.IWorkbenchPart;
-import org.tmatesoft.refactoring.split2.Split2RefactoringActivator;
 import org.tmatesoft.refactoring.split2.core.Split2Refactoring;
+import org.tmatesoft.refactoring.split2.core.Split2RefactoringUtils;
 import org.tmatesoft.refactoring.split2.ui.Split2RefactoringWizard;
 
 public class Split2RefactoringAction implements IObjectActionDelegate {
@@ -32,7 +32,7 @@ public class Split2RefactoringAction implements IObjectActionDelegate {
 			RefactoringWizardOpenOperation operation = new RefactoringWizardOpenOperation(wizard);
 			operation.run(parent, dialogTitle);
 		} catch (InterruptedException exception) {
-			Split2RefactoringActivator.log(exception);
+			Split2RefactoringUtils.log(exception);
 		}
 	}
 
