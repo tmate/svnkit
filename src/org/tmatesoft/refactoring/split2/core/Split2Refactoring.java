@@ -58,6 +58,7 @@ public class Split2Refactoring extends Refactoring {
 		model.setSourceClassNamePattern("SVN[\\w]*Client");
 		model.setTargetMovePackageName("org.tmatesoft.svn.core.internal.wc.v16");
 		model.setTargetMoveSuffix("16");
+		model.getTargetMoveNamesMap().put("SVNBasicClient", "SVNBasicDelegate");
 	}
 
 	@Override
@@ -236,7 +237,8 @@ public class Split2Refactoring extends Refactoring {
 
 			final IType sourcePrimaryType = sourceUnit.findPrimaryType();
 			final String sourceTypeName = sourcePrimaryType.getTypeQualifiedName();
-			final String targetTypeName = sourceTypeName + model.getTargetMoveSuffix();
+			final String targetTypeName = model.getTargetMoveNamesMap().containsKey(sourceTypeName) ? model
+					.getTargetMoveNamesMap().get(sourceTypeName) : sourceTypeName + model.getTargetMoveSuffix();
 
 			final ICompilationUnit targetUnit = targetPackage.getCompilationUnit(targetTypeName + ".java");
 

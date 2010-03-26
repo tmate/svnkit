@@ -31,6 +31,7 @@ public class Split2RefactoringModel {
 
 	private final List<ICompilationUnit> sourceCompilationUnits = new ArrayList<ICompilationUnit>();
 	private Map<ICompilationUnit, CompilationUnit> parsedUnits = new HashMap<ICompilationUnit, CompilationUnit>();
+	private Map<String, String> targetMoveNamesMap = new HashMap<String, String>();
 
 	public IStructuredSelection getSelection() {
 		return selection;
@@ -114,6 +115,10 @@ public class Split2RefactoringModel {
 
 	public CodeFormatter getCodeFormatter() {
 		return codeFormatter;
+	}
+
+	public Map<String, String> getTargetMoveNamesMap() {
+		return targetMoveNamesMap;
 	}
 
 }
