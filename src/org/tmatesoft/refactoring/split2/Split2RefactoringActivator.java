@@ -1,7 +1,5 @@
 package org.tmatesoft.refactoring.split2;
 
-import org.eclipse.core.runtime.IStatus;
-import org.eclipse.core.runtime.Status;
 import org.eclipse.jface.resource.ImageDescriptor;
 import org.eclipse.ui.plugin.AbstractUIPlugin;
 import org.osgi.framework.BundleContext;
@@ -16,12 +14,6 @@ public class Split2RefactoringActivator extends AbstractUIPlugin {
 
 	// The shared instance
 	private static Split2RefactoringActivator plugin;
-
-	static public void log(Exception exception) {
-		Split2RefactoringActivator.getDefault().getLog().log(
-				new Status(IStatus.ERROR, Split2RefactoringActivator.PLUGIN_ID,
-						0, exception.getMessage(), exception));
-	}
 
 	/**
 	 * The constructor
