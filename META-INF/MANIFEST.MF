@@ -3,7 +3,7 @@ Bundle-ManifestVersion: 2
 Bundle-Name: Split2 refactoring
 Bundle-SymbolicName: org.tmatesoft.refactoring.split2; singleton:=true
 Bundle-Version: 1.0.0.qualifier
-Bundle-Activator: org.tmatesoft.refactoring.split2.Activator
+Bundle-Activator: org.tmatesoft.refactoring.split2.Split2RefactoringActivator
 Require-Bundle: org.eclipse.ui,
  org.eclipse.core.runtime,
  org.eclipse.core.resources,
