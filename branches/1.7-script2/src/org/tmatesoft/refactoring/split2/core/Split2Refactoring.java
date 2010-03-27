@@ -81,6 +81,7 @@ public class Split2Refactoring extends Refactoring {
 		model.setTargetStubSuffix("17");
 		model.getSourceMoveClassesNames().add("org.tmatesoft.svn.core.internal.wc.SVNCopyDriver");
 		model.getSourceMoveClassesNames().add("org.tmatesoft.svn.core.internal.wc.SVNMergeDriver");
+		model.getSourceMoveClassesNames().add("org.tmatesoft.svn.core.wc.admin.SVNAdminClient");
 	}
 
 	@Override
