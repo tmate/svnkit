@@ -2,6 +2,7 @@ package org.tmatesoft.refactoring.split2.core;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 import org.eclipse.core.resources.IFile;
@@ -25,6 +26,8 @@ import org.eclipse.jdt.core.dom.ASTVisitor;
 import org.eclipse.jdt.core.dom.CompilationUnit;
 import org.eclipse.jdt.core.dom.Expression;
 import org.eclipse.jdt.core.dom.IExtendedModifier;
+import org.eclipse.jdt.core.dom.IPackageBinding;
+import org.eclipse.jdt.core.dom.ITypeBinding;
 import org.eclipse.jdt.core.dom.ImportDeclaration;
 import org.eclipse.jdt.core.dom.MethodDeclaration;
 import org.eclipse.jdt.core.dom.MethodInvocation;
@@ -72,7 +75,8 @@ public class Split2Refactoring extends Refactoring {
 	}
 
 	private static void initModel(Split2RefactoringModel model) {
-		model.setSourcePackageName("org.tmatesoft.svn.core.wc");
+		model.getSourcePackageNames().add("org.tmatesoft.svn.core.wc");
+		model.getSourcePackageNames().add("org.tmatesoft.svn.core.wc.admin");
 		model.setSourceClassNamePattern("SVN[\\w]*Client");
 		model.getTargetNamesMap().put("SVNBasicClient", "SVNBasicDelegate");
 		model.setTargetMovePackageName("org.tmatesoft.svn.core.internal.wc16");
@@ -81,7 +85,7 @@ public class Split2Refactoring extends Refactoring {
 		model.setTargetStubSuffix("17");
 		model.getSourceMoveClassesNames().add("org.tmatesoft.svn.core.internal.wc.SVNCopyDriver");
 		model.getSourceMoveClassesNames().add("org.tmatesoft.svn.core.internal.wc.SVNMergeDriver");
-		model.getSourceMoveClassesNames().add("org.tmatesoft.svn.core.wc.admin.SVNAdminClient");
+		// model.getSourceMoveClassesNames().add("org.tmatesoft.svn.core.wc.admin.SVNAdminClient");
 	}
 
 	@Override
@@ -148,36 +152,38 @@ public class Split2Refactoring extends Refactoring {
 		final IJavaSearchScope scope = Split2RefactoringUtils.createSearchScope(new IJavaElement[] { model
 				.getJavaProject() });
 
-		final SearchPattern pattern = SearchPattern.createPattern(model.getSourcePackageName(),
-				IJavaSearchConstants.PACKAGE, IJavaSearchConstants.DECLARATIONS, SearchPattern.R_EXACT_MATCH);
+		for (final String sourcePackageName : model.getSourcePackageNames()) {
+			final SearchPattern pattern = SearchPattern.createPattern(sourcePackageName, IJavaSearchConstants.PACKAGE,
+					IJavaSearchConstants.DECLARATIONS, SearchPattern.R_EXACT_MATCH);
 
-		final IPackageFragment sourcePackage = Split2RefactoringUtils.searchOneElement(IPackageFragment.class, pattern,
-				scope, pm);
+			final IPackageFragment sourcePackage = Split2RefactoringUtils.searchOneElement(IPackageFragment.class,
+					pattern, scope, pm);
 
-		if (sourcePackage == null) {
-			status.merge(RefactoringStatus.createFatalErrorStatus(String.format(
-					"Package '%s' has not been found in selected project", model.getSourcePackageName())));
-			return false;
-		}
-
-		model.setSourcePackage(sourcePackage);
-		model.setPackageRoot((IPackageFragmentRoot) sourcePackage.getAncestor(IJavaElement.PACKAGE_FRAGMENT_ROOT));
-
-		final Pattern classNamePattern = Pattern.compile(model.getSourceClassNamePattern());
-		final ICompilationUnit[] compilationUnits = sourcePackage.getCompilationUnits();
-		for (final ICompilationUnit compilationUnit : compilationUnits) {
-			final String typeQualifiedName = compilationUnit.findPrimaryType().getTypeQualifiedName();
-			if (classNamePattern.matcher(typeQualifiedName).matches()) {
-				model.getSourceCompilationUnits().add(compilationUnit);
+			if (sourcePackage == null) {
+				status.merge(RefactoringStatus.createFatalErrorStatus(String.format(
+						"Package '%s' has not been found in selected project", sourcePackageName)));
+				return false;
 			}
-		}
-		pm.worked(3);
 
-		if (model.getSourceCompilationUnits().size() == 0) {
-			status.merge(RefactoringStatus.createFatalErrorStatus(String.format(
-					"Not found classes with pattern '%s' in package '%s'", model.getSourceClassNamePattern(), model
-							.getSourcePackageName())));
-			return false;
+			model.getSourcePackages().add(sourcePackage);
+			model.setPackageRoot((IPackageFragmentRoot) sourcePackage.getAncestor(IJavaElement.PACKAGE_FRAGMENT_ROOT));
+
+			final Pattern classNamePattern = Pattern.compile(model.getSourceClassNamePattern());
+			final ICompilationUnit[] compilationUnits = sourcePackage.getCompilationUnits();
+			for (final ICompilationUnit compilationUnit : compilationUnits) {
+				final String typeQualifiedName = compilationUnit.findPrimaryType().getTypeQualifiedName();
+				if (classNamePattern.matcher(typeQualifiedName).matches()) {
+					model.getSourceCompilationUnits().add(compilationUnit);
+				}
+			}
+			pm.worked(3);
+
+			if (model.getSourceCompilationUnits().size() == 0) {
+				status.merge(RefactoringStatus.createFatalErrorStatus(String.format(
+						"Not found classes with pattern '%s' in package '%s'", model.getSourceClassNamePattern(),
+						sourcePackageName)));
+				return false;
+			}
 		}
 
 		for (final String sourceMoveClassName : model.getSourceMoveClassesNames()) {
@@ -230,14 +236,23 @@ public class Split2Refactoring extends Refactoring {
 			}
 		};
 
-		ASTParser parser = ASTParser.newParser(AST.JLS3);
-		final ICompilationUnit[] units = model.getSourceCompilationUnits().toArray(
-				new ICompilationUnit[model.getSourceCompilationUnits().size()]);
-		parser.createASTs(units, new String[0], requestor, new SubProgressMonitor(pm, 1));
+		{
+			final ASTParser parser = ASTParser.newParser(AST.JLS3);
+			parser.setProject(model.getJavaProject());
+			parser.setResolveBindings(true);
+			final ICompilationUnit[] units = model.getSourceCompilationUnits().toArray(
+					new ICompilationUnit[model.getSourceCompilationUnits().size()]);
+			parser.createASTs(units, new String[0], requestor, new SubProgressMonitor(pm, 1));
+		}
 
-		final ICompilationUnit[] moveUnits = model.getSourceMoveClassesUnits().toArray(
-				new ICompilationUnit[model.getSourceMoveClassesUnits().size()]);
-		parser.createASTs(moveUnits, new String[0], requestor, new SubProgressMonitor(pm, 1));
+		{
+			final ASTParser parser = ASTParser.newParser(AST.JLS3);
+			parser.setProject(model.getJavaProject());
+			parser.setResolveBindings(true);
+			final ICompilationUnit[] moveUnits = model.getSourceMoveClassesUnits().toArray(
+					new ICompilationUnit[model.getSourceMoveClassesUnits().size()]);
+			parser.createASTs(moveUnits, new String[0], requestor, new SubProgressMonitor(pm, 1));
+		}
 
 	}
 
@@ -280,7 +295,7 @@ public class Split2Refactoring extends Refactoring {
 			changes.add(new CreatePackageChange(targetPackage));
 		}
 
-		final List<ICompilationUnit> sourceCompilationUnits = model.getSourceCompilationUnits();
+		final Set<ICompilationUnit> sourceCompilationUnits = model.getSourceCompilationUnits();
 		for (final ICompilationUnit sourceUnit : sourceCompilationUnits) {
 
 			final IType sourcePrimaryType = sourceUnit.findPrimaryType();
@@ -291,6 +306,8 @@ public class Split2Refactoring extends Refactoring {
 			final ICompilationUnit targetUnit = targetPackage.getCompilationUnit(targetTypeName + ".java");
 
 			final CompilationUnit sourceParsedUnit = model.getParsedUnits().get(sourceUnit);
+			final TypeDeclaration sourceTypeDeclaration = (TypeDeclaration) NodeFinder.perform(sourceParsedUnit,
+					sourcePrimaryType.getSourceRange());
 
 			final AST targetAST = AST.newAST(AST.JLS3);
 			final CompilationUnit targetUnitNode = targetAST.newCompilationUnit();
@@ -308,13 +325,14 @@ public class Split2Refactoring extends Refactoring {
 				targetImports.add(targetImportDeclaration);
 			}
 
+			final ITypeBinding sourceTypeBinding = sourceTypeDeclaration.resolveBinding();
+			final IPackageBinding sourcePackageBinding = sourceTypeBinding.getPackage();
+
 			final ImportDeclaration targetImportDeclaration = targetAST.newImportDeclaration();
 			targetImportDeclaration.setOnDemand(true);
-			targetImportDeclaration.setName(targetAST.newName(model.getSourcePackageName()));
+			targetImportDeclaration.setName(targetAST.newName(sourcePackageBinding.getName()));
 			targetImports.add(targetImportDeclaration);
 
-			final TypeDeclaration sourceTypeDeclaration = (TypeDeclaration) NodeFinder.perform(sourceParsedUnit,
-					sourcePrimaryType.getSourceRange());
 			final TypeDeclaration targetTypeDeclaration = (TypeDeclaration) ASTNode.copySubtree(targetAST,
 					sourceTypeDeclaration);
 			targetUnitNode.types().add(targetTypeDeclaration);
@@ -374,7 +392,7 @@ public class Split2Refactoring extends Refactoring {
 			changes.add(new CreatePackageChange(targetPackage));
 		}
 
-		final List<ICompilationUnit> sourceCompilationUnits = model.getSourceCompilationUnits();
+		final Set<ICompilationUnit> sourceCompilationUnits = model.getSourceCompilationUnits();
 		for (final ICompilationUnit sourceUnit : sourceCompilationUnits) {
 
 			final IType sourcePrimaryType = sourceUnit.findPrimaryType();
@@ -389,6 +407,8 @@ public class Split2Refactoring extends Refactoring {
 			final ICompilationUnit targetUnit = targetPackage.getCompilationUnit(targetTypeName + ".java");
 
 			final CompilationUnit sourceParsedUnit = model.getParsedUnits().get(sourceUnit);
+			final TypeDeclaration sourceTypeDeclaration = (TypeDeclaration) NodeFinder.perform(sourceParsedUnit,
+					sourcePrimaryType.getSourceRange());
 
 			final AST targetAST = AST.newAST(AST.JLS3);
 			final CompilationUnit targetUnitNode = targetAST.newCompilationUnit();
@@ -407,9 +427,12 @@ public class Split2Refactoring extends Refactoring {
 			}
 
 			{
+				final ITypeBinding sourceTypeBinding = sourceTypeDeclaration.resolveBinding();
+				final IPackageBinding sourcePackageBinding = sourceTypeBinding.getPackage();
+
 				final ImportDeclaration targetImportDeclaration = targetAST.newImportDeclaration();
 				targetImportDeclaration.setOnDemand(true);
-				targetImportDeclaration.setName(targetAST.newName(model.getSourcePackageName()));
+				targetImportDeclaration.setName(targetAST.newName(sourcePackageBinding.getName()));
 				targetImports.add(targetImportDeclaration);
 			}
 
@@ -422,8 +445,6 @@ public class Split2Refactoring extends Refactoring {
 
 			addErrorsImports(targetAST, targetUnitNode);
 
-			final TypeDeclaration sourceTypeDeclaration = (TypeDeclaration) NodeFinder.perform(sourceParsedUnit,
-					sourcePrimaryType.getSourceRange());
 			final TypeDeclaration targetTypeDeclaration = (TypeDeclaration) ASTNode.copySubtree(targetAST,
 					sourceTypeDeclaration);
 			targetUnitNode.types().add(targetTypeDeclaration);
@@ -672,7 +693,7 @@ public class Split2Refactoring extends Refactoring {
 		final CompositeChange changes = new CompositeChange(
 				"Modify dependent classes to inherits from moved base delegate");
 
-		final List<ICompilationUnit> sourceMoveUnits = model.getSourceMoveClassesUnits();
+		final Set<ICompilationUnit> sourceMoveUnits = model.getSourceMoveClassesUnits();
 		for (final ICompilationUnit sourceUnit : sourceMoveUnits) {
 
 			final IType sourcePrimaryType = sourceUnit.findPrimaryType();
@@ -729,10 +750,9 @@ public class Split2Refactoring extends Refactoring {
 	private Change buildChangesSourceStubClasses(IProgressMonitor pm) throws JavaModelException,
 			MalformedTreeException, BadLocationException {
 
-		final CompositeChange changes = new CompositeChange(String.format(
-				"Modify classes in package '%s' to work as dispatchers", model.getSourcePackageName()));
+		final CompositeChange changes = new CompositeChange(String.format("Modify API classes to work as dispatchers"));
 
-		final List<ICompilationUnit> sourceCompilationUnits = model.getSourceCompilationUnits();
+		final Set<ICompilationUnit> sourceCompilationUnits = model.getSourceCompilationUnits();
 		for (final ICompilationUnit sourceUnit : sourceCompilationUnits) {
 
 			final IType sourcePrimaryType = sourceUnit.findPrimaryType();
