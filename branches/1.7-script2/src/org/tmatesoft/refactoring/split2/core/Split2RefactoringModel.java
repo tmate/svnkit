@@ -1,9 +1,9 @@
 package org.tmatesoft.refactoring.split2.core;
 
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 import org.eclipse.core.resources.IProject;
 import org.eclipse.jdt.core.ICompilationUnit;
@@ -20,22 +20,22 @@ public class Split2RefactoringModel {
 	final CodeFormatter codeFormatter = ToolFactory.createCodeFormatter(null);
 
 	private IStructuredSelection selection;
-	private String sourcePackageName;
 	private String targetMovePackageName;
 	private String targetMoveSuffix;
 	private String sourceClassNamePattern;
 	private IProject project;
 	private IJavaProject javaProject;
-	private IPackageFragment sourcePackage;
 	private IPackageFragmentRoot packageRoot;
 	private String targetStubPackageName;
 	private String targetStubSuffix;
 
-	private final List<ICompilationUnit> sourceCompilationUnits = new ArrayList<ICompilationUnit>();
+	private final Set<String> sourcePackageNames = new HashSet<String>();
+	private final Set<IPackageFragment> sourcePackages = new HashSet<IPackageFragment>();
+	private final Set<ICompilationUnit> sourceCompilationUnits = new HashSet<ICompilationUnit>();
 	private final Map<ICompilationUnit, CompilationUnit> parsedUnits = new HashMap<ICompilationUnit, CompilationUnit>();
 	private final Map<String, String> targetNamesMap = new HashMap<String, String>();
-	private final List<String> sourceMoveClassesNames = new ArrayList<String>();
-	private final List<ICompilationUnit> sourceMoveClassesUnits = new ArrayList<ICompilationUnit>();
+	private final Set<String> sourceMoveClassesNames = new HashSet<String>();
+	private final Set<ICompilationUnit> sourceMoveClassesUnits = new HashSet<ICompilationUnit>();
 
 	public IStructuredSelection getSelection() {
 		return selection;
@@ -45,12 +45,8 @@ public class Split2RefactoringModel {
 		this.selection = selection;
 	}
 
-	public void setSourcePackageName(String sourcePackageName) {
-		this.sourcePackageName = sourcePackageName;
-	}
-
-	public String getSourcePackageName() {
-		return sourcePackageName;
+	public Set<String> getSourcePackageNames() {
+		return sourcePackageNames;
 	}
 
 	public void setTargetMovePackageName(String targetMovePackageName) {
@@ -93,15 +89,11 @@ public class Split2RefactoringModel {
 		return javaProject;
 	}
 
-	public void setSourcePackage(IPackageFragment sourcePackage) {
-		this.sourcePackage = sourcePackage;
+	public Set<IPackageFragment> getSourcePackages() {
+		return sourcePackages;
 	}
 
-	public IPackageFragment getSourcePackage() {
-		return sourcePackage;
-	}
-
-	public List<ICompilationUnit> getSourceCompilationUnits() {
+	public Set<ICompilationUnit> getSourceCompilationUnits() {
 		return sourceCompilationUnits;
 	}
 
@@ -141,11 +133,11 @@ public class Split2RefactoringModel {
 		return targetStubSuffix;
 	}
 
-	public List<String> getSourceMoveClassesNames() {
+	public Set<String> getSourceMoveClassesNames() {
 		return sourceMoveClassesNames;
 	}
 
-	public List<ICompilationUnit> getSourceMoveClassesUnits() {
+	public Set<ICompilationUnit> getSourceMoveClassesUnits() {
 		return sourceMoveClassesUnits;
 	}
 
