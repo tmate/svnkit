@@ -28,10 +28,12 @@ public class Split2RefactoringModel {
 	private IJavaProject javaProject;
 	private IPackageFragment sourcePackage;
 	private IPackageFragmentRoot packageRoot;
+	private String targetStubPackageName;
+	private String targetStubSuffix;
 
 	private final List<ICompilationUnit> sourceCompilationUnits = new ArrayList<ICompilationUnit>();
-	private Map<ICompilationUnit, CompilationUnit> parsedUnits = new HashMap<ICompilationUnit, CompilationUnit>();
-	private Map<String, String> targetMoveNamesMap = new HashMap<String, String>();
+	private final Map<ICompilationUnit, CompilationUnit> parsedUnits = new HashMap<ICompilationUnit, CompilationUnit>();
+	private final Map<String, String> targetNamesMap = new HashMap<String, String>();
 
 	public IStructuredSelection getSelection() {
 		return selection;
@@ -117,8 +119,24 @@ public class Split2RefactoringModel {
 		return codeFormatter;
 	}
 
-	public Map<String, String> getTargetMoveNamesMap() {
-		return targetMoveNamesMap;
+	public Map<String, String> getTargetNamesMap() {
+		return targetNamesMap;
+	}
+
+	public void setTargetStubPackageName(String targetStubPackageName) {
+		this.targetStubPackageName = targetStubPackageName;
+	}
+
+	public String getTargetStubPackageName() {
+		return targetStubPackageName;
+	}
+
+	public void setTargetStubSuffix(String targetStubSuffix) {
+		this.targetStubSuffix = targetStubSuffix;
+	}
+
+	public String getTargetStubSuffix() {
+		return targetStubSuffix;
 	}
 
 }
