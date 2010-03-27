@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
 
+import org.eclipse.core.resources.IFile;
 import org.eclipse.core.resources.IProject;
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.IProgressMonitor;
@@ -54,6 +55,7 @@ import org.eclipse.ltk.core.refactoring.Change;
 import org.eclipse.ltk.core.refactoring.CompositeChange;
 import org.eclipse.ltk.core.refactoring.Refactoring;
 import org.eclipse.ltk.core.refactoring.RefactoringStatus;
+import org.eclipse.ltk.core.refactoring.TextFileChange;
 import org.eclipse.text.edits.MalformedTreeException;
 import org.eclipse.text.edits.TextEdit;
 
@@ -77,6 +79,8 @@ public class Split2Refactoring extends Refactoring {
 		model.setTargetMoveSuffix("16");
 		model.setTargetStubPackageName("org.tmatesoft.svn.core.internal.wc17");
 		model.setTargetStubSuffix("17");
+		model.getSourceMoveClassesNames().add("org.tmatesoft.svn.core.internal.wc.SVNCopyDriver");
+		model.getSourceMoveClassesNames().add("org.tmatesoft.svn.core.internal.wc.SVNMergeDriver");
 	}
 
 	@Override
@@ -175,6 +179,20 @@ public class Split2Refactoring extends Refactoring {
 			return false;
 		}
 
+		for (final String sourceMoveClassName : model.getSourceMoveClassesNames()) {
+
+			final SearchPattern sourceMoveClassPattern = SearchPattern.createPattern(sourceMoveClassName,
+					IJavaSearchConstants.CLASS, IJavaSearchConstants.DECLARATIONS, SearchPattern.R_EXACT_MATCH);
+
+			final IType sourceMoveClass = Split2RefactoringUtils.searchOneElement(IType.class, sourceMoveClassPattern,
+					scope, pm);
+
+			if (sourceMoveClass != null && sourceMoveClass.exists()) {
+				model.getSourceMoveClassesUnits().add(sourceMoveClass.getCompilationUnit());
+			}
+
+		}
+
 		return true;
 	}
 
@@ -184,7 +202,7 @@ public class Split2Refactoring extends Refactoring {
 		final RefactoringStatus status = new RefactoringStatus();
 
 		try {
-			pm.beginTask("Checking preconditions...", 2);
+			pm.beginTask("Checking preconditions...", 3);
 			if (!searchSourceClasses(status, pm)) {
 				return status;
 			}
@@ -215,6 +233,11 @@ public class Split2Refactoring extends Refactoring {
 		final ICompilationUnit[] units = model.getSourceCompilationUnits().toArray(
 				new ICompilationUnit[model.getSourceCompilationUnits().size()]);
 		parser.createASTs(units, new String[0], requestor, new SubProgressMonitor(pm, 1));
+
+		final ICompilationUnit[] moveUnits = model.getSourceMoveClassesUnits().toArray(
+				new ICompilationUnit[model.getSourceMoveClassesUnits().size()]);
+		parser.createASTs(moveUnits, new String[0], requestor, new SubProgressMonitor(pm, 1));
+
 	}
 
 	@Override
@@ -224,8 +247,10 @@ public class Split2Refactoring extends Refactoring {
 		final CompositeChange changes = new CompositeChange(TITLE);
 
 		try {
-			changes.add(buildChangesMoveClasses(pm));
-			changes.add(buildChangesStubClasses(pm));
+			changes.add(buildChangesTargetMoveClasses(pm));
+			changes.add(buildChangesTargetStubClasses(pm));
+			changes.add(buildChangesSourceMoveClasses(pm));
+			changes.add(buildChangesSourceStubClasses(pm));
 			return changes;
 		} catch (MalformedTreeException e) {
 			log(e);
@@ -239,7 +264,9 @@ public class Split2Refactoring extends Refactoring {
 
 	}
 
-	private Change buildChangesMoveClasses(IProgressMonitor pm) throws CoreException, MalformedTreeException,
+	// Move classes
+
+	private Change buildChangesTargetMoveClasses(IProgressMonitor pm) throws CoreException, MalformedTreeException,
 			BadLocationException {
 
 		final CompositeChange changes = new CompositeChange(String.format("Move classes to package '%s'", model
@@ -331,8 +358,10 @@ public class Split2Refactoring extends Refactoring {
 		return changes;
 	}
 
-	private Change buildChangesStubClasses(IProgressMonitor pm) throws JavaModelException, MalformedTreeException,
-			BadLocationException {
+	// Stub classes
+
+	private Change buildChangesTargetStubClasses(IProgressMonitor pm) throws JavaModelException,
+			MalformedTreeException, BadLocationException {
 
 		final CompositeChange changes = new CompositeChange(String.format("Create stub classes in package '%s'", model
 				.getTargetStubPackageName()));
@@ -632,6 +661,173 @@ public class Split2Refactoring extends Refactoring {
 			newReturnStatement.setExpression(ast.newNullLiteral());
 			emptyBody.add(newReturnStatement);
 		}
+	}
+
+	// Dispatcher classes
+
+	private Change buildChangesSourceMoveClasses(IProgressMonitor pm) throws JavaModelException,
+			MalformedTreeException, BadLocationException {
+
+		final CompositeChange changes = new CompositeChange(
+				"Modify dependent classes to inherits from moved base delegate");
+
+		final List<ICompilationUnit> sourceMoveUnits = model.getSourceMoveClassesUnits();
+		for (final ICompilationUnit sourceUnit : sourceMoveUnits) {
+
+			final IType sourcePrimaryType = sourceUnit.findPrimaryType();
+			final String sourceTypeName = sourcePrimaryType.getTypeQualifiedName();
+
+			final String sourceUnitText = sourceUnit.getSource();
+			final Document sourceUnitDocument = new Document(sourceUnitText);
+
+			final CompilationUnit sourceParsedUnit = model.getParsedUnits().get(sourceUnit);
+			final AST sourceAst = sourceParsedUnit.getAST();
+
+			final TypeDeclaration sourceTypeDeclaration = (TypeDeclaration) NodeFinder.perform(sourceParsedUnit,
+					sourcePrimaryType.getSourceRange());
+
+			final Type sourceSuperclassType = sourceTypeDeclaration.getSuperclassType();
+			if (sourceSuperclassType != null) {
+				if (sourceSuperclassType.isSimpleType()) {
+					final SimpleType sourceSuperclassSimpleType = (SimpleType) sourceSuperclassType;
+					final Name sourceSuperclassName = sourceSuperclassSimpleType.getName();
+					if (sourceSuperclassName.isSimpleName()) {
+						final SimpleName sourceSuperclassSimpleName = (SimpleName) sourceSuperclassName;
+						final String sourceSuperclassIdentifier = sourceSuperclassSimpleName.getIdentifier();
+						if (model.getTargetNamesMap().containsKey(sourceSuperclassIdentifier)) {
+
+							sourceParsedUnit.recordModifications();
+
+							final List<ImportDeclaration> sourceImports = sourceParsedUnit.imports();
+							{
+								final ImportDeclaration importDeclaration = sourceAst.newImportDeclaration();
+								importDeclaration.setOnDemand(true);
+								importDeclaration.setName(sourceAst.newName(model.getTargetMovePackageName()));
+								sourceImports.add(importDeclaration);
+							}
+
+							sourceSuperclassSimpleName.setIdentifier(model.getTargetNamesMap().get(
+									sourceSuperclassIdentifier));
+
+							final TextEdit sourceUnitEdits = sourceParsedUnit.rewrite(sourceUnitDocument, model
+									.getJavaProject().getOptions(true));
+							final TextFileChange sourceTextFileChange = new TextFileChange(sourceUnit.getElementName(),
+									(IFile) sourceUnit.getResource());
+							sourceTextFileChange.setEdit(sourceUnitEdits);
+							changes.add(sourceTextFileChange);
+						}
+					}
+				}
+			}
+
+		}
+
+		return changes;
+	}
+
+	private Change buildChangesSourceStubClasses(IProgressMonitor pm) throws JavaModelException,
+			MalformedTreeException, BadLocationException {
+
+		final CompositeChange changes = new CompositeChange(String.format(
+				"Modify classes in package '%s' to work as dispatchers", model.getSourcePackageName()));
+
+		final List<ICompilationUnit> sourceCompilationUnits = model.getSourceCompilationUnits();
+		for (final ICompilationUnit sourceUnit : sourceCompilationUnits) {
+
+			final IType sourcePrimaryType = sourceUnit.findPrimaryType();
+			final String sourceTypeName = sourcePrimaryType.getTypeQualifiedName();
+
+			final String sourceUnitText = sourceUnit.getSource();
+			final Document sourceUnitDocument = new Document(sourceUnitText);
+
+			final CompilationUnit sourceParsedUnit = model.getParsedUnits().get(sourceUnit);
+			final AST sourceAst = sourceParsedUnit.getAST();
+
+			sourceParsedUnit.recordModifications();
+
+			final List<ImportDeclaration> sourceImports = sourceParsedUnit.imports();
+			{
+				final ImportDeclaration importDeclaration = sourceAst.newImportDeclaration();
+				importDeclaration.setOnDemand(true);
+				importDeclaration.setName(sourceAst.newName(model.getTargetMovePackageName()));
+				sourceImports.add(importDeclaration);
+			}
+
+			{
+				final ImportDeclaration importDeclaration = sourceAst.newImportDeclaration();
+				importDeclaration.setOnDemand(true);
+				importDeclaration.setName(sourceAst.newName(model.getTargetStubPackageName()));
+				sourceImports.add(importDeclaration);
+			}
+
+			final TypeDeclaration sourceTypeDeclaration = (TypeDeclaration) NodeFinder.perform(sourceParsedUnit,
+					sourcePrimaryType.getSourceRange());
+
+			final MethodDeclaration[] sourceMethods = sourceTypeDeclaration.getMethods();
+			for (final MethodDeclaration sourceMethodDeclaration : sourceMethods) {
+
+				if (sourceMethodDeclaration.isConstructor()) {
+					continue;
+				}
+
+				boolean isPublic = false;
+				final List<IExtendedModifier> modifiers = sourceMethodDeclaration.modifiers();
+				for (final IExtendedModifier extendedModifier : modifiers) {
+					if (extendedModifier.isModifier()) {
+						final Modifier modifier = (Modifier) extendedModifier;
+						if (modifier.isPublic()) {
+							isPublic = true;
+							break;
+						}
+					}
+				}
+				if (!isPublic) {
+					sourceMethodDeclaration.delete();
+				} else {
+					final SimpleName sourceMethodName = sourceMethodDeclaration.getName();
+					final String sourceMethodIdentifier = sourceMethodName.getIdentifier();
+					if (sourceMethodIdentifier.startsWith("do") || sourceMethodIdentifier.startsWith("undo")) {
+						final List<Statement> statements = sourceMethodDeclaration.getBody().statements();
+						if (statements != null) {
+							final List<Statement> emptyBody = new ArrayList<Statement>();
+							insertDefaultReturn(sourceAst, sourceMethodDeclaration, emptyBody);
+							statements.clear();
+							if (!emptyBody.isEmpty()) {
+								statements.addAll(emptyBody);
+							}
+						}
+					}
+				}
+			}
+
+			final TypeDeclaration[] types = sourceTypeDeclaration.getTypes();
+			for (final TypeDeclaration typeDeclaration : types) {
+				boolean isPublic = false;
+				final List<IExtendedModifier> modifiers = typeDeclaration.modifiers();
+				for (final IExtendedModifier extendedModifier : modifiers) {
+					if (extendedModifier.isModifier()) {
+						final Modifier modifier = (Modifier) extendedModifier;
+						if (modifier.isPublic()) {
+							isPublic = true;
+							break;
+						}
+					}
+				}
+				if (!isPublic) {
+					typeDeclaration.delete();
+				}
+			}
+
+			final TextEdit sourceUnitEdits = sourceParsedUnit.rewrite(sourceUnitDocument, model.getJavaProject()
+					.getOptions(true));
+			final TextFileChange sourceTextFileChange = new TextFileChange(sourceUnit.getElementName(),
+					(IFile) sourceUnit.getResource());
+			sourceTextFileChange.setEdit(sourceUnitEdits);
+			changes.add(sourceTextFileChange);
+
+		}
+
+		return changes;
 	}
 
 }

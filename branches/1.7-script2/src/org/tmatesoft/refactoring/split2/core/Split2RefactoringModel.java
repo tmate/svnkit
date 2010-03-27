@@ -34,6 +34,8 @@ public class Split2RefactoringModel {
 	private final List<ICompilationUnit> sourceCompilationUnits = new ArrayList<ICompilationUnit>();
 	private final Map<ICompilationUnit, CompilationUnit> parsedUnits = new HashMap<ICompilationUnit, CompilationUnit>();
 	private final Map<String, String> targetNamesMap = new HashMap<String, String>();
+	private final List<String> sourceMoveClassesNames = new ArrayList<String>();
+	private final List<ICompilationUnit> sourceMoveClassesUnits = new ArrayList<ICompilationUnit>();
 
 	public IStructuredSelection getSelection() {
 		return selection;
@@ -137,6 +139,14 @@ public class Split2RefactoringModel {
 
 	public String getTargetStubSuffix() {
 		return targetStubSuffix;
+	}
+
+	public List<String> getSourceMoveClassesNames() {
+		return sourceMoveClassesNames;
+	}
+
+	public List<ICompilationUnit> getSourceMoveClassesUnits() {
+		return sourceMoveClassesUnits;
 	}
 
 }
