@@ -805,19 +805,7 @@ public class Split2Refactoring extends Refactoring {
 				if (!isPublic) {
 					sourceMethodDeclaration.delete();
 				} else {
-					final SimpleName sourceMethodName = sourceMethodDeclaration.getName();
-					final String sourceMethodIdentifier = sourceMethodName.getIdentifier();
-					if (sourceMethodIdentifier.startsWith("do") || sourceMethodIdentifier.startsWith("undo")) {
-						final List<Statement> statements = sourceMethodDeclaration.getBody().statements();
-						if (statements != null) {
-							final List<Statement> emptyBody = new ArrayList<Statement>();
-							insertDefaultReturn(sourceAst, sourceMethodDeclaration, emptyBody);
-							statements.clear();
-							if (!emptyBody.isEmpty()) {
-								statements.addAll(emptyBody);
-							}
-						}
-					}
+					delegateMethod(sourceAst, sourceMethodDeclaration);
 				}
 			}
 
@@ -849,6 +837,45 @@ public class Split2Refactoring extends Refactoring {
 		}
 
 		return changes;
+	}
+
+	private void delegateMethod(final AST sourceAst, final MethodDeclaration sourceMethodDeclaration) {
+
+		boolean isSVNExceptionThrown = false;
+		final List<Name> thrownExceptions = sourceMethodDeclaration.thrownExceptions();
+		for (final Name name : thrownExceptions) {
+			if (name.isSimpleName()) {
+				final SimpleName simpleName = (SimpleName) name;
+				if ("SVNException".equals(simpleName.getIdentifier())) {
+					isSVNExceptionThrown = true;
+					break;
+				}
+			}
+		}
+
+		final SimpleName sourceMethodName = sourceMethodDeclaration.getName();
+		final String sourceMethodIdentifier = sourceMethodName.getIdentifier();
+		final List<Statement> statements = sourceMethodDeclaration.getBody().statements();
+		if (statements != null) {
+			final List<Statement> emptyBody = new ArrayList<Statement>();
+			if (sourceMethodIdentifier.startsWith("do") || sourceMethodIdentifier.startsWith("undo")
+					|| isSVNExceptionThrown) {
+				// TODO delegation for do*
+				insertDefaultReturn(sourceAst, sourceMethodDeclaration, emptyBody);
+			} else if (sourceMethodIdentifier.startsWith("get")) {
+				// TODO delegation for get*
+				insertDefaultReturn(sourceAst, sourceMethodDeclaration, emptyBody);
+			} else if (sourceMethodIdentifier.startsWith("set")) {
+				// TODO delegation for set*
+				insertDefaultReturn(sourceAst, sourceMethodDeclaration, emptyBody);
+			} else {
+				return;
+			}
+			statements.clear();
+			if (!emptyBody.isEmpty()) {
+				statements.addAll(emptyBody);
+			}
+		}
 	}
 
 }
