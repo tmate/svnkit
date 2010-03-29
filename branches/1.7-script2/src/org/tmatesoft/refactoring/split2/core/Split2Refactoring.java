@@ -76,7 +76,7 @@ public class Split2Refactoring extends Refactoring {
 
 	private static void initModel(Split2RefactoringModel model) {
 		model.getSourcePackageNames().add("org.tmatesoft.svn.core.wc");
-		model.getSourcePackageNames().add("org.tmatesoft.svn.core.wc.admin");
+		// model.getSourcePackageNames().add("org.tmatesoft.svn.core.wc.admin");
 		model.setSourceClassNamePattern("SVN[\\w]*Client");
 		model.getTargetNamesMap().put("SVNBasicClient", "SVNBasicDelegate");
 		model.setTargetMovePackageName("org.tmatesoft.svn.core.internal.wc16");
