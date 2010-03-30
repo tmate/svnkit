@@ -26,6 +26,7 @@ import org.eclipse.jdt.core.dom.ASTVisitor;
 import org.eclipse.jdt.core.dom.Assignment;
 import org.eclipse.jdt.core.dom.Block;
 import org.eclipse.jdt.core.dom.BodyDeclaration;
+import org.eclipse.jdt.core.dom.ClassInstanceCreation;
 import org.eclipse.jdt.core.dom.CompilationUnit;
 import org.eclipse.jdt.core.dom.Expression;
 import org.eclipse.jdt.core.dom.FieldAccess;
@@ -46,6 +47,7 @@ import org.eclipse.jdt.core.dom.SimpleName;
 import org.eclipse.jdt.core.dom.SimpleType;
 import org.eclipse.jdt.core.dom.SingleVariableDeclaration;
 import org.eclipse.jdt.core.dom.Statement;
+import org.eclipse.jdt.core.dom.SuperConstructorInvocation;
 import org.eclipse.jdt.core.dom.Type;
 import org.eclipse.jdt.core.dom.TypeDeclaration;
 import org.eclipse.jdt.core.dom.VariableDeclarationFragment;
@@ -1004,6 +1006,30 @@ public class Split2Refactoring extends Refactoring {
 	}
 
 	private void dispatchConstructor(AST sourceAst, MethodDeclaration sourceMethodDeclaration, List<Statement> emptyBody) {
+
+		final String identifier = sourceMethodDeclaration.getName().getIdentifier();
+
+		final List<SingleVariableDeclaration> parameters = sourceMethodDeclaration.parameters();
+
+		final ClassInstanceCreation constructor16 = sourceAst.newClassInstanceCreation();
+		constructor16.setType(sourceAst
+				.newSimpleType(sourceAst.newSimpleName(identifier + model.getTargetMoveSuffix())));
+		for (SingleVariableDeclaration parameter : parameters) {
+			constructor16.arguments().add(sourceAst.newSimpleName(parameter.getName().getIdentifier()));
+		}
+
+		final ClassInstanceCreation constructor17 = sourceAst.newClassInstanceCreation();
+		constructor17.setType(sourceAst
+				.newSimpleType(sourceAst.newSimpleName(identifier + model.getTargetStubSuffix())));
+		for (SingleVariableDeclaration parameter : parameters) {
+			constructor17.arguments().add(sourceAst.newSimpleName(parameter.getName().getIdentifier()));
+		}
+
+		final SuperConstructorInvocation superInvoke = sourceAst.newSuperConstructorInvocation();
+		final List arguments = superInvoke.arguments();
+		arguments.add(constructor16);
+		arguments.add(constructor17);
+		emptyBody.add(superInvoke);
 
 	}
 
