@@ -23,8 +23,13 @@ import org.eclipse.jdt.core.dom.ASTNode;
 import org.eclipse.jdt.core.dom.ASTParser;
 import org.eclipse.jdt.core.dom.ASTRequestor;
 import org.eclipse.jdt.core.dom.ASTVisitor;
+import org.eclipse.jdt.core.dom.Assignment;
+import org.eclipse.jdt.core.dom.Block;
+import org.eclipse.jdt.core.dom.BodyDeclaration;
 import org.eclipse.jdt.core.dom.CompilationUnit;
 import org.eclipse.jdt.core.dom.Expression;
+import org.eclipse.jdt.core.dom.FieldAccess;
+import org.eclipse.jdt.core.dom.FieldDeclaration;
 import org.eclipse.jdt.core.dom.IExtendedModifier;
 import org.eclipse.jdt.core.dom.IPackageBinding;
 import org.eclipse.jdt.core.dom.ITypeBinding;
@@ -39,6 +44,7 @@ import org.eclipse.jdt.core.dom.PrimitiveType;
 import org.eclipse.jdt.core.dom.ReturnStatement;
 import org.eclipse.jdt.core.dom.SimpleName;
 import org.eclipse.jdt.core.dom.SimpleType;
+import org.eclipse.jdt.core.dom.SingleVariableDeclaration;
 import org.eclipse.jdt.core.dom.Statement;
 import org.eclipse.jdt.core.dom.Type;
 import org.eclipse.jdt.core.dom.TypeDeclaration;
@@ -784,13 +790,26 @@ public class Split2Refactoring extends Refactoring {
 			final TypeDeclaration sourceTypeDeclaration = (TypeDeclaration) NodeFinder.perform(sourceParsedUnit,
 					sourcePrimaryType.getSourceRange());
 
+			final FieldDeclaration[] sourceFields = sourceTypeDeclaration.getFields();
+			for (final FieldDeclaration sourceFieldDeclaration : sourceFields) {
+				boolean isPublic = false;
+				final List<IExtendedModifier> modifiers = sourceFieldDeclaration.modifiers();
+				for (final IExtendedModifier extendedModifier : modifiers) {
+					if (extendedModifier.isModifier()) {
+						final Modifier modifier = (Modifier) extendedModifier;
+						if (modifier.isPublic()) {
+							isPublic = true;
+							break;
+						}
+					}
+				}
+				if (!isPublic) {
+					sourceFieldDeclaration.delete();
+				}
+			}
+
 			final MethodDeclaration[] sourceMethods = sourceTypeDeclaration.getMethods();
 			for (final MethodDeclaration sourceMethodDeclaration : sourceMethods) {
-
-				if (sourceMethodDeclaration.isConstructor()) {
-					continue;
-				}
-
 				boolean isPublic = false;
 				final List<IExtendedModifier> modifiers = sourceMethodDeclaration.modifiers();
 				for (final IExtendedModifier extendedModifier : modifiers) {
@@ -827,6 +846,10 @@ public class Split2Refactoring extends Refactoring {
 				}
 			}
 
+			if (model.getTargetNamesMap().containsKey(sourceTypeName)) {
+				addBasicDelegatesConstructor(sourceAst, sourceTypeDeclaration, sourceTypeName);
+			}
+
 			final TextEdit sourceUnitEdits = sourceParsedUnit.rewrite(sourceUnitDocument, model.getJavaProject()
 					.getOptions(true));
 			final TextFileChange sourceTextFileChange = new TextFileChange(sourceUnit.getElementName(),
@@ -839,35 +862,137 @@ public class Split2Refactoring extends Refactoring {
 		return changes;
 	}
 
-	private void delegateMethod(final AST sourceAst, final MethodDeclaration sourceMethodDeclaration) {
+	private void addBasicDelegatesConstructor(AST sourceAst, TypeDeclaration sourceTypeDeclaration,
+			String sourceTypeName) {
 
+		final String targetTypeName = model.getTargetNamesMap().get(sourceTypeName);
+
+		final List<BodyDeclaration> bodyDeclarations = sourceTypeDeclaration.bodyDeclarations();
+
+		{
+			final VariableDeclarationFragment varF = sourceAst.newVariableDeclarationFragment();
+			varF.setName(sourceAst.newSimpleName("delegate16"));
+			final FieldDeclaration fieldDecl = sourceAst.newFieldDeclaration(varF);
+			fieldDecl.modifiers().add(sourceAst.newModifier(Modifier.ModifierKeyword.PRIVATE_KEYWORD));
+			fieldDecl.setType(sourceAst.newSimpleType(sourceAst.newSimpleName(targetTypeName)));
+			bodyDeclarations.add(0, fieldDecl);
+		}
+
+		{
+			final VariableDeclarationFragment varF = sourceAst.newVariableDeclarationFragment();
+			varF.setName(sourceAst.newSimpleName("delegate17"));
+			final FieldDeclaration fieldDecl = sourceAst.newFieldDeclaration(varF);
+			fieldDecl.modifiers().add(sourceAst.newModifier(Modifier.ModifierKeyword.PRIVATE_KEYWORD));
+			fieldDecl.setType(sourceAst.newSimpleType(sourceAst.newSimpleName(targetTypeName)));
+			bodyDeclarations.add(1, fieldDecl);
+		}
+
+		{
+			final MethodDeclaration constructorDecl = sourceAst.newMethodDeclaration();
+			bodyDeclarations.add(2, constructorDecl);
+			constructorDecl.setConstructor(true);
+			constructorDecl.setName(sourceAst.newSimpleName(sourceTypeName));
+			constructorDecl.modifiers().add(sourceAst.newModifier(Modifier.ModifierKeyword.PROTECTED_KEYWORD));
+
+			{
+				final SingleVariableDeclaration constructorParam = sourceAst.newSingleVariableDeclaration();
+				constructorParam.setType(sourceAst.newSimpleType(sourceAst.newSimpleName(targetTypeName)));
+				constructorParam.setName(sourceAst.newSimpleName("delegate16"));
+				constructorDecl.parameters().add(constructorParam);
+			}
+			{
+				final SingleVariableDeclaration constructorParam = sourceAst.newSingleVariableDeclaration();
+				constructorParam.setType(sourceAst.newSimpleType(sourceAst.newSimpleName(targetTypeName)));
+				constructorParam.setName(sourceAst.newSimpleName("delegate17"));
+				constructorDecl.parameters().add(constructorParam);
+			}
+
+			final Block constructorBody = sourceAst.newBlock();
+			constructorDecl.setBody(constructorBody);
+
+			{
+				final Assignment assign = sourceAst.newAssignment();
+				constructorBody.statements().add(sourceAst.newExpressionStatement(assign));
+				final FieldAccess fieldAccess = sourceAst.newFieldAccess();
+				fieldAccess.setExpression(sourceAst.newThisExpression());
+				fieldAccess.setName(sourceAst.newSimpleName("delegate16"));
+				assign.setLeftHandSide(fieldAccess);
+				assign.setRightHandSide(sourceAst.newName("delegate16"));
+			}
+
+			{
+				final Assignment assign = sourceAst.newAssignment();
+				constructorBody.statements().add(sourceAst.newExpressionStatement(assign));
+				final FieldAccess fieldAccess = sourceAst.newFieldAccess();
+				fieldAccess.setExpression(sourceAst.newThisExpression());
+				fieldAccess.setName(sourceAst.newSimpleName("delegate17"));
+				assign.setLeftHandSide(fieldAccess);
+				assign.setRightHandSide(sourceAst.newName("delegate17"));
+			}
+		}
+
+		{
+			final MethodDeclaration getter = sourceAst.newMethodDeclaration();
+			bodyDeclarations.add(3, getter);
+			getter.setName(sourceAst.newSimpleName("getDelegate16"));
+			getter.setReturnType2(sourceAst.newSimpleType(sourceAst.newName(targetTypeName)));
+			getter.modifiers().add(sourceAst.newModifier(Modifier.ModifierKeyword.PROTECTED_KEYWORD));
+			final ReturnStatement newReturnStatement = sourceAst.newReturnStatement();
+			final Block getterBody = sourceAst.newBlock();
+			getter.setBody(getterBody);
+			final ReturnStatement returnStatement = sourceAst.newReturnStatement();
+			final FieldAccess fieldAccess = sourceAst.newFieldAccess();
+			fieldAccess.setExpression(sourceAst.newThisExpression());
+			fieldAccess.setName(sourceAst.newSimpleName("delegate16"));
+			returnStatement.setExpression(fieldAccess);
+			getterBody.statements().add(returnStatement);
+		}
+
+		{
+			final MethodDeclaration getter = sourceAst.newMethodDeclaration();
+			bodyDeclarations.add(3, getter);
+			getter.setName(sourceAst.newSimpleName("getDelegate17"));
+			getter.setReturnType2(sourceAst.newSimpleType(sourceAst.newName(targetTypeName)));
+			getter.modifiers().add(sourceAst.newModifier(Modifier.ModifierKeyword.PROTECTED_KEYWORD));
+			final ReturnStatement newReturnStatement = sourceAst.newReturnStatement();
+			final Block getterBody = sourceAst.newBlock();
+			getter.setBody(getterBody);
+			final ReturnStatement returnStatement = sourceAst.newReturnStatement();
+			final FieldAccess fieldAccess = sourceAst.newFieldAccess();
+			fieldAccess.setExpression(sourceAst.newThisExpression());
+			fieldAccess.setName(sourceAst.newSimpleName("delegate17"));
+			returnStatement.setExpression(fieldAccess);
+			getterBody.statements().add(returnStatement);
+		}
+
+	}
+
+	private void delegateMethod(final AST sourceAst, final MethodDeclaration sourceMethodDeclaration) {
 		boolean isSVNExceptionThrown = false;
 		final List<Name> thrownExceptions = sourceMethodDeclaration.thrownExceptions();
 		for (final Name name : thrownExceptions) {
 			if (name.isSimpleName()) {
 				final SimpleName simpleName = (SimpleName) name;
-				if ("SVNException".equals(simpleName.getIdentifier())) {
+				if (simpleName.getIdentifier().startsWith("SVN") && simpleName.getIdentifier().endsWith("Exception")) {
 					isSVNExceptionThrown = true;
 					break;
 				}
 			}
 		}
-
 		final SimpleName sourceMethodName = sourceMethodDeclaration.getName();
 		final String sourceMethodIdentifier = sourceMethodName.getIdentifier();
 		final List<Statement> statements = sourceMethodDeclaration.getBody().statements();
 		if (statements != null) {
 			final List<Statement> emptyBody = new ArrayList<Statement>();
-			if (sourceMethodIdentifier.startsWith("do") || sourceMethodIdentifier.startsWith("undo")
+			if (sourceMethodDeclaration.isConstructor()) {
+				dispatchConstructor(sourceAst, sourceMethodDeclaration, emptyBody);
+			} else if (sourceMethodIdentifier.startsWith("do") || sourceMethodIdentifier.startsWith("undo")
 					|| isSVNExceptionThrown) {
-				// TODO delegation for do*
-				insertDefaultReturn(sourceAst, sourceMethodDeclaration, emptyBody);
-			} else if (sourceMethodIdentifier.startsWith("get")) {
-				// TODO delegation for get*
-				insertDefaultReturn(sourceAst, sourceMethodDeclaration, emptyBody);
+				dispatchDoMethod(sourceAst, sourceMethodDeclaration, emptyBody);
+			} else if (sourceMethodIdentifier.startsWith("get") || sourceMethodIdentifier.startsWith("is")) {
+				dispatchGetMethod(sourceAst, sourceMethodDeclaration, emptyBody);
 			} else if (sourceMethodIdentifier.startsWith("set")) {
-				// TODO delegation for set*
-				insertDefaultReturn(sourceAst, sourceMethodDeclaration, emptyBody);
+				dispatchSetMethod(sourceAst, sourceMethodDeclaration, emptyBody);
 			} else {
 				return;
 			}
@@ -878,4 +1003,19 @@ public class Split2Refactoring extends Refactoring {
 		}
 	}
 
+	private void dispatchConstructor(AST sourceAst, MethodDeclaration sourceMethodDeclaration, List<Statement> emptyBody) {
+
+	}
+
+	private void dispatchDoMethod(AST sourceAst, MethodDeclaration sourceMethodDeclaration, List<Statement> emptyBody) {
+		insertDefaultReturn(sourceAst, sourceMethodDeclaration, emptyBody);
+	}
+
+	private void dispatchGetMethod(AST sourceAst, MethodDeclaration sourceMethodDeclaration, List<Statement> emptyBody) {
+		insertDefaultReturn(sourceAst, sourceMethodDeclaration, emptyBody);
+	}
+
+	private void dispatchSetMethod(AST sourceAst, MethodDeclaration sourceMethodDeclaration, List<Statement> emptyBody) {
+		insertDefaultReturn(sourceAst, sourceMethodDeclaration, emptyBody);
+	}
 }
