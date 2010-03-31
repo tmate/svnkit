@@ -1081,9 +1081,9 @@ public class Split2Refactoring extends Refactoring {
 					|| isSVNExceptionThrown) {
 				dispatchDoMethod(sourceAst, sourceMethodDeclaration, emptyBody, sourceTypeName);
 			} else if (sourceMethodIdentifier.startsWith("get") || sourceMethodIdentifier.startsWith("is")) {
-				dispatchGetMethod(sourceAst, sourceMethodDeclaration, emptyBody);
+				dispatchGetMethod(sourceAst, sourceMethodDeclaration, emptyBody, sourceTypeName);
 			} else if (sourceMethodIdentifier.startsWith("set")) {
-				dispatchSetMethod(sourceAst, sourceMethodDeclaration, emptyBody);
+				dispatchSetMethod(sourceAst, sourceMethodDeclaration, emptyBody, sourceTypeName);
 			} else {
 				return;
 			}
@@ -1233,11 +1233,65 @@ public class Split2Refactoring extends Refactoring {
 
 	}
 
-	private void dispatchGetMethod(AST sourceAst, MethodDeclaration sourceMethodDeclaration, List<Statement> emptyBody) {
-		insertDefaultReturn(sourceAst, sourceMethodDeclaration, emptyBody);
+	private void dispatchGetMethod(AST sourceAst, MethodDeclaration sourceMethodDeclaration, List<Statement> emptyBody,
+			String sourceTypeName) {
+
+		final String dispatchTypeName = model.getTargetNamesMap().containsKey(sourceTypeName) ? "Delegate"
+				: sourceTypeName;
+
+		final MethodInvocation invoc1 = sourceAst.newMethodInvocation();
+		final MethodInvocation invoc2 = sourceAst.newMethodInvocation();
+		invoc2.setName(sourceAst.newSimpleName("get" + dispatchTypeName + model.getTargetMoveSuffix()));
+		invoc1.setExpression(invoc2);
+
+		invoc1.setName(sourceAst.newSimpleName(sourceMethodDeclaration.getName().getIdentifier()));
+		final List<Expression> arguments = invoc1.arguments();
+		final List<SingleVariableDeclaration> parameters = sourceMethodDeclaration.parameters();
+		for (SingleVariableDeclaration parameter : parameters) {
+			arguments.add(sourceAst.newSimpleName(parameter.getName().getIdentifier()));
+		}
+
+		final ReturnStatement returnStatement = sourceAst.newReturnStatement();
+		returnStatement.setExpression(invoc1);
+		emptyBody.add(returnStatement);
+
 	}
 
-	private void dispatchSetMethod(AST sourceAst, MethodDeclaration sourceMethodDeclaration, List<Statement> emptyBody) {
-		insertDefaultReturn(sourceAst, sourceMethodDeclaration, emptyBody);
+	private void dispatchSetMethod(AST sourceAst, MethodDeclaration sourceMethodDeclaration, List<Statement> emptyBody,
+			String sourceTypeName) {
+
+		final String dispatchTypeName = model.getTargetNamesMap().containsKey(sourceTypeName) ? "Delegate"
+				: sourceTypeName;
+
+		{
+			final MethodInvocation invoc1 = sourceAst.newMethodInvocation();
+			final MethodInvocation invoc2 = sourceAst.newMethodInvocation();
+			invoc2.setName(sourceAst.newSimpleName("get" + dispatchTypeName + model.getTargetMoveSuffix()));
+			invoc1.setExpression(invoc2);
+
+			invoc1.setName(sourceAst.newSimpleName(sourceMethodDeclaration.getName().getIdentifier()));
+			final List<Expression> arguments = invoc1.arguments();
+			final List<SingleVariableDeclaration> parameters = sourceMethodDeclaration.parameters();
+			for (SingleVariableDeclaration parameter : parameters) {
+				arguments.add(sourceAst.newSimpleName(parameter.getName().getIdentifier()));
+			}
+			emptyBody.add(sourceAst.newExpressionStatement(invoc1));
+		}
+
+		{
+			final MethodInvocation invoc1 = sourceAst.newMethodInvocation();
+			final MethodInvocation invoc2 = sourceAst.newMethodInvocation();
+			invoc2.setName(sourceAst.newSimpleName("get" + dispatchTypeName + model.getTargetStubSuffix()));
+			invoc1.setExpression(invoc2);
+
+			invoc1.setName(sourceAst.newSimpleName(sourceMethodDeclaration.getName().getIdentifier()));
+			final List<Expression> arguments = invoc1.arguments();
+			final List<SingleVariableDeclaration> parameters = sourceMethodDeclaration.parameters();
+			for (SingleVariableDeclaration parameter : parameters) {
+				arguments.add(sourceAst.newSimpleName(parameter.getName().getIdentifier()));
+			}
+			emptyBody.add(sourceAst.newExpressionStatement(invoc1));
+		}
+
 	}
 }
