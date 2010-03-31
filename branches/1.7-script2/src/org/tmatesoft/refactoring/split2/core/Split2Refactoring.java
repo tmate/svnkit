@@ -87,10 +87,13 @@ public class Split2Refactoring extends Refactoring {
 		// model.getSourcePackageNames().add("org.tmatesoft.svn.core.wc.admin");
 		model.setSourceClassNamePattern("SVN[\\w]*Client");
 		model.getTargetNamesMap().put("SVNBasicClient", "SVNBasicDelegate");
+		model.getSourcesNamesMap().put("SVNCopyDriver", "SVNBasicClient");
+		model.getSourcesNamesMap().put("SVNMergeDriver", "SVNBasicClient");
 		model.setTargetMovePackageName("org.tmatesoft.svn.core.internal.wc16");
 		model.setTargetMoveSuffix("16");
 		model.setTargetStubPackageName("org.tmatesoft.svn.core.internal.wc17");
 		model.setTargetStubSuffix("17");
+
 		model.getSourceMoveClassesNames().add("org.tmatesoft.svn.core.internal.wc.SVNCopyDriver");
 		model.getSourceMoveClassesNames().add("org.tmatesoft.svn.core.internal.wc.SVNMergeDriver");
 		// model.getSourceMoveClassesNames().add("org.tmatesoft.svn.core.wc.admin.SVNAdminClient");
@@ -736,8 +739,8 @@ public class Split2Refactoring extends Refactoring {
 								sourceImports.add(importDeclaration);
 							}
 
-							sourceSuperclassSimpleName.setIdentifier(model.getTargetNamesMap().get(
-									sourceSuperclassIdentifier));
+							final String targetTypeName = model.getTargetNamesMap().get(sourceSuperclassIdentifier);
+							sourceSuperclassSimpleName.setIdentifier(targetTypeName);
 
 							final TextEdit sourceUnitEdits = sourceParsedUnit.rewrite(sourceUnitDocument, model
 									.getJavaProject().getOptions(true));
@@ -850,6 +853,22 @@ public class Split2Refactoring extends Refactoring {
 
 			if (model.getTargetNamesMap().containsKey(sourceTypeName)) {
 				addBasicDelegatesConstructor(sourceAst, sourceTypeDeclaration, sourceTypeName);
+			} else {
+				final Type sourceSuperclassType = sourceTypeDeclaration.getSuperclassType();
+				if (sourceSuperclassType != null) {
+					if (sourceSuperclassType.isSimpleType()) {
+						final SimpleType sourceSuperclassSimpleType = (SimpleType) sourceSuperclassType;
+						final Name sourceSuperclassName = sourceSuperclassSimpleType.getName();
+						if (sourceSuperclassName.isSimpleName()) {
+							final SimpleName sourceSuperclassSimpleName = (SimpleName) sourceSuperclassName;
+							final String sourceSuperclassIdentifier = sourceSuperclassSimpleName.getIdentifier();
+							if (model.getSourcesNamesMap().containsKey(sourceSuperclassIdentifier)) {
+								sourceSuperclassSimpleName.setIdentifier(model.getSourcesNamesMap().get(
+										sourceSuperclassIdentifier));
+							}
+						}
+					}
+				}
 			}
 
 			final TextEdit sourceUnitEdits = sourceParsedUnit.rewrite(sourceUnitDocument, model.getJavaProject()
