@@ -26,6 +26,8 @@ import org.eclipse.jdt.core.dom.ASTVisitor;
 import org.eclipse.jdt.core.dom.Assignment;
 import org.eclipse.jdt.core.dom.Block;
 import org.eclipse.jdt.core.dom.BodyDeclaration;
+import org.eclipse.jdt.core.dom.CastExpression;
+import org.eclipse.jdt.core.dom.CatchClause;
 import org.eclipse.jdt.core.dom.ClassInstanceCreation;
 import org.eclipse.jdt.core.dom.CompilationUnit;
 import org.eclipse.jdt.core.dom.Expression;
@@ -34,7 +36,9 @@ import org.eclipse.jdt.core.dom.FieldDeclaration;
 import org.eclipse.jdt.core.dom.IExtendedModifier;
 import org.eclipse.jdt.core.dom.IPackageBinding;
 import org.eclipse.jdt.core.dom.ITypeBinding;
+import org.eclipse.jdt.core.dom.IfStatement;
 import org.eclipse.jdt.core.dom.ImportDeclaration;
+import org.eclipse.jdt.core.dom.InfixExpression;
 import org.eclipse.jdt.core.dom.MethodDeclaration;
 import org.eclipse.jdt.core.dom.MethodInvocation;
 import org.eclipse.jdt.core.dom.Modifier;
@@ -48,6 +52,8 @@ import org.eclipse.jdt.core.dom.SimpleType;
 import org.eclipse.jdt.core.dom.SingleVariableDeclaration;
 import org.eclipse.jdt.core.dom.Statement;
 import org.eclipse.jdt.core.dom.SuperConstructorInvocation;
+import org.eclipse.jdt.core.dom.ThrowStatement;
+import org.eclipse.jdt.core.dom.TryStatement;
 import org.eclipse.jdt.core.dom.Type;
 import org.eclipse.jdt.core.dom.TypeDeclaration;
 import org.eclipse.jdt.core.dom.VariableDeclarationFragment;
@@ -829,7 +835,7 @@ public class Split2Refactoring extends Refactoring {
 				if (!isPublic) {
 					sourceMethodDeclaration.delete();
 				} else {
-					delegateMethod(sourceAst, sourceMethodDeclaration);
+					delegateMethod(sourceAst, sourceMethodDeclaration, sourceTypeName);
 				}
 			}
 
@@ -869,6 +875,7 @@ public class Split2Refactoring extends Refactoring {
 						}
 					}
 				}
+				addDelegateAccessors(sourceAst, sourceTypeDeclaration, sourceTypeName);
 			}
 
 			final TextEdit sourceUnitEdits = sourceParsedUnit.rewrite(sourceUnitDocument, model.getJavaProject()
@@ -883,6 +890,59 @@ public class Split2Refactoring extends Refactoring {
 		return changes;
 	}
 
+	private void addDelegateAccessors(AST sourceAst, TypeDeclaration sourceTypeDeclaration, String sourceTypeName) {
+
+		final List<BodyDeclaration> bodyDeclarations = sourceTypeDeclaration.bodyDeclarations();
+
+		{
+			final String suffix = model.getTargetMoveSuffix();
+			final MethodDeclaration getter = sourceAst.newMethodDeclaration();
+			bodyDeclarations.add(0, getter);
+			getter.setName(sourceAst.newSimpleName("get" + sourceTypeName + suffix));
+			getter.setReturnType2(sourceAst.newSimpleType(sourceAst.newName(sourceTypeName + suffix)));
+			getter.modifiers().add(sourceAst.newModifier(Modifier.ModifierKeyword.PRIVATE_KEYWORD));
+
+			final ReturnStatement newReturnStatement = sourceAst.newReturnStatement();
+			final Block getterBody = sourceAst.newBlock();
+			getter.setBody(getterBody);
+			final ReturnStatement returnStatement = sourceAst.newReturnStatement();
+
+			final MethodInvocation invocation = sourceAst.newMethodInvocation();
+			invocation.setName(sourceAst.newSimpleName("getDelegate" + suffix));
+
+			final CastExpression cast = sourceAst.newCastExpression();
+			cast.setExpression(invocation);
+			cast.setType(sourceAst.newSimpleType(sourceAst.newSimpleName(sourceTypeName + suffix)));
+
+			returnStatement.setExpression(cast);
+			getterBody.statements().add(returnStatement);
+		}
+
+		{
+			final String suffix = model.getTargetStubSuffix();
+			final MethodDeclaration getter = sourceAst.newMethodDeclaration();
+			bodyDeclarations.add(1, getter);
+			getter.setName(sourceAst.newSimpleName("get" + sourceTypeName + suffix));
+			getter.setReturnType2(sourceAst.newSimpleType(sourceAst.newName(sourceTypeName + suffix)));
+			getter.modifiers().add(sourceAst.newModifier(Modifier.ModifierKeyword.PRIVATE_KEYWORD));
+
+			final ReturnStatement newReturnStatement = sourceAst.newReturnStatement();
+			final Block getterBody = sourceAst.newBlock();
+			getter.setBody(getterBody);
+			final ReturnStatement returnStatement = sourceAst.newReturnStatement();
+
+			final MethodInvocation invocation = sourceAst.newMethodInvocation();
+			invocation.setName(sourceAst.newSimpleName("getDelegate" + suffix));
+
+			final CastExpression cast = sourceAst.newCastExpression();
+			cast.setExpression(invocation);
+			cast.setType(sourceAst.newSimpleType(sourceAst.newSimpleName(sourceTypeName + suffix)));
+
+			returnStatement.setExpression(cast);
+			getterBody.statements().add(returnStatement);
+		}
+	}
+
 	private void addBasicDelegatesConstructor(AST sourceAst, TypeDeclaration sourceTypeDeclaration,
 			String sourceTypeName) {
 
@@ -891,8 +951,9 @@ public class Split2Refactoring extends Refactoring {
 		final List<BodyDeclaration> bodyDeclarations = sourceTypeDeclaration.bodyDeclarations();
 
 		{
+			final String suffix = model.getTargetMoveSuffix();
 			final VariableDeclarationFragment varF = sourceAst.newVariableDeclarationFragment();
-			varF.setName(sourceAst.newSimpleName("delegate16"));
+			varF.setName(sourceAst.newSimpleName("delegate" + suffix));
 			final FieldDeclaration fieldDecl = sourceAst.newFieldDeclaration(varF);
 			fieldDecl.modifiers().add(sourceAst.newModifier(Modifier.ModifierKeyword.PRIVATE_KEYWORD));
 			fieldDecl.setType(sourceAst.newSimpleType(sourceAst.newSimpleName(targetTypeName)));
@@ -900,8 +961,9 @@ public class Split2Refactoring extends Refactoring {
 		}
 
 		{
+			final String suffix = model.getTargetStubSuffix();
 			final VariableDeclarationFragment varF = sourceAst.newVariableDeclarationFragment();
-			varF.setName(sourceAst.newSimpleName("delegate17"));
+			varF.setName(sourceAst.newSimpleName("delegate" + suffix));
 			final FieldDeclaration fieldDecl = sourceAst.newFieldDeclaration(varF);
 			fieldDecl.modifiers().add(sourceAst.newModifier(Modifier.ModifierKeyword.PRIVATE_KEYWORD));
 			fieldDecl.setType(sourceAst.newSimpleType(sourceAst.newSimpleName(targetTypeName)));
@@ -916,15 +978,17 @@ public class Split2Refactoring extends Refactoring {
 			constructorDecl.modifiers().add(sourceAst.newModifier(Modifier.ModifierKeyword.PROTECTED_KEYWORD));
 
 			{
+				final String suffix = model.getTargetMoveSuffix();
 				final SingleVariableDeclaration constructorParam = sourceAst.newSingleVariableDeclaration();
 				constructorParam.setType(sourceAst.newSimpleType(sourceAst.newSimpleName(targetTypeName)));
-				constructorParam.setName(sourceAst.newSimpleName("delegate16"));
+				constructorParam.setName(sourceAst.newSimpleName("delegate" + suffix));
 				constructorDecl.parameters().add(constructorParam);
 			}
 			{
+				final String suffix = model.getTargetStubSuffix();
 				final SingleVariableDeclaration constructorParam = sourceAst.newSingleVariableDeclaration();
 				constructorParam.setType(sourceAst.newSimpleType(sourceAst.newSimpleName(targetTypeName)));
-				constructorParam.setName(sourceAst.newSimpleName("delegate17"));
+				constructorParam.setName(sourceAst.newSimpleName("delegate" + suffix));
 				constructorDecl.parameters().add(constructorParam);
 			}
 
@@ -932,30 +996,33 @@ public class Split2Refactoring extends Refactoring {
 			constructorDecl.setBody(constructorBody);
 
 			{
+				final String suffix = model.getTargetMoveSuffix();
 				final Assignment assign = sourceAst.newAssignment();
 				constructorBody.statements().add(sourceAst.newExpressionStatement(assign));
 				final FieldAccess fieldAccess = sourceAst.newFieldAccess();
 				fieldAccess.setExpression(sourceAst.newThisExpression());
-				fieldAccess.setName(sourceAst.newSimpleName("delegate16"));
+				fieldAccess.setName(sourceAst.newSimpleName("delegate" + suffix));
 				assign.setLeftHandSide(fieldAccess);
-				assign.setRightHandSide(sourceAst.newName("delegate16"));
+				assign.setRightHandSide(sourceAst.newName("delegate" + suffix));
 			}
 
 			{
+				final String suffix = model.getTargetStubSuffix();
 				final Assignment assign = sourceAst.newAssignment();
 				constructorBody.statements().add(sourceAst.newExpressionStatement(assign));
 				final FieldAccess fieldAccess = sourceAst.newFieldAccess();
 				fieldAccess.setExpression(sourceAst.newThisExpression());
-				fieldAccess.setName(sourceAst.newSimpleName("delegate17"));
+				fieldAccess.setName(sourceAst.newSimpleName("delegate" + suffix));
 				assign.setLeftHandSide(fieldAccess);
-				assign.setRightHandSide(sourceAst.newName("delegate17"));
+				assign.setRightHandSide(sourceAst.newName("delegate" + suffix));
 			}
 		}
 
 		{
+			final String suffix = model.getTargetMoveSuffix();
 			final MethodDeclaration getter = sourceAst.newMethodDeclaration();
 			bodyDeclarations.add(3, getter);
-			getter.setName(sourceAst.newSimpleName("getDelegate16"));
+			getter.setName(sourceAst.newSimpleName("getDelegate" + suffix));
 			getter.setReturnType2(sourceAst.newSimpleType(sourceAst.newName(targetTypeName)));
 			getter.modifiers().add(sourceAst.newModifier(Modifier.ModifierKeyword.PROTECTED_KEYWORD));
 			final ReturnStatement newReturnStatement = sourceAst.newReturnStatement();
@@ -964,15 +1031,16 @@ public class Split2Refactoring extends Refactoring {
 			final ReturnStatement returnStatement = sourceAst.newReturnStatement();
 			final FieldAccess fieldAccess = sourceAst.newFieldAccess();
 			fieldAccess.setExpression(sourceAst.newThisExpression());
-			fieldAccess.setName(sourceAst.newSimpleName("delegate16"));
+			fieldAccess.setName(sourceAst.newSimpleName("delegate" + suffix));
 			returnStatement.setExpression(fieldAccess);
 			getterBody.statements().add(returnStatement);
 		}
 
 		{
+			final String suffix = model.getTargetStubSuffix();
 			final MethodDeclaration getter = sourceAst.newMethodDeclaration();
 			bodyDeclarations.add(3, getter);
-			getter.setName(sourceAst.newSimpleName("getDelegate17"));
+			getter.setName(sourceAst.newSimpleName("getDelegate" + suffix));
 			getter.setReturnType2(sourceAst.newSimpleType(sourceAst.newName(targetTypeName)));
 			getter.modifiers().add(sourceAst.newModifier(Modifier.ModifierKeyword.PROTECTED_KEYWORD));
 			final ReturnStatement newReturnStatement = sourceAst.newReturnStatement();
@@ -981,20 +1049,22 @@ public class Split2Refactoring extends Refactoring {
 			final ReturnStatement returnStatement = sourceAst.newReturnStatement();
 			final FieldAccess fieldAccess = sourceAst.newFieldAccess();
 			fieldAccess.setExpression(sourceAst.newThisExpression());
-			fieldAccess.setName(sourceAst.newSimpleName("delegate17"));
+			fieldAccess.setName(sourceAst.newSimpleName("delegate" + suffix));
 			returnStatement.setExpression(fieldAccess);
 			getterBody.statements().add(returnStatement);
 		}
 
 	}
 
-	private void delegateMethod(final AST sourceAst, final MethodDeclaration sourceMethodDeclaration) {
+	private void delegateMethod(final AST sourceAst, final MethodDeclaration sourceMethodDeclaration,
+			final String sourceTypeName) {
+
 		boolean isSVNExceptionThrown = false;
 		final List<Name> thrownExceptions = sourceMethodDeclaration.thrownExceptions();
 		for (final Name name : thrownExceptions) {
 			if (name.isSimpleName()) {
 				final SimpleName simpleName = (SimpleName) name;
-				if (simpleName.getIdentifier().startsWith("SVN") && simpleName.getIdentifier().endsWith("Exception")) {
+				if (simpleName.getIdentifier().equals("SVNException")) {
 					isSVNExceptionThrown = true;
 					break;
 				}
@@ -1009,7 +1079,7 @@ public class Split2Refactoring extends Refactoring {
 				dispatchConstructor(sourceAst, sourceMethodDeclaration, emptyBody);
 			} else if (sourceMethodIdentifier.startsWith("do") || sourceMethodIdentifier.startsWith("undo")
 					|| isSVNExceptionThrown) {
-				dispatchDoMethod(sourceAst, sourceMethodDeclaration, emptyBody);
+				dispatchDoMethod(sourceAst, sourceMethodDeclaration, emptyBody, sourceTypeName);
 			} else if (sourceMethodIdentifier.startsWith("get") || sourceMethodIdentifier.startsWith("is")) {
 				dispatchGetMethod(sourceAst, sourceMethodDeclaration, emptyBody);
 			} else if (sourceMethodIdentifier.startsWith("set")) {
@@ -1052,8 +1122,115 @@ public class Split2Refactoring extends Refactoring {
 
 	}
 
-	private void dispatchDoMethod(AST sourceAst, MethodDeclaration sourceMethodDeclaration, List<Statement> emptyBody) {
-		insertDefaultReturn(sourceAst, sourceMethodDeclaration, emptyBody);
+	private void dispatchDoMethod(AST sourceAst, MethodDeclaration sourceMethodDeclaration, List<Statement> emptyBody,
+			String sourceTypeName) {
+
+		boolean isReturn = true;
+		final Type returnType = sourceMethodDeclaration.getReturnType2();
+		if (returnType.isPrimitiveType()) {
+			final PrimitiveType primitiveType = (PrimitiveType) returnType;
+			final Code code = primitiveType.getPrimitiveTypeCode();
+			if (PrimitiveType.VOID.equals(code)) {
+				isReturn = false;
+			}
+		}
+
+		final String dispatchTypeName = model.getTargetNamesMap().containsKey(sourceTypeName) ? "Delegate"
+				: sourceTypeName;
+
+		final TryStatement tryStatement = sourceAst.newTryStatement();
+		final List<CatchClause> catchClauses = tryStatement.catchClauses();
+		final CatchClause catchClause = sourceAst.newCatchClause();
+		final SingleVariableDeclaration exception = sourceAst.newSingleVariableDeclaration();
+		exception.setType(sourceAst.newSimpleType(sourceAst.newSimpleName("SVNException")));
+		exception.setName(sourceAst.newSimpleName("e"));
+		catchClause.setException(exception);
+		catchClauses.add(catchClause);
+		emptyBody.add(tryStatement);
+
+		{
+			final Block tryBody = tryStatement.getBody();
+			final List<Statement> tryStatements = tryBody.statements();
+
+			final MethodInvocation invoc1 = sourceAst.newMethodInvocation();
+			final MethodInvocation invoc2 = sourceAst.newMethodInvocation();
+			invoc2.setName(sourceAst.newSimpleName("get" + dispatchTypeName + model.getTargetStubSuffix()));
+			invoc1.setExpression(invoc2);
+
+			invoc1.setName(sourceAst.newSimpleName(sourceMethodDeclaration.getName().getIdentifier()));
+			final List<Expression> arguments = invoc1.arguments();
+			final List<SingleVariableDeclaration> parameters = sourceMethodDeclaration.parameters();
+			for (SingleVariableDeclaration parameter : parameters) {
+				arguments.add(sourceAst.newSimpleName(parameter.getName().getIdentifier()));
+			}
+
+			if (isReturn) {
+				final ReturnStatement returnStatement = sourceAst.newReturnStatement();
+				returnStatement.setExpression(invoc1);
+				tryStatements.add(returnStatement);
+			} else {
+				tryStatements.add(sourceAst.newExpressionStatement(invoc1));
+			}
+		}
+
+		{
+			final Block catchBody = catchClause.getBody();
+			final List<Statement> catchStatements = catchBody.statements();
+
+			final IfStatement ifStatement = sourceAst.newIfStatement();
+			catchStatements.add(ifStatement);
+
+			final InfixExpression infix = sourceAst.newInfixExpression();
+			ifStatement.setExpression(infix);
+
+			final MethodInvocation invocMessage = sourceAst.newMethodInvocation();
+			invocMessage.setExpression(sourceAst.newSimpleName("e"));
+			invocMessage.setName(sourceAst.newSimpleName("getErrorMessage"));
+			final MethodInvocation invocCode = sourceAst.newMethodInvocation();
+			invocCode.setExpression(invocMessage);
+			invocCode.setName(sourceAst.newSimpleName("getErrorCode"));
+
+			infix.setLeftOperand(invocCode);
+			infix.setOperator(InfixExpression.Operator.EQUALS);
+
+			final FieldAccess fieldAccess = sourceAst.newFieldAccess();
+			infix.setRightOperand(fieldAccess);
+			fieldAccess.setExpression(sourceAst.newName("SVNErrorCode"));
+			fieldAccess.setName(sourceAst.newSimpleName("VERSION_MISMATCH"));
+
+			final Block thenBlock = sourceAst.newBlock();
+			final Block elseBlock = sourceAst.newBlock();
+
+			ifStatement.setThenStatement(thenBlock);
+
+			final MethodInvocation invoc1 = sourceAst.newMethodInvocation();
+			final MethodInvocation invoc2 = sourceAst.newMethodInvocation();
+			invoc2.setName(sourceAst.newSimpleName("get" + dispatchTypeName + model.getTargetMoveSuffix()));
+			invoc1.setExpression(invoc2);
+
+			invoc1.setName(sourceAst.newSimpleName(sourceMethodDeclaration.getName().getIdentifier()));
+			final List<Expression> arguments = invoc1.arguments();
+			final List<SingleVariableDeclaration> parameters = sourceMethodDeclaration.parameters();
+			for (SingleVariableDeclaration parameter : parameters) {
+				arguments.add(sourceAst.newSimpleName(parameter.getName().getIdentifier()));
+			}
+
+			if (isReturn) {
+				final ReturnStatement returnStatement = sourceAst.newReturnStatement();
+				returnStatement.setExpression(invoc1);
+				thenBlock.statements().add(returnStatement);
+			} else {
+				thenBlock.statements().add(sourceAst.newExpressionStatement(invoc1));
+			}
+
+			ifStatement.setElseStatement(elseBlock);
+
+			final ThrowStatement throwStatement = sourceAst.newThrowStatement();
+			throwStatement.setExpression(sourceAst.newSimpleName("e"));
+			elseBlock.statements().add(throwStatement);
+
+		}
+
 	}
 
 	private void dispatchGetMethod(AST sourceAst, MethodDeclaration sourceMethodDeclaration, List<Statement> emptyBody) {
