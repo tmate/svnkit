@@ -1127,8 +1127,8 @@ public class Split2Refactoring extends Refactoring {
 			} else {
 				return;
 			}
-			statements.clear();
 			if (!emptyBody.isEmpty()) {
+				statements.clear();
 				statements.addAll(emptyBody);
 			}
 		}
@@ -1306,6 +1306,35 @@ public class Split2Refactoring extends Refactoring {
 		final SimpleType sourceReturnSimpleType = (SimpleType) sourceReturnType;
 		final SimpleName sourceReturnTypeName = (SimpleName) sourceReturnSimpleType.getName();
 
+		Expression initializer = null;
+
+		if (!"ISVNOptions".equals(sourceReturnTypeName.getIdentifier())
+				&& !"ISVNDebugLog".equals(sourceReturnTypeName.getIdentifier())) {
+
+			class Visitor extends ASTVisitor {
+				public Expression expression = null;
+
+				@Override
+				public boolean visit(ClassInstanceCreation node) {
+					if (expression == null) {
+						expression = node;
+					}
+					return false;
+				}
+
+				public boolean visit(Assignment node) {
+					if (expression == null) {
+						expression = node.getRightHandSide();
+					}
+					return false;
+				};
+			}
+
+			Visitor visitor = new Visitor();
+			sourceMethodDeclaration.accept(visitor);
+			initializer = visitor.expression;
+		}
+
 		final IfStatement ifStatement = sourceAst.newIfStatement();
 		emptyBody.add(ifStatement);
 
@@ -1346,9 +1375,11 @@ public class Split2Refactoring extends Refactoring {
 				invoke.setExpression(sourceAst.newSimpleName("SVNDebugLog"));
 				invoke.setName(sourceAst.newSimpleName("getDefaultLog"));
 				arguments.add(invoke);
+			} else if (initializer != null) {
+				arguments.add((Expression) ASTNode.copySubtree(sourceAst, initializer));
 			} else {
 				final ClassInstanceCreation create = sourceAst.newClassInstanceCreation();
-				create.setType(sourceAst.newSimpleType(sourceAst.newSimpleName(sourceMethodIdentifier)));
+				create.setType(sourceAst.newSimpleType(sourceAst.newSimpleName(sourceReturnTypeName.getIdentifier())));
 				arguments.add(create);
 			}
 
