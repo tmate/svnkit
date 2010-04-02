@@ -788,6 +788,27 @@ public class Split2Refactoring extends Refactoring {
 							final String targetTypeName = model.getTargetNamesMap().get(sourceSuperclassIdentifier);
 							sourceSuperclassSimpleName.setIdentifier(targetTypeName);
 
+							ASTVisitor visitor = new ASTVisitor() {
+								public boolean visit(SimpleType node) {
+									final Name name = node.getName();
+									if (name.isSimpleName()) {
+										SimpleName simpleName = (SimpleName) name;
+										final String identifier = simpleName.getIdentifier();
+										final Set<ICompilationUnit> units = model.getSourceCompilationUnits();
+										for (ICompilationUnit unit : units) {
+											final IType type = unit.findPrimaryType();
+											if (type.getTypeQualifiedName().equals(identifier)) {
+												node.setName(sourceAst
+														.newName(identifier + model.getTargetMoveSuffix()));
+												break;
+											}
+										}
+									}
+									return super.visit(node);
+								};
+							};
+							sourceParsedUnit.accept(visitor);
+
 							final TextEdit sourceUnitEdits = sourceParsedUnit.rewrite(sourceUnitDocument, model
 									.getJavaProject().getOptions(true));
 							final TextFileChange sourceTextFileChange = new TextFileChange(sourceUnit.getElementName(),
