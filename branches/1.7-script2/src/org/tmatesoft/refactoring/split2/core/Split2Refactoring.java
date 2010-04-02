@@ -382,9 +382,10 @@ public class Split2Refactoring extends Refactoring {
 						final List<VariableDeclarationFragment> fragments = fieldDeclaration.fragments();
 						for (final VariableDeclarationFragment fragment : fragments) {
 							final String variableName = fragment.getName().getIdentifier();
-							final String accessorName = (isGet ? "get" : "set") + variableName;
+							final String accessorName = (isGet ? "get" : "set")
+									+ (variableName.startsWith("my") ? variableName.substring(2) : variableName);
 							if (methodName.equalsIgnoreCase(accessorName)) {
-								final List bodyStatements = methodDeclaration.getBody().statements();
+								final List<Statement> bodyStatements = methodDeclaration.getBody().statements();
 								bodyStatements.clear();
 								final FieldAccess fieldAccess = targetAST.newFieldAccess();
 								fieldAccess.setExpression(targetAST.newThisExpression());
@@ -400,6 +401,7 @@ public class Split2Refactoring extends Refactoring {
 										final Assignment assignment = targetAST.newAssignment();
 										assignment.setLeftHandSide(fieldAccess);
 										assignment.setRightHandSide(targetAST.newName(param.getName().getIdentifier()));
+										bodyStatements.add(targetAST.newExpressionStatement(assignment));
 									}
 								}
 							}
