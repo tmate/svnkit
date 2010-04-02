@@ -371,6 +371,43 @@ public class Split2Refactoring extends Refactoring {
 				}
 			}
 
+			final FieldDeclaration[] fields = targetTypeDeclaration.getFields();
+			final MethodDeclaration[] methods = targetTypeDeclaration.getMethods();
+			for (final MethodDeclaration methodDeclaration : methods) {
+				final String methodName = methodDeclaration.getName().getIdentifier();
+				final boolean isGet = methodName.startsWith("get");
+				final boolean isSet = methodName.startsWith("set");
+				if (isGet || isSet) {
+					for (final FieldDeclaration fieldDeclaration : fields) {
+						final List<VariableDeclarationFragment> fragments = fieldDeclaration.fragments();
+						for (final VariableDeclarationFragment fragment : fragments) {
+							final String variableName = fragment.getName().getIdentifier();
+							final String accessorName = (isGet ? "get" : "set") + variableName;
+							if (methodName.equalsIgnoreCase(accessorName)) {
+								final List bodyStatements = methodDeclaration.getBody().statements();
+								bodyStatements.clear();
+								final FieldAccess fieldAccess = targetAST.newFieldAccess();
+								fieldAccess.setExpression(targetAST.newThisExpression());
+								fieldAccess.setName(targetAST.newSimpleName(variableName));
+								if (isGet) {
+									final ReturnStatement returnStatement = targetAST.newReturnStatement();
+									returnStatement.setExpression(fieldAccess);
+									bodyStatements.add(returnStatement);
+								} else {
+									final List<SingleVariableDeclaration> parameters = methodDeclaration.parameters();
+									if (parameters.size() == 1) {
+										final SingleVariableDeclaration param = parameters.get(0);
+										final Assignment assignment = targetAST.newAssignment();
+										assignment.setLeftHandSide(fieldAccess);
+										assignment.setRightHandSide(targetAST.newName(param.getName().getIdentifier()));
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+
 			targetUnitNode.accept(new ASTVisitor() {
 				@Override
 				public boolean visit(SimpleName node) {
