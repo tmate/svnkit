@@ -103,6 +103,7 @@ public class Split2Refactoring extends Refactoring {
 		model.getSourceMoveClassesNames().add("org.tmatesoft.svn.core.internal.wc.SVNCopyDriver");
 		model.getSourceMoveClassesNames().add("org.tmatesoft.svn.core.internal.wc.SVNMergeDriver");
 		// model.getSourceMoveClassesNames().add("org.tmatesoft.svn.core.wc.admin.SVNAdminClient");
+
 	}
 
 	@Override
@@ -1236,20 +1237,89 @@ public class Split2Refactoring extends Refactoring {
 	private void dispatchGetMethod(AST sourceAst, MethodDeclaration sourceMethodDeclaration, List<Statement> emptyBody,
 			String sourceTypeName) {
 
+		final String sourceMethodIdentifier = sourceMethodDeclaration.getName().getIdentifier();
+		final String setterName = "s" + sourceMethodIdentifier.substring(1);
+
 		final String dispatchTypeName = model.getTargetNamesMap().containsKey(sourceTypeName) ? "Delegate"
 				: sourceTypeName;
+
+		final Type sourceReturnType = sourceMethodDeclaration.getReturnType2();
+
+		if (sourceReturnType.isPrimitiveType()) {
+
+			final MethodInvocation invoc1 = sourceAst.newMethodInvocation();
+			final MethodInvocation invoc2 = sourceAst.newMethodInvocation();
+			invoc2.setName(sourceAst.newSimpleName("get" + dispatchTypeName + model.getTargetMoveSuffix()));
+			invoc1.setExpression(invoc2);
+			invoc1.setName(sourceAst.newSimpleName(sourceMethodIdentifier));
+
+			final ReturnStatement returnStatement = sourceAst.newReturnStatement();
+			returnStatement.setExpression(invoc1);
+			emptyBody.add(returnStatement);
+
+			return;
+		}
+
+		if (!sourceReturnType.isSimpleType()) {
+			return;
+		}
+
+		final SimpleType sourceReturnSimpleType = (SimpleType) sourceReturnType;
+		final SimpleName sourceReturnTypeName = (SimpleName) sourceReturnSimpleType.getName();
+
+		final IfStatement ifStatement = sourceAst.newIfStatement();
+		emptyBody.add(ifStatement);
+
+		{
+			final MethodInvocation invoc1 = sourceAst.newMethodInvocation();
+			final MethodInvocation invoc2 = sourceAst.newMethodInvocation();
+			invoc2.setName(sourceAst.newSimpleName("get" + dispatchTypeName + model.getTargetMoveSuffix()));
+			invoc1.setExpression(invoc2);
+			invoc1.setName(sourceAst.newSimpleName(sourceMethodIdentifier));
+
+			final InfixExpression infixExpression = sourceAst.newInfixExpression();
+			infixExpression.setLeftOperand(invoc1);
+			infixExpression.setOperator(InfixExpression.Operator.EQUALS);
+			infixExpression.setRightOperand(sourceAst.newNullLiteral());
+
+			ifStatement.setExpression(infixExpression);
+		}
+
+		{
+			final Block thenBlock = sourceAst.newBlock();
+			ifStatement.setThenStatement(thenBlock);
+			final List thenStatements = thenBlock.statements();
+
+			final MethodInvocation invoc1 = sourceAst.newMethodInvocation();
+			invoc1.setName(sourceAst.newSimpleName(setterName));
+
+			final List<Expression> arguments = invoc1.arguments();
+			thenStatements.add(sourceAst.newExpressionStatement(invoc1));
+
+			if ("ISVNOptions".equals(sourceReturnTypeName.getIdentifier())) {
+				final MethodInvocation invoke = sourceAst.newMethodInvocation();
+				invoke.setExpression(sourceAst.newSimpleName("SVNWCUtil"));
+				invoke.setName(sourceAst.newSimpleName("createDefaultOptions"));
+				invoke.arguments().add(sourceAst.newBooleanLiteral(true));
+				arguments.add(invoke);
+			} else if ("ISVNDebugLog".equals(sourceReturnTypeName.getIdentifier())) {
+				final MethodInvocation invoke = sourceAst.newMethodInvocation();
+				invoke.setExpression(sourceAst.newSimpleName("SVNDebugLog"));
+				invoke.setName(sourceAst.newSimpleName("getDefaultLog"));
+				arguments.add(invoke);
+			} else {
+				final ClassInstanceCreation create = sourceAst.newClassInstanceCreation();
+				create.setType(sourceAst.newSimpleType(sourceAst.newSimpleName(sourceMethodIdentifier)));
+				arguments.add(create);
+			}
+
+		}
 
 		final MethodInvocation invoc1 = sourceAst.newMethodInvocation();
 		final MethodInvocation invoc2 = sourceAst.newMethodInvocation();
 		invoc2.setName(sourceAst.newSimpleName("get" + dispatchTypeName + model.getTargetMoveSuffix()));
 		invoc1.setExpression(invoc2);
-
-		invoc1.setName(sourceAst.newSimpleName(sourceMethodDeclaration.getName().getIdentifier()));
-		final List<Expression> arguments = invoc1.arguments();
-		final List<SingleVariableDeclaration> parameters = sourceMethodDeclaration.parameters();
-		for (SingleVariableDeclaration parameter : parameters) {
-			arguments.add(sourceAst.newSimpleName(parameter.getName().getIdentifier()));
-		}
+		invoc1.setName(sourceAst.newSimpleName(sourceMethodIdentifier));
 
 		final ReturnStatement returnStatement = sourceAst.newReturnStatement();
 		returnStatement.setExpression(invoc1);
