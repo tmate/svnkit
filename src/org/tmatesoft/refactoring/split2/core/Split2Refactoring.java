@@ -102,7 +102,7 @@ public class Split2Refactoring extends Refactoring {
 
 		model.getSourceMoveClassesNames().add("org.tmatesoft.svn.core.internal.wc.SVNCopyDriver");
 		model.getSourceMoveClassesNames().add("org.tmatesoft.svn.core.internal.wc.SVNMergeDriver");
-		// model.getSourceMoveClassesNames().add("org.tmatesoft.svn.core.wc.admin.SVNAdminClient");
+		model.getSourceMoveClassesNames().add("org.tmatesoft.svn.core.internal.wc.SVNCommitUtil");
 
 	}
 
@@ -411,6 +411,7 @@ public class Split2Refactoring extends Refactoring {
 			}
 
 			targetUnitNode.accept(new ASTVisitor() {
+
 				@Override
 				public boolean visit(SimpleName node) {
 					if (sourceTypeName.equals(node.getIdentifier())) {
@@ -419,6 +420,8 @@ public class Split2Refactoring extends Refactoring {
 					return super.visit(node);
 				}
 			});
+
+			targetUnitNode.accept(new MoveToTargetVisitor());
 
 			final String targetUnitText = targetUnitNode.toString();
 			final Document targetUnitDocument = new Document(targetUnitText);
@@ -588,6 +591,8 @@ public class Split2Refactoring extends Refactoring {
 				}
 			});
 
+			targetUnitNode.accept(new MoveToTargetVisitor(model.getTargetStubSuffix()));
+
 			final String targetUnitText = targetUnitNode.toString();
 			final Document targetUnitDocument = new Document(targetUnitText);
 			final TextEdit formatEdit = model.getCodeFormatter().format(CodeFormatter.K_COMPILATION_UNIT,
@@ -753,6 +758,8 @@ public class Split2Refactoring extends Refactoring {
 		final Set<ICompilationUnit> sourceMoveUnits = model.getSourceMoveClassesUnits();
 		for (final ICompilationUnit sourceUnit : sourceMoveUnits) {
 
+			boolean changed = false;
+
 			final IType sourcePrimaryType = sourceUnit.findPrimaryType();
 			final String sourceTypeName = sourcePrimaryType.getTypeQualifiedName();
 
@@ -765,6 +772,8 @@ public class Split2Refactoring extends Refactoring {
 			final TypeDeclaration sourceTypeDeclaration = (TypeDeclaration) NodeFinder.perform(sourceParsedUnit,
 					sourcePrimaryType.getSourceRange());
 
+			sourceParsedUnit.recordModifications();
+
 			final Type sourceSuperclassType = sourceTypeDeclaration.getSuperclassType();
 			if (sourceSuperclassType != null) {
 				if (sourceSuperclassType.isSimpleType()) {
@@ -775,49 +784,53 @@ public class Split2Refactoring extends Refactoring {
 						final String sourceSuperclassIdentifier = sourceSuperclassSimpleName.getIdentifier();
 						if (model.getTargetNamesMap().containsKey(sourceSuperclassIdentifier)) {
 
-							sourceParsedUnit.recordModifications();
-
-							final List<ImportDeclaration> sourceImports = sourceParsedUnit.imports();
-							{
-								final ImportDeclaration importDeclaration = sourceAst.newImportDeclaration();
-								importDeclaration.setOnDemand(true);
-								importDeclaration.setName(sourceAst.newName(model.getTargetMovePackageName()));
-								sourceImports.add(importDeclaration);
-							}
-
 							final String targetTypeName = model.getTargetNamesMap().get(sourceSuperclassIdentifier);
 							sourceSuperclassSimpleName.setIdentifier(targetTypeName);
 
-							ASTVisitor visitor = new ASTVisitor() {
-								public boolean visit(SimpleType node) {
-									final Name name = node.getName();
-									if (name.isSimpleName()) {
-										SimpleName simpleName = (SimpleName) name;
-										final String identifier = simpleName.getIdentifier();
-										final Set<ICompilationUnit> units = model.getSourceCompilationUnits();
-										for (ICompilationUnit unit : units) {
-											final IType type = unit.findPrimaryType();
-											if (type.getTypeQualifiedName().equals(identifier)) {
-												node.setName(sourceAst
-														.newName(identifier + model.getTargetMoveSuffix()));
-												break;
-											}
-										}
-									}
-									return super.visit(node);
-								};
-							};
-							sourceParsedUnit.accept(visitor);
+							changed = true;
 
-							final TextEdit sourceUnitEdits = sourceParsedUnit.rewrite(sourceUnitDocument, model
-									.getJavaProject().getOptions(true));
-							final TextFileChange sourceTextFileChange = new TextFileChange(sourceUnit.getElementName(),
-									(IFile) sourceUnit.getResource());
-							sourceTextFileChange.setEdit(sourceUnitEdits);
-							changes.add(sourceTextFileChange);
 						}
 					}
 				}
+			}
+
+			MoveToTargetVisitor visitor = new MoveToTargetVisitor();
+			sourceParsedUnit.accept(visitor);
+			if (visitor.changed) {
+				changed = true;
+			}
+
+			if (changed) {
+
+				final List<ImportDeclaration> sourceImports = sourceParsedUnit.imports();
+				final List<ImportDeclaration> importsToDelete = new ArrayList<ImportDeclaration>();
+				for (final ImportDeclaration importDeclaration : sourceImports) {
+					final Name name = importDeclaration.getName();
+					final Set<ICompilationUnit> sourceCompilationUnits = model.getSourceCompilationUnits();
+					for (ICompilationUnit unit : sourceCompilationUnits) {
+						final IType type = unit.findPrimaryType();
+						if (type.getFullyQualifiedName().equals(name.getFullyQualifiedName())) {
+							importsToDelete.add(importDeclaration);
+							break;
+						}
+					}
+				}
+				for (final ImportDeclaration importDeclaration : importsToDelete) {
+					sourceImports.remove(importDeclaration);
+				}
+				{
+					final ImportDeclaration importDeclaration = sourceAst.newImportDeclaration();
+					importDeclaration.setOnDemand(true);
+					importDeclaration.setName(sourceAst.newName(model.getTargetMovePackageName()));
+					sourceImports.add(importDeclaration);
+				}
+
+				final TextEdit sourceUnitEdits = sourceParsedUnit.rewrite(sourceUnitDocument, model.getJavaProject()
+						.getOptions(true));
+				final TextFileChange sourceTextFileChange = new TextFileChange(sourceUnit.getElementName(),
+						(IFile) sourceUnit.getResource());
+				sourceTextFileChange.setEdit(sourceUnitEdits);
+				changes.add(sourceTextFileChange);
 			}
 
 		}
@@ -1455,4 +1468,36 @@ public class Split2Refactoring extends Refactoring {
 		}
 
 	}
+
+	class MoveToTargetVisitor extends ASTVisitor {
+		boolean changed = false;
+		String suffix;
+
+		public MoveToTargetVisitor() {
+			suffix = model.getTargetMoveSuffix();
+		}
+
+		public MoveToTargetVisitor(String suffix) {
+			this.suffix = suffix;
+		}
+
+		public boolean visit(SimpleType node) {
+			final Name name = node.getName();
+			if (name.isSimpleName()) {
+				SimpleName simpleName = (SimpleName) name;
+				final String identifier = simpleName.getIdentifier();
+				final Set<ICompilationUnit> units = model.getSourceCompilationUnits();
+				for (ICompilationUnit unit : units) {
+					final IType type = unit.findPrimaryType();
+					if (type.getTypeQualifiedName().equals(identifier)) {
+						node.setName(node.getAST().newName(identifier + suffix));
+						changed = true;
+						break;
+					}
+				}
+			}
+			return super.visit(node);
+		};
+	}
+
 }
