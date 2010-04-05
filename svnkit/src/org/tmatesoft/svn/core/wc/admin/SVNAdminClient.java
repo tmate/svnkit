@@ -1389,7 +1389,6 @@ public class SVNAdminClient extends SVNBasicClient {
             ISVNEditor editor = getDumpEditor(fsfs, toRoot, rev, startRev, "/", SVNFileUtil.DUMMY_OUT, false, true);
             editor = SVNCancellableEditor.newInstance(editor, getEventDispatcher(), getDebugLog());
             FSRepositoryUtil.replay(fsfs, toRoot, "", SVNRepository.INVALID_REVISION, false, editor);
-            fsfs.getRevisionProperties(rev);
             String message = "* Verified revision " + rev + ".";
         
             if (myEventHandler != null) {

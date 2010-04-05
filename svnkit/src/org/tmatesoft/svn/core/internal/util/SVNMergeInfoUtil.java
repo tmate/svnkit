@@ -227,7 +227,7 @@ public class SVNMergeInfoUtil {
         } 
         fromMergeInfo = fromMergeInfo == null ? parseMergeInfo(new StringBuffer(fromPropValue), null) : fromMergeInfo;
         toMergeInfo = toMergeInfo == null ? parseMergeInfo(new StringBuffer(toPropValue), null) : toMergeInfo;
-        diffMergeInfo(deleted, added, fromMergeInfo, toMergeInfo, true);
+        diffMergeInfo(deleted, added, fromMergeInfo, toMergeInfo, false);
     }
     
     public static void diffMergeInfo(Map deleted, Map added, Map from, Map to, 

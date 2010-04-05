@@ -132,10 +132,8 @@ public class SVNEvent {
      * 
      * @param errorMessage the message describing the operation fault
      */
-    public SVNEvent(SVNErrorMessage errorMessage, SVNEventAction expected) {
+    public SVNEvent(SVNErrorMessage errorMessage) {
         myErrorMessage = errorMessage;
-        myAction = SVNEventAction.SKIP;
-        myExpectedAction = expected;
     }
     
 
@@ -439,5 +437,6 @@ public class SVNEvent {
     public void setInfo(Object info) {
         this.info = info;
     }
-    
+	
+	
 }

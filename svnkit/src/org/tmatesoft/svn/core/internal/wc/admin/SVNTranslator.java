@@ -106,8 +106,7 @@ public class SVNTranslator {
         ISVNOptions options = adminArea.getWCAccess().getOptions();
         SVNVersionedProperties props = adminArea.getProperties(name);
         String keywords = props.getStringPropertyValue(SVNProperty.KEYWORDS);
-        String mimeType = props.getStringPropertyValue(SVNProperty.MIME_TYPE);
-        String charset = getCharset(props.getStringPropertyValue(SVNProperty.CHARSET), mimeType, adminArea.getFile(name).getPath(), options);
+        String charset = getCharset(props.getStringPropertyValue(SVNProperty.CHARSET), adminArea.getFile(name).getPath(), options);
         String eolStyle = null;
         if (customEOLStyle != null) {
             eolStyle = customEOLStyle;
@@ -189,12 +188,10 @@ public class SVNTranslator {
 
     public static InputStream getTranslatedStream(SVNAdminArea adminArea, String name, boolean translateToNormalForm, boolean repairEOL) throws SVNException {
         ISVNOptions options = adminArea.getWCAccess().getOptions();
-        SVNVersionedProperties props = adminArea.getProperties(name);
-        String mimeType = props.getStringPropertyValue(SVNProperty.MIME_TYPE);
-        String charset = getCharset(props.getStringPropertyValue(SVNProperty.CHARSET), mimeType, adminArea.getFile(name).getPath(), options);
-        String eolStyle = props.getStringPropertyValue(SVNProperty.EOL_STYLE);
-        String keywords = props.getStringPropertyValue(SVNProperty.KEYWORDS);
-        boolean special = props.getPropertyValue(SVNProperty.SPECIAL) != null;
+        String charset = getCharset(adminArea.getProperties(name).getStringPropertyValue(SVNProperty.CHARSET), adminArea.getFile(name).getPath(), options);
+        String eolStyle = adminArea.getProperties(name).getStringPropertyValue(SVNProperty.EOL_STYLE);
+        String keywords = adminArea.getProperties(name).getStringPropertyValue(SVNProperty.KEYWORDS);
+        boolean special = adminArea.getProperties(name).getPropertyValue(SVNProperty.SPECIAL) != null;
         File src = adminArea.getFile(name);
         if (special) {
             if (!SVNFileUtil.symlinksSupported()) {
@@ -247,12 +244,10 @@ public class SVNTranslator {
 
     public static File getTranslatedFile(SVNAdminArea dir, String name, File src, boolean forceEOLRepair, boolean useGlobalTmp, boolean forceCopy, boolean toNormalFormat) throws SVNException {
         ISVNOptions options = dir.getWCAccess().getOptions();
-        SVNVersionedProperties props = dir.getProperties(name);
-        String mimeType = props.getStringPropertyValue(SVNProperty.MIME_TYPE);
-        String charset = getCharset(props.getStringPropertyValue(SVNProperty.CHARSET), mimeType, dir.getFile(name).getPath(), options);
-        String eolStyle = props.getStringPropertyValue(SVNProperty.EOL_STYLE);
-        String keywords = props.getStringPropertyValue(SVNProperty.KEYWORDS);
-        boolean special = props.getPropertyValue(SVNProperty.SPECIAL) != null;
+        String charset = getCharset(dir.getProperties(name).getStringPropertyValue(SVNProperty.CHARSET), dir.getFile(name).getPath(), options);
+        String eolStyle = dir.getProperties(name).getStringPropertyValue(SVNProperty.EOL_STYLE);
+        String keywords = dir.getProperties(name).getStringPropertyValue(SVNProperty.KEYWORDS);
+        boolean special = dir.getProperties(name).getPropertyValue(SVNProperty.SPECIAL) != null;
         boolean needsTranslation = charset != null || eolStyle != null || keywords != null || special;
         File result = null;
         if (!needsTranslation && !forceCopy) {
@@ -295,7 +290,6 @@ public class SVNTranslator {
         SVNVersionedProperties props = dir.getProperties(name);
         boolean isLocalBinary = SVNProperty.isBinaryMimeType(props.getStringPropertyValue(SVNProperty.MIME_TYPE));
 
-        String mimeType = null;
         String charsetProp = null;
         String eolStyle = null;
         String keywords = null;
@@ -308,7 +302,6 @@ public class SVNTranslator {
             isSpecial = props.getPropertyValue(SVNProperty.SPECIAL) != null;
             keywords = props.getStringPropertyValue(SVNProperty.KEYWORDS);
             charsetProp = props.getStringPropertyValue(SVNProperty.CHARSET);
-            mimeType = props.getStringPropertyValue(SVNProperty.MIME_TYPE);
         } else if (!isLocalBinary || isRemoteBinaryRemoved) {
             isSpecial = props.getPropertyValue(SVNProperty.SPECIAL) != null;
             if (!isSpecial) {
@@ -320,10 +313,8 @@ public class SVNTranslator {
 
                 if (propDiff != null && propDiff.getStringValue(SVNProperty.CHARSET) != null) {
                     charsetProp = propDiff.getStringValue(SVNProperty.CHARSET);
-                    mimeType = propDiff.getStringValue(SVNProperty.MIME_TYPE);
                 } else if (!isLocalBinary) {
                     charsetProp = props.getStringPropertyValue(SVNProperty.CHARSET);
-                    mimeType = props.getStringPropertyValue(SVNProperty.MIME_TYPE);
                 }
 
                 if (!isLocalBinary) {
@@ -334,7 +325,7 @@ public class SVNTranslator {
 
         File detranslatedFile = null;
         ISVNOptions options = dir.getWCAccess().getOptions();
-        String charset = getCharset(charsetProp, mimeType, dir.getFile(name).getPath(), options);
+        String charset = getCharset(charsetProp, dir.getFile(name).getPath(), options);
         if (force || charset != null || keywords != null || eolStyle != null || isSpecial) {
             File tmpFile = SVNAdminUtil.createTmpFile(dir);
             translateToNormalForm(dir.getFile(name), tmpFile, charset, eolStyle, true, keywords, isSpecial);
@@ -649,9 +640,9 @@ public class SVNTranslator {
         return null;
     }
 
-    public static String getCharset(String charset, String mimeType, String path, ISVNOptions options) throws SVNException {
+    public static String getCharset(String charset, String path, ISVNOptions options) throws SVNException {
         if (charset == null) {
-            charset = getGlobalCharset(options, mimeType);
+            charset = getGlobalCharset(options);
         }
         if (SVNProperty.NATIVE.equals(charset)) {
             charset = options.getNativeCharset();
@@ -673,8 +664,8 @@ public class SVNTranslator {
         return charset;
     }
 
-    private static String getGlobalCharset(ISVNOptions options, String mimeType) {
-        if (options instanceof DefaultSVNOptions && SVNProperty.isTextMimeType(mimeType)) {
+    private static String getGlobalCharset(ISVNOptions options) {
+        if (options instanceof DefaultSVNOptions) {
             DefaultSVNOptions defaults = (DefaultSVNOptions) options;
             return defaults.getGlobalCharset();
         }

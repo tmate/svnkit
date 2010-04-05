@@ -96,15 +96,8 @@ public class SVNExportEditor implements ISVNEditor {
                 SVNFileUtil.deleteAll(myCurrentDirectory, myEventDispatcher);
             }
         } else if (dirType == SVNFileType.DIRECTORY && !myIsForce) {
-            if (!"".equals(path)) {
-                SVNErrorMessage err =  SVNErrorMessage.create(SVNErrorCode.WC_OBSTRUCTED_UPDATE, "''{0}'' already exists", myCurrentDirectory);
-                SVNErrorManager.error(err, SVNLogType.WC);
-            }
-            File[] children = SVNFileListUtil.listFiles(myCurrentDirectory);
-            if (children != null && children.length > 0) {
-                SVNErrorMessage err =  SVNErrorMessage.create(SVNErrorCode.WC_OBSTRUCTED_UPDATE, "''{0}'' already exists", myCurrentDirectory);
-                SVNErrorManager.error(err, SVNLogType.WC);
-            }
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_OBSTRUCTED_UPDATE, "''{0}'' already exists", myCurrentDirectory);
+            SVNErrorManager.error(err, SVNLogType.WC);
         } else if (dirType == SVNFileType.NONE) {        
             if (!myCurrentDirectory.mkdirs()) {
                 SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_NOT_DIRECTORY, "Cannot create directory ''{0}''", myCurrentDirectory);
@@ -181,8 +174,7 @@ public class SVNExportEditor implements ISVNEditor {
         try {
             String date = myFileProperties.getStringValue(SVNProperty.COMMITTED_DATE);
             boolean special = myFileProperties.getStringValue(SVNProperty.SPECIAL) != null;
-            String mimeType = myFileProperties.getStringValue(SVNProperty.MIME_TYPE);
-            boolean binary = SVNProperty.isBinaryMimeType(mimeType);
+            boolean binary = SVNProperty.isBinaryMimeType(myFileProperties.getStringValue(SVNProperty.MIME_TYPE));
             String keywords = myFileProperties.getStringValue(SVNProperty.KEYWORDS);
             Map keywordsMap = null;
             if (keywords != null) {
@@ -192,7 +184,7 @@ public class SVNExportEditor implements ISVNEditor {
                 String revStr = myFileProperties.getStringValue(SVNProperty.COMMITTED_REVISION);
                 keywordsMap = SVNTranslator.computeKeywords(keywords, url, author, date, revStr, myOptions);
             }
-            String charset = SVNTranslator.getCharset(myFileProperties.getStringValue(SVNProperty.CHARSET), mimeType, myCurrentFile.getPath(), myOptions);
+            String charset = SVNTranslator.getCharset(myFileProperties.getStringValue(SVNProperty.CHARSET), myCurrentFile.getPath(), myOptions);
             byte[] eolBytes = null;
             if (SVNProperty.EOL_STYLE_NATIVE.equals(myFileProperties.getStringValue(SVNProperty.EOL_STYLE))) {
                 eolBytes = SVNTranslator.getEOL(myEOLStyle != null ? myEOLStyle : myFileProperties.getStringValue(SVNProperty.EOL_STYLE), myOptions);

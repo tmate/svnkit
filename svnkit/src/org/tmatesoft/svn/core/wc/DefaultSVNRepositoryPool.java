@@ -147,16 +147,7 @@ public class DefaultSVNRepositoryPool implements ISVNRepositoryPool, ISVNSession
             }
             if (myIsKeepConnection) {
                 myTimer = ourTimer;
-                try {
-                    myTimer.schedule(new TimeoutTask(), 10000);
-                } catch (IllegalArgumentException e) {
-                    // Timer already cancelled error.
-                    SVNDebugLog.getDefaultLog().logError(SVNLogType.DEFAULT, e);
-                    
-                    ourTimer = new Timer(true);
-                    myTimer = ourTimer;
-                    myTimer.schedule(new TimeoutTask(), 10000);
-                }
+                ourTimer.schedule(new TimeoutTask(), 10000);
             }
             ourInstanceCount++;
         }
