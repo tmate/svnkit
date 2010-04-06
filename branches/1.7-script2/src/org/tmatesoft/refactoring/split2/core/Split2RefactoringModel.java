@@ -37,6 +37,8 @@ public class Split2RefactoringModel {
 	private final Set<String> sourceMoveClassesNames = new HashSet<String>();
 	private final Set<ICompilationUnit> sourceMoveClassesUnits = new HashSet<ICompilationUnit>();
 	private final Map<String, String> sourcesNamesMap = new HashMap<String, String>();
+	private final Set<String> sourceSplitPackages = new HashSet<String>();
+	private final Map<String, String> splitNamesMap = new HashMap<String, String>();
 
 	public IStructuredSelection getSelection() {
 		return selection;
@@ -144,6 +146,14 @@ public class Split2RefactoringModel {
 
 	public Map<String, String> getSourcesNamesMap() {
 		return sourcesNamesMap;
+	}
+
+	public Set<String> getSourceSplitPackages() {
+		return sourceSplitPackages;
+	}
+
+	public Map<String, String> getSplitNamesMap() {
+		return splitNamesMap;
 	}
 
 }
