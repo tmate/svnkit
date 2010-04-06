@@ -1,7 +1,10 @@
 package org.tmatesoft.refactoring.split2.core;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 
@@ -13,6 +16,7 @@ import org.eclipse.core.runtime.OperationCanceledException;
 import org.eclipse.core.runtime.SubProgressMonitor;
 import org.eclipse.jdt.core.ICompilationUnit;
 import org.eclipse.jdt.core.IJavaElement;
+import org.eclipse.jdt.core.IMethod;
 import org.eclipse.jdt.core.IPackageFragment;
 import org.eclipse.jdt.core.IPackageFragmentRoot;
 import org.eclipse.jdt.core.IType;
@@ -34,6 +38,7 @@ import org.eclipse.jdt.core.dom.Expression;
 import org.eclipse.jdt.core.dom.FieldAccess;
 import org.eclipse.jdt.core.dom.FieldDeclaration;
 import org.eclipse.jdt.core.dom.IExtendedModifier;
+import org.eclipse.jdt.core.dom.IMethodBinding;
 import org.eclipse.jdt.core.dom.IPackageBinding;
 import org.eclipse.jdt.core.dom.ITypeBinding;
 import org.eclipse.jdt.core.dom.IfStatement;
@@ -90,7 +95,7 @@ public class Split2Refactoring extends Refactoring {
 
 	private static void initModel(Split2RefactoringModel model) {
 		model.getSourcePackageNames().add("org.tmatesoft.svn.core.wc");
-		// model.getSourcePackageNames().add("org.tmatesoft.svn.core.wc.admin");
+		model.getSourcePackageNames().add("org.tmatesoft.svn.core.wc.admin");
 		model.setSourceClassNamePattern("SVN[\\w]*Client");
 		model.getTargetNamesMap().put("SVNBasicClient", "SVNBasicDelegate");
 		model.getSourcesNamesMap().put("SVNCopyDriver", "SVNBasicClient");
@@ -104,6 +109,8 @@ public class Split2Refactoring extends Refactoring {
 		model.getSourceMoveClassesNames().add("org.tmatesoft.svn.core.internal.wc.SVNMergeDriver");
 		model.getSourceMoveClassesNames().add("org.tmatesoft.svn.core.internal.wc.SVNCommitUtil");
 
+		model.getSourceSplitPackages().add("org.tmatesoft.svn.core.wc.admin");
+		model.getSplitNamesMap().put("SVNBasicClient", "SVNAdminBasicClient");
 	}
 
 	@Override
@@ -284,6 +291,7 @@ public class Split2Refactoring extends Refactoring {
 			changes.add(buildChangesTargetMoveClasses(pm));
 			changes.add(buildChangesTargetStubClasses(pm));
 			changes.add(buildChangesSourceMoveClasses(pm));
+			changes.add(buildChangesSourceSplitClasses(pm));
 			changes.add(buildChangesSourceStubClasses(pm));
 			return changes;
 		} catch (MalformedTreeException e) {
@@ -317,6 +325,12 @@ public class Split2Refactoring extends Refactoring {
 		for (final ICompilationUnit sourceUnit : sourceCompilationUnits) {
 
 			final IType sourcePrimaryType = sourceUnit.findPrimaryType();
+
+			final String sourcePackageName = sourcePrimaryType.getPackageFragment().getElementName();
+			if (model.getSourceSplitPackages().contains(sourcePackageName)) {
+				continue;
+			}
+
 			final String sourceTypeName = sourcePrimaryType.getTypeQualifiedName();
 			final String targetTypeName = model.getTargetNamesMap().containsKey(sourceTypeName) ? model
 					.getTargetNamesMap().get(sourceTypeName) : sourceTypeName + model.getTargetMoveSuffix();
@@ -459,6 +473,11 @@ public class Split2Refactoring extends Refactoring {
 			final String sourceTypeName = sourcePrimaryType.getTypeQualifiedName();
 
 			if (model.getTargetNamesMap().containsKey(sourceTypeName)) {
+				continue;
+			}
+
+			final String sourcePackageName = sourcePrimaryType.getPackageFragment().getElementName();
+			if (model.getSourceSplitPackages().contains(sourcePackageName)) {
 				continue;
 			}
 
@@ -763,6 +782,11 @@ public class Split2Refactoring extends Refactoring {
 			final IType sourcePrimaryType = sourceUnit.findPrimaryType();
 			final String sourceTypeName = sourcePrimaryType.getTypeQualifiedName();
 
+			final String sourcePackageName = sourcePrimaryType.getPackageFragment().getElementName();
+			if (model.getSourceSplitPackages().contains(sourcePackageName)) {
+				continue;
+			}
+
 			final String sourceUnitText = sourceUnit.getSource();
 			final Document sourceUnitDocument = new Document(sourceUnitText);
 
@@ -848,6 +872,11 @@ public class Split2Refactoring extends Refactoring {
 
 			final IType sourcePrimaryType = sourceUnit.findPrimaryType();
 			final String sourceTypeName = sourcePrimaryType.getTypeQualifiedName();
+
+			final String sourcePackageName = sourcePrimaryType.getPackageFragment().getElementName();
+			if (model.getSourceSplitPackages().contains(sourcePackageName)) {
+				continue;
+			}
 
 			final String sourceUnitText = sourceUnit.getSource();
 			final Document sourceUnitDocument = new Document(sourceUnitText);
@@ -1500,4 +1529,301 @@ public class Split2Refactoring extends Refactoring {
 		};
 	}
 
+	private Change buildChangesSourceSplitClasses(IProgressMonitor pm) throws CoreException, MalformedTreeException,
+			BadLocationException {
+
+		final CompositeChange changesList = new CompositeChange("Split packages");
+
+		for (final String splitPackageName : model.getSourceSplitPackages()) {
+
+			final Map<ICompilationUnit, CompilationUnit> unitsSplitUses = new HashMap<ICompilationUnit, CompilationUnit>();
+			final Map<ICompilationUnit, CompilationUnit> unitsSplitUsed = new HashMap<ICompilationUnit, CompilationUnit>();
+			final Map<ICompilationUnit, Set<IMethod>> splitUsedMethods = new HashMap<ICompilationUnit, Set<IMethod>>();
+
+			{
+				final Set<ICompilationUnit> sourceCompilationUnits = model.getSourceCompilationUnits();
+				for (final ICompilationUnit sourceUnit : sourceCompilationUnits) {
+
+					final IType sourcePrimaryType = sourceUnit.findPrimaryType();
+					final String sourceTypeName = sourcePrimaryType.getTypeQualifiedName();
+					final String sourcePackageName = sourcePrimaryType.getPackageFragment().getElementName();
+					final CompilationUnit sourceParsedUnit = model.getParsedUnits().get(sourceUnit);
+
+					if (model.getSourceSplitPackages().contains(sourcePackageName)) {
+						unitsSplitUses.put(sourceUnit, sourceParsedUnit);
+					} else if (model.getSplitNamesMap().keySet().contains(sourceTypeName)) {
+						unitsSplitUsed.put(sourceUnit, sourceParsedUnit);
+					}
+				}
+			}
+
+			if (unitsSplitUses.isEmpty() || unitsSplitUsed.isEmpty()) {
+				continue;
+			}
+
+			final CompositeChange changes = new CompositeChange(splitPackageName);
+			changesList.add(changes);
+
+			final IPackageFragment sourcePackage = model.getPackageRoot().getPackageFragment(splitPackageName);
+
+			if (!sourcePackage.exists()) {
+				changes.add(new CreatePackageChange(sourcePackage));
+			}
+
+			for (final ICompilationUnit sourceUnit : unitsSplitUses.keySet()) {
+
+				final IType sourcePrimaryType = sourceUnit.findPrimaryType();
+				final String sourceTypeName = sourcePrimaryType.getTypeQualifiedName();
+
+				final String sourceUnitText = sourceUnit.getSource();
+				final Document sourceUnitDocument = new Document(sourceUnitText);
+
+				final CompilationUnit sourceParsedUnit = model.getParsedUnits().get(sourceUnit);
+				final AST sourceAst = sourceParsedUnit.getAST();
+
+				final TypeDeclaration sourceTypeDeclaration = (TypeDeclaration) NodeFinder.perform(sourceParsedUnit,
+						sourcePrimaryType.getSourceRange());
+
+				sourceParsedUnit.recordModifications();
+
+				final Type sourceSuperclassType = sourceTypeDeclaration.getSuperclassType();
+				if (sourceSuperclassType != null) {
+					if (sourceSuperclassType.isSimpleType()) {
+						final SimpleType sourceSuperclassSimpleType = (SimpleType) sourceSuperclassType;
+						final Name sourceSuperclassName = sourceSuperclassSimpleType.getName();
+						if (sourceSuperclassName.isSimpleName()) {
+							final SimpleName sourceSuperclassSimpleName = (SimpleName) sourceSuperclassName;
+							final String sourceSuperclassIdentifier = sourceSuperclassSimpleName.getIdentifier();
+							if (model.getSplitNamesMap().containsKey(sourceSuperclassIdentifier)) {
+								final String targetTypeName = model.getSplitNamesMap().get(sourceSuperclassIdentifier);
+								sourceSuperclassSimpleName.setIdentifier(targetTypeName);
+								class Visitor extends ASTVisitor {
+									public boolean visit(SimpleType node) {
+										final Name name = node.getName();
+										if (name.isSimpleName()) {
+											SimpleName simpleName = (SimpleName) name;
+											final String identifier = simpleName.getIdentifier();
+											if (model.getSplitNamesMap().containsKey(identifier)) {
+												node.setName(node.getAST().newName(
+														model.getSplitNamesMap().get(identifier)));
+											}
+										}
+										return super.visit(node);
+									};
+
+									@Override
+									public boolean visit(MethodInvocation node) {
+										final IMethodBinding methodBinding = node.resolveMethodBinding();
+										addUsedMethod(methodBinding);
+										return super.visit(node);
+									}
+
+									private void addUsedMethod(final IMethodBinding methodBinding) {
+										final ITypeBinding declaringClass = methodBinding.getDeclaringClass();
+										final IType type = (IType) declaringClass.getJavaElement();
+										final ICompilationUnit compilationUnit = type.getCompilationUnit();
+										if (unitsSplitUsed.keySet().contains(compilationUnit)) {
+											if (splitUsedMethods.get(compilationUnit) == null) {
+												splitUsedMethods.put(compilationUnit, new HashSet<IMethod>());
+											}
+											splitUsedMethods.get(compilationUnit).add(
+													(IMethod) methodBinding.getJavaElement());
+										}
+									}
+
+									@Override
+									public boolean visit(SuperConstructorInvocation node) {
+										final IMethodBinding methodBinding = node.resolveConstructorBinding();
+										addUsedMethod(methodBinding);
+										return super.visit(node);
+									}
+
+								}
+								Visitor visitor = new Visitor();
+								sourceParsedUnit.accept(visitor);
+
+								final List<ImportDeclaration> sourceImports = sourceParsedUnit.imports();
+								final List<ImportDeclaration> importsToDelete = new ArrayList<ImportDeclaration>();
+								for (final ImportDeclaration importDeclaration : sourceImports) {
+									final Name name = importDeclaration.getName();
+									final Set<ICompilationUnit> sourceCompilationUnits = model
+											.getSourceCompilationUnits();
+									for (ICompilationUnit unit : sourceCompilationUnits) {
+										final IType type = unit.findPrimaryType();
+										if (type.getFullyQualifiedName().equals(name.getFullyQualifiedName())) {
+											importsToDelete.add(importDeclaration);
+											break;
+										}
+									}
+								}
+								for (final ImportDeclaration importDeclaration : importsToDelete) {
+									sourceImports.remove(importDeclaration);
+								}
+								{
+									final ImportDeclaration importDeclaration = sourceAst.newImportDeclaration();
+									importDeclaration.setOnDemand(true);
+									importDeclaration.setName(sourceAst.newName(model.getTargetMovePackageName()));
+									sourceImports.add(importDeclaration);
+								}
+
+								final TextEdit sourceUnitEdits = sourceParsedUnit.rewrite(sourceUnitDocument, model
+										.getJavaProject().getOptions(true));
+								final TextFileChange sourceTextFileChange = new TextFileChange(sourceUnit
+										.getElementName(), (IFile) sourceUnit.getResource());
+								sourceTextFileChange.setEdit(sourceUnitEdits);
+								changes.add(sourceTextFileChange);
+
+							}
+						}
+					}
+				}
+
+			}
+
+			for (final ICompilationUnit sourceUnit : unitsSplitUsed.keySet()) {
+
+				final IType sourcePrimaryType = sourceUnit.findPrimaryType();
+				final String sourceTypeName = sourcePrimaryType.getTypeQualifiedName();
+				final String sourcePackageName = sourcePrimaryType.getPackageFragment().getElementName();
+
+				final String targetTypeName = model.getSplitNamesMap().get(sourceTypeName);
+
+				final ICompilationUnit targetUnit = sourcePackage.getCompilationUnit(targetTypeName + ".java");
+
+				final CompilationUnit sourceParsedUnit = unitsSplitUsed.get(sourceUnit);
+				final TypeDeclaration sourceTypeDeclaration = (TypeDeclaration) NodeFinder.perform(sourceParsedUnit,
+						sourcePrimaryType.getSourceRange());
+
+				/*
+				 * final SearchPattern pattern =
+				 * SearchPattern.createPattern(sourcePrimaryType,
+				 * IJavaSearchConstants.ALL_OCCURRENCES); final IJavaSearchScope
+				 * scope =
+				 * SearchEngine.createJavaSearchScope(unitsSplitUses.keySet
+				 * ().toArray( new ICompilationUnit[unitsSplitUses.size()]),
+				 * IJavaSearchScope.SOURCES); final List<IMethod> foundMethods =
+				 * Split2RefactoringUtils.searchManyElements(IMethod.class,
+				 * pattern, scope, pm); if (foundMethods.isEmpty()) { continue;
+				 * } final Set<IMethod> usedMethods = new HashSet<IMethod>();
+				 * for (final IMethod method : foundMethods) {
+				 * usedMethods.add(method); }
+				 */
+
+				final AST targetAST = AST.newAST(AST.JLS3);
+				final CompilationUnit targetUnitNode = targetAST.newCompilationUnit();
+
+				final PackageDeclaration packageDeclaration = targetAST.newPackageDeclaration();
+				packageDeclaration.setName(targetAST.newName(splitPackageName));
+				targetUnitNode.setPackage(packageDeclaration);
+
+				final List<ImportDeclaration> targetImports = targetUnitNode.imports();
+
+				final List<ImportDeclaration> sourceImports = sourceParsedUnit.imports();
+				for (final ImportDeclaration sourceImportDeclaration : sourceImports) {
+					ImportDeclaration targetImportDeclaration = (ImportDeclaration) ASTNode.copySubtree(targetAST,
+							sourceImportDeclaration);
+					targetImports.add(targetImportDeclaration);
+				}
+
+				final ITypeBinding sourceTypeBinding = sourceTypeDeclaration.resolveBinding();
+				final IPackageBinding sourcePackageBinding = sourceTypeBinding.getPackage();
+
+				final ImportDeclaration targetImportDeclaration = targetAST.newImportDeclaration();
+				targetImportDeclaration.setOnDemand(true);
+				targetImportDeclaration.setName(targetAST.newName(sourcePackageBinding.getName()));
+				targetImports.add(targetImportDeclaration);
+
+				final TypeDeclaration targetTypeDeclaration = (TypeDeclaration) ASTNode.copySubtree(targetAST,
+						sourceTypeDeclaration);
+				targetUnitNode.types().add(targetTypeDeclaration);
+
+				final Set<IMethod> usedMethods = splitUsedMethods.get(sourceUnit);
+
+				final ITypeBinding[] sourceInterfaces = sourceTypeBinding.getInterfaces();
+				final IMethodBinding[] sourceDeclaredMethods = sourceTypeBinding.getDeclaredMethods();
+				for (final ITypeBinding sourceInterface : sourceInterfaces) {
+					final IMethodBinding[] interfaceDeclaredMethods = sourceInterface.getDeclaredMethods();
+					for (IMethodBinding interfaceDeclaredMethod : interfaceDeclaredMethods) {
+						for (IMethodBinding sourceDeclaredMethod : sourceDeclaredMethods) {
+							if (sourceDeclaredMethod.overrides(interfaceDeclaredMethod)) {
+								final IMethod method = (IMethod) sourceDeclaredMethod.getJavaElement();
+								usedMethods.add(method);
+								break;
+							}
+						}
+					}
+				}
+
+				final Set<MethodDeclaration> methodsToCopy = new HashSet<MethodDeclaration>();
+				for (final IMethod usedMethod : usedMethods) {
+					final MethodDeclaration methodDeclaration = (MethodDeclaration) NodeFinder.perform(
+							sourceParsedUnit, usedMethod.getSourceRange());
+					methodsToCopy.add(methodDeclaration);
+
+					class Visitor extends ASTVisitor {
+						@Override
+						public boolean visit(MethodInvocation node) {
+							final IMethodBinding methodBinding = node.resolveMethodBinding();
+							final ITypeBinding declaringClass = methodBinding.getDeclaringClass();
+							final IType type = (IType) declaringClass.getJavaElement();
+							if (type.equals(sourcePrimaryType)) {
+								final IMethod method = (IMethod) methodBinding.getJavaElement();
+								try {
+									MethodDeclaration methodDeclaration = (MethodDeclaration) NodeFinder.perform(
+											sourceParsedUnit, method.getSourceRange());
+									if (!methodsToCopy.contains(methodDeclaration)) {
+										methodsToCopy.add(methodDeclaration);
+										methodDeclaration.accept(new Visitor());
+									}
+								} catch (JavaModelException e) {
+									Split2RefactoringUtils.log(e);
+								}
+							}
+							return super.visit(node);
+						}
+					}
+
+					methodDeclaration.accept(new Visitor());
+
+				}
+
+				final MethodDeclaration[] targetMethods = targetTypeDeclaration.getMethods();
+				for (MethodDeclaration methodDeclaration : targetMethods) {
+					methodDeclaration.delete();
+				}
+
+				for (MethodDeclaration methodDeclaration : methodsToCopy) {
+					targetTypeDeclaration.bodyDeclarations().add(ASTNode.copySubtree(targetAST, methodDeclaration));
+				}
+
+				final TypeDeclaration[] types = targetTypeDeclaration.getTypes();
+				for (TypeDeclaration typeDeclaration : types) {
+					typeDeclaration.delete();
+				}
+
+				targetUnitNode.accept(new ASTVisitor() {
+
+					@Override
+					public boolean visit(SimpleName node) {
+						if (sourceTypeName.equals(node.getIdentifier())) {
+							node.setIdentifier(targetTypeName);
+						}
+						return super.visit(node);
+					}
+				});
+
+				final String targetUnitText = targetUnitNode.toString();
+				final Document targetUnitDocument = new Document(targetUnitText);
+				final TextEdit formatEdit = model.getCodeFormatter().format(CodeFormatter.K_COMPILATION_UNIT,
+						targetUnitText, 0, targetUnitText.length(), 0,
+						model.getJavaProject().findRecommendedLineSeparator());
+				formatEdit.apply(targetUnitDocument);
+
+				changes.add(new CreateCompilationUnitChange(targetUnit, targetUnitDocument.get(), null));
+
+			}
+		}
+
+		return changesList;
+	}
 }
