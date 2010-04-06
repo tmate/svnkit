@@ -48,9 +48,9 @@ import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNNodeEditor;
 import org.tmatesoft.svn.core.wc.ISVNOptions;
 import org.tmatesoft.svn.core.wc.ISVNRepositoryPool;
-import org.tmatesoft.svn.core.wc.SVNBasicClient;
 import org.tmatesoft.svn.core.wc.SVNRevision;
 import org.tmatesoft.svn.util.SVNLogType;
+import org.tmatesoft.svn.core.internal.wc16.*;
 
 /**
  * The <b>SVNLookClient</b> class provides API for examining 
@@ -123,7 +123,7 @@ import org.tmatesoft.svn.util.SVNLogType;
  * @author  TMate Software Ltd.
  * @since   1.2
  */
-public class SVNLookClient extends SVNBasicClient {
+public class SVNLookClient extends SVNAdminBasicClient {
     private ISVNGNUDiffGenerator myDiffGenerator;
     
     /**
