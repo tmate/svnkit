@@ -67,7 +67,10 @@ import org.eclipse.jdt.core.dom.PrimitiveType.Code;
 import org.eclipse.jdt.core.formatter.CodeFormatter;
 import org.eclipse.jdt.core.search.IJavaSearchConstants;
 import org.eclipse.jdt.core.search.IJavaSearchScope;
+import org.eclipse.jdt.core.search.SearchEngine;
+import org.eclipse.jdt.core.search.SearchMatch;
 import org.eclipse.jdt.core.search.SearchPattern;
+import org.eclipse.jdt.core.search.SearchRequestor;
 import org.eclipse.jdt.internal.corext.refactoring.changes.CreateCompilationUnitChange;
 import org.eclipse.jdt.internal.corext.refactoring.changes.CreatePackageChange;
 import org.eclipse.jface.text.BadLocationException;
@@ -1595,6 +1598,47 @@ public class Split2Refactoring extends Refactoring {
 							final SimpleName sourceSuperclassSimpleName = (SimpleName) sourceSuperclassName;
 							final String sourceSuperclassIdentifier = sourceSuperclassSimpleName.getIdentifier();
 							if (model.getSplitNamesMap().containsKey(sourceSuperclassIdentifier)) {
+
+								{
+									final SearchPattern pattern = SearchPattern.createPattern(sourcePrimaryType,
+											IJavaSearchConstants.REFERENCES | IJavaSearchConstants.METHOD);
+									final IJavaSearchScope scope = SearchEngine.createJavaSearchScope(
+											new IJavaElement[] { model.getJavaProject() }, IJavaSearchScope.SOURCES);
+									final List<IMethod> foundMethods = Split2RefactoringUtils.searchManyElements(
+											IMethod.class, pattern, scope, pm);
+									if (!foundMethods.isEmpty()) {
+										for (IMethod foundMethod : foundMethods) {
+											final SearchEngine searchEngine = Split2RefactoringUtils.getSearchEngine();
+											class Requestor extends SearchRequestor {
+												@Override
+												public void acceptSearchMatch(SearchMatch match) throws CoreException {
+													if (match.getAccuracy() == SearchMatch.A_ACCURATE
+															&& !match.isInsideDocComment()) {
+														final Object element = match.getElement();
+														if (element != null && element instanceof IMethod) {
+															IMethod method = (IMethod) element;
+															final IType declaringType = method.getDeclaringType();
+															if (declaringType != null) {
+																final ICompilationUnit compilationUnit = declaringType
+																		.getCompilationUnit();
+																if (unitsSplitUsed.containsKey(compilationUnit)) {
+																	if (splitUsedMethods.get(compilationUnit) == null) {
+																		splitUsedMethods.put(compilationUnit,
+																				new HashSet<IMethod>());
+																	}
+																	splitUsedMethods.get(compilationUnit).add(method);
+																}
+															}
+														}
+													}
+												}
+											}
+											Requestor requestor = new Requestor();
+											searchEngine.searchDeclarationsOfSentMessages(foundMethod, requestor, pm);
+										}
+									}
+								}
+
 								final String targetTypeName = model.getSplitNamesMap().get(sourceSuperclassIdentifier);
 								sourceSuperclassSimpleName.setIdentifier(targetTypeName);
 								class Visitor extends ASTVisitor {
@@ -1693,21 +1737,6 @@ public class Split2Refactoring extends Refactoring {
 				final CompilationUnit sourceParsedUnit = unitsSplitUsed.get(sourceUnit);
 				final TypeDeclaration sourceTypeDeclaration = (TypeDeclaration) NodeFinder.perform(sourceParsedUnit,
 						sourcePrimaryType.getSourceRange());
-
-				/*
-				 * final SearchPattern pattern =
-				 * SearchPattern.createPattern(sourcePrimaryType,
-				 * IJavaSearchConstants.ALL_OCCURRENCES); final IJavaSearchScope
-				 * scope =
-				 * SearchEngine.createJavaSearchScope(unitsSplitUses.keySet
-				 * ().toArray( new ICompilationUnit[unitsSplitUses.size()]),
-				 * IJavaSearchScope.SOURCES); final List<IMethod> foundMethods =
-				 * Split2RefactoringUtils.searchManyElements(IMethod.class,
-				 * pattern, scope, pm); if (foundMethods.isEmpty()) { continue;
-				 * } final Set<IMethod> usedMethods = new HashSet<IMethod>();
-				 * for (final IMethod method : foundMethods) {
-				 * usedMethods.add(method); }
-				 */
 
 				final AST targetAST = AST.newAST(AST.JLS3);
 				final CompilationUnit targetUnitNode = targetAST.newCompilationUnit();

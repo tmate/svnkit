@@ -23,7 +23,7 @@ public class Split2RefactoringUtils {
 
 	private static final SearchEngine SEARCH_ENGINE = new SearchEngine();
 
-	private static synchronized SearchEngine getSearchEngine() {
+	public static synchronized SearchEngine getSearchEngine() {
 		return SEARCH_ENGINE;
 	}
 
