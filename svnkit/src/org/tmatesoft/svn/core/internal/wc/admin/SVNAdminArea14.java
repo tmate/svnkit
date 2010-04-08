@@ -50,7 +50,6 @@ import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNWCProperties;
 import org.tmatesoft.svn.core.wc.SVNRevision;
 import org.tmatesoft.svn.core.wc.SVNTreeConflictDescription;
-import org.tmatesoft.svn.util.SVNDebugLog;
 import org.tmatesoft.svn.util.SVNLogType;
 
 
@@ -1216,7 +1215,7 @@ public class SVNAdminArea14 extends SVNAdminArea {
             url = (String)entry.get(SVNProperty.URL);
         } else if (!isSubDir) {
             url = (String)entry.get(SVNProperty.URL);
-            String expectedURL = SVNPathUtil.append((String)rootEntry.get(SVNProperty.URL), SVNEncodingUtil.uriEncode(name));
+            String expectedURL = SVNPathUtil.append((String)rootEntry.get(SVNProperty.URL), name);
             if (url != null && url.equals(expectedURL)) {
                 url = null;
             }
@@ -1908,11 +1907,7 @@ public class SVNAdminArea14 extends SVNAdminArea {
         for (int i = 0; logs != null && i < logs.length; i++) {
             File log = logs[i];
             if ("log".equals(log.getName()) || log.getName().startsWith("log.")) {
-                if (log.isFile() && log.exists()) {
-                    SVNDebugLog.getDefaultLog().logFiner(SVNLogType.WC, "unlock: log file: '" + log.getName() + "', listed, and exists.");
-                    return false;
-                }
-                SVNDebugLog.getDefaultLog().logFiner(SVNLogType.WC, "unlock: log file: '" + log.getName() + "', listed, but does not exist.");
+                return false;
             }
         }
         boolean deleted = SVNFileUtil.deleteFile(myLockFile);

@@ -71,10 +71,10 @@ import org.tmatesoft.svn.core.replicator.SVNRepositoryReplicator;
 import org.tmatesoft.svn.core.wc.ISVNEventHandler;
 import org.tmatesoft.svn.core.wc.ISVNOptions;
 import org.tmatesoft.svn.core.wc.ISVNRepositoryPool;
-import org.tmatesoft.svn.core.wc.SVNBasicClient;
 import org.tmatesoft.svn.core.wc.SVNRevision;
 import org.tmatesoft.svn.util.SVNDebugLog;
 import org.tmatesoft.svn.util.SVNLogType;
+import org.tmatesoft.svn.core.internal.wc16.*;
 
 /**
  * The <b>SVNAdminClient</b> class provides methods that brings repository-side functionality
@@ -130,7 +130,7 @@ import org.tmatesoft.svn.util.SVNLogType;
  * @author  TMate Software Ltd.
  * @since   1.2
  */
-public class SVNAdminClient extends SVNBasicClient {
+public class SVNAdminClient extends SVNAdminBasicClient {
 
     private ISVNLogEntryHandler mySyncHandler;
     private DefaultDumpFilterHandler myDumpFilterHandler;
@@ -1389,7 +1389,6 @@ public class SVNAdminClient extends SVNBasicClient {
             ISVNEditor editor = getDumpEditor(fsfs, toRoot, rev, startRev, "/", SVNFileUtil.DUMMY_OUT, false, true);
             editor = SVNCancellableEditor.newInstance(editor, getEventDispatcher(), getDebugLog());
             FSRepositoryUtil.replay(fsfs, toRoot, "", SVNRepository.INVALID_REVISION, false, editor);
-            fsfs.getRevisionProperties(rev);
             String message = "* Verified revision " + rev + ".";
         
             if (myEventHandler != null) {

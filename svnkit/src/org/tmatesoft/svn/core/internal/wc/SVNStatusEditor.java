@@ -11,6 +11,14 @@
  */
 package org.tmatesoft.svn.core.internal.wc;
 
+import java.io.File;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.StringTokenizer;
+import java.util.TreeMap;
+
 import org.tmatesoft.svn.core.SVNCommitInfo;
 import org.tmatesoft.svn.core.SVNDepth;
 import org.tmatesoft.svn.core.SVNException;
@@ -26,20 +34,11 @@ import org.tmatesoft.svn.core.internal.wc.admin.SVNAdminAreaInfo;
 import org.tmatesoft.svn.core.internal.wc.admin.SVNEntry;
 import org.tmatesoft.svn.core.internal.wc.admin.SVNWCAccess;
 import org.tmatesoft.svn.core.wc.ISVNOptions;
-import org.tmatesoft.svn.core.wc.ISVNStatusFileProvider;
 import org.tmatesoft.svn.core.wc.ISVNStatusHandler;
 import org.tmatesoft.svn.core.wc.SVNStatus;
 import org.tmatesoft.svn.core.wc.SVNStatusType;
 import org.tmatesoft.svn.core.wc.SVNTreeConflictDescription;
 import org.tmatesoft.svn.core.wc.SVNWCUtil;
-
-import java.io.File;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Iterator;
-import java.util.Map;
-import java.util.StringTokenizer;
-import java.util.TreeMap;
 
 
 /**
@@ -64,9 +63,7 @@ public class SVNStatusEditor {
     private Map myRepositoryLocks;
     private long myTargetRevision;
     private String myWCRootPath;
-    private ISVNStatusFileProvider myFileProvider;
-    private ISVNStatusFileProvider myDefaultFileProvider;
-
+    
     public SVNStatusEditor(ISVNOptions options, SVNWCAccess wcAccess, SVNAdminAreaInfo info, boolean noIgnore, boolean reportAll, SVNDepth depth,
             ISVNStatusHandler handler) {
         myWCAccess = wcAccess;
@@ -78,8 +75,6 @@ public class SVNStatusEditor {
         myExternalsMap = new SVNHashMap();
         myGlobalIgnores = getGlobalIgnores(options);
         myTargetRevision = -1;
-        myDefaultFileProvider = new DefaultSVNStatusFileProvider();
-        myFileProvider = myDefaultFileProvider;
     }
     
     public long getTargetRevision() {
@@ -128,7 +123,7 @@ public class SVNStatusEditor {
             ISVNStatusHandler handler) throws SVNException {
         myWCAccess.checkCancelled();
         depth = depth == SVNDepth.UNKNOWN ? SVNDepth.INFINITY : depth;
-        Map childrenFiles = myFileProvider.getChildrenFiles(dir.getRoot());
+        Map childrenFiles = getChildrenFiles(dir.getRoot());
         SVNEntry dirEntry = myWCAccess.getEntry(dir.getRoot(), false);
 
         String externals = dir.getProperties(dir.getThisDirName()).getStringPropertyValue(SVNProperty.EXTERNALS);
@@ -456,40 +451,17 @@ public class SVNStatusEditor {
         }
         return false;
     }
-
-    public void setFileProvider(ISVNStatusFileProvider fileProvider) {
-        myFileProvider = new WrapperSVNStatusFileProvider(myDefaultFileProvider, fileProvider);
-    }
-
-    private static class WrapperSVNStatusFileProvider implements ISVNStatusFileProvider {
-        private final ISVNStatusFileProvider myDefault;
-        private final ISVNStatusFileProvider myDelegate;
-
-        private WrapperSVNStatusFileProvider(ISVNStatusFileProvider defaultProvider, ISVNStatusFileProvider delegate) {
-            myDefault = defaultProvider;
-            myDelegate = delegate;
-        }
-
-        public Map getChildrenFiles(File parent) {
-            final Map result = myDelegate.getChildrenFiles(parent);
-            if (result != null) {
-                return result;
+    
+    private static Map getChildrenFiles(File parent) {
+        File[] children = SVNFileListUtil.listFiles(parent);
+        if (children != null) {
+            Map map = new SVNHashMap();
+            for (int i = 0; i < children.length; i++) {
+                map.put(children[i].getName(), children[i]);
             }
-            return myDefault.getChildrenFiles(parent);
+            return map;
         }
+        return Collections.EMPTY_MAP;
     }
-
-    private static class DefaultSVNStatusFileProvider implements ISVNStatusFileProvider {
-        public Map getChildrenFiles(File parent) {
-            File[] children = SVNFileListUtil.listFiles(parent);
-            if (children != null) {
-                Map map = new SVNHashMap();
-                for (int i = 0; i < children.length; i++) {
-                    map.put(children[i].getName(), children[i]);
-                }
-                return map;
-            }
-            return Collections.EMPTY_MAP;
-        }
-    }
+    
 }

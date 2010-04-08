@@ -11,24 +11,17 @@
  */
 package org.tmatesoft.svn.core.internal.wc;
 
-import org.tmatesoft.svn.core.SVNErrorCode;
-import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNProperties;
 import org.tmatesoft.svn.core.SVNProperty;
-import org.tmatesoft.svn.core.internal.util.SVNCharsetOutputStream;
 import org.tmatesoft.svn.core.internal.wc.admin.SVNAdminArea;
 import org.tmatesoft.svn.core.wc.DefaultSVNDiffGenerator;
 import org.tmatesoft.svn.core.wc.ISVNDiffGenerator;
 import org.tmatesoft.svn.core.wc.SVNStatusType;
-import org.tmatesoft.svn.util.SVNDebugLog;
-import org.tmatesoft.svn.util.SVNLogType;
 
 import java.io.File;
-import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.Charset;
-import java.util.logging.Level;
 
 
 /**
@@ -78,7 +71,11 @@ public class SVNDiffCallback extends AbstractDiffCallback {
     public SVNStatusType[] fileAdded(String path, File file1, File file2, long revision1, long revision2, String mimeType1, 
             String mimeType2, SVNProperties originalProperties, SVNProperties diff, boolean[] isTreeConflicted) throws SVNException {
         if (file2 != null) {
-            displayFileDiff(path, null, file2, revision1, revision2, mimeType1, mimeType2, originalProperties, diff);
+            boolean useDefaultEncoding = defineEncoding(originalProperties, diff);
+            myGenerator.displayFileDiff(getDisplayPath(path), null, file2, getRevision(revision1), getRevision(revision2), mimeType1, mimeType2, myResult);
+            if (!useDefaultEncoding) {
+                myGenerator.setEncoding(null);
+            }
         }
         if (diff != null && !diff.isEmpty()) {
             propertiesChanged(path, originalProperties, diff, null);
@@ -89,7 +86,11 @@ public class SVNDiffCallback extends AbstractDiffCallback {
     public SVNStatusType[] fileChanged(String path, File file1, File file2, long revision1, long revision2, String mimeType1,
             String mimeType2, SVNProperties originalProperties, SVNProperties diff, boolean[] isTreeConflicted) throws SVNException {
         if (file1 != null) {
-            displayFileDiff(path, file1, file2, revision1, revision2, mimeType1, mimeType2, originalProperties, diff);
+            boolean useDefaultEncoding = defineEncoding(originalProperties, diff);
+            myGenerator.displayFileDiff(getDisplayPath(path), file1, file2, getRevision(revision1), getRevision(revision2), mimeType1, mimeType2, myResult);
+            if (!useDefaultEncoding) {
+                myGenerator.setEncoding(null);
+            }
         }
         if (diff != null && !diff.isEmpty()) {
             propertiesChanged(path, originalProperties, diff, null);
@@ -100,44 +101,13 @@ public class SVNDiffCallback extends AbstractDiffCallback {
     public SVNStatusType fileDeleted(String path, File file1, File file2, String mimeType1, String mimeType2, SVNProperties originalProperties,
             boolean[] isTreeConflicted) throws SVNException {
         if (file1 != null) {
-            displayFileDiff(path, file1, file2, myRevision1, myRevision2, mimeType1, mimeType2, originalProperties, null);
-        }
-        return SVNStatusType.UNKNOWN;
-    }
-
-    private void displayFileDiff(String path, File file1, File file2, long revision1, long revision2, String mimeType1, String mimeType2, SVNProperties originalProperties, SVNProperties diff) throws SVNException {
-        boolean resetEncoding = false;
-        OutputStream result = myResult;
-        String encoding = defineEncoding(originalProperties, diff);
-        if (encoding != null) {
-            SVNDebugLog.getDefaultLog().log(SVNLogType.DEFAULT, "Diff: using encoding " + encoding + " derived from svn:mime-type property", Level.FINEST);
-            myGenerator.setEncoding(encoding);
-            resetEncoding = true;
-        } else {
-            String conversionEncoding = defineConversionEncoding(originalProperties, diff);
-            if (conversionEncoding != null) {
-                SVNDebugLog.getDefaultLog().log(SVNLogType.DEFAULT, "Diff: using conversion encoding " + conversionEncoding
-                        + " derived from svnkit:charset property or from global.charset option", Level.FINEST);
-                myGenerator.setEncoding("UTF-8");
-                result = new SVNCharsetOutputStream(result, Charset.forName("UTF-8"), Charset.forName(conversionEncoding));
-                resetEncoding = true;
-            }
-        }
-        try {
-            myGenerator.displayFileDiff(getDisplayPath(path), file1, file2, getRevision(revision1), getRevision(revision2), mimeType1, mimeType2, result);
-        } finally {
-            if (resetEncoding) {
-                SVNDebugLog.getDefaultLog().log(SVNLogType.DEFAULT, "Diff: encoding reset", Level.FINEST);
+            boolean useDefaultEncoding = defineEncoding(originalProperties, null);
+            myGenerator.displayFileDiff(getDisplayPath(path), file1, file2, getRevision(myRevision1), getRevision(myRevision2), mimeType1, mimeType2, myResult);
+            if (!useDefaultEncoding) {
                 myGenerator.setEncoding(null);
             }
-            if (result instanceof SVNCharsetOutputStream) {
-                try {
-                    result.flush();
-                } catch (IOException e) {
-                    SVNErrorManager.error(SVNErrorMessage.create(SVNErrorCode.IO_ERROR, e), e, SVNLogType.WC);
-                }
-            }
         }
+        return SVNStatusType.UNKNOWN;
     }
 
     public SVNStatusType propertiesChanged(String path, SVNProperties originalProperties, SVNProperties diff, boolean[] isTreeConflicted) throws SVNException {
@@ -159,55 +129,50 @@ public class SVNDiffCallback extends AbstractDiffCallback {
         return "(working copy)";
     }
 
-    private String defineEncoding(SVNProperties properties, SVNProperties diff) {
+    private boolean defineEncoding(SVNProperties properties, SVNProperties diff) {
         if (myGenerator instanceof DefaultSVNDiffGenerator) {
             DefaultSVNDiffGenerator defaultGenerator = (DefaultSVNDiffGenerator) myGenerator;
             if (defaultGenerator.hasEncoding()) {
-                return null;
+                return true;
             }
+            if (!defaultGenerator.hasEncoding()) {
+                String originCharset = properties == null ? null : properties.getStringValue(SVNProperty.CHARSET);
+                if (originCharset != null) {
+                    defaultGenerator.setEncoding("UTF-8");
+                    return false;
+                }
 
-            String originalMimeType = properties == null ? null : properties.getStringValue(SVNProperty.MIME_TYPE);
-            String originalEncoding = SVNPropertiesManager.determineEncodingByMimeType(originalMimeType);
-            boolean originalEncodingSupported = originalEncoding != null && Charset.isSupported(originalEncoding);
-            if (originalEncodingSupported) {
-                return originalEncoding;
-            }
+                String changedCharset = diff == null ? null : diff.getStringValue(SVNProperty.CHARSET);
+                if (changedCharset != null) {
+                    defaultGenerator.setEncoding("UTF-8");
+                    return false;
+                }
 
-            String changedMimeType = diff == null ? null : diff.getStringValue(SVNProperty.MIME_TYPE);
-            String changedEncoding = SVNPropertiesManager.determineEncodingByMimeType(changedMimeType);
-            boolean changedEncodingSupported = changedEncoding != null && Charset.isSupported(changedEncoding);
-            if (changedEncodingSupported) {
-                return changedEncoding;
+                String originMimeType = properties == null ? null : properties.getStringValue(SVNProperty.MIME_TYPE);
+                String originEncoding = SVNPropertiesManager.determineEncodingByMimeType(originMimeType);
+                boolean originEncodingSupported = originEncoding != null && Charset.isSupported(originEncoding);
+                if (originEncodingSupported) {
+                    defaultGenerator.setEncoding(originEncoding);
+                    return false;
+                }
+
+                String changedMimeType = diff == null ? null : diff.getStringValue(SVNProperty.MIME_TYPE);
+                String changedEncoding = SVNPropertiesManager.determineEncodingByMimeType(changedMimeType);
+                boolean changedEncodingSupported = changedEncoding != null && Charset.isSupported(changedEncoding);
+                if (changedEncodingSupported) {
+                    defaultGenerator.setEncoding(changedEncoding);
+                    return false;
+                }
+
+                String globalEncoding = defaultGenerator.getGlobalEncoding();
+                boolean globalEncodingSupported = globalEncoding != null && Charset.isSupported(globalEncoding);
+                if (globalEncodingSupported) {
+                    defaultGenerator.setEncoding("UTF-8");
+                    return false;
+                }
             }
         }
-        return null;
-    }
-
-    private String defineConversionEncoding(SVNProperties properties, SVNProperties diff) {
-        if (myGenerator instanceof DefaultSVNDiffGenerator) {
-            DefaultSVNDiffGenerator defaultGenerator = (DefaultSVNDiffGenerator) myGenerator;
-            if (defaultGenerator.hasEncoding()) {
-                return null;
-            }
-            String originalCharset = properties == null ? null : properties.getStringValue(SVNProperty.CHARSET);
-            boolean originalCharsetSupported = originalCharset != null && Charset.isSupported(originalCharset);
-            if (originalCharsetSupported) {
-                return originalCharset;
-            }
-
-            String changedCharset = diff == null ? null : diff.getStringValue(SVNProperty.CHARSET);
-            boolean changedCharsetSupported = changedCharset != null && Charset.isSupported(changedCharset);
-            if (changedCharsetSupported) {
-                return changedCharset;
-            }
-
-            String globalEncoding = defaultGenerator.getGlobalEncoding();
-            boolean globalEncodingSupported = globalEncoding != null && Charset.isSupported(globalEncoding);
-            if (globalEncodingSupported) {
-                return globalEncoding;
-            }
-        }
-        return null;
+        return true;
     }
 
     public SVNStatusType directoryDeleted(String path, boolean[] isTreeConflicted) throws SVNException {
