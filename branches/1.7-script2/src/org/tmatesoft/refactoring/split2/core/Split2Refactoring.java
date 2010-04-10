@@ -1365,7 +1365,6 @@ public class Split2Refactoring extends Refactoring {
 			fieldAccess.setName(sourceAst.newSimpleName("VERSION_MISMATCH"));
 
 			final Block thenBlock = sourceAst.newBlock();
-			final Block elseBlock = sourceAst.newBlock();
 
 			ifStatement.setThenStatement(thenBlock);
 
@@ -1389,11 +1388,9 @@ public class Split2Refactoring extends Refactoring {
 				thenBlock.statements().add(sourceAst.newExpressionStatement(invoc1));
 			}
 
-			ifStatement.setElseStatement(elseBlock);
-
 			final ThrowStatement throwStatement = sourceAst.newThrowStatement();
 			throwStatement.setExpression(sourceAst.newSimpleName("e"));
-			elseBlock.statements().add(throwStatement);
+			catchStatements.add(throwStatement);
 
 		}
 
