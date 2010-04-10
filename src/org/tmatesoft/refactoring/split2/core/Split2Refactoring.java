@@ -727,7 +727,7 @@ public class Split2Refactoring extends Refactoring {
 		invoc1.setExpression(ast.newSimpleName("SVNErrorMessage"));
 		invoc1.setName(ast.newSimpleName("create"));
 		final List<Expression> args1 = invoc1.arguments();
-		args1.add(ast.newQualifiedName(ast.newSimpleName("SVNErrorCode"), ast.newSimpleName("VERSION_MISMATCH")));
+		args1.add(ast.newQualifiedName(ast.newSimpleName("SVNErrorCode"), ast.newSimpleName("WC_UNSUPPORTED_FORMAT")));
 
 		final VariableDeclarationFragment varF = ast.newVariableDeclarationFragment();
 		varF.setName(ast.newSimpleName("err"));
@@ -1362,7 +1362,7 @@ public class Split2Refactoring extends Refactoring {
 			final FieldAccess fieldAccess = sourceAst.newFieldAccess();
 			infix.setRightOperand(fieldAccess);
 			fieldAccess.setExpression(sourceAst.newName("SVNErrorCode"));
-			fieldAccess.setName(sourceAst.newSimpleName("VERSION_MISMATCH"));
+			fieldAccess.setName(sourceAst.newSimpleName("WC_UNSUPPORTED_FORMAT"));
 
 			final Block thenBlock = sourceAst.newBlock();
 
