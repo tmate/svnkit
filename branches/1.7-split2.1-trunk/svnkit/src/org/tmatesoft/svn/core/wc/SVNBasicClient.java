@@ -275,30 +275,5 @@ public class SVNBasicClient {
         getDelegate17().setEventPathPrefix(prefix);
     }
 
-    
-    /**
-     * Handles a next working copy path with the {@link ISVNPathListHandler path list handler} 
-     * if any was provided to this object through {@link #setPathListHandler(ISVNPathListHandler)}.
-     * 
-     * <p/>
-     * Note: used by <code>SVNKit</code> internals.
-     * 
-     * @param  path            working copy path 
-     * @throws SVNException 
-     * @since                  1.2.0
-     */
-    public void handlePathListItem(File path) throws SVNException {
-        try {
-            getDelegate17().handlePathListItem(path);
-        } catch (SVNException e) {
-            if (e.getErrorMessage().getErrorCode() == SVNErrorCode.WC_UNSUPPORTED_FORMAT) {
-                getDelegate16().handlePathListItem(path);
-                return;
-            }
-            throw e;
-        }
-    }
-
-    
 
 }
