@@ -250,7 +250,9 @@ public class SVNBasicClient {
      * @param  access         working copy access object
      * @return                repository root url
      * @throws SVNException 
-     * @since                 1.2.0         
+     * @since                 1.2.0
+     * 
+     * @deprecated
      */
     public SVNURL getReposRoot(File path, SVNURL url, SVNRevision pegRevision, SVNAdminArea adminArea, 
             SVNWCAccess access) throws SVNException {
@@ -263,7 +265,40 @@ public class SVNBasicClient {
             throw e;
         }
     }
-    
+
+    /**
+     * Returns the root of the repository. 
+     * 
+     * <p/>
+     * If <code>path</code> is not <span class="javakeyword">null</span> and <code>pegRevision</code> is 
+     * either {@link SVNRevision#WORKING} or {@link SVNRevision#BASE}, then attempts to fetch the repository 
+     * root from the working copy represented by <code>path</code>. If these conditions are not met or if the 
+     * repository root is not recorded in the working copy, then a repository connection is established 
+     * and the repository root is fetched from the session. 
+     *  
+     * <p/>
+     * All necessary cleanup (session or|and working copy close) will be performed automatically as the routine 
+     * finishes. 
+     * 
+     * @param  path           working copy path
+     * @param  url            repository url
+     * @param  pegRevision    revision in which the target is valid
+     * @return                repository root url
+     * @throws SVNException 
+     * @since                 1.2.0
+     * 
+     */
+    public SVNURL getReposRoot(File path, SVNURL url, SVNRevision pegRevision) throws SVNException {
+        try {
+            return getDelegate17().getReposRoot(path, url, pegRevision, null, null);
+        } catch (SVNException e) {
+            if (e.getErrorMessage().getErrorCode() == SVNErrorCode.WC_UNSUPPORTED_FORMAT) {
+                return getDelegate16().getReposRoot(path, url, pegRevision, null, null);
+            }
+            throw e;
+        }
+    }
+
     /**
      * Removes or adds a path prefix. This method is not intended for 
      * users (from an API point of view). 
