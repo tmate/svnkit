@@ -13,38 +13,14 @@ package org.tmatesoft.svn.core.wc;
 
 import java.io.File;
 import java.util.Collection;
-import java.util.Iterator;
-import java.util.Map;
 
-import org.tmatesoft.svn.core.SVNCancelException;
 import org.tmatesoft.svn.core.SVNDepth;
 import org.tmatesoft.svn.core.SVNErrorCode;
-import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
-import org.tmatesoft.svn.core.SVNNodeKind;
-import org.tmatesoft.svn.core.SVNURL;
 import org.tmatesoft.svn.core.auth.ISVNAuthenticationManager;
-import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
-import org.tmatesoft.svn.core.internal.wc.SVNCancellableEditor;
-import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
-import org.tmatesoft.svn.core.internal.wc.SVNEventFactory;
-import org.tmatesoft.svn.core.internal.wc.SVNExternal;
-import org.tmatesoft.svn.core.internal.wc.SVNFileType;
-import org.tmatesoft.svn.core.internal.wc.SVNRemoteStatusEditor;
-import org.tmatesoft.svn.core.internal.wc.SVNStatusEditor;
-import org.tmatesoft.svn.core.internal.wc.SVNStatusReporter;
-import org.tmatesoft.svn.core.internal.wc.admin.SVNAdminArea;
-import org.tmatesoft.svn.core.internal.wc.admin.SVNAdminAreaFactory;
-import org.tmatesoft.svn.core.internal.wc.admin.SVNAdminAreaInfo;
-import org.tmatesoft.svn.core.internal.wc.admin.SVNEntry;
-import org.tmatesoft.svn.core.internal.wc.admin.SVNReporter;
-import org.tmatesoft.svn.core.internal.wc.admin.SVNWCAccess;
-import org.tmatesoft.svn.core.io.ISVNEditor;
-import org.tmatesoft.svn.core.io.SVNCapability;
+import org.tmatesoft.svn.core.internal.wc16.SVNStatusClient16;
+import org.tmatesoft.svn.core.internal.wc17.SVNStatusClient17;
 import org.tmatesoft.svn.core.io.SVNRepository;
-import org.tmatesoft.svn.util.SVNLogType;
-import org.tmatesoft.svn.core.internal.wc16.*;
-import org.tmatesoft.svn.core.internal.wc17.*;
 
 /**
  * The <b>SVNStatusClient</b> class provides methods for obtaining information on the 
