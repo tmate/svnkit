@@ -1386,6 +1386,7 @@ public class Split2Refactoring extends Refactoring {
 				thenBlock.statements().add(returnStatement);
 			} else {
 				thenBlock.statements().add(sourceAst.newExpressionStatement(invoc1));
+				thenBlock.statements().add(sourceAst.newReturnStatement());
 			}
 
 			final ThrowStatement throwStatement = sourceAst.newThrowStatement();
