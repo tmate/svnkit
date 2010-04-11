@@ -1,45 +1,27 @@
 package org.tmatesoft.svn.core.wc.admin;
 
-import java.io.File;
-import java.util.ArrayList;
-import java.util.Collections;
-import org.tmatesoft.svn.core.internal.util.SVNHashMap;
-import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
-import org.tmatesoft.svn.core.ISVNLogEntryHandler;
+
 import org.tmatesoft.svn.core.SVNCancelException;
-import org.tmatesoft.svn.core.SVNDepth;
 import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
-import org.tmatesoft.svn.core.SVNLogEntry;
-import org.tmatesoft.svn.core.SVNLogEntryPath;
-import org.tmatesoft.svn.core.SVNMergeInfo;
-import org.tmatesoft.svn.core.SVNMergeInfoInheritance;
-import org.tmatesoft.svn.core.SVNNodeKind;
-import org.tmatesoft.svn.core.SVNProperty;
-import org.tmatesoft.svn.core.SVNPropertyValue;
 import org.tmatesoft.svn.core.SVNURL;
 import org.tmatesoft.svn.core.auth.ISVNAuthenticationManager;
-import org.tmatesoft.svn.core.internal.util.SVNEncodingUtil;
-import org.tmatesoft.svn.core.internal.util.SVNMergeInfoUtil;
-import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
-import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
-import org.tmatesoft.svn.core.internal.wc.SVNPropertiesManager;
-import org.tmatesoft.svn.core.internal.wc.SVNWCManager;
-import org.tmatesoft.svn.core.internal.wc.admin.SVNAdminArea;
-import org.tmatesoft.svn.core.internal.wc.admin.SVNEntry;
-import org.tmatesoft.svn.core.internal.wc.admin.SVNWCAccess;
-import org.tmatesoft.svn.core.io.SVNLocationEntry;
 import org.tmatesoft.svn.core.io.SVNRepository;
 import org.tmatesoft.svn.core.io.SVNRepositoryFactory;
+import org.tmatesoft.svn.core.wc.DefaultSVNRepositoryPool;
+import org.tmatesoft.svn.core.wc.ISVNEventHandler;
+import org.tmatesoft.svn.core.wc.ISVNOptions;
+import org.tmatesoft.svn.core.wc.ISVNPathListHandler;
+import org.tmatesoft.svn.core.wc.ISVNRepositoryPool;
+import org.tmatesoft.svn.core.wc.SVNEvent;
+import org.tmatesoft.svn.core.wc.SVNWCUtil;
 import org.tmatesoft.svn.util.ISVNDebugLog;
 import org.tmatesoft.svn.util.SVNDebugLog;
 import org.tmatesoft.svn.util.SVNLogType;
-import org.tmatesoft.svn.core.wc.*;
 
 /** 
  * The <b>SVNBasicClient</b> is the base class of all 

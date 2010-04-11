@@ -2,6 +2,7 @@ package org.tmatesoft.svn.core.internal.wc16;
 
 import java.io.File;
 import java.util.Collection;
+
 import org.tmatesoft.svn.core.SVNCommitInfo;
 import org.tmatesoft.svn.core.SVNDepth;
 import org.tmatesoft.svn.core.SVNErrorCode;
@@ -16,8 +17,20 @@ import org.tmatesoft.svn.core.internal.wc.SVNCopyDriver;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.internal.wc.SVNPath;
 import org.tmatesoft.svn.core.io.SVNRepository;
+import org.tmatesoft.svn.core.wc.DefaultSVNCommitHandler;
+import org.tmatesoft.svn.core.wc.DefaultSVNCommitParameters;
+import org.tmatesoft.svn.core.wc.ISVNCommitHandler;
+import org.tmatesoft.svn.core.wc.ISVNCommitParameters;
+import org.tmatesoft.svn.core.wc.ISVNEventHandler;
+import org.tmatesoft.svn.core.wc.ISVNExternalsHandler;
+import org.tmatesoft.svn.core.wc.ISVNOptions;
+import org.tmatesoft.svn.core.wc.ISVNRepositoryPool;
+import org.tmatesoft.svn.core.wc.SVNCommitItem;
+import org.tmatesoft.svn.core.wc.SVNCopySource;
+import org.tmatesoft.svn.core.wc.SVNRevision;
+import org.tmatesoft.svn.core.wc.SVNWCClient;
+import org.tmatesoft.svn.core.wc.SVNWCUtil;
 import org.tmatesoft.svn.util.SVNLogType;
-import org.tmatesoft.svn.core.wc.*;
 
 /** 
  * The <b>SVNCopyClient</b> provides methods to perform any kinds of copying and moving that SVN

@@ -12,32 +12,14 @@
 package org.tmatesoft.svn.core.wc;
 
 import java.io.File;
-import java.util.Iterator;
 
-import org.tmatesoft.svn.core.SVNDepth;
 import org.tmatesoft.svn.core.SVNErrorCode;
-import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
-import org.tmatesoft.svn.core.SVNNodeKind;
-import org.tmatesoft.svn.core.SVNURL;
 import org.tmatesoft.svn.core.auth.ISVNAuthenticationManager;
-import org.tmatesoft.svn.core.internal.util.SVNEncodingUtil;
-import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
-import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
-import org.tmatesoft.svn.core.internal.wc.SVNEventFactory;
-import org.tmatesoft.svn.core.internal.wc.SVNFileType;
-import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
-import org.tmatesoft.svn.core.internal.wc.SVNCopyDriver;
-import org.tmatesoft.svn.core.internal.wc.admin.SVNAdminArea;
-import org.tmatesoft.svn.core.internal.wc.admin.SVNEntry;
-import org.tmatesoft.svn.core.internal.wc.admin.SVNLog;
-import org.tmatesoft.svn.core.internal.wc.admin.SVNVersionedProperties;
-import org.tmatesoft.svn.core.internal.wc.admin.SVNWCAccess;
+import org.tmatesoft.svn.core.internal.wc16.SVNMoveClient16;
+import org.tmatesoft.svn.core.internal.wc17.SVNMoveClient17;
 import org.tmatesoft.svn.core.io.SVNRepository;
 import org.tmatesoft.svn.util.ISVNDebugLog;
-import org.tmatesoft.svn.util.SVNLogType;
-import org.tmatesoft.svn.core.internal.wc16.*;
-import org.tmatesoft.svn.core.internal.wc17.*;
 
 /**
  * The <b>SVNMoveClient</b> provides an extra client-side functionality over
