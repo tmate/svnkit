@@ -1,7 +1,6 @@
 package org.tmatesoft.svn.core.wc.admin;
 
 import java.util.LinkedList;
-import java.util.List;
 
 import org.tmatesoft.svn.core.SVNCancelException;
 import org.tmatesoft.svn.core.SVNErrorCode;
@@ -15,7 +14,6 @@ import org.tmatesoft.svn.core.io.SVNRepositoryFactory;
 import org.tmatesoft.svn.core.wc.DefaultSVNRepositoryPool;
 import org.tmatesoft.svn.core.wc.ISVNEventHandler;
 import org.tmatesoft.svn.core.wc.ISVNOptions;
-import org.tmatesoft.svn.core.wc.ISVNPathListHandler;
 import org.tmatesoft.svn.core.wc.ISVNRepositoryPool;
 import org.tmatesoft.svn.core.wc.SVNEvent;
 import org.tmatesoft.svn.core.wc.SVNWCUtil;
@@ -42,12 +40,8 @@ public class SVNAdminBasicClient implements ISVNEventHandler {
 	private ISVNRepositoryPool myRepositoryPool;
 	private ISVNOptions myOptions;
 	private ISVNEventHandler myEventDispatcher;
-	private List myPathPrefixesStack;
-	private boolean myIsIgnoreExternals;
-	private boolean myIsLeaveConflictsUnresolved;
 	private ISVNDebugLog myDebugLog;
-	private ISVNPathListHandler myPathListHandler;
-
+	
 	protected SVNRepository createRepository(SVNURL url, String uuid,
 			boolean mayReuse) throws SVNException {
 		SVNRepository repository = null;
@@ -146,7 +140,6 @@ public class SVNAdminBasicClient implements ISVNEventHandler {
 	 * @see #isIgnoreExternals()
 	 */
 	public void setIgnoreExternals(boolean ignore) {
-		myIsIgnoreExternals = ignore;
 	}
 
 	protected SVNAdminBasicClient(final ISVNAuthenticationManager authManager,
@@ -160,7 +153,7 @@ public class SVNAdminBasicClient implements ISVNEventHandler {
 			ISVNOptions options) {
 		myRepositoryPool = repositoryPool;
 		setOptions(options);
-		myPathPrefixesStack = new LinkedList();
+		new LinkedList();
 	}
 
 	/** 
