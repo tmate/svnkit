@@ -80,7 +80,7 @@ public abstract class BasicDAVHandler extends DefaultHandler {
 
     public void startElement(String uri, String localName, String qName, Attributes attributes) throws SAXException {
         setNamespace(uri);
-        DAVElement element = getDAVElement(qName, localName, myNamespace);
+        DAVElement element = getDAVElement(qName, myNamespace);
         try {
             startElement(getParent(), element, attributes);
         } catch (SVNException e) {
@@ -94,7 +94,7 @@ public abstract class BasicDAVHandler extends DefaultHandler {
     public void endElement(String uri, String localName, String qName) throws SAXException {
         myParent.pop();
         String namespace = uri != null && !"".equals(uri) ? uri : myNamespace;
-        DAVElement element = getDAVElement(qName, localName, namespace);
+        DAVElement element = getDAVElement(qName, namespace);
         try {
             endElement(getParent(), element, myCDATA);
         } catch (SVNException e) {
@@ -151,10 +151,7 @@ public abstract class BasicDAVHandler extends DefaultHandler {
         return (DAVElement) parent;
     }
 
-    private DAVElement getDAVElement(String qName, String localName, String namespace) {
-        if (qName == null || qName.trim().length() == 0) {
-            qName = localName;
-        }
+    private DAVElement getDAVElement(String qName, String namespace) {
         String prefix = namespace;
         int index = qName.indexOf(':');
         if (index >= 0) {

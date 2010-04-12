@@ -86,8 +86,7 @@ class JavaHLAuthenticationProvider implements ISVNAuthenticationProvider {
                             alias = cert.substring(cert.lastIndexOf(';') + 1);
                         }
                         return new SVNSSLAuthentication(SVNSSLAuthentication.MSCAPI, alias, save, url, false);
-                    }
-                    return new SVNSSLAuthentication(new File(cert), password, save, url, false);
+                  }
                 }
             }
             return null;
