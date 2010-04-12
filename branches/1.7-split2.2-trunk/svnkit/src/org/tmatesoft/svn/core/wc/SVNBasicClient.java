@@ -12,47 +12,15 @@
 package org.tmatesoft.svn.core.wc;
 
 import java.io.File;
-import java.util.ArrayList;
-import java.util.Collections;
-import org.tmatesoft.svn.core.internal.util.SVNHashMap;
-import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
 
-import org.tmatesoft.svn.core.ISVNLogEntryHandler;
-import org.tmatesoft.svn.core.SVNCancelException;
-import org.tmatesoft.svn.core.SVNDepth;
 import org.tmatesoft.svn.core.SVNErrorCode;
-import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
-import org.tmatesoft.svn.core.SVNLogEntry;
-import org.tmatesoft.svn.core.SVNLogEntryPath;
-import org.tmatesoft.svn.core.SVNMergeInfo;
-import org.tmatesoft.svn.core.SVNMergeInfoInheritance;
-import org.tmatesoft.svn.core.SVNNodeKind;
-import org.tmatesoft.svn.core.SVNProperty;
-import org.tmatesoft.svn.core.SVNPropertyValue;
 import org.tmatesoft.svn.core.SVNURL;
-import org.tmatesoft.svn.core.auth.ISVNAuthenticationManager;
-import org.tmatesoft.svn.core.internal.util.SVNEncodingUtil;
-import org.tmatesoft.svn.core.internal.util.SVNMergeInfoUtil;
-import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
-import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
-import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
-import org.tmatesoft.svn.core.internal.wc.SVNPropertiesManager;
-import org.tmatesoft.svn.core.internal.wc.SVNWCManager;
 import org.tmatesoft.svn.core.internal.wc.admin.SVNAdminArea;
-import org.tmatesoft.svn.core.internal.wc.admin.SVNEntry;
 import org.tmatesoft.svn.core.internal.wc.admin.SVNWCAccess;
-import org.tmatesoft.svn.core.io.SVNLocationEntry;
-import org.tmatesoft.svn.core.io.SVNRepository;
-import org.tmatesoft.svn.core.io.SVNRepositoryFactory;
+import org.tmatesoft.svn.core.internal.wc16.SVNBasicDelegate;
 import org.tmatesoft.svn.util.ISVNDebugLog;
 import org.tmatesoft.svn.util.SVNDebugLog;
-import org.tmatesoft.svn.util.SVNLogType;
-import org.tmatesoft.svn.core.internal.wc16.*;
-import org.tmatesoft.svn.core.internal.wc17.*;
 
 
 /**
@@ -282,7 +250,9 @@ public class SVNBasicClient {
      * @param  access         working copy access object
      * @return                repository root url
      * @throws SVNException 
-     * @since                 1.2.0         
+     * @since                 1.2.0
+     * 
+     * @deprecated
      */
     public SVNURL getReposRoot(File path, SVNURL url, SVNRevision pegRevision, SVNAdminArea adminArea, 
             SVNWCAccess access) throws SVNException {
@@ -295,7 +265,40 @@ public class SVNBasicClient {
             throw e;
         }
     }
-    
+
+    /**
+     * Returns the root of the repository. 
+     * 
+     * <p/>
+     * If <code>path</code> is not <span class="javakeyword">null</span> and <code>pegRevision</code> is 
+     * either {@link SVNRevision#WORKING} or {@link SVNRevision#BASE}, then attempts to fetch the repository 
+     * root from the working copy represented by <code>path</code>. If these conditions are not met or if the 
+     * repository root is not recorded in the working copy, then a repository connection is established 
+     * and the repository root is fetched from the session. 
+     *  
+     * <p/>
+     * All necessary cleanup (session or|and working copy close) will be performed automatically as the routine 
+     * finishes. 
+     * 
+     * @param  path           working copy path
+     * @param  url            repository url
+     * @param  pegRevision    revision in which the target is valid
+     * @return                repository root url
+     * @throws SVNException 
+     * @since                 1.2.0
+     * 
+     */
+    public SVNURL getReposRoot(File path, SVNURL url, SVNRevision pegRevision) throws SVNException {
+        try {
+            return getDelegate17().getReposRoot(path, url, pegRevision, null, null);
+        } catch (SVNException e) {
+            if (e.getErrorMessage().getErrorCode() == SVNErrorCode.WC_UNSUPPORTED_FORMAT) {
+                return getDelegate16().getReposRoot(path, url, pegRevision, null, null);
+            }
+            throw e;
+        }
+    }
+
     /**
      * Removes or adds a path prefix. This method is not intended for 
      * users (from an API point of view). 
@@ -306,28 +309,6 @@ public class SVNBasicClient {
         getDelegate16().setEventPathPrefix(prefix);
         getDelegate17().setEventPathPrefix(prefix);
     }
-   
-    /**
-     * Handles a next working copy path with the {@link ISVNPathListHandler path list handler} 
-     * if any was provided to this object through {@link #setPathListHandler(ISVNPathListHandler)}.
-     * 
-     * <p/>
-     * Note: used by <code>SVNKit</code> internals.
-     * 
-     * @param  path            working copy path 
-     * @throws SVNException 
-     * @since                  1.2.0
-     */
-    public void handlePathListItem(File path) throws SVNException {
-        try {
-            getDelegate17().handlePathListItem(path);
-        } catch (SVNException e) {
-            if (e.getErrorMessage().getErrorCode() == SVNErrorCode.WC_UNSUPPORTED_FORMAT) {
-                getDelegate16().handlePathListItem(path);
-                return;
-            }
-            throw e;
-        }
-    }
+
 
 }
