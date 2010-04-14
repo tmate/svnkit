@@ -86,6 +86,8 @@ public class SVNMoveClient extends SVNBasicClient {
         setDebugLog(null);
         setOptions(null);
         setEventHandler(null);
+                
+        setOptions(options);
     }
 
     /**
@@ -111,6 +113,8 @@ public class SVNMoveClient extends SVNBasicClient {
         setDebugLog(null);
         setOptions(null);
         setEventHandler(null);
+                
+        setOptions(options);
     }
 
 	public void setEventHandler(ISVNEventHandler dispatcher) {

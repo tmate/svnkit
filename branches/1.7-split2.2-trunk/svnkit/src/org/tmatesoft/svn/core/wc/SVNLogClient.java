@@ -92,6 +92,8 @@ public class SVNLogClient extends SVNBasicClient {
     public SVNLogClient(ISVNAuthenticationManager authManager, ISVNOptions options) {
         super(new SVNLogClient16(authManager, options), new SVNLogClient17(authManager, options));
         setDiffOptions(null);
+        
+        setOptions(options);
     }
 
     /**
@@ -116,6 +118,8 @@ public class SVNLogClient extends SVNBasicClient {
     public SVNLogClient(ISVNRepositoryPool repositoryPool, ISVNOptions options) {
         super(new SVNLogClient16(repositoryPool, options), new SVNLogClient17(repositoryPool, options));
         setDiffOptions(null);
+                
+        setOptions(options);
     }
     
     /**

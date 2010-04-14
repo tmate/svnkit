@@ -111,6 +111,8 @@ public class SVNCopyClient extends SVNBasicClient {
         setCommitParameters(null);
         setCommitHandler(null);
         setExternalsHandler(null);
+                
+        setOptions(options);
     }
 
     /**
@@ -136,6 +138,8 @@ public class SVNCopyClient extends SVNBasicClient {
         setCommitParameters(null);
         setCommitHandler(null);
         setExternalsHandler(null);
+                
+        setOptions(options);
     }
 
     /**

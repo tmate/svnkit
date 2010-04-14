@@ -49,6 +49,7 @@ import org.tmatesoft.svn.core.io.SVNRepository;
  * @since   1.2
  */
 public class SVNChangelistClient extends SVNBasicClient {
+    
     private SVNChangelistClient16 getSVNChangelistClient16() {
         return (SVNChangelistClient16) getDelegate16();
     }
@@ -82,6 +83,8 @@ public class SVNChangelistClient extends SVNBasicClient {
      */
     public SVNChangelistClient(ISVNAuthenticationManager authManager, ISVNOptions options) {
         super(new SVNChangelistClient16(authManager, options), new SVNChangelistClient17(authManager, options));
+        
+        setOptions(options);
     }
 
     /**
@@ -104,6 +107,8 @@ public class SVNChangelistClient extends SVNBasicClient {
      */
     public SVNChangelistClient(ISVNRepositoryPool repositoryPool, ISVNOptions options) {
         super(new SVNChangelistClient16(repositoryPool, options), new SVNChangelistClient17(repositoryPool, options));
+        
+        setOptions(options);
     }
 
     /**

@@ -102,6 +102,8 @@ public class SVNDiffClient extends SVNBasicClient {
         super(new SVNDiffClient16(authManager, options), new SVNDiffClient17(authManager, options));
         setDiffGenerator(null);
         setMergeOptions(null);
+        
+        setOptions(options);
     }
 
     /**
@@ -129,6 +131,9 @@ public class SVNDiffClient extends SVNBasicClient {
         super(new SVNDiffClient16(repositoryPool, options), new SVNDiffClient17(repositoryPool, options));
         setDiffGenerator(null);
         setMergeOptions(null);
+        
+        
+        setOptions(options);
     }
 
     /**
