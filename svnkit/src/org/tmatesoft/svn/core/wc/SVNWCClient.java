@@ -200,6 +200,9 @@ public class SVNWCClient extends SVNBasicClient {
      * @since 1.2
      */
     public void setAddParameters(ISVNAddParameters addParameters) {
+        if(addParameters==null){
+            addParameters = DEFAULT_ADD_PARAMETERS;
+        }
         getSVNWCClient16().setAddParameters(addParameters);
         getSVNWCClient17().setAddParameters(addParameters);
     }
