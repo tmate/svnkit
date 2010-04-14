@@ -169,17 +169,8 @@ import org.tmatesoft.svn.util.SVNLogType;
  * @see     <a target="_top" href="http://svnkit.com/kb/examples/">Examples</a>
  */
 public class SVNWCClient16 extends SVNBasicDelegate {
-	/** 
-	 * Default implementation of {@link ISVNAddParameters} which
-	 * <code>onInconsistentEOLs(File file)</code> always returns the {@link ISVNAddParameters#REPORT_ERROR} action.
-	 * @since 1.2
-	 */
-	public static ISVNAddParameters DEFAULT_ADD_PARAMETERS = new ISVNAddParameters() {
-		public Action onInconsistentEOLs(File file) {
-			return ISVNAddParameters.REPORT_ERROR;
-		}
-	};
-	private ISVNAddParameters myAddParameters;
+
+    private ISVNAddParameters myAddParameters;
 	private ISVNCommitHandler myCommitHandler;
 	private boolean myIsRevertMissingDirectories;
 
