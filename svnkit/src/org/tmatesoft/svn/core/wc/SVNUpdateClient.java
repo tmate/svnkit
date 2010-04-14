@@ -94,6 +94,8 @@ public class SVNUpdateClient extends SVNBasicClient {
     public SVNUpdateClient(ISVNAuthenticationManager authManager, ISVNOptions options) {
         super(new SVNUpdateClient16(authManager, options), new SVNUpdateClient17(authManager, options));
         setExternalsHandler(null);
+        
+        setOptions(options);
     }
 
     /**
@@ -118,6 +120,8 @@ public class SVNUpdateClient extends SVNBasicClient {
     public SVNUpdateClient(ISVNRepositoryPool repositoryPool, ISVNOptions options) {
         super(new SVNUpdateClient16(repositoryPool, options), new SVNUpdateClient17(repositoryPool, options));
         setExternalsHandler(null);
+                
+        setOptions(options);
     }
     
     /**

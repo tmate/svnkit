@@ -163,6 +163,8 @@ public class SVNWCClient extends SVNBasicClient {
         super(new SVNWCClient16(authManager, options), new SVNWCClient17(authManager, options));
         setCommitHandler(null);
         setAddParameters(null);
+                
+        setOptions(options);
     }
 
     /**
@@ -187,6 +189,8 @@ public class SVNWCClient extends SVNBasicClient {
         super(new SVNWCClient16(repositoryPool, options), new SVNWCClient17(repositoryPool, options));
         setCommitHandler(null);
         setAddParameters(null);
+                
+        setOptions(options);
     }
 
     /**

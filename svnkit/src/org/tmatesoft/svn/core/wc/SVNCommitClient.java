@@ -99,6 +99,8 @@ public class SVNCommitClient extends SVNBasicClient {
         setCommitHander(null);
         setCommitParameters(null);
         setCommitHandler(null);
+        
+        setOptions(options);
     }
 
     /**
@@ -124,6 +126,8 @@ public class SVNCommitClient extends SVNBasicClient {
         setCommitHander(null);
         setCommitParameters(null);
         setCommitHandler(null);
+        
+        setOptions(options);
     }
 
     /**
