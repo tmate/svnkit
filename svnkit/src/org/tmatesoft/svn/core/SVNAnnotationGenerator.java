@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2009 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2010 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -367,7 +367,12 @@ public class SVNAnnotationGenerator implements ISVNFileRevisionHandler {
             return;
         }
 
-        SVNErrorManager.assertionFailure(myPreviousFile != null, null, SVNLogType.WC);
+        if (myPreviousFile == null) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.UNKNOWN, 
+                    "ASSERTION FAILURE in SVNAnnotationGenerator.reportAnnotations(): myPreviousFile is null, " +
+                    "generator has to have been called at least once");
+            SVNErrorManager.error(err, SVNLogType.DEFAULT);
+        }
         int mergedCount = -1;
         if (myIncludeMergedRevisions) {
             if (myBlameChunks.isEmpty()) {
@@ -617,7 +622,12 @@ public class SVNAnnotationGenerator implements ISVNFileRevisionHandler {
         for (; i < chain.size() - 1 && k < mergedChain.size() - 1; i++, k++) {
             BlameChunk chunk = (BlameChunk) chain.get(i);
             BlameChunk mergedChunk = (BlameChunk) mergedChain.get(k);
-            SVNErrorManager.assertionFailure(chunk.blockStart == mergedChunk.blockStart, null, SVNLogType.WC);
+            if (chunk.blockStart != mergedChunk.blockStart) {
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.UNKNOWN,                               
+                        "ASSERTION FAILURE in SVNAnnotationGenerator.normalizeBlames():" +
+                        "current chunks should always start at the same offset");
+                SVNErrorManager.error(err, SVNLogType.DEFAULT);
+            }
 
             BlameChunk nextChunk = (BlameChunk) chain.get(i + 1);
             BlameChunk nextMergedChunk = (BlameChunk) mergedChain.get(k + 1);

@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2009 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2010 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -472,8 +472,6 @@ public class SVNWCAccess implements ISVNEventHandler {
         if (!preserveLocks && adminArea.isLocked()) {
             adminArea.unlock();
         }
-        
-        adminArea.close();
     }
 
     public SVNAdminArea probeRetrieve(File path) throws SVNException {
@@ -831,7 +829,7 @@ public class SVNWCAccess implements ISVNEventHandler {
             boolean allowUnversionedObstructions, boolean depthIsSticky, SVNDepth depth,
             String[] preservedExtensions, ISVNFileFetcher fileFetcher, boolean lockOnDemand) throws SVNException {
         int maxVersion = getMaxFormatVersion();
-        if (0 < maxVersion && maxVersion < SVNAdminAreaFactory.WC_FORMAT_16) {
+        if (0 < maxVersion && maxVersion < SVNAdminArea16.WC_FORMAT) {
             return SVNUpdateEditor15.createUpdateEditor(info, switchURL, allowUnversionedObstructions, depthIsSticky, depth, preservedExtensions, fileFetcher, lockOnDemand);
         } 
         return SVNUpdateEditor.createUpdateEditor(info, switchURL, allowUnversionedObstructions, depthIsSticky, depth, preservedExtensions, fileFetcher, lockOnDemand);

@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2009 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2010 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -151,8 +151,12 @@ public class FSHotCopier {
             SVNFileUtil.copyDirectory(srcOwner.getPackDir(packedShard), dstOwner.getPackDir(packedShard), false, null);
         }
         
-        SVNErrorManager.assertionFailure(rev == minUnpackedRevision, "expected minimal unpacked revision " + String.valueOf(minUnpackedRevision) + ", but real revision is " + 
-                String.valueOf(rev), SVNLogType.FSFS);
+        if (rev != minUnpackedRevision) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.UNKNOWN, 
+                    "Assertion failed: expected minimal unpacked revision {0}, but real revision is {1}", 
+                    new Object[] { String.valueOf(minUnpackedRevision), String.valueOf(rev) });
+            SVNErrorManager.error(err, SVNLogType.FSFS);
+        }
             
         for (; rev <= youngestRev; rev++) {
             File dstDir = dstRevsDir;

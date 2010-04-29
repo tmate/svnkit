@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2009 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2010 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -15,7 +15,6 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
-import java.nio.charset.Charset;
 import java.text.DateFormat;
 import java.text.DateFormatSymbols;
 import java.text.SimpleDateFormat;
@@ -69,7 +68,6 @@ public class DefaultSVNOptions implements ISVNOptions, ISVNMergerFactory {
     private static final String PRESERVED_CONFLICT_FILE_EXTENSIONS = "preserved-conflict-file-exts";
     private static final String INTERACTIVE_COFLICTS = "interactive-conflicts";
     private static final String MIME_TYPES_FILE = "mime-types-file";
-    private static final String GLOBAL_CHARSET = "global-charset";
     private static final String DEFAULT_IGNORES = "*.o *.lo *.la #*# .*.rej *.rej .*~ *~ .#* .DS_Store";
     private static final String YES = "yes";
     private static final String NO = "no";
@@ -614,14 +612,6 @@ public class DefaultSVNOptions implements ISVNOptions, ISVNMergerFactory {
 
     public boolean isAllowAllForwardMergesFromSelf() {
         return false;
-    }
-
-    public String getGlobalCharset() {
-        return getPropertyValue(GLOBAL_CHARSET);
-    }
-
-    public void setGlobalCharset(String charset) {
-        setPropertyValue(GLOBAL_CHARSET, charset);
     }
 
     public String getNativeCharset() {

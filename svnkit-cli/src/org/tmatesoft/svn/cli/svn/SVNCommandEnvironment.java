@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2009 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2010 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -136,8 +136,6 @@ public class SVNCommandEnvironment extends AbstractSVNCommandEnvironment impleme
     private String myRegularExpression;
     private Map myConfigOptions;
     private Map myServersOptions;
-
-    private int myStripCount;
     
     public SVNCommandEnvironment(String programName, PrintStream out, PrintStream err, InputStream in) {
         super(programName, out, err, in);
@@ -563,16 +561,6 @@ public class SVNCommandEnvironment extends AbstractSVNCommandEnvironment impleme
             myRegularExpression = optionValue.getValue();
         } else if (option == SVNOption.TRUST_SERVER_CERT) {
             myIsTrustServerCertificate = true;
-        } else if(option == SVNOption.STRIP ) {
-            final String value = optionValue.getValue();
-            try {
-                myStripCount = Integer.parseInt(optionValue.getValue());
-            } catch (NumberFormatException nfe) {
-                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.CL_ARG_PARSING_ERROR, 
-                        "Non-numeric change argument ({0}) given to -strip", value);
-                SVNErrorManager.error(err, SVNLogType.CLIENT);
-            }
-
         }
     }
     
@@ -832,10 +820,6 @@ public class SVNCommandEnvironment extends AbstractSVNCommandEnvironment impleme
     
     public boolean isAllRevisionProperties() {
         return myIsWithAllRevprops;
-    }
-    
-    public int getStripCount() {
-        return myStripCount;
     }
     
     public SVNDiffOptions getDiffOptions() throws SVNException {
