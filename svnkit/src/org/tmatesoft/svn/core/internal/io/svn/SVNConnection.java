@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2009 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2010 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -17,6 +17,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.SequenceInputStream;
+import java.lang.reflect.Constructor;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
@@ -27,8 +28,8 @@ import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNURL;
 import org.tmatesoft.svn.core.auth.ISVNAuthenticationManager;
 import org.tmatesoft.svn.core.internal.util.SVNHashSet;
-import org.tmatesoft.svn.core.internal.wc.SVNClassLoader;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
+import org.tmatesoft.svn.util.SVNDebugLog;
 import org.tmatesoft.svn.util.SVNLogType;
 
 /**
@@ -174,7 +175,19 @@ public class SVNConnection {
     }
     
     private SVNAuthenticator createSASLAuthenticator() throws SVNException {
-        return SVNClassLoader.getSASLAuthenticator(this);
+        try {
+            Class saslClass = 
+                SVNConnection.class.getClassLoader().loadClass("org.tmatesoft.svn.core.internal.io.svn.sasl.SVNSaslAuthenticator");
+            if (saslClass != null) {
+                Constructor constructor = saslClass.getConstructor(new Class[] {SVNConnection.class});
+                if (constructor != null) {
+                    return (SVNAuthenticator) constructor.newInstance(new Object[] {this});
+                }
+            }
+        } catch (Throwable th) {
+            SVNDebugLog.getDefaultLog().logFine(SVNLogType.NETWORK, th.getMessage());
+        }
+        return new SVNPlainAuthenticator(this);
     }
     
     private void addCapabilities(List capabilities) throws SVNException {
