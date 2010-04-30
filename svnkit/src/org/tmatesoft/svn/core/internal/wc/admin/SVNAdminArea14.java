@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2009 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2010 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -303,19 +303,19 @@ public class SVNAdminArea14 extends SVNAdminArea {
         return wcPropsCache;
     }
     
-    protected SVNProperties readBaseProperties(String name) throws SVNException {
+    private SVNProperties readBaseProperties(String name) throws SVNException {
         File propertiesFile = getBasePropertiesFile(name, false);
         SVNWCProperties props = new SVNWCProperties(propertiesFile, null);
         return props.asMap();
     }
 
-    protected SVNProperties readRevertProperties(String name) throws SVNException {
+    private SVNProperties readRevertProperties(String name) throws SVNException {
         File propertiesFile = getRevertPropertiesFile(name, false);
         SVNWCProperties props = new SVNWCProperties(propertiesFile, null);
         return props.asMap();
     }
     
-    protected SVNProperties readProperties(String name) throws SVNException {
+    private SVNProperties readProperties(String name) throws SVNException {
         if (hasPropModifications(name)) {
             File propertiesFile = getPropertiesFile(name, false);
             SVNWCProperties props = new SVNWCProperties(propertiesFile, null);

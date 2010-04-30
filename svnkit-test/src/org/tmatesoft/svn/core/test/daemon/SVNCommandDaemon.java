@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2009 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2010 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -36,6 +36,7 @@ import org.tmatesoft.svn.util.SVNLogType;
  */
 public class SVNCommandDaemon implements Runnable {
 
+    private String myCurrentTestsType;
     private int myPort;
     private SecurityManager myDefaultSecurityManager;
     
@@ -167,7 +168,7 @@ public class SVNCommandDaemon implements Runnable {
         }
         buffer.close();
         // now parse.
-        SVNCommandDaemonEnvironment environment = new SVNCommandDaemonEnvironment();
+        SVNCommandDaemonEnvironment environment = new SVNCommandDaemonEnvironment(getTestsType());
         BufferedReader inputReader = new BufferedReader(new InputStreamReader(new ByteArrayInputStream(buffer.toByteArray()), "UTF-8"));
         while(true) {
             String line = inputReader.readLine();
@@ -191,6 +192,14 @@ public class SVNCommandDaemon implements Runnable {
         buffer.close();
         environment.setStdIn(buffer.toByteArray());
         return environment;
+    }
+    
+    public void setTestsType(String type) {
+        myCurrentTestsType = type;
+    }
+    
+    private String getTestsType() {
+        return myCurrentTestsType;
     }
     
     private byte[] escape(byte[] src) throws IOException {

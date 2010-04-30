@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2009 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2010 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -10,26 +10,6 @@
  * ====================================================================
  */
 package org.tmatesoft.svn.core.wc;
-
-import de.regnis.q.sequence.line.diff.QDiffGenerator;
-import de.regnis.q.sequence.line.diff.QDiffGeneratorFactory;
-import de.regnis.q.sequence.line.diff.QDiffManager;
-import de.regnis.q.sequence.line.diff.QDiffUniGenerator;
-import org.tmatesoft.svn.core.SVNErrorCode;
-import org.tmatesoft.svn.core.SVNErrorMessage;
-import org.tmatesoft.svn.core.SVNException;
-import org.tmatesoft.svn.core.SVNMergeRangeList;
-import org.tmatesoft.svn.core.SVNProperties;
-import org.tmatesoft.svn.core.SVNProperty;
-import org.tmatesoft.svn.core.SVNPropertyValue;
-import org.tmatesoft.svn.core.internal.util.SVNHashMap;
-import org.tmatesoft.svn.core.internal.util.SVNMergeInfoUtil;
-import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
-import org.tmatesoft.svn.core.internal.wc.DefaultSVNOptions;
-import org.tmatesoft.svn.core.internal.wc.ISVNReturnValueCallback;
-import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
-import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
-import org.tmatesoft.svn.util.SVNLogType;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -46,6 +26,27 @@ import java.util.LinkedList;
 import java.util.Map;
 import java.util.TreeMap;
 
+import org.tmatesoft.svn.core.SVNErrorCode;
+import org.tmatesoft.svn.core.SVNErrorMessage;
+import org.tmatesoft.svn.core.SVNException;
+import org.tmatesoft.svn.core.SVNMergeRangeList;
+import org.tmatesoft.svn.core.SVNProperties;
+import org.tmatesoft.svn.core.SVNProperty;
+import org.tmatesoft.svn.core.SVNPropertyValue;
+import org.tmatesoft.svn.core.internal.util.SVNHashMap;
+import org.tmatesoft.svn.core.internal.util.SVNMergeInfoUtil;
+import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
+import org.tmatesoft.svn.core.internal.wc.DefaultSVNOptions;
+import org.tmatesoft.svn.core.internal.wc.ISVNReturnValueCallback;
+import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
+import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
+import org.tmatesoft.svn.util.SVNLogType;
+
+import de.regnis.q.sequence.line.diff.QDiffGenerator;
+import de.regnis.q.sequence.line.diff.QDiffGeneratorFactory;
+import de.regnis.q.sequence.line.diff.QDiffManager;
+import de.regnis.q.sequence.line.diff.QDiffUniGenerator;
+
 /**
  * <b>DefaultSVNDiffGenerator</b> is a default implementation of 
  * <b>ISVNDiffGenerator</b>.
@@ -60,8 +61,8 @@ import java.util.TreeMap;
  */
 public class DefaultSVNDiffGenerator implements ISVNDiffGenerator {
 
-    protected static final String PROPERTIES_SEPARATOR = "___________________________________________________________________";
-    protected static final String HEADER_SEPARATOR = "===================================================================";
+    protected static final byte[] PROPERTIES_SEPARATOR = "___________________________________________________________________".getBytes();
+    protected static final byte[] HEADER_SEPARATOR = "===================================================================".getBytes();
     protected static final String WC_REVISION_LABEL = "(working copy)";
     protected static final InputStream EMPTY_FILE_IS = SVNFileUtil.DUMMY_IN;
 
@@ -311,7 +312,7 @@ public class DefaultSVNDiffGenerator implements ISVNDiffGenerator {
             bos.write(getEOL());
             bos.write(("Property changes on: " + (useLocalFileSeparatorChar() ? path.replace('/', File.separatorChar) : path)).getBytes(getEncoding()));
             bos.write(getEOL());
-            bos.write(PROPERTIES_SEPARATOR.getBytes(getEncoding()));
+            bos.write(PROPERTIES_SEPARATOR);
             bos.write(getEOL());
             for (Iterator changedPropNames = diff.nameSet().iterator(); changedPropNames.hasNext();) {
                 String name = (String) changedPropNames.next();
@@ -595,7 +596,7 @@ public class DefaultSVNDiffGenerator implements ISVNDiffGenerator {
         String header;
         try {
             bos.close();
-            header = bos.toString(getEncoding());            
+            header = bos.toString();            
         } catch (IOException inner) {
             header = "";
         }
@@ -657,31 +658,6 @@ public class DefaultSVNDiffGenerator implements ISVNDiffGenerator {
      */
     public boolean hasEncoding() {
         return myEncoding != null;
-    }
-
-    /**
-     * Says whether this generator is using any special (non-native)
-     * EOL bytes for outputting diffs.
-     *
-     * @return <span class="javakeyword">true</span> if yes;
-     *         otherwise <span class="javakeyword">false</span>
-     */
-    public boolean hasEOL() {
-        return myEOL != null;
-    }
-
-    /**
-     * Returns the encoding specified by svnkit.global-charset option
-     * of the global configuration.
-     *
-     * @return global charset name 
-     */
-    public String getGlobalEncoding() {
-        if (getOptions() instanceof DefaultSVNOptions) {
-            DefaultSVNOptions defaultOptions = (DefaultSVNOptions) getOptions();
-            return defaultOptions.getGlobalCharset();
-        }
-        return null;
     }
 
     /**
@@ -831,14 +807,14 @@ public class DefaultSVNDiffGenerator implements ISVNDiffGenerator {
             os.write(path.getBytes(getEncoding()));
             os.write(" (deleted)".getBytes(getEncoding()));
             os.write(getEOL());
-            os.write(HEADER_SEPARATOR.getBytes(getEncoding()));
+            os.write(HEADER_SEPARATOR);
             os.write(getEOL());
             return true;
         }
         os.write("Index: ".getBytes(getEncoding()));
         os.write(path.getBytes(getEncoding()));
         os.write(getEOL());
-        os.write(HEADER_SEPARATOR.getBytes(getEncoding()));
+        os.write(HEADER_SEPARATOR);
         os.write(getEOL());
         return false;
     }

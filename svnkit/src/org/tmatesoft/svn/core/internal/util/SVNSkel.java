@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2009 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2010 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -180,7 +180,7 @@ public class SVNSkel {
         if (data == null) {
             return null;
         }
-        return createAtom(data, 0, data.length);
+        return createAtom(data);
     }
 
     public static SVNSkel createAtom(byte[] data, int offset, int length) {
@@ -263,11 +263,6 @@ public class SVNSkel {
         myList.add(0, child);
     }
 
-    public void prependString(String str) throws SVNException {
-        SVNSkel skel = SVNSkel.createAtom(str);
-        addChild(skel);
-    }
-    
     public int getListSize() {
         if (isAtom()) {
             return -1;

@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2009 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2010 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -685,9 +685,6 @@ public class JavaHLObjectFactory {
             path = path.replace(File.separatorChar, '/');
         }
         int depth = info.getDepth() != null ? info.getDepth().getId() : Depth.unknown;
-        if (info.getKind() == SVNNodeKind.FILE) {
-        	depth = 0;
-        }
         return new Info2(
                 path,
                 info.getURL() != null ? info.getURL().toString() : null,

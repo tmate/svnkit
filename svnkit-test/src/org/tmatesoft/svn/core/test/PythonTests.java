@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2009 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2010 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -38,6 +38,7 @@ import java.util.logging.Logger;
 import org.tmatesoft.svn.core.internal.util.DefaultSVNDebugFormatter;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 import org.tmatesoft.svn.core.test.daemon.SVNCommandDaemon;
+import org.tmatesoft.svn.util.SVNLogType;
 
 /**
  * @version 1.3
@@ -49,7 +50,7 @@ public class PythonTests {
     private static Process ourSVNServer;
     
     private static AbstractTestLogger[] ourLoggers;
-    private static SVNCommandDaemon ourDaemon;
+    private static SVNCommandDaemon ourDaemon; 
 
     public static void main(String[] args) {
 		String fileName = args[0];
@@ -70,7 +71,7 @@ public class PythonTests {
 			System.exit(1);
 		}
 		
-        Loggers loggers = setupLogging();
+        setupLogging();
         
         for (int i = 0; i < ourLoggers.length; i++) {
             try{
@@ -106,7 +107,7 @@ public class PythonTests {
                     ourLoggers[i].startServer("file", url);
                 }
                 started = true;
-                runPythonTests(properties, defaultTestSuite, "fsfs", url, libPath, loggers.myPythonLogger);
+                runPythonTests(properties, defaultTestSuite, "fsfs", url, libPath);
             } catch (Throwable th) {
                 th.printStackTrace();
             } finally {
@@ -128,7 +129,7 @@ public class PythonTests {
                     ourLoggers[i].startServer("svnserve", url);
                 }
                 started = true;
-				runPythonTests(properties, defaultTestSuite, "svn", url, libPath, loggers.myPythonLogger);
+				runPythonTests(properties, defaultTestSuite, "svn", url, libPath);
 			} catch (Throwable th) {
 				th.printStackTrace();
 			} finally {
@@ -148,18 +149,18 @@ public class PythonTests {
                 boolean started = false;
                 int port = -1;
                 try {
-                    port = startApache(properties, loggers.myPythonLogger);
+                    port = startApache(properties);
                     url = "http://localhost:" + port;
                     for (int i = 0; i < ourLoggers.length; i++) {
                         ourLoggers[i].startServer("apache", url);
                     }
                     started = true;
-                    runPythonTests(properties, defaultTestSuite, "dav", url, libPath, loggers.myPythonLogger);
+                    runPythonTests(properties, defaultTestSuite, "dav", url, libPath);
                 } catch (Throwable th) {
                     th.printStackTrace();
                 } finally {
                     try {
-                        stopApache(properties, port, loggers.myPythonLogger);
+                        stopApache(properties, port);
                         if (started) {
                             for (int i = 0; i < ourLoggers.length; i++) {
                                 ourLoggers[i].endServer("apache", url);
@@ -177,7 +178,7 @@ public class PythonTests {
 			    boolean started = false;
 	            int port = -1;
 	            try {
-	                port = startTomcat(properties, loggers.myPythonLogger);
+	                port = startTomcat(properties);
 	                url = "http://localhost:" + port + "/svnkit";
 	                for (int i = 0; i < ourLoggers.length; i++) {
 	                    ourLoggers[i].startServer("tomcat", url);
@@ -185,12 +186,12 @@ public class PythonTests {
 	                //wait a little until tomcat
 	                Thread.sleep(1000);
 	                started = true;
-	                runPythonTests(properties, defaultTestSuite, "dav", url, libPath, loggers.myPythonLogger);
+	                runPythonTests(properties, defaultTestSuite, "dav", url, libPath);
 	            } catch (Throwable th) {
 	                th.printStackTrace();
 	            } finally {
 	                try {
-	                    stopTomcat(properties, loggers.myPythonLogger);
+	                    stopTomcat(properties);
 	                    if (started) {
 	                        for (int i = 0; i < ourLoggers.length; i++) {
 	                            ourLoggers[i].endServer("tomcat", url);
@@ -211,17 +212,18 @@ public class PythonTests {
         }
 	}
 
-    private static Loggers setupLogging() {
-        Loggers loggers = new Loggers();
-        loggers.myPythonLogger = setupLogger("python", Level.INFO);
-        return loggers;
+    private static void setupLogging() {
+        setupLogger("python", Level.INFO);
+        setupLogger(SVNLogType.DEFAULT.getName(), Level.ALL);
+        setupLogger(SVNLogType.CLIENT.getName(), Level.ALL);
+        setupLogger(SVNLogType.NETWORK.getName(), Level.ALL);
+        setupLogger(SVNLogType.WC.getName(), Level.ALL);
     }
 
-    private static Logger setupLogger(String name, Level level) {
+    private static void setupLogger(String name, Level level) {
         Logger python = Logger.getLogger(name);
         python.setUseParentHandlers(false);
         python.setLevel(level);
-        return python;
     }
     
     private static Handler createLogHandler(String logName) throws IOException {
@@ -231,7 +233,7 @@ public class PythonTests {
       return fileHandler;
     }
 
-	private static void runPythonTests(Properties properties, String defaultTestSuite, String type, String url, String libPath, Logger pythonLogger) throws IOException {
+	private static void runPythonTests(Properties properties, String defaultTestSuite, String type, String url, String libPath) throws IOException {
 		System.out.println("RUNNING TESTS AGAINST '" + url + "'");
 		String pythonLauncher = properties.getProperty("python.launcher");
 		String testSuite = properties.getProperty("python.tests.suite", defaultTestSuite);
@@ -248,22 +250,25 @@ public class PythonTests {
 			
 			final String testFile = suiteName + "_tests.py";
 			tokens = tokens.subList(1, tokens.size());
+			if (ourDaemon != null) {
+			    ourDaemon.setTestsType(type);
+			}
 			
 			Handler logHandler = createLogHandler(type + "_" + suiteName + "_python");
-			pythonLogger.addHandler(logHandler);
+			Logger.getLogger("python").addHandler(logHandler);
 			try {
     			if (tokens.isEmpty() || (tokens.size() == 1 && "ALL".equals(tokens.get(0)))) {
                     System.out.println("PROCESSING " + testFile + " [ALL]");
-                    processTestCase(pythonLauncher, testFile, options, null, url, libPath, fsfsConfig, pythonLogger);
+                    processTestCase(pythonLauncher, testFile, options, null, url, libPath, fsfsConfig);
     			} else {
-    	            final List availabledTestCases = getAvailableTestCases(pythonLauncher, testFile, pythonLogger);
+    	            final List availabledTestCases = getAvailableTestCases(pythonLauncher, testFile);
     	            final List testCases = !tokens.isEmpty() ? combineTestCases(tokens, availabledTestCases) : availabledTestCases;
     	            System.out.println("PROCESSING " + testFile + " " + testCases);
-    	            processTestCase(pythonLauncher, testFile, options, testCases, url, libPath, fsfsConfig, pythonLogger);
+    	            processTestCase(pythonLauncher, testFile, options, testCases, url, libPath, fsfsConfig);
     			}
 			} finally {
 			    logHandler.close();
-			    pythonLogger.removeHandler(logHandler);
+			    Logger.getLogger("python").removeHandler(logHandler);
 			}
             for (int i = 0; i < ourLoggers.length; i++) {
                 ourLoggers[i].endSuite(suiteName);
@@ -272,7 +277,7 @@ public class PythonTests {
 	}
 
 	private static void processTestCase(String pythonLauncher, String testFile, String options, List testCases, 
-	        String url, String libPath, String fsfsConfigPath, Logger pythonLogger) {
+	        String url, String libPath, String fsfsConfigPath) {
 	    Collection commandsList = new ArrayList();
         commandsList.add(pythonLauncher);
         commandsList.add(testFile);
@@ -299,9 +304,9 @@ public class PythonTests {
 
 		try {
 			Process process = Runtime.getRuntime().exec(commands, null, new File("python/cmdline"));
-			ReaderThread inReader = new ReaderThread(process.getInputStream(), null, pythonLogger);
+			ReaderThread inReader = new ReaderThread(process.getInputStream(), null);
 			inReader.start();
-			ReaderThread errReader = new ReaderThread(process.getErrorStream(), null, pythonLogger);
+			ReaderThread errReader = new ReaderThread(process.getErrorStream(), null);
 			errReader.start();
 			try {
 				process.waitFor();
@@ -311,8 +316,9 @@ public class PythonTests {
 			    errReader.close();
 			    process.destroy();
 			}
-		} catch (Throwable th) {
-			pythonLogger.log(Level.SEVERE, "", th);
+		}
+		catch (Throwable th) {
+			Logger.getLogger("python").log(Level.SEVERE, "", th);
 		}
 	}
 
@@ -388,14 +394,14 @@ public class PythonTests {
 		return combinedTestCases;
 	}
 
-	private static List getAvailableTestCases(String pythonLauncher, String testFile, Logger pythonLogger) throws IOException {
+	private static List getAvailableTestCases(String pythonLauncher, String testFile) throws IOException {
 		final String[] commands = new String[]{pythonLauncher, testFile, "list"};
 		final ByteArrayOutputStream os = new ByteArrayOutputStream();
 		try {
 			Process process = Runtime.getRuntime().exec(commands, null, new File("python/cmdline"));
-            ReaderThread readerThread = new ReaderThread(process.getInputStream(), new PrintStream(os), pythonLogger);
+            ReaderThread readerThread = new ReaderThread(process.getInputStream(), new PrintStream(os));
             readerThread.start();
-			ReaderThread errReader = new ReaderThread(process.getErrorStream(), null, pythonLogger);
+			ReaderThread errReader = new ReaderThread(process.getErrorStream(), null);
 			errReader.start();
 			try {
 				process.waitFor();
@@ -450,12 +456,10 @@ public class PythonTests {
 		private final BufferedReader myInputStream;
 		private final PrintStream myHelpStream;
         private boolean myIsClosed;
-        private Logger myPythonLogger;
-        
-		public ReaderThread(InputStream is, PrintStream helpStream, Logger logger) {
+
+		public ReaderThread(InputStream is, PrintStream helpStream) {
 			myInputStream = new BufferedReader(new InputStreamReader(is));
 			myHelpStream = helpStream;
-			myPythonLogger = logger;
 			setDaemon(false);
 		}
 		
@@ -472,7 +476,7 @@ public class PythonTests {
 				while ((line = myInputStream.readLine()) != null) {
                     TestResult testResult = TestResult.parse(line);
                     // will be logged to python.log only
-                    myPythonLogger.info(line);
+                    Logger.getLogger("python").info(line);
                     if (testResult != null) {
                         for (int i = 0; i < ourLoggers.length; i++) {
                             ourLoggers[i].handleTest(testResult);
@@ -570,18 +574,18 @@ public class PythonTests {
         }
     }
 
-    public static int startApache(Properties props, Logger pythonLogger) throws Throwable {
-        return apache(props, -1, true, pythonLogger);
+    public static int startApache(Properties props) throws Throwable {
+        return apache(props, -1, true);
     }
 
-    public static void stopApache(Properties props, int port, Logger pythonLogger) throws Throwable {
-        apache(props, port, false, pythonLogger);
+    public static void stopApache(Properties props, int port) throws Throwable {
+        apache(props, port, false);
         // delete apache log.
         File file = new File(System.getProperty("user.home"), "httpd." + port + ".error.log");
         SVNFileUtil.deleteFile(file);
     }
     
-    private static int apache(Properties props, int port, boolean start, Logger pythonLogger) throws Throwable {
+    private static int apache(Properties props, int port, boolean start) throws Throwable {
         String[] command = null;
         File configFile = File.createTempFile("jsvn.", ".apache.config.tmp");
         configFile.deleteOnExit();
@@ -590,7 +594,7 @@ public class PythonTests {
 
         String apache = props.getProperty("apache.path");
         command = new String[] {apache, "-f", path, "-k", (start ? "start" : "stop")};
-        execCommand(command, start, pythonLogger);
+        execCommand(command, start);
         return port;
     }
     
@@ -634,22 +638,22 @@ public class PythonTests {
         return port;
     }
 
-    public static int startTomcat(Properties props, Logger pythonLogger) throws Throwable {
-        return tomcat(props, -1, -1, true, pythonLogger);
+    public static int startTomcat(Properties props) throws Throwable {
+        return tomcat(props, -1, -1, true);
     }
 
-    public static void stopTomcat(Properties props, Logger pythonLogger) throws Throwable {
-        tomcat(props, -1, -1, false, pythonLogger);
+    public static void stopTomcat(Properties props) throws Throwable {
+        tomcat(props, -1, -1, false);
     }
 
-    private static int tomcat(Properties props, int serverPort, int connectorPort, boolean start, Logger pythonLogger) throws Throwable {
+    private static int tomcat(Properties props, int serverPort, int connectorPort, boolean start) throws Throwable {
         if (start) {
             connectorPort = generateTomcatServerXML(props, serverPort, connectorPort);
         }
 
         String catalina = "tomcat/bin/catalina.sh";
         String[] command = new String[] {catalina, (start ? "start" : "stop")};
-        execCommand(command, start, pythonLogger);
+        execCommand(command, start);
         return connectorPort;
     }
 
@@ -731,12 +735,12 @@ public class PythonTests {
         return path;
     }
     
-    private static Process execCommand(String[] command, boolean wait, Logger pythonLogger) throws IOException {
+    private static Process execCommand(String[] command, boolean wait) throws IOException {
         Process process = Runtime.getRuntime().exec(command);
         if (process != null) {
             try {
-                new ReaderThread(process.getInputStream(), null, pythonLogger).start();
-                new ReaderThread(process.getErrorStream(), null, pythonLogger).start();
+                new ReaderThread(process.getInputStream(), null).start();
+                new ReaderThread(process.getErrorStream(), null).start();
                 if (wait) {
                     int code = process.waitFor();
                     if (code != 0) {
@@ -757,7 +761,4 @@ public class PythonTests {
         return process;
     }
     
-    private static class Loggers {
-        private Logger myPythonLogger;
-    }
 }
