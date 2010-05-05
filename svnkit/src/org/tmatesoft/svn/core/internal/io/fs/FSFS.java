@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2009 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2010 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -38,6 +38,7 @@ import org.tmatesoft.svn.core.SVNRevisionProperty;
 import org.tmatesoft.svn.core.internal.util.SVNDate;
 import org.tmatesoft.svn.core.internal.util.SVNHashMap;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
+import org.tmatesoft.svn.core.internal.util.SVNUUIDGenerator;
 import org.tmatesoft.svn.core.internal.wc.DefaultSVNOptions;
 import org.tmatesoft.svn.core.internal.wc.SVNConfigFile;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
@@ -531,7 +532,11 @@ public class FSFS {
     
     protected void writeDBFormat(int format, long maxFilesPerDir, boolean overwrite) throws SVNException {
         File formatFile = getDBFormatFile();
-        SVNErrorManager.assertionFailure(format >= 1 && format <= DB_FORMAT, "unexpected format " + String.valueOf(format), SVNLogType.FSFS);
+        if (!(format >= 1 && format <= DB_FORMAT)) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.UNKNOWN, 
+                    "assertion failure in FSFS.writeFormat(): format == {0}", new Integer(format));
+            SVNErrorManager.error(err, SVNLogType.FSFS);
+        }
         String contents = null;
         if (format >= LAYOUT_FORMAT_OPTION_MINIMAL_FORMAT) {
             if (maxFilesPerDir > 0) {
@@ -882,7 +887,7 @@ public class FSFS {
         }
         
         if (!revPropsFile.exists() && !returnMissing) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_NO_SUCH_REVISION, "No such revision {0}", String.valueOf(revision));
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_NO_SUCH_REVISION, "No such revision {0}", new Long(revision));
             SVNErrorManager.error(err, SVNLogType.FSFS);
         }
         return revPropsFile;
@@ -1610,7 +1615,7 @@ public class FSFS {
         File revisionFile = getRevisionFile(revision);
         
         if (!revisionFile.exists()) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_NO_SUCH_REVISION, "No such revision {0}", String.valueOf(revision));
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_NO_SUCH_REVISION, "No such revision {0}", new Long(revision));
             SVNErrorManager.error(err, SVNLogType.FSFS);
         }
         return new FSFile(revisionFile);
@@ -1619,7 +1624,7 @@ public class FSFS {
     protected FSFile getPackOrRevisionFSFile(long revision) throws SVNException {
         File file = getAbsoluteRevisionPath(revision);
         if (!file.exists()) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_NO_SUCH_REVISION, "No such revision {0}", String.valueOf(revision));
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_NO_SUCH_REVISION, "No such revision {0}", new Long(revision));
             SVNErrorManager.error(err, SVNLogType.FSFS);
         }
         return new FSFile(file);
@@ -1647,8 +1652,15 @@ public class FSFS {
     }
 
     protected File getPackedRevPath(long revision, String kind) throws SVNException {
-        SVNErrorManager.assertionFailure(myMaxFilesPerDirectory > 0, "max files per directory is 0 or negative: " + String.valueOf(myMaxFilesPerDirectory), SVNLogType.FSFS);
-        SVNErrorManager.assertionFailure(isPackedRevision(revision), "revision " + String.valueOf(revision) + " is not packed", SVNLogType.FSFS);
+        if (myMaxFilesPerDirectory == 0) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.UNKNOWN, "Asserion failed: myMaxFilesPerDirectory is {0}", String.valueOf(myMaxFilesPerDirectory));
+            SVNErrorManager.error(err, SVNLogType.FSFS);
+        }
+        
+        if (!isPackedRevision(revision)) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.UNKNOWN, "Assertion failed: revision {0} is not packed", String.valueOf(revision));
+            SVNErrorManager.error(err, SVNLogType.FSFS);
+        }
         
         File file = new File(getDBRevsDir(), (revision/myMaxFilesPerDirectory) + PACK_EXT);
         file = new File(file, kind);
@@ -1668,7 +1680,11 @@ public class FSFS {
     }
 
     protected File getRevisionFile(long revision) throws SVNException {
-        SVNErrorManager.assertionFailure(!isPackedRevision(revision), "revision " + String.valueOf(revision) + " is not expected to be packed", SVNLogType.FSFS);
+        if (isPackedRevision(revision)) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.UNKNOWN, "Assertion failed: revision {0} is not expected to be packed", 
+                    String.valueOf(revision));
+            SVNErrorManager.error(err, SVNLogType.FSFS);
+        }
         File revisionFile = null;
         if (myMaxFilesPerDirectory > 0) {
             File shardDir = new File(getDBRevsDir(), String.valueOf(revision/myMaxFilesPerDirectory));
@@ -1753,7 +1769,11 @@ public class FSFS {
         }
         
         Long revOffsetLong = (Long) manifest.get((int) (revision % myMaxFilesPerDirectory));
-        SVNErrorManager.assertionFailure(revOffsetLong != null, "offset for revision " + String.valueOf(revision) + " is null", SVNLogType.FSFS);
+        if (revOffsetLong == null) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.UNKNOWN, "Assertion failed: offset for revision {0} is null", 
+                    String.valueOf(revision));
+            SVNErrorManager.error(err, SVNLogType.FSFS);
+        }
         return revOffsetLong.longValue();
     }
 
@@ -1784,7 +1804,7 @@ public class FSFS {
         }
         
         SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_NO_SUCH_REVISION, 
-                "No such revision {0}", String.valueOf(revision));
+                "No such revision {0}", new Long(revision));
         SVNErrorManager.error(err, SVNLogType.FSFS);
     }
     
@@ -1855,7 +1875,8 @@ public class FSFS {
 
         SVNLock lock = null;
         if (token == null) {
-            token = FSRepositoryUtil.generateLockToken();
+            String uuid = SVNUUIDGenerator.formatUUID(SVNUUIDGenerator.generateUUID());
+            token = FSFS.SVN_OPAQUE_LOCK_TOKEN + uuid;
             lock = new FSLock(path, token, username, comment, new Date(System.currentTimeMillis()), expirationDate, isDAVComment);
         } else {
             lock = new FSLock(path, token, username, comment, new Date(System.currentTimeMillis()), expirationDate, isDAVComment);

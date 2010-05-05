@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2009 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2010 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -344,8 +344,11 @@ public class SVNWCUtil {
      */
     public static File getWorkingCopyRoot(File versionedDir, boolean stopOnExtenrals) throws SVNException {
         versionedDir = versionedDir.getAbsoluteFile();
-        if (versionedDir == null || (!isVersionedDirectory(versionedDir) && !isVersionedDirectory(versionedDir.getParentFile()))) {
-            // both this dir and its parent are not versioned.
+        if (versionedDir == null || 
+                (!isVersionedDirectory(versionedDir) && 
+                (versionedDir.getParentFile() == null || !isVersionedDirectory(versionedDir.getParentFile())))) {
+            // both this dir and its parent are not versioned, 
+            // or dir is root and not versioned
             return null;
         }
 

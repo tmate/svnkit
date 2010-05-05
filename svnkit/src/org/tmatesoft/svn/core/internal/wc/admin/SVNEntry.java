@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2009 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2010 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -143,14 +143,6 @@ public class SVNEntry {
         return setAttributeValue(SVNProperty.REVISION, Long.toString(revision));
     }
 
-    public boolean setCommittedRevision(long cmtRevision) {
-        return setAttributeValue(SVNProperty.COMMITTED_REVISION, Long.toString(cmtRevision));
-    }
-
-    public boolean setAuthor(String cmtAuthor) {
-        return setAttributeValue(SVNProperty.LAST_AUTHOR, cmtAuthor);
-    }
-    
     public boolean setChangelistName(String changelistName) {
         return setAttributeValue(SVNProperty.CHANGELIST, changelistName);
     }
@@ -235,10 +227,6 @@ public class SVNEntry {
         return (String) myAttributes.get(SVNProperty.LAST_AUTHOR);
     }
 
-    public void setCommittedDate(String date) {
-        setAttributeValue(SVNProperty.COMMITTED_DATE, date);
-    }
-    
     public String getCommittedDate() {
         return (String) myAttributes.get(SVNProperty.COMMITTED_DATE);
     }
@@ -290,10 +278,6 @@ public class SVNEntry {
         return (String) myAttributes.get(SVNProperty.CHECKSUM);
     }
 
-    public void setChecksum(String checksum) {
-        myAttributes.put(SVNProperty.CHECKSUM, checksum);
-    }
-    
     public void setLockComment(String comment) {
         myAttributes.put(SVNProperty.LOCK_COMMENT, comment);
     }

@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2009 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2010 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -92,13 +92,5 @@ public class SVNCharsetInputStream extends FilterInputStream {
             readed += r;
         }
         return readed;
-    }
-
-    public String toString() {
-        final StringBuffer buffer = new StringBuffer();
-        buffer.append("SVNCharsetInputStream");
-        buffer.append("[").append(myCharsetConvertor);
-        buffer.append(']');
-        return buffer.toString();
     }
 }

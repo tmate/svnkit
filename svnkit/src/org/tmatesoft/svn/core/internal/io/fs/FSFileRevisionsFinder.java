@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2009 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2010 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -66,7 +66,11 @@ public class FSFileRevisionsFinder {
             mergedPathRevisions = new LinkedList();
         }
        
-        SVNErrorManager.assertionFailure(!mainLinePathRevisions.isEmpty(), "no main line path revisions found", SVNLogType.FSFS);
+        if (mainLinePathRevisions.isEmpty()) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.UNKNOWN, 
+                    "ASSERTION FAILURE in FSFileRevisionsFinder: mainLinePathRevisions is empty");
+            SVNErrorManager.error(err, SVNLogType.FSFS);
+        }
 
         SendBaton sb = new SendBaton();
         sb.myLastProps = new SVNProperties();

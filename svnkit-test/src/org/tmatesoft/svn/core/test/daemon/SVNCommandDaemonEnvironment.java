@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2009 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2010 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -46,8 +46,10 @@ public class SVNCommandDaemonEnvironment {
     
     private ByteArrayOutputStream myCommandOutput = new ByteArrayOutputStream();
     private ByteArrayOutputStream myCommandError = new ByteArrayOutputStream();
+    private String myTestType;
     
-    public SVNCommandDaemonEnvironment() {
+    public SVNCommandDaemonEnvironment(String testType) {
+        myTestType = testType;
     }
 
     public void addArgumentLine(String line) {
@@ -162,6 +164,6 @@ public class SVNCommandDaemonEnvironment {
     }
 
     private String getPathFromTestName(String prefix, String testName) {
-        return (prefix != null ? prefix : "") + "build/logs/" + testName.trim() + ".log"; 
+        return (prefix != null ? prefix : "") + "build/logs/" + (myTestType != null ? myTestType : "") + "_" + testName.trim() + ".log"; 
     }
 }

@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2009 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2010 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -21,6 +21,7 @@ import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.nio.charset.Charset;
 import java.nio.charset.CharsetDecoder;
+
 import java.text.MessageFormat;
 import java.util.Arrays;
 import java.util.Collection;
@@ -33,11 +34,11 @@ import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNLock;
-import org.tmatesoft.svn.core.SVNProperties;
 import org.tmatesoft.svn.core.SVNProperty;
-import org.tmatesoft.svn.core.SVNPropertyValue;
 import org.tmatesoft.svn.core.SVNRevisionProperty;
 import org.tmatesoft.svn.core.SVNURL;
+import org.tmatesoft.svn.core.SVNProperties;
+import org.tmatesoft.svn.core.SVNPropertyValue;
 import org.tmatesoft.svn.core.auth.ISVNAuthenticationManager;
 import org.tmatesoft.svn.core.internal.io.fs.FSFS;
 import org.tmatesoft.svn.core.internal.io.fs.FSHotCopier;
@@ -70,6 +71,7 @@ import org.tmatesoft.svn.core.replicator.SVNRepositoryReplicator;
 import org.tmatesoft.svn.core.wc.ISVNEventHandler;
 import org.tmatesoft.svn.core.wc.ISVNOptions;
 import org.tmatesoft.svn.core.wc.ISVNRepositoryPool;
+import org.tmatesoft.svn.core.wc.SVNBasicClient;
 import org.tmatesoft.svn.core.wc.SVNRevision;
 import org.tmatesoft.svn.util.SVNDebugLog;
 import org.tmatesoft.svn.util.SVNLogType;
@@ -128,7 +130,7 @@ import org.tmatesoft.svn.util.SVNLogType;
  * @author  TMate Software Ltd.
  * @since   1.2
  */
-public class SVNAdminClient extends SVNAdminBasicClient {
+public class SVNAdminClient extends SVNBasicClient {
 
     private ISVNLogEntryHandler mySyncHandler;
     private DefaultDumpFilterHandler myDumpFilterHandler;
@@ -1692,7 +1694,7 @@ public class SVNAdminClient extends SVNAdminBasicClient {
 
     public static String normalizeString(String string) throws SVNException {
         if (string != null && string.indexOf(SVNProperty.EOL_CR_BYTES[0]) != -1) {
-            return SVNTranslator.translateString(string, SVNProperty.EOL_LF_BYTES, null, true, false);
+            return SVNTranslator.transalteString(string, SVNProperty.EOL_LF_BYTES, null, true, false);
         }
         return null;
     }

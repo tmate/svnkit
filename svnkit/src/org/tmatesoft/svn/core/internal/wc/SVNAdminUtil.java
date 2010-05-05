@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2009 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2010 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -11,21 +11,15 @@
  */
 package org.tmatesoft.svn.core.internal.wc;
 
-import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.io.OutputStream;
-import java.util.Map;
-import java.util.logging.Level;
 
 import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNNodeKind;
-import org.tmatesoft.svn.core.SVNProperty;
 import org.tmatesoft.svn.core.internal.wc.admin.SVNAdminArea;
-import org.tmatesoft.svn.core.wc.SVNRevision;
 import org.tmatesoft.svn.util.SVNLogType;
 
 
@@ -48,8 +42,7 @@ public class SVNAdminUtil {
     private static final String PROP_WORK_DIR_NAME = "props";
     private static final String PROP_WC_DIR_NAME = "wcprops";
     private static final String TMP_DIR_NAME = "tmp";
-    private static final String SDB_FILE_NAME = "wc.db";
-    
+
     private static final String DIR_PROPS_FILE = "dir-props";
     private static final String DIR_BASE_PROPS_FILE = "dir-prop-base";
     private static final String DIR_REVERT_PROPS_FILE = "dir-prop-revert";
@@ -198,11 +191,6 @@ public class SVNAdminUtil {
         }
         return buffer.toString();
     }
-
-    public static File getSDBFile(File dir) {
-        File sdbFile = new File(dir, SVNFileUtil.getAdminDirectoryName());
-        return new File(sdbFile, SDB_FILE_NAME);
-    }
     
     /**
      * Creates "tempfile[.n].tmp" in admin area's /tmp dir
@@ -226,106 +214,6 @@ public class SVNAdminUtil {
         String adminPath = buffer.toString();
         File dir = adminArea.getFile(adminPath);
         return SVNFileUtil.createUniqueFile(dir, prefix, suffix, false);
-    }
-
-    public static int getVersion(File path) throws SVNException {
-        File adminDir = new File(path, SVNFileUtil.getAdminDirectoryName());
-        File entriesFile = new File(adminDir, "entries");
-        int formatVersion = -1;
-
-        BufferedReader reader = null;
-        String line = null;
-    
-        try {
-            reader = new BufferedReader(new InputStreamReader(SVNFileUtil.openFileForReading(entriesFile, Level.FINEST, SVNLogType.WC), "UTF-8"));
-            line = reader.readLine();
-        } catch (IOException e) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, "Cannot read entries file ''{0}'': {1}", new Object[] {entriesFile, e.getLocalizedMessage()});
-            SVNErrorManager.error(err, e, SVNLogType.WC);
-        } catch (SVNException svne) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_NOT_DIRECTORY, "''{0}'' is not a working copy", path);
-            err.setChildErrorMessage(svne.getErrorMessage());
-            SVNErrorManager.error(err, svne, Level.FINEST, SVNLogType.WC);
-        } finally {
-            SVNFileUtil.closeFile(reader);
-        }
-        
-        if (line == null || line.length() == 0) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.STREAM_UNEXPECTED_EOF, "Reading ''{0}''", entriesFile);
-            SVNErrorMessage err1 = SVNErrorMessage.create(SVNErrorCode.WC_NOT_DIRECTORY, "''{0}'' is not a working copy", path);
-            err1.setChildErrorMessage(err);
-            SVNErrorManager.error(err1, Level.FINEST, SVNLogType.WC);
-        }
-        
-        try {
-            formatVersion = Integer.parseInt(line.trim());
-        } catch (NumberFormatException e) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.BAD_VERSION_FILE_FORMAT, "First line of ''{0}'' contains non-digit", entriesFile);
-            SVNErrorMessage err1 = SVNErrorMessage.create(SVNErrorCode.WC_NOT_DIRECTORY, "''{0}'' is not a working copy", path);
-            err1.setChildErrorMessage(err);
-            SVNErrorManager.error(err1, Level.FINEST, SVNLogType.WC);
-        }
-        return formatVersion;
-    }
-
-    public static void unserializeExternalFileData(Map entryAttrs, String rawExternalFileData) throws SVNException {
-        SVNRevision pegRevision = SVNRevision.UNDEFINED;
-        SVNRevision revision = SVNRevision.UNDEFINED;
-        String path = null;
-        if (rawExternalFileData != null) {
-            StringBuffer buffer = new StringBuffer(rawExternalFileData);
-            pegRevision = parseRevision(buffer);
-            revision = parseRevision(buffer);
-            path = buffer.toString();
-        }
-        entryAttrs.put(SVNProperty.FILE_EXTERNAL_PATH, path);
-        entryAttrs.put(SVNProperty.FILE_EXTERNAL_REVISION, revision);
-        entryAttrs.put(SVNProperty.FILE_EXTERNAL_PEG_REVISION, pegRevision);
-    }
-
-    public static SVNRevision parseRevision(StringBuffer str) throws SVNException {
-        int ind = str.indexOf(":"); 
-        if ( ind == -1) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.INCORRECT_PARAMS, 
-                    "Found an unexpected \\0 in the file external ''{0}''", str);
-            SVNErrorManager.error(err, SVNLogType.WC);
-        }
-        
-        SVNRevision revision = null;
-        String subStr = str.substring(0, ind);
-        if (subStr.equals(SVNRevision.HEAD.getName())) {
-            revision = SVNRevision.HEAD;
-        } else {
-            revision = SVNRevision.parse(subStr);
-        }
-        str = str.delete(0, ind + 1);
-        return revision;
-    }
-
-    public static String serializeExternalFileData(Map entryAttrs) throws SVNException {
-        String representation = null;
-        String path = (String) entryAttrs.get(SVNProperty.FILE_EXTERNAL_PATH);
-        SVNRevision revision = (SVNRevision) entryAttrs.get(SVNProperty.FILE_EXTERNAL_REVISION);
-        SVNRevision pegRevision = (SVNRevision) entryAttrs.get(SVNProperty.FILE_EXTERNAL_PEG_REVISION);
-        if (path != null) {
-            String revStr = SVNAdminUtil.asString(revision, path);
-            String pegRevStr = SVNAdminUtil.asString(pegRevision, path);
-            representation = pegRevStr + ":" + revStr + ":" + path;
-        }
-        return representation;
-    }
-
-    public static String asString(SVNRevision revision, String path) throws SVNException {
-        if (revision == SVNRevision.HEAD || 
-                SVNRevision.isValidRevisionNumber(revision.getNumber())) {
-            return revision.toString();
-        }
-        
-        SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.INCORRECT_PARAMS, "Illegal file external revision kind {0} for path ''{1}''", 
-        
-                new Object[] { revision.toString(), path });
-        SVNErrorManager.error(err, SVNLogType.WC);
-        return null;
     }
 
 }

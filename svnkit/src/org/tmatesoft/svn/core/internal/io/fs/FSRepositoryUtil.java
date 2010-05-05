@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2009 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2010 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -36,7 +36,6 @@ import org.tmatesoft.svn.core.internal.delta.SVNDeltaCombiner;
 import org.tmatesoft.svn.core.internal.util.SVNDate;
 import org.tmatesoft.svn.core.internal.util.SVNHashMap;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
-import org.tmatesoft.svn.core.internal.util.SVNUUIDGenerator;
 import org.tmatesoft.svn.core.internal.wc.IOExceptionWrapper;
 import org.tmatesoft.svn.core.internal.wc.ISVNCommitPathHandler;
 import org.tmatesoft.svn.core.internal.wc.SVNCommitUtil;
@@ -53,15 +52,10 @@ import org.tmatesoft.svn.util.SVNLogType;
  * @author  TMate Software Ltd.
  */
 public class FSRepositoryUtil {
-
     public static final int MAX_KEY_SIZE = 200;
 
-    public static String generateLockToken() throws SVNException {
-        String uuid = SVNUUIDGenerator.formatUUID(SVNUUIDGenerator.generateUUID());
-        return FSFS.SVN_OPAQUE_LOCK_TOKEN + uuid;
+    private static final byte[] ourCopyBuffer = new byte[1024*16];
 
-    }
-    
     public static void replay(FSFS fsfs, FSRoot root, String basePath, long lowRevision, boolean sendDeltas, ISVNEditor editor) throws SVNException {
         Map fsChanges = root.getChangedPaths();
         basePath = basePath.startsWith("/") ? basePath.substring(1) : basePath;
@@ -106,16 +100,15 @@ public class FSRepositoryUtil {
         SVNCommitUtil.driveCommitEditor(handler, interestingPaths, editor, -1);
     }
     
-    public static void copy(InputStream src, OutputStream dst, ISVNCanceller canceller) throws SVNException {
-        byte[] copyBuffer = new byte[1024*16];
+    public synchronized static void copy(InputStream src, OutputStream dst, ISVNCanceller canceller) throws SVNException {
         try {
             while (true) {
                 if (canceller != null) {
                     canceller.checkCancelled();
                 }
-                int length = src.read(copyBuffer);
+                int length = src.read(ourCopyBuffer);
                 if (length > 0) {
-                    dst.write(copyBuffer, 0, length);
+                    dst.write(ourCopyBuffer, 0, length);
                 }
                 if (length < 0) {
                     break;
