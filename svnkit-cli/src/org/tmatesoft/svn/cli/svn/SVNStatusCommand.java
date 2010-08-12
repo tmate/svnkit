@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2009 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2010 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -45,7 +45,7 @@ public class SVNStatusCommand extends SVNXMLCommand implements ISVNStatusHandler
     public SVNStatusCommand() {
         super("status", new String[] {"stat", "st"});
     }
-
+    
     protected Collection createSupportedOptions() {
         Collection options = new ArrayList();
 
@@ -63,7 +63,7 @@ public class SVNStatusCommand extends SVNXMLCommand implements ISVNStatusHandler
     }
 
     public void run() throws SVNException {
-        Collection targets = new ArrayList();
+        Collection targets = new ArrayList(); 
         targets = getSVNEnvironment().combineTargets(targets, true);
         if (targets.isEmpty()) {
             targets.add("");
@@ -91,7 +91,7 @@ public class SVNStatusCommand extends SVNXMLCommand implements ISVNStatusHandler
                 StringBuffer xmlBuffer = openXMLTag("target", SVNXMLUtil.XML_STYLE_NORMAL, "path", SVNCommandUtil.getLocalPath(target), null);
                 getSVNEnvironment().getOut().print(xmlBuffer);
             }
-
+            
             try {
                 long rev = client.doStatus(commandTarget.getFile(), SVNRevision.HEAD,
                         getSVNEnvironment().getDepth(), getSVNEnvironment().isUpdate(),
@@ -107,7 +107,7 @@ public class SVNStatusCommand extends SVNXMLCommand implements ISVNStatusHandler
                     getSVNEnvironment().getOut().print(xmlBuffer);
                 }
             } catch (SVNException e) {
-                getSVNEnvironment().handleWarning(e.getErrorMessage(), new SVNErrorCode[] {SVNErrorCode.WC_NOT_DIRECTORY},
+                getSVNEnvironment().handleWarning(e.getErrorMessage(), new SVNErrorCode[] {SVNErrorCode.WC_NOT_DIRECTORY}, 
                         getSVNEnvironment().isQuiet());
             }
         }
@@ -119,8 +119,8 @@ public class SVNStatusCommand extends SVNXMLCommand implements ISVNStatusHandler
                 for (Iterator paths = statuses.keySet().iterator(); paths.hasNext();) {
                     String path = (String) paths.next();
                     SVNStatus status = (SVNStatus) statuses.get(path);
-                    myStatusPrinter.printStatus(path, status,
-                            getSVNEnvironment().isVerbose() || getSVNEnvironment().isUpdate(),
+                    myStatusPrinter.printStatus(path, status, 
+                            getSVNEnvironment().isVerbose() || getSVNEnvironment().isUpdate(), 
                             getSVNEnvironment().isVerbose(), getSVNEnvironment().isQuiet(), getSVNEnvironment().isUpdate());
                 }
             }
@@ -150,8 +150,8 @@ public class SVNStatusCommand extends SVNXMLCommand implements ISVNStatusHandler
             StringBuffer xmlBuffer = printXMLStatus(status, path);
             getSVNEnvironment().getOut().print(xmlBuffer);
         } else {
-            myStatusPrinter.printStatus(path, status,
-                getSVNEnvironment().isVerbose() || getSVNEnvironment().isUpdate(),
+            myStatusPrinter.printStatus(path, status, 
+                getSVNEnvironment().isVerbose() || getSVNEnvironment().isUpdate(), 
                 getSVNEnvironment().isVerbose(), getSVNEnvironment().isQuiet(), getSVNEnvironment().isUpdate());
         }
     }
