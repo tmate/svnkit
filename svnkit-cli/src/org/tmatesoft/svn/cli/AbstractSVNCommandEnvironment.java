@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2009 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2010 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -276,7 +276,7 @@ public abstract class AbstractSVNCommandEnvironment implements ISVNCanceller {
         if (hasRelativeURLs) {
             if (rootURL == null) {
                 SVNWCClient wcClient = getClientManager().getWCClient();
-                rootURL = wcClient.getReposRoot(new File("").getAbsoluteFile(), null, SVNRevision.BASE);
+                rootURL = wcClient.getReposRoot(new File("").getAbsoluteFile(), null, SVNRevision.BASE, null, null);
             }
             for (Iterator targetsIter = targets.iterator(); targetsIter.hasNext();) {
                 String target = (String) targetsIter.next();
@@ -473,7 +473,7 @@ public abstract class AbstractSVNCommandEnvironment implements ISVNCanceller {
         SVNURL url = svnPath.isURL() ? svnPath.getURL() : null;
         SVNURL tmpRootURL = null;
         try {
-            tmpRootURL = client.getReposRoot(path, url, svnPath.getPegRevision()); 
+            tmpRootURL = client.getReposRoot(path, url, svnPath.getPegRevision(), null, null); 
         } catch (SVNException svne) {
             SVNErrorMessage err = svne.getErrorMessage();
             if (err.getErrorCode() == SVNErrorCode.ENTRY_NOT_FOUND || err.getErrorCode() == SVNErrorCode.WC_NOT_DIRECTORY) {

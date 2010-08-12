@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2009 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2010 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -346,20 +346,5 @@ public class SVNEventAction {
      * @since 1.3, SVN 1.6
      */
     public static final SVNEventAction FAILED_EXTERNAL = new SVNEventAction(39, "failed_external");
-    
-    /**
-     * @since 1.4, SVN 1.7
-     */
-    public static final SVNEventAction PATCH = new SVNEventAction(40, "patch");
-    
-    /**
-     * @since 1.4, SVN 1.7
-     */
-    public static final SVNEventAction PATCH_REJECTED_HUNK = new SVNEventAction(41, "patch_rejected_hunk");
-    
-    /**
-     * @since 1.4, SVN 1.7
-     */
-    public static final SVNEventAction PATCH_APPLIED_HUNK = new SVNEventAction(42, "patch_applied_hunk");
     
 }

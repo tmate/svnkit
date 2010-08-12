@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2009 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2010 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -1736,8 +1736,13 @@ public class SVNUpdateEditor implements ISVNUpdateEditor, ISVNCleanupHandler {
 
         File fullPath = myAdminInfo.getAnchor().getFile(fileInfo.getPath());
         if (fileInfo.addedWithHistory && !fileInfo.receivedTextDelta) {
-            SVNErrorManager.assertionFailure(fileInfo.baseFile == null && fileInfo.newBaseFile == null && 
-                    fileInfo.copiedBaseText != null, null, SVNLogType.WC);
+            if (fileInfo.baseFile != null || fileInfo.newBaseFile != null || fileInfo.copiedBaseText == null) {
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.UNKNOWN, "assertion failure in " +
+                        "SVNUpdateEditor.closeFile(): fileInfo.baseFile = {0}, fileInfo.newBaseFile = {1}, " +
+                        "fileInfo.copiedBaseText = {2}", new Object[] { fileInfo.baseFile, fileInfo.newBaseFile,
+                        fileInfo.copiedBaseText });
+                SVNErrorManager.error(err, SVNLogType.DEFAULT);
+            }
             SVNAdminArea adminArea = fileInfo.getAdminArea();
             SVNEntry entry = adminArea.getEntry(fileInfo.name, false);
             boolean replaced = entry != null && entry.isScheduledForReplacement();

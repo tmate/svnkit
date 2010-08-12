@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2009 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2010 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -40,6 +40,7 @@ import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
 import java.nio.charset.Charset;
+import java.nio.charset.CodingErrorAction;
 import java.nio.charset.IllegalCharsetNameException;
 import java.util.Arrays;
 import java.util.Collections;
@@ -56,7 +57,7 @@ public class SVNTranslator {
 
     private static final Charset UTF8_CHARSET = Charset.forName("UTF-8");
 
-    public static String translateString(String str, byte[] eol, Map keywords, boolean repair, boolean expand) throws SVNException {
+    public static String transalteString(String str, byte[] eol, Map keywords, boolean repair, boolean expand) throws SVNException {
         ByteArrayOutputStream bufferOS = new ByteArrayOutputStream();
         OutputStream resultOS = null;
         try {
@@ -477,14 +478,14 @@ public class SVNTranslator {
                 byte[] convertedEOL = convertEOL(lf, UTF8_CHARSET, cs);
                 boolean encodingConvertsEOL = !Arrays.equals(lf, convertedEOL);
                 if (Arrays.equals(convertedEOL, eol) && encodingConvertsEOL) {
-                    out = new SVNCharsetOutputStream(out, UTF8_CHARSET, cs);
+                    out = new SVNCharsetOutputStream(out, UTF8_CHARSET, cs, CodingErrorAction.REPORT, CodingErrorAction.REPORT);
                     if (keywords != null) {
                         out = new SVNTranslatorOutputStream(out, null, false, keywords, expand);
                     }
                     return out;
                 }
             }
-            out = new SVNCharsetOutputStream(out, UTF8_CHARSET, cs);
+            out = new SVNCharsetOutputStream(out, UTF8_CHARSET, cs, CodingErrorAction.REPORT, CodingErrorAction.REPORT);
             return new SVNTranslatorOutputStream(out, eol, repair, keywords, expand);
         }
         if (eol != null) {
@@ -494,14 +495,14 @@ public class SVNTranslator {
                 if (keywords != null) {
                     out = new SVNTranslatorOutputStream(out, null, false, keywords, expand);
                 }
-                return new SVNCharsetOutputStream(out, cs, UTF8_CHARSET);
+                return new SVNCharsetOutputStream(out, cs, UTF8_CHARSET, CodingErrorAction.REPORT, CodingErrorAction.REPORT);
             }
         }
         out = new SVNTranslatorOutputStream(out, eol, repair, keywords, expand);
-        return new SVNCharsetOutputStream(out, cs, UTF8_CHARSET);
+        return new SVNCharsetOutputStream(out, cs, UTF8_CHARSET, CodingErrorAction.REPORT, CodingErrorAction.REPORT);
     }
 
-    public static InputStream getTranslatingInputStream(InputStream in, String charset, byte[] eol, boolean repair, Map keywords, boolean expand) {
+    public static InputStream getTranslatingInputStream(InputStream in, String charset, byte[] eol, boolean repair, Map keywords, boolean expand) throws SVNException {
         if (charset == null || SVNProperty.isUTF8(charset)) {
             return new SVNTranslatorInputStream(in, eol, repair, keywords, expand);
         }
@@ -663,9 +664,9 @@ public class SVNTranslator {
         if (charset == null) {
             return null;
         }
-        boolean isSupported;
+        boolean isSupported = true;
         try {
-            isSupported = Charset.isSupported(charset);
+            isSupported = charset == null || Charset.isSupported(charset);
         } catch (IllegalCharsetNameException e) {
             isSupported = false;
         }
