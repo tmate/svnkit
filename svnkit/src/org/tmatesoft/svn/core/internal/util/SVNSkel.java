@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2009 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2011 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -180,7 +180,7 @@ public class SVNSkel {
         if (data == null) {
             return null;
         }
-        return createAtom(data, 0, data.length);
+        return createAtom(data);
     }
 
     public static SVNSkel createAtom(byte[] data, int offset, int length) {
@@ -204,7 +204,7 @@ public class SVNSkel {
         for (Iterator iterator = props.entrySet().iterator(); iterator.hasNext();) {
             Map.Entry entry = (Map.Entry) iterator.next();
             SVNSkel name = createAtom((String) entry.getKey());
-            SVNSkel value = createAtom(entry.getValue()!=null ? entry.getValue().toString() : "");
+            SVNSkel value = createAtom((String) entry.getValue());
             list.addChild(value);
             list.addChild(name);
         }
@@ -247,7 +247,7 @@ public class SVNSkel {
         return (SVNSkel) myList.get(i);
     }
 
-    public void appendChild(SVNSkel child) throws SVNException {
+    private void appendChild(SVNSkel child) throws SVNException {
         if (isAtom()) {
             SVNErrorMessage error = SVNErrorMessage.create(SVNErrorCode.FS_MALFORMED_SKEL, "Unable to add a child to atom");
             SVNErrorManager.error(error, SVNLogType.DEFAULT);
@@ -261,11 +261,6 @@ public class SVNSkel {
             SVNErrorManager.error(error, SVNLogType.DEFAULT);
         }
         myList.add(0, child);
-    }
-
-    public void prependString(String str) throws SVNException {
-        SVNSkel skel = SVNSkel.createAtom(str);
-        addChild(skel);
     }
 
     public int getListSize() {
@@ -374,7 +369,7 @@ public class SVNSkel {
                 }
                 buffer = allocate(buffer, sizeBytes.length + 1 + data.length);
                 buffer.put(sizeBytes);
-
+                
                 try {
                     buffer.put(" ".getBytes("UTF-8"));
                 } catch (UnsupportedEncodingException e) {

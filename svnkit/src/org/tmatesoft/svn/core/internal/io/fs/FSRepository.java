@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2009 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2011 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -348,11 +348,11 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
             long histEnd = endRevision;
 
             if (startRevision > youngestRev) {
-                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_NO_SUCH_REVISION, "No such revision {0}", String.valueOf(startRevision));
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_NO_SUCH_REVISION, "No such revision {0}", new Long(startRevision));
                 SVNErrorManager.error(err, SVNLogType.FSFS);
             }
             if (endRevision > youngestRev) {
-                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_NO_SUCH_REVISION, "No such revision {0}", String.valueOf(endRevision));
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_NO_SUCH_REVISION, "No such revision {0}", new Long(endRevision));
                 SVNErrorManager.error(err, SVNLogType.FSFS);
             }
 

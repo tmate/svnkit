@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2009 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2011 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -38,7 +38,6 @@ import java.util.logging.Logger;
 import org.tmatesoft.svn.core.internal.util.DefaultSVNDebugFormatter;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 import org.tmatesoft.svn.core.test.daemon.SVNCommandDaemon;
-import org.tmatesoft.svn.core.SVNException;
 
 /**
  * @version 1.3
@@ -85,7 +84,7 @@ public class PythonTests {
         
         if (Boolean.TRUE.toString().equals(properties.getProperty("daemon")) && SVNFileUtil.isLinux) {
             try {
-                libPath = startCommandDaemon(properties);
+                libPath = startCommandDaemon();
             } catch (IOException e) {
                 e.getMessage();
                 e.printStackTrace();
@@ -93,7 +92,7 @@ public class PythonTests {
             }
         }
 
-        String pythonTestsRoot = properties.getProperty("python.tests", "python/cmdline");
+        String pythonTestsRoot = properties.getProperty("python.tests");
 		properties.setProperty("repository.root", new File(pythonTestsRoot).getAbsolutePath());
         String absTestsRootLocation = new File(pythonTestsRoot).getAbsolutePath().replace(File.separatorChar, '/');
         if(!absTestsRootLocation.startsWith("/")){
@@ -237,8 +236,6 @@ public class PythonTests {
 		String pythonLauncher = properties.getProperty("python.launcher");
 		String testSuite = properties.getProperty("python.tests.suite", defaultTestSuite);
 		String options = properties.getProperty("python.tests.options", "");
-        String testsLocation = properties.getProperty("python.tests", "python/cmdline");
-        String listOption = properties.getProperty("python.tests.listOption", "list");
 		String fsfsConfig = properties.getProperty("fsfs.config");
 		for (StringTokenizer tests = new StringTokenizer(testSuite, ","); tests.hasMoreTokens();) {
 			final String testFileString = tests.nextToken();
@@ -257,12 +254,12 @@ public class PythonTests {
 			try {
     			if (tokens.isEmpty() || (tokens.size() == 1 && "ALL".equals(tokens.get(0)))) {
                     System.out.println("PROCESSING " + testFile + " [ALL]");
-                    processTestCase(pythonLauncher, testsLocation, testFile, options, null, url, libPath, fsfsConfig, pythonLogger);
+                    processTestCase(pythonLauncher, testFile, options, null, url, libPath, fsfsConfig, pythonLogger);
     			} else {
-    	            final List availabledTestCases = getAvailableTestCases(pythonLauncher, testsLocation, testFile, listOption, pythonLogger);
+    	            final List availabledTestCases = getAvailableTestCases(pythonLauncher, testFile, pythonLogger);
     	            final List testCases = !tokens.isEmpty() ? combineTestCases(tokens, availabledTestCases) : availabledTestCases;
     	            System.out.println("PROCESSING " + testFile + " " + testCases);
-    	            processTestCase(pythonLauncher, testsLocation, testFile, options, testCases, url, libPath, fsfsConfig, pythonLogger);
+    	            processTestCase(pythonLauncher, testFile, options, testCases, url, libPath, fsfsConfig, pythonLogger);
     			}
 			} finally {
 			    logHandler.close();
@@ -274,7 +271,7 @@ public class PythonTests {
 		}
 	}
 
-	private static void processTestCase(String pythonLauncher, String testsLocation, String testFile, String options, List testCases, 
+	private static void processTestCase(String pythonLauncher, String testFile, String options, List testCases, 
 	        String url, String libPath, String fsfsConfigPath, Logger pythonLogger) {
 	    Collection commandsList = new ArrayList();
         commandsList.add(pythonLauncher);
@@ -301,7 +298,7 @@ public class PythonTests {
         String[] commands = (String[]) commandsList.toArray(new String[commandsList.size()]); 
 
 		try {
-			Process process = Runtime.getRuntime().exec(commands, null, new File(testsLocation));
+			Process process = Runtime.getRuntime().exec(commands, null, new File("python/cmdline"));
 			ReaderThread inReader = new ReaderThread(process.getInputStream(), null, pythonLogger);
 			inReader.start();
 			ReaderThread errReader = new ReaderThread(process.getErrorStream(), null, pythonLogger);
@@ -332,9 +329,6 @@ public class PythonTests {
 
 	private static List combineTestCases(List tokens, List availableTestCases) {
 		final List combinedTestCases = new ArrayList();
-		if (availableTestCases.isEmpty()) {
-		    return combinedTestCases;
-		}
 		Integer endInt = (Integer) availableTestCases.get(availableTestCases.size() - 1);
 		Integer startInt = (Integer) availableTestCases.get(0);
 		boolean isAllSpecified = false;
@@ -394,11 +388,11 @@ public class PythonTests {
 		return combinedTestCases;
 	}
 
-	private static List getAvailableTestCases(String pythonLauncher, String testsLocation, String testFile, String listOption, Logger pythonLogger) throws IOException {
-		final String[] commands = new String[]{pythonLauncher, testFile, listOption};
+	private static List getAvailableTestCases(String pythonLauncher, String testFile, Logger pythonLogger) throws IOException {
+		final String[] commands = new String[]{pythonLauncher, testFile, "list"};
 		final ByteArrayOutputStream os = new ByteArrayOutputStream();
 		try {
-			Process process = Runtime.getRuntime().exec(commands, null, new File(testsLocation));
+			Process process = Runtime.getRuntime().exec(commands, null, new File("python/cmdline"));
             ReaderThread readerThread = new ReaderThread(process.getInputStream(), new PrintStream(os), pythonLogger);
             readerThread.start();
 			ReaderThread errReader = new ReaderThread(process.getErrorStream(), null, pythonLogger);
@@ -526,7 +520,7 @@ public class PythonTests {
         return props;
     }
     
-    public static String startCommandDaemon(Properties properties) throws IOException {
+    public static String startCommandDaemon() throws IOException {
         int portNumber = 1729;
         portNumber = findUnoccupiedPort(portNumber);
         ourDaemon = new SVNCommandDaemon(portNumber);
@@ -535,23 +529,13 @@ public class PythonTests {
         daemonThread.start();
         
         // create client scripts.
-        String svnHome = properties.getProperty("svn.home", "/usr/bin");
-
-        generateClientScript(new File("daemon/template"), new File("daemon/jsvn"), "svn", portNumber, svnHome);
-        generateClientScript(new File("daemon/template"), new File("daemon/jsvnadmin"), "svnadmin", portNumber, svnHome);
-        generateClientScript(new File("daemon/template"), new File("daemon/jsvnversion"), "svnversion", portNumber, svnHome);
-        generateClientScript(new File("daemon/template"), new File("daemon/jsvnlook"), "svnlook", portNumber, svnHome);
-        generateClientScript(new File("daemon/template"), new File("daemon/jsvnsync"), "svnsync", portNumber, svnHome);
-        generateClientScript(new File("daemon/template"), new File("daemon/jsvndumpfilter"), "svndumpfilter", portNumber, svnHome);
-
-	String pattern = properties.getProperty("python.tests.pattern", null);
-        if (pattern != null) {
-	   generateMatcher(new File("daemon/matcher.pl"), new File("daemon/matcher.pl"), pattern);
-        } else {
-           try {
-               SVNFileUtil.deleteFile(new File("daemon/matcher.pl"));
-           } catch (SVNException e) {}
-        }
+        generateClientScript(new File("daemon/template"), new File("daemon/jsvn"), "svn", portNumber);
+        generateClientScript(new File("daemon/template"), new File("daemon/jsvnadmin"), "svnadmin", portNumber);
+        generateClientScript(new File("daemon/template"), new File("daemon/jsvnversion"), "svnversion", portNumber);
+        generateClientScript(new File("daemon/template"), new File("daemon/jsvnlook"), "svnlook", portNumber);
+        generateClientScript(new File("daemon/template"), new File("daemon/jsvnsync"), "svnsync", portNumber);
+        generateClientScript(new File("daemon/template"), new File("daemon/jsvndumpfilter"), "svndumpfilter", portNumber);
+        
         return new File("daemon").getAbsolutePath();
     }
     
@@ -704,7 +688,7 @@ public class PythonTests {
         return connectorPort;
     }
 
-    private static void generateClientScript(File src, File destination, String name, int port, String svnHome) throws IOException {
+    private static void generateClientScript(File src, File destination, String name, int port) throws IOException {
         byte[] contents = new byte[(int) src.length()];
         InputStream is = new FileInputStream(src);
         SVNFileUtil.readIntoBuffer(is, contents, 0, contents.length);
@@ -713,23 +697,6 @@ public class PythonTests {
         String script = new String(contents);
         script = script.replaceAll("%name%", name);
         script = script.replaceAll("%port%", Integer.toString(port));
-        script = script.replaceAll("%svn_home%", svnHome);
-        
-        FileOutputStream os = new FileOutputStream(destination);
-        os.write(script.getBytes());
-        os.close();
-        
-        SVNFileUtil.setExecutable(destination, true);
-    }
-
-    private static void generateMatcher(File src, File destination, String pattern) throws IOException {
-        byte[] contents = new byte[(int) src.length()];
-        InputStream is = new FileInputStream(src);
-        SVNFileUtil.readIntoBuffer(is, contents, 0, contents.length);
-        is.close();
-
-        String script = new String(contents);
-        script = script.replace("%pattern%", pattern);
         
         FileOutputStream os = new FileOutputStream(destination);
         os.write(script.getBytes());

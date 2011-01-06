@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2009 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2011 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -92,9 +92,7 @@ public class SVNOption extends AbstractSVNOption {
     public static final SVNOption NO_AUTH_CACHE = new SVNOption("no-auth-cache");
     public static final SVNOption NON_INTERACTIVE = new SVNOption("non-interactive");
     public static final SVNOption TRUST_SERVER_CERT = new SVNOption("trust-server-cert");
-
-    public static final SVNOption STRIP = new SVNOption("strip", "p");
-
+    
     public static Collection addLogMessageOptions(Collection target) {
         if (target != null) {
             target.add(MESSAGE);

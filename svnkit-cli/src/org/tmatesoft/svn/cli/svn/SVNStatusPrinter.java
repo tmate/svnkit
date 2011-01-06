@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2009 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2011 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -13,7 +13,6 @@ package org.tmatesoft.svn.cli.svn;
 
 import org.tmatesoft.svn.core.internal.util.SVNFormatUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNTreeConflictUtil;
-import org.tmatesoft.svn.core.internal.wc17.SVNStatus17;
 import org.tmatesoft.svn.core.wc.SVNStatus;
 import org.tmatesoft.svn.core.wc.SVNStatusType;
 
@@ -31,7 +30,7 @@ public class SVNStatusPrinter {
     
     public void printStatus(String path, SVNStatus status, 
             boolean detailed, boolean showLastCommitted, boolean skipUnrecognized, boolean showReposLocks) {
-        if (status == null || (skipUnrecognized && !(status.isVersioned() || status.getTreeConflict() != null)) || 
+        if (status == null || (skipUnrecognized && !(status.getEntry() != null || status.getTreeConflict() != null)) || 
                 (status.getContentsStatus() == SVNStatusType.STATUS_NONE && status.getRemoteContentsStatus() == SVNStatusType.STATUS_NONE)) {
             return;
         }
@@ -48,22 +47,12 @@ public class SVNStatusPrinter {
         if (detailed) {
             String wcRevision;
             char remoteStatus;
-            if (!status.isVersioned()) {
+            if (status.getEntry() == null) {
                 wcRevision = "";
+            } else if (!status.getRevision().isValid()) {
+                wcRevision = " ? ";
             } else if (status.isCopied()) {
                 wcRevision = "-";
-            } else if (!status.getRevision().isValid()) {                
-                if(status.getStatus17()!=null) {
-                    SVNStatus17 status17 = status.getStatus17();
-                    if (status17.getNodeStatus() == SVNStatusType.STATUS_ADDED ||
-                        status17.getNodeStatus() == SVNStatusType.STATUS_REPLACED)
-                        wcRevision = "0";
-                    else if(status17.getNodeStatus()==SVNStatusType.STATUS_DELETED)
-                        wcRevision = Long.toString(status17.getChangedRev());
-                    else
-                        wcRevision = " ? ";
-                } else 
-                    wcRevision = " ? ";
             } else {
                 wcRevision = Long.toString(status.getRevision().getNumber());
             }
@@ -92,14 +81,14 @@ public class SVNStatusPrinter {
                 String commitRevision = "";
                 String commitAuthor = "";
 
-                if (status.isVersioned() && status.getCommittedRevision().isValid()) {
+                if (status.getEntry() != null && status.getCommittedRevision().isValid()) {
                     commitRevision = status.getCommittedRevision().toString();
-                } else if (status.isVersioned()) {
+                } else if (status.getEntry() != null) {
                     commitRevision = " ? ";
                 }
-                if (status.isVersioned() && status.getAuthor() != null) {
+                if (status.getEntry() != null && status.getAuthor() != null) {
                     commitAuthor = status.getAuthor();
-                } else if (status.isVersioned()) {
+                } else if (status.getEntry() != null) {
                     commitAuthor = " ? ";
                 }
                 result.append(status.getContentsStatus().getCode());

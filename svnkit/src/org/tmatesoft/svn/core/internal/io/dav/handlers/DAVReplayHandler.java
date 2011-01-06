@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2009 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2011 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -16,10 +16,12 @@ import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNPropertyValue;
 import org.tmatesoft.svn.core.internal.io.dav.DAVElement;
+import org.tmatesoft.svn.core.internal.util.SVNBase64;
 import org.tmatesoft.svn.core.internal.util.SVNXMLUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.io.ISVNEditor;
 import org.tmatesoft.svn.util.SVNLogType;
+
 import org.xml.sax.Attributes;
 
 
@@ -227,11 +229,14 @@ public class DAVReplayHandler extends DAVEditorHandler {
                 SVNErrorManager.error(err, SVNLogType.NETWORK);
             }
             if (myPropertyName != null) {
-                SVNPropertyValue propertyValue = createPropertyValueFromBase64(null, myPropertyName, cdata);
+                StringBuffer sb = SVNBase64.normalizeBase64(cdata);
+                byte[] buffer = allocateBuffer(sb.length());
+                int length = SVNBase64.base64ToByteArray(sb, buffer);
+                SVNPropertyValue property = SVNPropertyValue.create(myPropertyName, buffer, 0, length);
                 if (element == CHANGE_FILE_PROPERTY) {
-                    myEditor.changeFileProperty(myPath, myPropertyName, propertyValue);
+                    myEditor.changeFileProperty(myPath, myPropertyName, property);
                 } else {
-                    myEditor.changeDirProperty(myPropertyName, propertyValue);
+                    myEditor.changeDirProperty(myPropertyName, property);
                 }
             }
         }
