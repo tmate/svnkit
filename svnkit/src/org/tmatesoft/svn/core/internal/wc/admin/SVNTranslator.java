@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2009 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2010 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -57,7 +57,7 @@ public class SVNTranslator {
 
     private static final Charset UTF8_CHARSET = Charset.forName("UTF-8");
 
-    public static String translateString(String str, byte[] eol, Map keywords, boolean repair, boolean expand) throws SVNException {
+    public static String transalteString(String str, byte[] eol, Map keywords, boolean repair, boolean expand) throws SVNException {
         ByteArrayOutputStream bufferOS = new ByteArrayOutputStream();
         OutputStream resultOS = null;
         try {
@@ -68,10 +68,10 @@ public class SVNTranslator {
         } finally {
             SVNFileUtil.closeFile(resultOS);
         }
-
+        
         return new String(bufferOS.toByteArray());
     }
-
+    
     public static void translate(SVNAdminArea adminArea, String name, String srcPath,
                                  String dstPath, boolean expand) throws SVNException {
         translate(adminArea, name, srcPath, dstPath, false, expand);
@@ -360,7 +360,7 @@ public class SVNTranslator {
         copyAndTranslate(source, destination, charset, eol, keywordsMap, isSpecial, false, repair);
     }
 
-    public static void copyAndTranslate(File source, File destination, String charset, byte[] eol, Map keywords, boolean special, boolean expand, boolean repair) throws SVNException {
+    private static void copyAndTranslate(File source, File destination, String charset, byte[] eol, Map keywords, boolean special, boolean expand, boolean repair) throws SVNException {
         boolean isSpecialPath = false;
         if (SVNFileUtil.symlinksSupported()) {
             SVNFileType type = SVNFileType.getType(source);
@@ -664,9 +664,9 @@ public class SVNTranslator {
         if (charset == null) {
             return null;
         }
-        boolean isSupported;
+        boolean isSupported = true;
         try {
-            isSupported = Charset.isSupported(charset);
+            isSupported = charset == null || Charset.isSupported(charset);
         } catch (IllegalCharsetNameException e) {
             isSupported = false;
         }

@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2009 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2010 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -55,7 +55,7 @@ public class DefaultSVNOptions implements ISVNOptions, ISVNMergerFactory {
     private static final String SVNKIT_GROUP = "svnkit";
     private static final String OLD_SVNKIT_GROUP = "javasvn";
     private static final String HELPERS_GROUP = "helpers";
-
+    
     private static final String USE_COMMIT_TIMES = "use-commit-times";
     private static final String GLOBAL_IGNORES = "global-ignores";
     private static final String ENABLE_AUTO_PROPS = "enable-auto-props";
@@ -74,7 +74,7 @@ public class DefaultSVNOptions implements ISVNOptions, ISVNMergerFactory {
     private static final String PASSWORD_STORES = "password-stores";
     private static final String DEFAULT_IGNORES = "*.o *.lo *.la #*# .*.rej *.rej .*~ *~ .#* .DS_Store";
     private static final String YES = "yes";
-
+    
     private static final String NO = "no";
     private static final String DEFAULT_LOCALE = Locale.getDefault().toString();
 
@@ -89,12 +89,12 @@ public class DefaultSVNOptions implements ISVNOptions, ISVNMergerFactory {
     private SVNCompositeConfigFile myConfigFile;
     private ISVNMergerFactory myMergerFactory;
     private ISVNConflictHandler myConflictResolver;
-
-    private String myKeywordLocale = DEFAULT_LOCALE;
+    
+    private String myKeywordLocale = DEFAULT_LOCALE; 
     private String myKeywordTimezone = DEFAULT_TIMEZONE;
     private SimpleDateFormat myKeywordDateFormat = new SimpleDateFormat("yyyy-MM-dd' 'HH:mm:ss' 'ZZZZ' ('E', 'dd' 'MMM' 'yyyy')'");
     private Map myConfigOptions;
-
+    
     public DefaultSVNOptions() {
         this(null, true);
     }
@@ -115,7 +115,7 @@ public class DefaultSVNOptions implements ISVNOptions, ISVNMergerFactory {
             myConfigFile.setGroupsToOptions(myConfigOptions);
         }
     }
-
+    
     /**
      * Enables or disables the commit-times option.
      *
@@ -177,7 +177,7 @@ public class DefaultSVNOptions implements ISVNOptions, ISVNMergerFactory {
     public void setUseAutoProperties(boolean useAutoProperties) {
         getConfigFile().setPropertyValue(MISCELLANY_GROUP, ENABLE_AUTO_PROPS, useAutoProperties ? YES : NO, !myIsReadonly);
     }
-
+    
     /**
      * Determines if the authentication storage is enabled.
      *
@@ -456,7 +456,7 @@ public class DefaultSVNOptions implements ISVNOptions, ISVNMergerFactory {
                                 continue;
                             }
                             // escaped at the end of the line.
-                        }
+                        } 
                         if (ch != ';') {
                             // just last character.
                             token.append(ch);
@@ -487,7 +487,7 @@ public class DefaultSVNOptions implements ISVNOptions, ISVNMergerFactory {
         }
         return target;
     }
-
+    
     public ISVNMergerFactory getMergerFactory() {
         if (myMergerFactory == null) {
             return this;
@@ -527,7 +527,7 @@ public class DefaultSVNOptions implements ISVNOptions, ISVNMergerFactory {
 
     /**
      * Sets the value of a property from the <i>[svnkit]</i> section
-     * of the <i>config</i> file.
+     * of the <i>config</i> file. 
      *
      * @param   propertyName   a SVNKit specific config property name
      * @param   propertyValue  a new value for the property; if
@@ -540,13 +540,9 @@ public class DefaultSVNOptions implements ISVNOptions, ISVNMergerFactory {
         }
         getConfigFile().setPropertyValue(SVNKIT_GROUP, propertyName, propertyValue, !myIsReadonly);
     }
-
+    
     public void setConflictHandler(ISVNConflictHandler resolver) {
         myConflictResolver = resolver;
-    }
-
-    public ISVNConflictHandler getConflictResolver() {
-        return myConflictResolver;
     }
 
     public static boolean matches(String pattern, String fileName) {
@@ -561,7 +557,7 @@ public class DefaultSVNOptions implements ISVNOptions, ISVNMergerFactory {
     }
 
     public ISVNMerger createMerger(byte[] conflictStart, byte[] conflictSeparator, byte[] conflictEnd) {
-        return new DefaultSVNMerger(conflictStart, conflictSeparator, conflictEnd, myConflictResolver, SVNDiffConflictChoiceStyle.CHOOSE_MODIFIED_LATEST);
+        return new DefaultSVNMerger(conflictStart, conflictSeparator, conflictEnd, myConflictResolver);
     }
 
     public ISVNConnector createTunnelConnector(SVNURL url) {
@@ -643,7 +639,7 @@ public class DefaultSVNOptions implements ISVNOptions, ISVNMergerFactory {
         return System.getProperty("file.encoding");
     }
 
-    public byte[] getNativeEOL() {
+    public byte[] getNativeEOL() {        
         return System.getProperty("line.separator").getBytes();
     }
 
@@ -652,7 +648,7 @@ public class DefaultSVNOptions implements ISVNOptions, ISVNMergerFactory {
         if (mimeTypesFile == null) {
             return null;
         }
-
+        
         BufferedReader reader = null;
         Map extensionsToMimeTypes = new SVNHashMap();
         try {
@@ -675,11 +671,11 @@ public class DefaultSVNOptions implements ISVNOptions, ISVNMergerFactory {
                 if (tokensList.size() < 2) {
                     continue;
                 }
-
+                
                 String mimeType = (String) tokensList.get(0);
                 for (int i = 1; i < tokensList.size(); i++) {
                     String extension = (String) tokensList.get(i);
-                    extensionsToMimeTypes.put(extension, mimeType);
+                    extensionsToMimeTypes.put(extension, mimeType);    
                 }
             }
         } catch (IOException e) {

@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2009 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2010 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -23,8 +23,6 @@ import org.tmatesoft.svn.core.SVNMergeRange;
 import org.tmatesoft.svn.core.SVNNodeKind;
 import org.tmatesoft.svn.core.SVNProperty;
 import org.tmatesoft.svn.core.internal.util.SVNFormatUtil;
-import org.tmatesoft.svn.core.internal.wc.patch.SVNPatchHunk;
-import org.tmatesoft.svn.core.internal.wc.patch.SVNPatchHunkInfo;
 import org.tmatesoft.svn.core.wc.ISVNEventHandler;
 import org.tmatesoft.svn.core.wc.SVNEvent;
 import org.tmatesoft.svn.core.wc.SVNEventAction;
@@ -38,9 +36,9 @@ import org.tmatesoft.svn.util.SVNLogType;
  * @author  TMate Software Ltd.
  */
 public class SVNNotifyPrinter implements ISVNEventHandler {
-
+    
     private SVNCommandEnvironment myEnvironment;
-
+    
     private boolean myIsInExternal;
     private boolean myIsChangesReceived;
     private boolean myIsDeltaSent;
@@ -48,17 +46,17 @@ public class SVNNotifyPrinter implements ISVNEventHandler {
     private boolean myIsCheckout;
     private boolean myIsExport;
     private boolean myIsSuppressLastLine;
-
+    
     private int myTextConflicts = 0;
     private int myPropConflicts = 0;
     private int myTreeConflicts = 0;
     private int mySkippedPaths = 0;
-
+    
     private int myExternalTextConflicts = 0;
     private int myExternalPropConflicts = 0;
     private int myExternalTreeConflicts = 0;
     private int myExternalSkippedPaths = 0;
-
+    
     public SVNNotifyPrinter(SVNCommandEnvironment env) {
         this(env, false, false, false);
     }
@@ -76,7 +74,7 @@ public class SVNNotifyPrinter implements ISVNEventHandler {
         if (file != null) {
             path = myEnvironment.getRelativePath(file);
             path = SVNCommandUtil.getLocalPath(path);
-        }
+        } 
         PrintStream out = myEnvironment.getOut();
         StringBuffer buffer = new StringBuffer();
         if (event.getAction() == SVNEventAction.STATUS_EXTERNAL) {
@@ -89,19 +87,19 @@ public class SVNNotifyPrinter implements ISVNEventHandler {
                 // hack to let external test #14 work.
                 myEnvironment.getErr().println(event.getErrorMessage());
             }
-
+            
             if (myIsInExternal) {
                 myExternalSkippedPaths++;
             } else {
                 mySkippedPaths++;
             }
-
+            
             if (event.getContentsStatus() == SVNStatusType.MISSING) {
                 buffer.append("Skipped missing target: '" + path + "'\n");
             } else {
                 buffer.append("Skipped '" + path + "'\n");
             }
-        } else if (event.getAction() == SVNEventAction.UPDATE_DELETE || event.getAction() == SVNEventAction.UPDATE_ADD_DELETED || event.getAction() == SVNEventAction.UPDATE_UPDATE_DELETED ) {
+        } else if (event.getAction() == SVNEventAction.UPDATE_DELETE) {
             myIsChangesReceived = true;
             buffer.append("D    " + path + "\n");
         } else if (event.getAction() == SVNEventAction.UPDATE_REPLACE) {
@@ -115,7 +113,7 @@ public class SVNNotifyPrinter implements ISVNEventHandler {
                 } else {
                     myTextConflicts++;
                 }
-
+                
                 buffer.append("C    " + path + "\n");
             } else {
                 buffer.append("A    " + path + "\n");
@@ -147,7 +145,7 @@ public class SVNNotifyPrinter implements ISVNEventHandler {
             buffer.append("   " + path + "\n");
         } else if (event.getAction() == SVNEventAction.UPDATE_UPDATE) {
             SVNStatusType propStatus = event.getPropertiesStatus();
-            if (event.getNodeKind() == SVNNodeKind.DIR &&
+            if (event.getNodeKind() == SVNNodeKind.DIR && 
                     (propStatus == SVNStatusType.INAPPLICABLE || propStatus == SVNStatusType.UNKNOWN || propStatus == SVNStatusType.UNCHANGED)) {
                 return;
             }
@@ -255,18 +253,14 @@ public class SVNNotifyPrinter implements ISVNEventHandler {
                 myExternalTextConflicts = 0;
                 myExternalTreeConflicts = 0;
                 return;
-            }
-
+            } 
+            
             SVNErrorMessage warnMessage = SVNErrorMessage.create(SVNErrorCode.BASE, "Error handling externals definition for ''{0}'':", path);
-            myEnvironment.handleWarning(warnMessage, new SVNErrorCode[] { warnMessage.getErrorCode() },
+            myEnvironment.handleWarning(warnMessage, new SVNErrorCode[] { warnMessage.getErrorCode() }, 
                     myEnvironment.isQuiet());
             myEnvironment.handleWarning(event.getErrorMessage(), new SVNErrorCode[] { event.getErrorMessage().getErrorCode() },
                     myEnvironment.isQuiet());
             return;
-        } else if(event.getAction() == SVNEventAction.UPDATE_STARTED) {
-            if (! (myIsSuppressLastLine || myIsInExternal || myIsCheckout || myIsExport)) {
-                buffer.append("Updating '"+path+"' ...\n");
-            }
         } else if (event.getAction() == SVNEventAction.UPDATE_COMPLETED) {
             if (!myIsSuppressLastLine) {
                 long rev = event.getRevision();
@@ -292,9 +286,9 @@ public class SVNNotifyPrinter implements ISVNEventHandler {
                     }
                 }
             }
-
+            
             printConflictStatus(buffer);
-
+            
             if (myIsInExternal) {
                 buffer.append('\n');
                 myIsInExternal = false;
@@ -348,7 +342,7 @@ public class SVNNotifyPrinter implements ISVNEventHandler {
             buffer.append("'" + path + "' locked by user '" + event.getLock().getOwner() + "'.\n");
         } else if (event.getAction() == SVNEventAction.UNLOCKED) {
             buffer.append("'" + path + "' unlocked.\n");
-        } else if (event.getAction() == SVNEventAction.LOCK_FAILED ||
+        } else if (event.getAction() == SVNEventAction.LOCK_FAILED || 
                 event.getAction() == SVNEventAction.UNLOCK_FAILED) {
             myEnvironment.handleWarning(event.getErrorMessage(), new SVNErrorCode[] {event.getErrorMessage().getErrorCode()},
                 myEnvironment.isQuiet());
@@ -360,118 +354,11 @@ public class SVNNotifyPrinter implements ISVNEventHandler {
         } else if (event.getAction() == SVNEventAction.CHANGELIST_CLEAR) {
             buffer.append("Path '" + path + "' is no longer a member of a changelist.\n");
         } else if (event.getAction() == SVNEventAction.CHANGELIST_MOVED) {
-            myEnvironment.handleWarning(event.getErrorMessage(), new SVNErrorCode[] {
+            myEnvironment.handleWarning(event.getErrorMessage(), new SVNErrorCode[] { 
                 event.getErrorMessage().getErrorCode() }, myEnvironment.isQuiet());
             return;
-        } else if (event.getAction() == SVNEventAction.PATCH) {
-
-            myIsChangesReceived = true;
-
-            if (event.getContentsStatus() == SVNStatusType.CONFLICTED) {
-                if (myIsInExternal) {
-                    myExternalTextConflicts++;
-                } else {
-                    myTextConflicts++;
-                }
-                buffer.append('C');
-            } else if (event.getNodeKind() == SVNNodeKind.FILE) {
-                if (event.getContentsStatus() == SVNStatusType.MERGED) {
-                    buffer.append('G');
-                } else if (event.getContentsStatus() == SVNStatusType.CHANGED) {
-                    buffer.append('U');
-                }
-            }
-
-            if (buffer.length() > 0) {
-                buffer.append(' ');
-                buffer.append(path);
-            }
-
-        } else if (event.getAction() == SVNEventAction.PATCH_APPLIED_HUNK) {
-
-            myIsChangesReceived = true;
-
-            final Object info = event.getInfo();
-
-            if (info == null || !(info instanceof SVNPatchHunkInfo)) {
-                return;
-            }
-
-            final SVNPatchHunkInfo hi = (SVNPatchHunkInfo) info;
-            final SVNPatchHunk hunk = hi.getHunk();
-
-            if (hunk.getOriginal().getStart() != hi.getMatchedLine()) {
-                long off;
-                String minus;
-
-                if (hi.getMatchedLine() > hunk.getOriginal().getStart()) {
-                    off = hi.getMatchedLine() - hunk.getOriginal().getStart();
-                    minus = null;
-                } else {
-                    off = hunk.getOriginal().getStart() - hi.getMatchedLine();
-                    minus = "-";
-                }
-
-                buffer.append(">         applied hunk @@ -");
-                buffer.append(hunk.getOriginal().getStart());
-                buffer.append(",");
-                buffer.append(hunk.getOriginal().getLength());
-                buffer.append(" +");
-                buffer.append(hunk.getModified().getStart());
-                buffer.append(",");
-                buffer.append(hunk.getModified().getLength());
-                buffer.append(" @@ with offset ");
-                if (null != minus) {
-                    buffer.append(minus);
-                }
-                buffer.append(off);
-                if (hi.getFuzz() > 0) {
-                    buffer.append(" and fuzz ");
-                    buffer.append(hi.getFuzz());
-                }
-                buffer.append("\n");
-
-            } else if (hi.getFuzz() > 0) {
-
-                buffer.append(">         applied hunk @@ -");
-                buffer.append(hunk.getOriginal().getStart());
-                buffer.append(",");
-                buffer.append(hunk.getOriginal().getLength());
-                buffer.append(" +");
-                buffer.append(hunk.getModified().getStart());
-                buffer.append(",");
-                buffer.append(hunk.getModified().getLength());
-                buffer.append(" @@ with fuzz ");
-                buffer.append(hi.getFuzz());
-                buffer.append("\n");
-
-            }
-
-        } else if (event.getAction() == SVNEventAction.PATCH_REJECTED_HUNK) {
-
-            myIsChangesReceived = true;
-
-            final Object info = event.getInfo();
-
-            if (info == null || !(info instanceof SVNPatchHunkInfo)) {
-                return;
-            }
-
-            final SVNPatchHunkInfo hi = (SVNPatchHunkInfo) info;
-            final SVNPatchHunk hunk = hi.getHunk();
-
-            buffer.append(">         rejected hunk @@ -");
-            buffer.append(hunk.getOriginal().getStart());
-            buffer.append(",");
-            buffer.append(hunk.getOriginal().getLength());
-            buffer.append(" +");
-            buffer.append(hunk.getModified().getStart());
-            buffer.append(",");
-            buffer.append(hunk.getModified().getLength());
-            buffer.append(" @@\n");
-
         }
-
+        
         if (buffer.length() > 0) {
             SVNDebugLog.getDefaultLog().logFine(SVNLogType.CLIENT, buffer.toString());
             out.print(buffer);
@@ -501,29 +388,29 @@ public class SVNNotifyPrinter implements ISVNEventHandler {
             treeConflicts = myTreeConflicts;
             skippedPaths = mySkippedPaths;
         }
-
+        
         if (textConflicts > 0 || propConflicts > 0 || treeConflicts > 0 || skippedPaths > 0) {
             buffer.append(header);
         }
-
+        
         if (textConflicts > 0) {
             buffer.append("  Text conflicts: ");
             buffer.append(textConflicts);
             buffer.append("\n");
         }
-
+        
         if (propConflicts > 0) {
             buffer.append("  Property conflicts: ");
             buffer.append(propConflicts);
             buffer.append("\n");
         }
-
+        
         if (treeConflicts > 0) {
             buffer.append("  Tree conflicts: ");
             buffer.append(treeConflicts);
             buffer.append("\n");
         }
-
+        
         if (skippedPaths > 0) {
             buffer.append("  Skipped paths: ");
             buffer.append(skippedPaths);
