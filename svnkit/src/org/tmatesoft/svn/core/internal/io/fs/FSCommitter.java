@@ -583,6 +583,7 @@ public class FSCommitter {
                 context.writePathInfoToReportFile("/", null, null, newRevision - 1, false, SVNDepth.INFINITY);
             } else {
                 context.writePathInfoToReportFile("/", null, null, newRevision - 1, false, SVNDepth.EMPTY);
+                FSRoot oldRoot = myFSFS.createRevisionRoot(newRevision - 1);
                 for (int i = 0; i < updatableRoots.length; i++) {
                     String rootPath = updatableRoots[i];
                     if (rootPath == null) {
@@ -591,8 +592,9 @@ public class FSCommitter {
                     if (rootPath.startsWith("/")) {
                         rootPath = rootPath.substring("/".length());
                     }
-                    System.out.println("reporting " + rootPath);
-                    context.writePathInfoToReportFile(rootPath, null, null, newRevision - 1, false, SVNDepth.INFINITY);
+                    if (oldRoot.checkNodeKind(rootPath) == SVNNodeKind.DIR) {
+                        context.writePathInfoToReportFile(rootPath, null, null, newRevision - 1, false, SVNDepth.INFINITY);
+                    }
                 }
             }
             
