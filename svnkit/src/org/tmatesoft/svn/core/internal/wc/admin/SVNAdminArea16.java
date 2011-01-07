@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2009 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2011 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -24,7 +24,6 @@ import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNProperty;
 import org.tmatesoft.svn.core.SVNURL;
 import org.tmatesoft.svn.core.SVNProperties;
-import org.tmatesoft.svn.core.internal.wc.SVNAdminUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNTreeConflictUtil;
@@ -150,7 +149,7 @@ public class SVNAdminArea16 extends SVNAdminArea15 {
         }
         String fileExternalData = parseString(line);
         if (fileExternalData != null) {
-            SVNAdminUtil.unserializeExternalFileData(entryAttrs, fileExternalData);
+            unserializeExternalFileData(entryAttrs, fileExternalData);
         }
         
         return false;
@@ -165,13 +164,73 @@ public class SVNAdminArea16 extends SVNAdminArea15 {
             ++emptyFields;
         }
         
-        String serializedFileExternalData = SVNAdminUtil.serializeExternalFileData(entryAttrs);
+        String serializedFileExternalData = serializeExternalFileData(entryAttrs);
         if (writeString(writer, serializedFileExternalData, emptyFields)) {
             emptyFields = 0;
         } else {
             ++emptyFields;
         }
         return emptyFields;
+    }
+
+    private String serializeExternalFileData(Map entryAttrs) throws SVNException {
+        String representation = null;
+        String path = (String) entryAttrs.get(SVNProperty.FILE_EXTERNAL_PATH);
+        SVNRevision revision = (SVNRevision) entryAttrs.get(SVNProperty.FILE_EXTERNAL_REVISION);
+        SVNRevision pegRevision = (SVNRevision) entryAttrs.get(SVNProperty.FILE_EXTERNAL_PEG_REVISION);
+        if (path != null) {
+            String revStr = asString(revision, path);
+            String pegRevStr = asString(pegRevision, path);
+            representation = pegRevStr + ":" + revStr + ":" + path;
+        }
+        return representation;
+    }
+    
+    private String asString(SVNRevision revision, String path) throws SVNException {
+        if (revision == SVNRevision.HEAD || 
+                SVNRevision.isValidRevisionNumber(revision.getNumber())) {
+            return revision.toString();
+        }
+        
+        SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.INCORRECT_PARAMS, "Illegal file external revision kind {0} for path ''{1}''", 
+        
+                new Object[] { revision.toString(), path });
+        SVNErrorManager.error(err, SVNLogType.WC);
+        return null;
+    }
+    
+    private void unserializeExternalFileData(Map entryAttrs, String rawExternalFileData) throws SVNException {
+        SVNRevision pegRevision = SVNRevision.UNDEFINED;
+        SVNRevision revision = SVNRevision.UNDEFINED;
+        String path = null;
+        if (rawExternalFileData != null) {
+            StringBuffer buffer = new StringBuffer(rawExternalFileData);
+            pegRevision = parseRevision(buffer);
+            revision = parseRevision(buffer);
+            path = buffer.toString();
+        }
+        entryAttrs.put(SVNProperty.FILE_EXTERNAL_PATH, path);
+        entryAttrs.put(SVNProperty.FILE_EXTERNAL_REVISION, revision);
+        entryAttrs.put(SVNProperty.FILE_EXTERNAL_PEG_REVISION, pegRevision);
+    }
+    
+    private SVNRevision parseRevision(StringBuffer str) throws SVNException {
+        int ind = str.indexOf(":"); 
+        if ( ind == -1) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.INCORRECT_PARAMS, 
+                    "Found an unexpected \\0 in the file external ''{0}''", str);
+            SVNErrorManager.error(err, SVNLogType.WC);
+        }
+        
+        SVNRevision revision = null;
+        String subStr = str.substring(0, ind);
+        if (subStr.equals(SVNRevision.HEAD.getName())) {
+            revision = SVNRevision.HEAD;
+        } else {
+            revision = SVNRevision.parse(subStr);
+        }
+        str = str.delete(0, ind + 1);
+        return revision;
     }
 
     protected boolean isEntryPropertyApplicable(String propName) {

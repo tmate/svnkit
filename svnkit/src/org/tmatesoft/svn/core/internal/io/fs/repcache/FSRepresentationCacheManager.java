@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2009 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2011 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -50,7 +50,7 @@ public class FSRepresentationCacheManager implements IFSRepresentationCacheManag
     private ISqlJetTable myTable;
     private FSFS myFSFS;
     
-    public static IFSRepresentationCacheManager openRepresentationCache(FSFS fsfs) throws SVNException {
+    public static FSRepresentationCacheManager openRepresentationCache(FSFS fsfs) throws SVNException {
         final FSRepresentationCacheManager cacheObj = new FSRepresentationCacheManager();
         try {
             cacheObj.myRepCacheDB = SqlJetDb.open(fsfs.getRepositoryCacheFile(), true);

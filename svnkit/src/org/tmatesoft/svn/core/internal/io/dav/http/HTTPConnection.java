@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2009 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2011 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -289,6 +289,7 @@ class HTTPConnection implements IHTTPConnection {
         }
         
         ISVNAuthenticationManager authManager = myRepository.getAuthenticationManager();
+
         // 1. prompt for ssl client cert if needed, if cancelled - throw cancellation exception.
         HTTPSSLKeyManager keyManager = myKeyManager == null && authManager != null ? createKeyManager() : myKeyManager;
         TrustManager trustManager = myTrustManager == null && authManager != null ? authManager.getTrustManager(myRepository.getLocation()) : myTrustManager;
@@ -831,15 +832,12 @@ class HTTPConnection implements IHTTPConnection {
             if (mySocket == null) {
                 return null;
             }
-//            myInputStream = new CancellableSocketInputStream(new BufferedInputStream(mySocket.getInputStream(), 2048), myRepository.getCanceller());
             myInputStream = new BufferedInputStream(mySocket.getInputStream(), 2048);
-
         }
         return myInputStream;
     }
 
     private OutputStream getOutputStream() throws IOException {
-        SVNDebugLog.getDefaultLog().logFine(SVNLogType.DEFAULT, "socket output stream requested...");
         if (myOutputStream == null) {
             if (mySocket == null) {
                 return null;

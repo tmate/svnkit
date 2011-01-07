@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2009 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2011 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -45,7 +45,7 @@ public class SVNCommitPacket {
     private boolean[] myIsSkipped;
     private boolean myIsDisposed;
 
-    public SVNCommitPacket(SVNWCAccess wcAccess, SVNCommitItem[] items, Map lockTokens) {
+    SVNCommitPacket(SVNWCAccess wcAccess, SVNCommitItem[] items, Map lockTokens) {
         myCommitItems = items;
         myLockTokens = lockTokens;
         myIsSkipped = new boolean[items == null ? 0 : items.length];
@@ -145,11 +145,11 @@ public class SVNCommitPacket {
         return -1;
     }
 
-    public Map getLockTokens() {
+    Map getLockTokens() {
         return myLockTokens;
     }
 
-    public SVNCommitPacket removeSkippedItems() {
+    SVNCommitPacket removeSkippedItems() {
         if (this == EMPTY) {
             return EMPTY;
         }
