@@ -66,6 +66,7 @@ public class FSUpdateContext {
     private FSRepository myRepository;
     private SVNDeltaGenerator myDeltaGenerator;
     private SVNDeltaCombiner myDeltaCombiner;
+    private SVNProperties myMetaProperties;
 
     public FSUpdateContext(FSRepository repository, FSFS owner, long revision, File reportFile, 
             String target, String targetPath, boolean isSwitch, SVNDepth depth, 
@@ -100,6 +101,12 @@ public class FSUpdateContext {
         myTargetPath = targetPath;
         this.isSwitch = isSwitch;
         mySendCopyFromArgs = sendCopyFrom;
+    }
+    
+    public void setMetaProperties(SVNProperties metaProperties) {
+        if (myMetaProperties == null) {
+            myMetaProperties = metaProperties;
+        }
     }
 
     public OutputStream getReportFileForWriting() throws SVNException {
@@ -265,7 +272,7 @@ public class FSUpdateContext {
         }
 
         String fullTargetPath = getReportTargetPath();
-        String fullSourcePath = SVNPathUtil.getAbsolutePath(SVNPathUtil.append(myRepository.getRepositoryPath(""), getReportTarget()));
+        String fullSourcePath = myRepository == null ? "/" : SVNPathUtil.getAbsolutePath(SVNPathUtil.append(myRepository.getRepositoryPath(""), getReportTarget()));
         FSEntry targetEntry = fakeDirEntry(fullTargetPath, getTargetRoot());
         FSRevisionRoot srcRoot = getSourceRoot(sourceRevision);
         FSEntry sourceEntry = fakeDirEntry(fullSourcePath, srcRoot);
@@ -549,12 +556,19 @@ public class FSUpdateContext {
         return new SVNLocationEntry(copyFromRevision, copyFromPath);
     }
     
+    private SVNProperties getMetaProperties(long revision) throws SVNException {
+        if (revision == myTargetRevision && myMetaProperties != null) {
+            return myMetaProperties;
+        }
+        return myFSFS.compoundMetaProperties(revision);
+    }
+    
     private void diffProplists(long sourceRevision, String sourcePath, String editPath, String targetPath, String lockToken, boolean isDir) throws SVNException {
         FSRevisionNode targetNode = getTargetRoot().getRevisionNode(targetPath);
         long createdRevision = targetNode.getCreatedRevision();
 
         if (FSRepository.isValidRevision(createdRevision)) {
-            SVNProperties entryProps = myFSFS.compoundMetaProperties(createdRevision);
+            SVNProperties entryProps = getMetaProperties(createdRevision);
             SVNPropertyValue committedRevision = entryProps.getSVNPropertyValue(SVNProperty.COMMITTED_REVISION);
             changeProperty(editPath, SVNProperty.COMMITTED_REVISION, committedRevision, isDir);
             SVNPropertyValue committedDate = entryProps.getSVNPropertyValue(SVNProperty.COMMITTED_DATE);

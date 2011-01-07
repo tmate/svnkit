@@ -163,6 +163,8 @@ public abstract class SVNRepository {
     private ISVNCanceller myCanceller;
     private Collection myConnectionListeners;
 
+    private ISVNCommitHookFactory myCommitHookFactory;
+
     protected SVNRepository(SVNURL location, ISVNSession options) {
         myLocation = location;
         myOptions = options;
@@ -2949,6 +2951,14 @@ public abstract class SVNRepository {
             return SVNDebugLog.getDefaultLog();
         }
         return myDebugLog;
+    }
+    
+    public void setCommitHookFactory(ISVNCommitHookFactory commitHookFactory) {
+        myCommitHookFactory = commitHookFactory;
+    }
+    
+    public ISVNCommitHookFactory getCommitHookFactory() {
+        return myCommitHookFactory;
     }
     
     private long getDeletedRevisionFromLog(String path, long pegRevision, long endRevision) throws SVNException {

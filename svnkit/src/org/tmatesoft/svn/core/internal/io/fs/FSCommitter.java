@@ -22,6 +22,7 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 
+import org.tmatesoft.svn.core.SVNDepth;
 import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
@@ -39,6 +40,8 @@ import org.tmatesoft.svn.core.internal.util.SVNSkel;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 import org.tmatesoft.svn.core.internal.wc17.db.statement.SVNWCDbStatements;
+import org.tmatesoft.svn.core.io.ISVNCommitHookFactory;
+import org.tmatesoft.svn.core.io.ISVNEditor;
 import org.tmatesoft.svn.core.io.ISVNLockHandler;
 import org.tmatesoft.svn.core.io.SVNRepository;
 import org.tmatesoft.svn.util.SVNLogType;
@@ -55,6 +58,7 @@ public class FSCommitter {
     private FSTransactionInfo myTxn;
     private Collection myLockTokens;
     private String myAuthor;
+    private ISVNCommitHookFactory myCommitHookFactory;
 
     public FSCommitter(FSFS fsfs, FSTransactionRoot txnRoot, FSTransactionInfo txn, Collection lockTokens, String author) {
         myFSFS = fsfs;
@@ -70,6 +74,10 @@ public class FSCommitter {
         myTxn = txn;
         myLockTokens = lockTokens != null ? lockTokens : Collections.EMPTY_LIST;
         myAuthor = author;
+    }
+    
+    public void setCommitHookFactory(ISVNCommitHookFactory hookFactory) {
+        myCommitHookFactory = hookFactory;
     }
 
     public void deleteNode(String path) throws SVNException {
@@ -474,6 +482,8 @@ public class FSCommitter {
         final FSID newRootId = null;
         final FSTransactionRoot txnRoot = getTxnRoot();
         FSWriteLock txnWriteLock = FSWriteLock.getWriteLockForTxn(myTxn.getTxnId(), myFSFS);
+        String commitTime = null;
+        
         synchronized (txnWriteLock) {
             try {
                 // start transaction.
@@ -491,15 +501,15 @@ public class FSCommitter {
                 }
                 File dstRevFile = myFSFS.getNewRevisionFile(newRevision);
                 SVNFileUtil.rename(revisionPrototypeFile, dstRevFile);
+                commitTime = SVNDate.formatDate(new Date(System.currentTimeMillis()));
+                commitHook(newRevision, commitTime);
             } finally {
                txnWriteLock.unlock();
                FSWriteLock.release(txnWriteLock);
             }
         }
 
-        String commitTime = SVNDate.formatDate(new Date(System.currentTimeMillis()));
-        myFSFS.setTransactionProperty(myTxn.getTxnId(), SVNRevisionProperty.DATE,
-                SVNPropertyValue.create(commitTime));
+        myFSFS.setTransactionProperty(myTxn.getTxnId(), SVNRevisionProperty.DATE, SVNPropertyValue.create(commitTime));
 
         File txnPropsFile = myFSFS.getTransactionPropertiesFile(myTxn.getTxnId());
 
@@ -507,10 +517,8 @@ public class FSCommitter {
                 newRevision >= myFSFS.getMinUnpackedRevProp()){
             File dstRevPropsFile = myFSFS.getNewRevisionPropertiesFile(newRevision);
             SVNFileUtil.rename(txnPropsFile, dstRevPropsFile);
-        }
-        else
-        {
-          /* Read the revprops, and commit them to the permenant sqlite db. */
+        } else {
+          /* Read the revprops, and commit them to the sqlite db. */
           FSFile fsfProps = new FSFile(txnPropsFile);
           try {
               final SVNProperties revProperties = fsfProps.readProperties(false, true);
@@ -534,6 +542,67 @@ public class FSCommitter {
         myFSFS.setYoungestRevisionCache(newRevision);
         myFSFS.purgeTxn(myTxn.getTxnId());
         return newRevision;
+    }
+
+    private void commitHook(final long newRevision, String commitTime) throws SVNException {
+        if (myCommitHookFactory == null) {
+            return;
+        }
+        
+        SVNProperties metadata = new SVNProperties();
+        metadata.put(SVNProperty.LAST_AUTHOR, myAuthor);
+        metadata.put(SVNProperty.COMMITTED_DATE, commitTime);
+        metadata.put(SVNProperty.COMMITTED_REVISION, String.valueOf(newRevision));
+        metadata.put(SVNProperty.UUID, myFSFS.getUUID());
+        
+        ISVNEditor editor = myCommitHookFactory.createUpdateEditor(metadata);
+        if (editor == null) {
+            return;
+        }        
+        long oldYoungestRevisionCache = myFSFS.getYoungestRevision();
+        myFSFS.setYoungestRevisionCache(newRevision);
+
+        try {
+            File reportFile = SVNFileUtil.createTempFile("svnkit.", ".tmp");
+            FSUpdateContext context = new FSUpdateContext(
+                    null, 
+                    myFSFS, 
+                    newRevision, 
+                    reportFile, 
+                    "", 
+                    "/", 
+                    false, 
+                    SVNDepth.INFINITY, 
+                    false, 
+                    true, 
+                    true, 
+                    editor);
+            context.setMetaProperties(metadata);        
+            String[] updatableRoots = myCommitHookFactory.getUpdatableRoots();
+            if (updatableRoots == null || updatableRoots.length == 0) {
+                context.writePathInfoToReportFile("/", null, null, newRevision - 1, false, SVNDepth.INFINITY);
+            } else {
+                context.writePathInfoToReportFile("/", null, null, newRevision - 1, false, SVNDepth.EMPTY);
+                for (int i = 0; i < updatableRoots.length; i++) {
+                    String rootPath = updatableRoots[i];
+                    if (rootPath == null) {
+                        continue;
+                    }
+                    if (rootPath.startsWith("/")) {
+                        rootPath = rootPath.substring("/".length());
+                    }
+                    System.out.println("reporting " + rootPath);
+                    context.writePathInfoToReportFile(rootPath, null, null, newRevision - 1, false, SVNDepth.INFINITY);
+                }
+            }
+            
+            context.drive();
+        } catch (Throwable th) {
+            // ignore all for now.
+            th.printStackTrace();
+        } finally {
+            myFSFS.setYoungestRevisionCache(oldYoungestRevisionCache);
+        }
     }
 
     private void commit(String startNodeId, String startCopyId, long newRevision, OutputStream protoFileOS, FSID newRootId, FSTransactionRoot txnRoot, File revisionPrototypeFile, long offset)
