@@ -27,8 +27,8 @@ import org.tmatesoft.svn.util.SVNLogType;
  */
 public class DAVConfig {
 
-    private static final String PATH_DIRECIVE = "SVNPath";
-    private static final String PARENT_PATH_DIRECIVE = "SVNParentPath";
+    public static final String PATH_DIRECTIVE = "SVNPath";
+    public static final String PARENT_PATH_DIRECTIVE = "SVNParentPath";
     private static final String SVN_ACCESS_FILE_DIRECTIVE = "AuthzSVNAccessFile";
     private static final String SVN_ANONYMOUS_DIRECTIVE = "AuthzSVNAnonymous";
     private static final String SVN_NO_AUTH_IF_ANONYMOUS_ALLOWED_DIRECIVE = "AuthzSVNNoAuthWhenAnonymousAllowed";
@@ -57,8 +57,8 @@ public class DAVConfig {
     private boolean myIsAllowDepthInfinity = false;
     
     public DAVConfig(ServletConfig servletConfig) throws SVNException {
-        String repositoryPath = servletConfig.getInitParameter(PATH_DIRECIVE);
-        String repositoryParentPath = servletConfig.getInitParameter(PARENT_PATH_DIRECIVE);
+        String repositoryPath = servletConfig.getInitParameter(PATH_DIRECTIVE);
+        String repositoryParentPath = servletConfig.getInitParameter(PARENT_PATH_DIRECTIVE);
         myRepositoryName = servletConfig.getInitParameter(REPOS_NAME);
         myXSLTIndex = servletConfig.getInitParameter(XSLT_INDEX);
         
