@@ -358,7 +358,7 @@ public class FSCommitEditor implements ISVNEditor {
             }
             
             SVNErrorMessage[] errorMessage = new SVNErrorMessage[1];
-            myCommitter.setCommitHookFactory(myRepository.getCommitHookFactory());
+            myCommitter.setCommitHookFactory(myRepository);
             try {
                 committedRev = myCommitter.commitTxn(true, true, errorMessage, null);
             } finally {

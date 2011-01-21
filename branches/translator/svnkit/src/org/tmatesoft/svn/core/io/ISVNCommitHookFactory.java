@@ -11,6 +11,8 @@
  */
 package org.tmatesoft.svn.core.io;
 
+import org.tmatesoft.svn.core.SVNException;
+import org.tmatesoft.svn.core.SVNLogEntry;
 import org.tmatesoft.svn.core.SVNProperties;
 
 
@@ -20,7 +22,7 @@ import org.tmatesoft.svn.core.SVNProperties;
  */
 public interface ISVNCommitHookFactory {
 
-    public ISVNEditor createUpdateEditor(SVNProperties commitMetadata);
+    public ISVNEditor createUpdateEditor(SVNRepository repository, SVNLogEntry logEntry) throws SVNException;
     
     public String[] getUpdatableRoots();
     
