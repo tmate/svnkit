@@ -29,6 +29,7 @@ import org.tmatesoft.svn.core.internal.server.dav.handlers.DAVHandlerFactory;
 import org.tmatesoft.svn.core.internal.util.SVNEncodingUtil;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
+import org.tmatesoft.svn.core.io.ISVNCommitHookFactory;
 import org.tmatesoft.svn.core.io.SVNRepository;
 import org.tmatesoft.svn.core.io.SVNRepositoryFactory;
 import org.tmatesoft.svn.util.SVNDebugLog;
@@ -51,6 +52,7 @@ public class DAVRepositoryManager {
     private String myResourcePathInfo;
     private Principal myUserPrincipal;
     private File myRepositoryRootDir;
+	private ISVNCommitHookFactory myCommitHookFactory;
     
     public DAVRepositoryManager(DAVConfig config, HttpServletRequest request) throws SVNException {
         if (config == null) {
@@ -88,6 +90,14 @@ public class DAVRepositoryManager {
             int access = getRequestedAccess(request.getMethod());
             checkAccess(repository, path, checkDestinationPath, destinationPath, user, access);
         }
+    }
+    
+    public void setCommitHookFactory(ISVNCommitHookFactory commitHookFactory) {
+    	myCommitHookFactory = commitHookFactory;
+    }
+    
+    public ISVNCommitHookFactory getCommitHookFactory() {
+    	return myCommitHookFactory;
     }
 
     private int getRequestedAccess(String method) {
@@ -221,6 +231,7 @@ public class DAVRepositoryManager {
         BasicAuthenticationManager authManager = new BasicAuthenticationManager(new SVNAuthentication[] { auth });
         SVNRepository resourceRepository = SVNRepositoryFactory.create(SVNURL.parseURIEncoded(getResourceRepositoryRoot()));
         resourceRepository.setAuthenticationManager(authManager);
+        resourceRepository.setCommitHookFactory(getCommitHookFactory());
         DAVResource resource = new DAVResource(resourceRepository, this, resourceURI, isSVNClient, deltaBase, version, 
                 clientOptions, baseChecksum, resultChecksum, userName, activitiesDBDir, lockTokens, capabilities);
         return resource;

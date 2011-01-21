@@ -27,6 +27,7 @@ import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNLock;
+import org.tmatesoft.svn.core.SVNLogEntry;
 import org.tmatesoft.svn.core.SVNNodeKind;
 import org.tmatesoft.svn.core.SVNProperties;
 import org.tmatesoft.svn.core.SVNProperty;
@@ -53,6 +54,7 @@ import org.tmatesoft.svn.util.SVNLogType;
  */
 public class FSCommitter {
 
+	private SVNRepository myRepository;
     private FSFS myFSFS;
     private FSTransactionRoot myTxnRoot;
     private FSTransactionInfo myTxn;
@@ -76,8 +78,13 @@ public class FSCommitter {
         myAuthor = author;
     }
     
-    public void setCommitHookFactory(ISVNCommitHookFactory hookFactory) {
-        myCommitHookFactory = hookFactory;
+    public void setCommitHookFactory(SVNRepository repository) {
+        myRepository = repository;
+        if (repository != null) {
+        	myCommitHookFactory = repository.getCommitHookFactory();
+        } else {
+        	myCommitHookFactory = null;
+        }
     }
 
     public void deleteNode(String path) throws SVNException {
@@ -501,8 +508,16 @@ public class FSCommitter {
                 }
                 File dstRevFile = myFSFS.getNewRevisionFile(newRevision);
                 SVNFileUtil.rename(revisionPrototypeFile, dstRevFile);
-                commitTime = SVNDate.formatDate(new Date(System.currentTimeMillis()));
-                commitHook(newRevision, commitTime);
+                Date commitDate = new Date(System.currentTimeMillis());
+                commitTime = SVNDate.formatDate(commitDate);
+                String message = myFSFS.getTransactionProperties(myTxn.getTxnId()).getStringValue(SVNRevisionProperty.LOG);
+                Map changedPaths = myTxnRoot.getChangedPaths();
+
+                try {
+                	commitHook(changedPaths, newRevision, commitDate, message);
+                } catch (Throwable th) {
+                	th.printStackTrace();
+                }
             } finally {
                txnWriteLock.unlock();
                FSWriteLock.release(txnWriteLock);
@@ -544,18 +559,19 @@ public class FSCommitter {
         return newRevision;
     }
 
-    private void commitHook(final long newRevision, String commitTime) throws SVNException {
+    private void commitHook(Map changedPaths, final long newRevision, Date commitTime, String message) throws SVNException {
         if (myCommitHookFactory == null) {
             return;
         }
         
+        SVNLogEntry logEntry = new SVNLogEntry(changedPaths, newRevision, myAuthor, commitTime, message); 
         SVNProperties metadata = new SVNProperties();
         metadata.put(SVNProperty.LAST_AUTHOR, myAuthor);
-        metadata.put(SVNProperty.COMMITTED_DATE, commitTime);
+        metadata.put(SVNProperty.COMMITTED_DATE, SVNDate.formatDate(commitTime));
         metadata.put(SVNProperty.COMMITTED_REVISION, String.valueOf(newRevision));
         metadata.put(SVNProperty.UUID, myFSFS.getUUID());
         
-        ISVNEditor editor = myCommitHookFactory.createUpdateEditor(metadata);
+        ISVNEditor editor = myCommitHookFactory.createUpdateEditor(myRepository, logEntry);
         if (editor == null) {
             return;
         }        

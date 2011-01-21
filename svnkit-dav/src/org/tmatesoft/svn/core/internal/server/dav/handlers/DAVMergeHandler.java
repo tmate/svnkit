@@ -169,6 +169,7 @@ public class DAVMergeHandler extends ServletDAVHandler {
         
         FSCommitter committer = getCommitter(sourceResource.getFSFS(), txnRoot, txn, 
                 sourceResource.getLockTokens(), sourceResource.getUserName());
+        committer.setCommitHookFactory(sourceResource.getRepository());
         
         StringBuffer buffer = new StringBuffer();
         SVNErrorMessage[] postCommitHookErr = new SVNErrorMessage[1];

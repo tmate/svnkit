@@ -33,6 +33,7 @@ import org.tmatesoft.svn.core.internal.server.dav.handlers.ServletDAVHandler;
 import org.tmatesoft.svn.core.internal.util.SVNEncodingUtil;
 import org.tmatesoft.svn.core.internal.util.SVNHashMap;
 import org.tmatesoft.svn.core.internal.util.SVNXMLUtil;
+import org.tmatesoft.svn.core.io.ISVNCommitHookFactory;
 import org.tmatesoft.svn.util.SVNDebugLog;
 import org.tmatesoft.svn.util.SVNLogType;
 
@@ -109,6 +110,7 @@ public class DAVServlet extends HttpServlet {
     }
      
     private DAVConfig myDAVConfig;
+	private ISVNCommitHookFactory myHookFactory;
 
     private DAVConfig getDAVConfig() {
         return myDAVConfig;
@@ -128,6 +130,7 @@ public class DAVServlet extends HttpServlet {
         logRequest(request);//TODO: remove later
         try {
             DAVRepositoryManager repositoryManager = new DAVRepositoryManager(getDAVConfig(), request);
+            repositoryManager.setCommitHookFactory(getCommitHookFactory());
             handler = DAVHandlerFactory.createHandler(repositoryManager, request, response);
             handler.execute();
         } catch (DAVException de) {
@@ -301,4 +304,12 @@ public class DAVServlet extends HttpServlet {
     public static boolean isHTTPServerError(int statusCode) {
         return statusCode >= 500 && statusCode < 600;
     }
+
+	public void setCommitHookFactory(ISVNCommitHookFactory commitHookFactory) {
+		myHookFactory = commitHookFactory;
+	}
+	
+	private ISVNCommitHookFactory getCommitHookFactory() {
+		return myHookFactory;
+	}
 }
