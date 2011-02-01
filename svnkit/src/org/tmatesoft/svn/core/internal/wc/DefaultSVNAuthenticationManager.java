@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2009 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2011 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -101,10 +101,6 @@ public class DefaultSVNAuthenticationManager implements ISVNAuthenticationManage
     public void setAuthenticationProvider(ISVNAuthenticationProvider provider) {
         // add provider to list
         myProviders[3] = provider; 
-    }
-
-    protected File getConfigDirectory() {
-	    return myConfigDirectory;
     }
 
     public DefaultSVNOptions getDefaultOptions() {
@@ -422,7 +418,6 @@ public class DefaultSVNAuthenticationManager implements ISVNAuthenticationManage
             super(myConfigDirectory);
         }
 
-        @Override
         public ISVNHostOptions getHostOptions(SVNURL url) {
             return new ExtendedHostOptions(getServersFile(), url);
         }
@@ -433,8 +428,6 @@ public class DefaultSVNAuthenticationManager implements ISVNAuthenticationManage
         public ExtendedHostOptions(SVNCompositeConfigFile serversFile, SVNURL url) {
             super(serversFile, url);
         }
-
-        @Override
         public boolean isAuthStorageEnabled() {
             if (!super.hasAuthStorageEnabledOption()) {
                 return myIsStoreAuth;

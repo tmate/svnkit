@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2009 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2011 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -74,10 +74,6 @@ public class SVNCommandDaemon implements Runnable {
         } catch (IOException e) {
             log.logSevere(SVNLogType.DEFAULT, "cannot create server socket at port " + myPort);
             log.logSevere(SVNLogType.DEFAULT, e);
-            return;
-        }
-        if (serverSocket == null) {
-            log.logSevere(SVNLogType.DEFAULT, "cannot create server socket at port " + myPort);
             return;
         }
         while(true) {
