@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2009 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2011 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -139,7 +139,7 @@ public class SVNStatusEditor {
             myAdminInfo.addExternal(path, externals, externals);
             myAdminInfo.addDepth(path, dirEntry.getDepth());
             
-            SVNExternal[] externalsInfo = SVNExternal.parseExternals(dir.getRelativePath(myAdminInfo.getAnchor()), externals);
+            SVNExternal[] externalsInfo = SVNExternal.parseExternals(myAdminInfo.getAnchor(), externals);
             for (int i = 0; i < externalsInfo.length; i++) {
                 SVNExternal external = externalsInfo[i];
                 myExternalsMap.put(SVNPathUtil.append(path, external.getPath()), external);

@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2009 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2011 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -11,6 +11,12 @@
  */
 
 package org.tmatesoft.svn.core.internal.io.dav.handlers;
+
+import java.io.IOException;
+import java.io.OutputStream;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.Stack;
 
 import org.tmatesoft.svn.core.SVNCancelException;
 import org.tmatesoft.svn.core.SVNDepth;
@@ -28,6 +34,7 @@ import org.tmatesoft.svn.core.internal.io.dav.DAVProperties;
 import org.tmatesoft.svn.core.internal.io.dav.DAVRepository;
 import org.tmatesoft.svn.core.internal.io.dav.DAVUtil;
 import org.tmatesoft.svn.core.internal.io.dav.http.IHTTPConnectionFactory;
+import org.tmatesoft.svn.core.internal.util.SVNBase64;
 import org.tmatesoft.svn.core.internal.util.SVNEncodingUtil;
 import org.tmatesoft.svn.core.internal.util.SVNHashMap;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
@@ -41,14 +48,9 @@ import org.tmatesoft.svn.core.io.ISVNReporterBaton;
 import org.tmatesoft.svn.core.io.diff.SVNDeltaGenerator;
 import org.tmatesoft.svn.core.io.diff.SVNDiffWindow;
 import org.tmatesoft.svn.util.SVNLogType;
+
 import org.xml.sax.Attributes;
 import org.xml.sax.SAXException;
-
-import java.io.IOException;
-import java.io.OutputStream;
-import java.util.Iterator;
-import java.util.Map;
-import java.util.Stack;
 
 
 /**
@@ -530,7 +532,20 @@ public class DAVEditorHandler extends BasicDAVDeltaHandler {
             if (myPropertyName == null) {
                 myPropertyName = computeWCPropertyName(element);
             }
-            SVNPropertyValue value = createPropertyValue(null, myPropertyName, cdata, myEncoding);
+            
+            SVNPropertyValue value = null;
+            if (myEncoding == null || "".equals(myEncoding)) {
+                value = SVNPropertyValue.create(cdata.toString());
+            } else if ("base64".equals(myEncoding)) {
+                StringBuffer sb = SVNBase64.normalizeBase64(cdata);
+                byte[] buffer = allocateBuffer(sb.length());
+                int length = SVNBase64.base64ToByteArray(sb, buffer);
+                value = SVNPropertyValue.create(myPropertyName, buffer, 0, length);                
+            } else {
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.XML_UNKNOWN_ENCODING, 
+                        "Unknown XML encoding: ''{0}''", myEncoding);
+                SVNErrorManager.error(err, SVNLogType.NETWORK);
+            }
             
             if (myIsDirectory) {
                 myEditor.changeDirProperty(myPropertyName, value);
@@ -566,7 +581,11 @@ public class DAVEditorHandler extends BasicDAVDeltaHandler {
         }
         
         if (myIsFetchContent) {
-            SVNErrorManager.assertionFailure(myHref != null, "myHref is null", SVNLogType.NETWORK);
+            if (myHref == null) {
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.UNKNOWN, 
+                        "assertion failure in DAVEditorHandler.fetchFile(): myHref is null");
+                SVNErrorManager.error(err, SVNLogType.NETWORK);
+            }
             String deltaBaseVersionURL = myPath != null ? (String) myVersionURLs.get(myPath) : null;
             DeltaOutputStreamWrapper osWrapper = new DeltaOutputStreamWrapper(deltaBaseVersionURL != null, myPath);
             DAVConnection connection = getConnection();
