@@ -1,7 +1,0 @@
-processResources {
-    eachFile {
-        if (it.name == 'svnkit.build.properties') {
-            it.expand(project : project)
-        }
-    }
-}
