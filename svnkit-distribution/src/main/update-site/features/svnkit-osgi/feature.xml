@@ -10,8 +10,8 @@
    <license url="http://svnkit.com/license.html">%license</license>
 
    <url>
-      <update label="TMate Software SVNKit 1.7.x Update Site" url="http://eclipse.tmatesoft.com/svnkit/1.7.x/"/>
-      <discovery label="TMate Software SVNKit 1.7.x Update Site" url="http://eclipse.tmatesoft.com/svnkit/1.7.x/"/>
+      <update label="TMate Software SVNKit 1.3.x Update Site" url="http://eclipse.tmatesoft.com/svnkit/1.3.x/"/>
+      <discovery label="TMate Software SVNKit 1.3.x Update Site" url="http://eclipse.tmatesoft.com/svnkit/1.3.x/"/>
    </url>
    <plugin
          id="${svnkit_osgi_name}"
