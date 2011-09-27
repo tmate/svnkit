@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2009 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2011 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -11,10 +11,8 @@
  */
 package org.tmatesoft.svn.cli.svn;
 
-import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.internal.util.SVNFormatUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNTreeConflictUtil;
-import org.tmatesoft.svn.core.internal.wc17.db.ISVNWCDb;
 import org.tmatesoft.svn.core.wc.SVNStatus;
 import org.tmatesoft.svn.core.wc.SVNStatusType;
 
@@ -29,15 +27,14 @@ public class SVNStatusPrinter {
     public SVNStatusPrinter(SVNCommandEnvironment env) {
         myEnvironment = env;
     }
-
-    public void printStatus(String path, SVNStatus status,
-            boolean detailed, boolean showLastCommitted, boolean skipUnrecognized, boolean showReposLocks) throws SVNException {
-        if (status == null || 
-                (skipUnrecognized && !(status.isVersioned() || status.getTreeConflict() != null || status.getNodeStatus() == SVNStatusType.STATUS_EXTERNAL)) ||
-                (combineStatus(status) == SVNStatusType.STATUS_NONE && status.getRemoteContentsStatus() == SVNStatusType.STATUS_NONE)) {
+    
+    public void printStatus(String path, SVNStatus status, 
+            boolean detailed, boolean showLastCommitted, boolean skipUnrecognized, boolean showReposLocks) {
+        if (status == null || (skipUnrecognized && !(status.getEntry() != null || status.getTreeConflict() != null)) || 
+                (status.getContentsStatus() == SVNStatusType.STATUS_NONE && status.getRemoteContentsStatus() == SVNStatusType.STATUS_NONE)) {
             return;
         }
-
+        
         char treeStatusCode = ' ';
         String treeDescriptionLine = "";
         if (status.getTreeConflict() != null) {
@@ -45,25 +42,17 @@ public class SVNStatusPrinter {
             treeStatusCode = 'C';
             treeDescriptionLine = "\n      >   " + description;
         }
-
+        
         StringBuffer result = new StringBuffer();
         if (detailed) {
             String wcRevision;
             char remoteStatus;
-            if (!status.isVersioned()) {
+            if (status.getEntry() == null) {
                 wcRevision = "";
+            } else if (!status.getRevision().isValid()) {
+                wcRevision = " ? ";
             } else if (status.isCopied()) {
                 wcRevision = "-";
-            } else if (!status.getRevision().isValid()) {
-                if(status.getWorkingCopyFormat() == ISVNWCDb.WC_FORMAT_17) {
-                    if(status.getNodeStatus()==SVNStatusType.STATUS_DELETED) {
-                        wcRevision = status.getCommittedRevision().toString();
-                    } else {
-                        wcRevision = "-";
-                    }
-                } else {
-                    wcRevision = " ? ";
-                }
             } else {
                 wcRevision = Long.toString(status.getRevision().getNumber());
             }
@@ -92,17 +81,17 @@ public class SVNStatusPrinter {
                 String commitRevision = "";
                 String commitAuthor = "";
 
-                if (status.isVersioned() && status.getCommittedRevision().isValid()) {
+                if (status.getEntry() != null && status.getCommittedRevision().isValid()) {
                     commitRevision = status.getCommittedRevision().toString();
-                } else if (status.isVersioned()) {
+                } else if (status.getEntry() != null) {
                     commitRevision = " ? ";
                 }
-                if (status.isVersioned() && status.getAuthor() != null) {
+                if (status.getEntry() != null && status.getAuthor() != null) {
                     commitAuthor = status.getAuthor();
-                } else if (status.isVersioned()) {
+                } else if (status.getEntry() != null) {
                     commitAuthor = " ? ";
                 }
-                result.append(combineStatus(status).getCode());
+                result.append(status.getContentsStatus().getCode());
                 result.append(status.getPropertiesStatus().getCode());
                 result.append(status.isLocked() ? 'L' : ' ');
                 result.append(status.isCopied() ? '+' : ' ');
@@ -112,16 +101,16 @@ public class SVNStatusPrinter {
                 result.append(" ");
                 result.append(remoteStatus);
                 result.append("   ");
-                result.append(SVNFormatUtil.formatString(wcRevision, 6, false, false)); // 6 chars
+                result.append(SVNFormatUtil.formatString(wcRevision, 6, false)); // 6 chars
                 result.append("   ");
-                result.append(SVNFormatUtil.formatString(commitRevision, 6, false, false)); // 6 chars
+                result.append(SVNFormatUtil.formatString(commitRevision, 6, false)); // 6 chars
                 result.append(" ");
                 result.append(SVNFormatUtil.formatString(commitAuthor, 12, true)); // 12 chars
                 result.append(" ");
                 result.append(path);
                 result.append(treeDescriptionLine);
             }  else {
-                result.append(combineStatus(status).getCode());
+                result.append(status.getContentsStatus().getCode());
                 result.append(status.getPropertiesStatus().getCode());
                 result.append(status.isLocked() ? 'L' : ' ');
                 result.append(status.isCopied() ? '+' : ' ');
@@ -131,13 +120,13 @@ public class SVNStatusPrinter {
                 result.append(" ");
                 result.append(remoteStatus);
                 result.append("   ");
-                result.append(SVNFormatUtil.formatString(wcRevision, 6, false, false)); // 6 chars
+                result.append(SVNFormatUtil.formatString(wcRevision, 6, false)); // 6 chars
                 result.append("   ");
                 result.append(path);
                 result.append(treeDescriptionLine);
             }
         } else {
-            result.append(combineStatus(status).getCode());
+            result.append(status.getContentsStatus().getCode());
             result.append(status.getPropertiesStatus().getCode());
             result.append(status.isLocked() ? 'L' : ' ');
             result.append(status.isCopied() ? '+' : ' ');
@@ -151,18 +140,6 @@ public class SVNStatusPrinter {
         myEnvironment.getOut().println(result);
     }
     
-    public static SVNStatusType combineStatus(SVNStatus status) {
-        if (status.getNodeStatus() == SVNStatusType.STATUS_CONFLICTED) {
-            if (!status.isVersioned() && status.isConflicted()) {
-                return SVNStatusType.STATUS_MISSING;
-            }
-            return status.getContentsStatus();
-        } else if (status.getNodeStatus() == SVNStatusType.STATUS_MODIFIED) {
-            return status.getContentsStatus();
-        }
-        return status.getNodeStatus();
-    }
-
     private static char getSwitchCharacter(SVNStatus status) {
         if (status == null) {
             return ' ';

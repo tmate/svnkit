@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2009 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2011 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -238,7 +238,7 @@ public class SVNCommandUtil {
                 result = SVNFileUtil.execCommand(command, env, false, callback);
             }
         } else if (SVNFileUtil.isLinux || SVNFileUtil.isBSD || SVNFileUtil.isOSX || SVNFileUtil.isSolaris){
-            if (env == null && !SVNFileUtil.isSolaris) {
+            if (env == null) {
                 String shellCommand = SVNFileUtil.getEnvironmentVariable("SHELL");
                 if (shellCommand == null || "".equals(shellCommand.trim())) {
                     shellCommand = "/bin/sh";
@@ -462,14 +462,14 @@ public class SVNCommandUtil {
 
     public static String getVersion(AbstractSVNCommandEnvironment env, boolean quiet) {
         String version = Version.getMajorVersion() + "." + Version.getMinorVersion() + "." + Version.getMicroVersion();
-        String revNumber = Version.getRevisionString() == null ? "SNAPSHOT" : Version.getRevisionString();
-        String message = MessageFormat.format(env.getProgramName() + ", version {0}\n", new Object[] {version + " (" + revNumber + ")"});
+        String revNumber = Version.getRevisionNumber() < 0 ? "SNAPSHOT" : Long.toString(Version.getRevisionNumber());
+        String message = MessageFormat.format(env.getProgramName() + ", version {0}\n", new Object[] {version + " (r" + revNumber + ")"});
         if (quiet) {
             message = version;
         }
         if (!quiet) {
             message += 
-                "\nCopyright (c) 2004-2009 TMate Software.\n" +
+                "\nCopyright (c) 2004-2011 TMate Software.\n" +
                 "SVNKit is an Open Source software, see http://svnkit.com/ for more information.\n" +
                 "SVNKit is a pure Java (TM) version of Subversion, see http://subversion.tigris.org/";
         }

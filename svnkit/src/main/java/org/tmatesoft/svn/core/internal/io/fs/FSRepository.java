@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2009 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2011 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -329,7 +329,7 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
         try {
             openRepository();
             if (targetPaths == null || targetPaths.length == 0) {
-                targetPaths = new String[] {""};
+                targetPaths = new String[] {"/"};
             }
             String[] absPaths = new String[targetPaths.length];
             for (int i = 0; i < targetPaths.length; i++) {
@@ -348,11 +348,11 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
             long histEnd = endRevision;
 
             if (startRevision > youngestRev) {
-                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_NO_SUCH_REVISION, "No such revision {0}", String.valueOf(startRevision));
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_NO_SUCH_REVISION, "No such revision {0}", new Long(startRevision));
                 SVNErrorManager.error(err, SVNLogType.FSFS);
             }
             if (endRevision > youngestRev) {
-                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_NO_SUCH_REVISION, "No such revision {0}", String.valueOf(endRevision));
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_NO_SUCH_REVISION, "No such revision {0}", new Long(endRevision));
                 SVNErrorManager.error(err, SVNLogType.FSFS);
             }
 
@@ -444,7 +444,8 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
         }
         // fetch user name!
         String author = getUserName();
-        return new FSCommitEditor(getRepositoryPath(""), logMessage, author, locks, keepLocks, null, myFSFS, this);
+        FSCommitEditor commitEditor = new FSCommitEditor(getRepositoryPath(""), logMessage, author, locks, keepLocks, null, myFSFS, this);
+        return commitEditor;
     }
 
     public SVNLock getLock(String path) throws SVNException {
@@ -915,7 +916,6 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
                 while (auth != null) {
                     String userName = auth.getUserName();
                     if (userName == null) {
-                        // anonymous.
                         return null;
                     }
                     if ("".equals(userName.trim())) {
@@ -941,7 +941,6 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
                 throw e;
             }
         }
-        // anonymous
         return null;
     }
 

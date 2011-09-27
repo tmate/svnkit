@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2009 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2011 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -81,7 +81,7 @@ import org.tmatesoft.svn.core.internal.io.dav.http.IHTTPConnectionFactory;
 import org.tmatesoft.svn.core.internal.io.fs.FSRepositoryFactory;
 import org.tmatesoft.svn.core.internal.io.svn.ISVNConnectorFactory;
 import org.tmatesoft.svn.core.internal.io.svn.SVNRepositoryFactoryImpl;
-import org.tmatesoft.svn.core.internal.io.svn.SVNSSHConnector;
+import org.tmatesoft.svn.core.internal.io.svn.SVNSSHSession;
 import org.tmatesoft.svn.core.internal.util.DefaultSVNDebugFormatter;
 import org.tmatesoft.svn.core.internal.util.SVNFormatUtil;
 import org.tmatesoft.svn.core.internal.util.SVNHashMap;
@@ -1597,7 +1597,7 @@ public class SVNClientImpl implements SVNClientInterface {
             ourInstanceCount--;
             if (ourInstanceCount <= 0) {
                 ourInstanceCount = 0;
-                SVNSSHConnector.shutdown();
+                SVNSSHSession.shutdown();
             }
         }
     }

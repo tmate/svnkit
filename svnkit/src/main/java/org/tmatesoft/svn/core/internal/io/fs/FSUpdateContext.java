@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2009 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2011 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -29,7 +29,6 @@ import org.tmatesoft.svn.core.SVNNodeKind;
 import org.tmatesoft.svn.core.SVNProperties;
 import org.tmatesoft.svn.core.SVNProperty;
 import org.tmatesoft.svn.core.SVNPropertyValue;
-import org.tmatesoft.svn.core.SVNRevisionProperty;
 import org.tmatesoft.svn.core.internal.delta.SVNDeltaCombiner;
 import org.tmatesoft.svn.core.internal.util.SVNHashMap;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
@@ -61,7 +60,7 @@ public class FSUpdateContext {
     private String myTargetPath;
     private boolean isSwitch;
     private boolean mySendCopyFromArgs;
-    private FSRoot myTargetRoot;
+    private FSRevisionRoot myTargetRoot;
     private LinkedList myRootsCache;
     private FSFS myFSFS;
     private FSRepository myRepository;
@@ -101,10 +100,6 @@ public class FSUpdateContext {
         myTargetPath = targetPath;
         this.isSwitch = isSwitch;
         mySendCopyFromArgs = sendCopyFrom;
-    }
-    
-    public void setTargetRoot(FSRoot root) {
-        myTargetRoot = root;
     }
 
     public OutputStream getReportFileForWriting() throws SVNException {
@@ -176,7 +171,7 @@ public class FSUpdateContext {
         return myCurrentPathInfo;
     }
 
-    private FSRoot getTargetRoot() throws SVNException {
+    private FSRevisionRoot getTargetRoot() throws SVNException {
         if (myTargetRoot == null) {
             myTargetRoot = myFSFS.createRevisionRoot(myTargetRevision);
         }
@@ -270,9 +265,7 @@ public class FSUpdateContext {
         }
 
         String fullTargetPath = getReportTargetPath();
-        String fullSourcePath = myRepository != null ?
-                SVNPathUtil.getAbsolutePath(SVNPathUtil.append(myRepository.getRepositoryPath(""), getReportTarget())) :
-                SVNPathUtil.getAbsolutePath(getReportTarget());
+        String fullSourcePath = SVNPathUtil.getAbsolutePath(SVNPathUtil.append(myRepository.getRepositoryPath(""), getReportTarget()));
         FSEntry targetEntry = fakeDirEntry(fullTargetPath, getTargetRoot());
         FSRevisionRoot srcRoot = getSourceRoot(sourceRevision);
         FSEntry sourceEntry = fakeDirEntry(fullSourcePath, srcRoot);
@@ -376,9 +369,10 @@ public class FSUpdateContext {
                             continue;
                         }
                         String entryEditPath = SVNPathUtil.append(editPath, srcEntry.getName());
-                        long deletedRev = getDeletedRevision(SVNPathUtil.append(targetPath, 
+                        long deletedRev = myFSFS.getDeletedRevision(SVNPathUtil.append(targetPath, 
                                                                     srcEntry.getName()), 
-                                                                    sourceRevision, getTargetRevision());
+                                                                    sourceRevision, 
+                                                                    getTargetRevision());
                         getEditor().deleteEntry(entryEditPath, deletedRev);
                     }
                 }
@@ -485,25 +479,17 @@ public class FSUpdateContext {
         if (sourceEntry != null && targetEntry != null && sourceEntry.getType() == targetEntry.getType()) {
             int distance = sourceEntry.getId().compareTo(targetEntry.getId());
             if (distance == 0 && !PathInfo.isRelevant(getCurrentPathInfo(), editPath) && 
+                    (pathInfo == null || 
+                            (!pathInfo.isStartEmpty() && pathInfo.getLockToken() == null)) && 
                             (requestedDepth.compareTo(wcDepth) <= 0 || targetEntry.getType() == SVNNodeKind.FILE)) {
-                if (pathInfo == null) {
-                    return;
-                }
-                if (!pathInfo.isStartEmpty()) {
-                    if (pathInfo.getLockToken() == null) {
-                        return;
-                    }
-                    SVNLock exitsingLock = myFSFS.getLock(targetPath, false, false);
-                    if (exitsingLock != null && exitsingLock.getID().equals(pathInfo.getLockToken())) {
-                        return;
-                    }
-                }
+                return;
+            } else if (distance != -1 || isIgnoreAncestry()) {
+                related = true;
             }
-            related = distance != -1 || isIgnoreAncestry();
         }
 
         if (sourceEntry != null && !related) {
-            long deletedRev = getDeletedRevision(targetPath, sourceRevision, getTargetRevision());
+            long deletedRev = myFSFS.getDeletedRevision(targetPath, sourceRevision, getTargetRevision());
             getEditor().deleteEntry(editPath, deletedRev);
             sourcePath = null;
         }
@@ -543,39 +529,19 @@ public class FSUpdateContext {
         }
     }
 
-    private long getDeletedRevision(String targetPath, long sourceRevision, long targetRevision) throws SVNException {
-        if (isTransactionTarget()) {
-            return getTargetRevision();
-        }
-        return myFSFS.getDeletedRevision(targetPath, sourceRevision, targetRevision);
-    }
-    
-    private boolean isTransactionTarget() throws SVNException {
-        return getTargetRoot() instanceof FSTransactionRoot;
-    }
-
     private SVNLocationEntry addFileSmartly(String editPath, String originalPath) throws SVNException {
         String copyFromPath = null;
         long copyFromRevision = SVNRepository.INVALID_REVISION;
         if (mySendCopyFromArgs) {
-            if (!isTransactionTarget()) {
-                FSClosestCopy closestCopy = ((FSRevisionRoot) getTargetRoot()).getClosestCopy(originalPath);
-                if (closestCopy != null) {
-                    FSRevisionRoot closestCopyRoot = closestCopy.getRevisionRoot();
-                    String closestCopyPath = closestCopy.getPath();
-                    if (originalPath.equals(closestCopyPath)) {
-                        FSRevisionNode closestCopyFromNode = closestCopyRoot.getRevisionNode(
-                                closestCopyPath);
-                        copyFromPath = closestCopyFromNode.getCopyFromPath();
-                        copyFromRevision = closestCopyFromNode.getCopyFromRevision();
-                    }
-                }
-            } else if (isTransactionTarget()) {
-                FSTransactionRoot txn = (FSTransactionRoot) getTargetRoot();
-                FSPathChange change = (FSPathChange) txn.getChangedPaths().get(originalPath);
-                if (change != null) {
-                    copyFromPath = change.getCopyPath();
-                    copyFromRevision = change.getCopyRevision();
+            FSClosestCopy closestCopy = getTargetRoot().getClosestCopy(originalPath);
+            if (closestCopy != null) {
+                FSRevisionRoot closestCopyRoot = closestCopy.getRevisionRoot();
+                String closestCopyPath = closestCopy.getPath();
+                if (originalPath.equals(closestCopyPath)) {
+                    FSRevisionNode closestCopyFromNode = closestCopyRoot.getRevisionNode(
+                            closestCopyPath);
+                    copyFromPath = closestCopyFromNode.getCopyFromPath();
+                    copyFromRevision = closestCopyFromNode.getCopyFromRevision();
                 }
             }
         }
@@ -583,48 +549,33 @@ public class FSUpdateContext {
         return new SVNLocationEntry(copyFromRevision, copyFromPath);
     }
     
-    private Map computeMetaProperties(long revision) throws SVNException {
-        Map metaProperties = new SVNHashMap();
-        if (FSRepository.isValidRevision(revision)) {
-            SVNProperties entryProps = myFSFS.compoundMetaProperties(revision);
-            metaProperties.put(SVNProperty.COMMITTED_REVISION, entryProps.getSVNPropertyValue(SVNProperty.COMMITTED_REVISION));
-            metaProperties.put(SVNProperty.COMMITTED_DATE, entryProps.getSVNPropertyValue(SVNProperty.COMMITTED_DATE));
-            metaProperties.put(SVNProperty.LAST_AUTHOR, entryProps.getSVNPropertyValue(SVNProperty.LAST_AUTHOR));
-            metaProperties.put(SVNProperty.UUID, entryProps.getSVNPropertyValue(SVNProperty.UUID));
-        } else if (!FSRepository.isValidRevision(revision) && isTransactionTarget()) {
-            FSTransactionRoot txnRoot = (FSTransactionRoot) getTargetRoot();
-            SVNProperties txnProperties = myFSFS.getTransactionProperties(txnRoot.getTxnID());
-            metaProperties.put(SVNProperty.COMMITTED_REVISION, SVNPropertyValue.create(Long.toString(getTargetRevision())));
-            metaProperties.put(SVNProperty.COMMITTED_DATE, txnProperties.getSVNPropertyValue(SVNRevisionProperty.DATE));
-            metaProperties.put(SVNProperty.LAST_AUTHOR, txnProperties.getSVNPropertyValue(SVNRevisionProperty.AUTHOR));
-            metaProperties.put(SVNProperty.UUID, SVNPropertyValue.create(myFSFS.getUUID()));
-        }  else {
-            metaProperties = null;
-        }
-        return metaProperties;
-    }
-    
     private void diffProplists(long sourceRevision, String sourcePath, String editPath, String targetPath, String lockToken, boolean isDir) throws SVNException {
         FSRevisionNode targetNode = getTargetRoot().getRevisionNode(targetPath);
         long createdRevision = targetNode.getCreatedRevision();
-        Map metaProperties = computeMetaProperties(createdRevision);
-        if (metaProperties != null) {
-            SVNPropertyValue committedRevision = (SVNPropertyValue) metaProperties.get(SVNProperty.COMMITTED_REVISION);
+
+        if (FSRepository.isValidRevision(createdRevision)) {
+            SVNProperties entryProps = myFSFS.compoundMetaProperties(createdRevision);
+            SVNPropertyValue committedRevision = entryProps.getSVNPropertyValue(SVNProperty.COMMITTED_REVISION);
             changeProperty(editPath, SVNProperty.COMMITTED_REVISION, committedRevision, isDir);
-            SVNPropertyValue committedDate = (SVNPropertyValue) metaProperties.get(SVNProperty.COMMITTED_DATE);
+            SVNPropertyValue committedDate = entryProps.getSVNPropertyValue(SVNProperty.COMMITTED_DATE);
+
             if (committedDate != null || sourcePath != null) {
                 changeProperty(editPath, SVNProperty.COMMITTED_DATE, committedDate, isDir);
             }
-            SVNPropertyValue lastAuthor = (SVNPropertyValue) metaProperties.get(SVNProperty.LAST_AUTHOR);
+
+            SVNPropertyValue lastAuthor = entryProps.getSVNPropertyValue(SVNProperty.LAST_AUTHOR);
+
             if (lastAuthor != null || sourcePath != null) {
                 changeProperty(editPath, SVNProperty.LAST_AUTHOR, lastAuthor, isDir);
             }
-            SVNPropertyValue uuid = (SVNPropertyValue) metaProperties.get(SVNProperty.UUID);
+
+            SVNPropertyValue uuid = entryProps.getSVNPropertyValue(SVNProperty.UUID);
+
             if (uuid != null || sourcePath != null) {
                 changeProperty(editPath, SVNProperty.UUID, uuid, isDir);
             }
-        } 
-        
+        }
+
         if (lockToken != null) {
             SVNLock lock = myFSFS.getLockHelper(targetPath, false);
             if (lock == null || !lockToken.equals(lock.getID())) {
@@ -691,7 +642,7 @@ public class FSUpdateContext {
         }
     }
 
-    private FSEntry fakeDirEntry(String reposPath, FSRoot root) throws SVNException {
+    private FSEntry fakeDirEntry(String reposPath, FSRevisionRoot root) throws SVNException {
         if (root.checkNodeKind(reposPath) == SVNNodeKind.NONE) {
             return null;
         }
