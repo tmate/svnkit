@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2009 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2011 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -222,7 +222,12 @@ public class SVNMergeRangeList {
             }
         }
         
-        SVNErrorManager.assertionFailure(i >= myRanges.length || j >= rangeList.myRanges.length, "expected to reach the end of at least one range list", SVNLogType.DEFAULT);
+        if (i < myRanges.length && j < rangeList.myRanges.length) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.UNKNOWN, 
+                    "ASSERTION FAILURE in SVNMergeRangeList.merge(): expected to reach the end of at least " +
+                    "one range list");
+            SVNErrorManager.error(err, SVNLogType.DEFAULT);
+        }
         
         for (; i < myRanges.length; i++) {
             SVNMergeRange range = myRanges[i];
@@ -554,8 +559,7 @@ public class SVNMergeRangeList {
                         if (lastRange.getEndRevision() < mRange.getEndRevision()) {
                             if (pushedMRange2 == null) {
                                 pushedMRange2 = new SVNMergeRange(lastRange.getEndRevision(), mRange.getEndRevision(), mRange.isInheritable());
-                            }
-                            
+                            } 
                             tmpRevision = lastRange.getStartRevision();
                             lastRange.setStartRevision(mRange.getStartRevision());
                             lastRange.setEndRevision(tmpRevision);
@@ -567,7 +571,7 @@ public class SVNMergeRangeList {
                         } else {
                             if (pushedMRange2 == null) {
                                 pushedMRange2 = new SVNMergeRange(mRange.getEndRevision(), lastRange.getEndRevision(), lastRange.isInheritable());
-                            }
+                            } 
                             
                             tmpRevision = lastRange.getStartRevision();
                             lastRange.setStartRevision(mRange.getStartRevision());

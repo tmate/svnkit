@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2009 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2011 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -10,8 +10,6 @@
  * ====================================================================
  */
 package org.tmatesoft.svn.cli;
-
-import static org.tmatesoft.svn.core.wc.SVNBasicClient.isWC17Supported;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -33,7 +31,6 @@ import org.tmatesoft.svn.core.SVNCommitInfo;
 import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
-import org.tmatesoft.svn.core.SVNNodeKind;
 import org.tmatesoft.svn.core.SVNURL;
 import org.tmatesoft.svn.core.auth.ISVNAuthenticationManager;
 import org.tmatesoft.svn.core.internal.util.SVNEncodingUtil;
@@ -45,9 +42,7 @@ import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNPath;
 import org.tmatesoft.svn.core.internal.wc.admin.SVNEntry;
 import org.tmatesoft.svn.core.internal.wc.admin.SVNWCAccess;
-import org.tmatesoft.svn.core.internal.wc17.SVNWCContext;
 import org.tmatesoft.svn.core.wc.ISVNEventHandler;
-import org.tmatesoft.svn.core.wc.SVNBasicClient;
 import org.tmatesoft.svn.core.wc.SVNClientManager;
 import org.tmatesoft.svn.core.wc.SVNEvent;
 import org.tmatesoft.svn.core.wc.SVNRevision;
@@ -61,7 +56,7 @@ import org.tmatesoft.svn.util.SVNLogType;
  * @author  TMate Software Ltd.
  */
 public abstract class AbstractSVNCommandEnvironment implements ISVNCanceller {
-
+    
     private boolean ourIsCancelled;
     private InputStream myIn;
     private PrintStream myErr;
@@ -79,7 +74,7 @@ public abstract class AbstractSVNCommandEnvironment implements ISVNCanceller {
         myIn = in;
         myProgramName = programName;
     }
-
+    
     public String getProgramName() {
         return myProgramName;
     }
@@ -91,7 +86,7 @@ public abstract class AbstractSVNCommandEnvironment implements ISVNCanceller {
     public PrintStream getErr() {
         return myErr;
     }
-
+    
     public InputStream getIn() {
         return myIn;
     }
@@ -107,22 +102,22 @@ public abstract class AbstractSVNCommandEnvironment implements ISVNCanceller {
     public List getArguments() {
         return myArguments;
     }
-
+    
     public AbstractSVNCommand getCommand() {
         return myCommand;
     }
-
+    
     public String getCommandName() {
         return myCommandName;
     }
-
+    
     public String popArgument() {
         if (myArguments.isEmpty()) {
             return null;
         }
         return (String) myArguments.remove(0);
     }
-
+    
     protected void setArguments(List newArguments) {
         myArguments = newArguments;
     }
@@ -132,7 +127,7 @@ public abstract class AbstractSVNCommandEnvironment implements ISVNCanceller {
     	initOptions(commandLine);
         validateOptions(commandLine);
     }
-
+    
     public boolean run() {
         myCommand.init(this);
         try {
@@ -158,7 +153,7 @@ public abstract class AbstractSVNCommandEnvironment implements ISVNCanceller {
         }
         return !myCommand.isFailed();
     }
-
+    
     protected void initOptions(SVNCommandLine commandLine) throws SVNException {
         for (Iterator options = commandLine.optionValues(); options.hasNext();) {
             SVNOptionValue optionValue = (SVNOptionValue) options.next();
@@ -166,7 +161,7 @@ public abstract class AbstractSVNCommandEnvironment implements ISVNCanceller {
         }
         myArguments = new LinkedList(commandLine.getArguments());
     }
-
+    
     protected abstract void initOption(SVNOptionValue optionValue) throws SVNException;
 
     protected void validateOptions(SVNCommandLine commandLine) throws SVNException {
@@ -178,7 +173,7 @@ public abstract class AbstractSVNCommandEnvironment implements ISVNCanceller {
             }
         }
     }
-
+    
     protected void initCommand(SVNCommandLine commandLine) throws SVNException {
         myCommandName = getCommandName(commandLine);
         myCommand = AbstractSVNCommand.getCommand(myCommandName);
@@ -187,20 +182,20 @@ public abstract class AbstractSVNCommandEnvironment implements ISVNCanceller {
             SVNErrorManager.error(err, SVNLogType.CLIENT);
         }
     }
-
+    
     protected String getCommandName(SVNCommandLine commandLine) throws SVNException {
         String commandName = commandLine.getCommandName();
         return refineCommandName(commandName, commandLine);
     }
-
+    
     protected abstract String refineCommandName(String commandName, SVNCommandLine commandLine) throws SVNException;
-
+    
     protected abstract DefaultSVNOptions createClientOptions() throws SVNException;
 
     protected abstract ISVNAuthenticationManager createClientAuthenticationManager();
-
+    
     protected abstract String getCommandLineClientName();
-
+    
     public void initClientManager() throws SVNException {
         myOptions = createClientOptions();
         myClientManager = SVNClientManager.newInstance(myOptions, createClientAuthenticationManager());
@@ -212,14 +207,14 @@ public abstract class AbstractSVNCommandEnvironment implements ISVNCanceller {
             }
         });
     }
-
+    
     public void dispose() {
         if (myClientManager != null) {
             myClientManager.dispose();
             myClientManager = null;
         }
     }
-
+    
     public List combineTargets(Collection targets, boolean warnReserved) throws SVNException {
         List result = new LinkedList();
         result.addAll(getArguments());
@@ -235,7 +230,7 @@ public abstract class AbstractSVNCommandEnvironment implements ISVNCanceller {
                 hasRelativeURLs = true;
             }
         }
-
+        
         List canonical = new ArrayList(result.size());
         targets = new ArrayList(result.size());
         for (Iterator iterator = result.iterator(); iterator.hasNext();) {
@@ -262,7 +257,7 @@ public abstract class AbstractSVNCommandEnvironment implements ISVNCanceller {
                     String name = SVNPathUtil.tail(path);
                     if (SVNFileUtil.getAdminDirectoryName().equals(name) || ".svn".equals(name) || "_svn".equals(name)) {
                         if (warnReserved) {
-                            SVNErrorMessage error = SVNErrorMessage.create(SVNErrorCode.RESERVED_FILENAME_SPECIFIED,
+                            SVNErrorMessage error = SVNErrorMessage.create(SVNErrorCode.RESERVED_FILENAME_SPECIFIED, 
                                     "Skipping argument: ''{0}'' ends in a reserved name", path);
                             error.setType(SVNErrorMessage.TYPE_WARNING);
                             handleError(error);
@@ -270,18 +265,18 @@ public abstract class AbstractSVNCommandEnvironment implements ISVNCanceller {
                         continue;
                     }
                 }
-
+                
                 if (hasRelativeURLs) {
                     rootURL = checkRootURLOfTarget(rootURL, path);
                 }
                 targets.add(path);
             }
         }
-
+        
         if (hasRelativeURLs) {
             if (rootURL == null) {
                 SVNWCClient wcClient = getClientManager().getWCClient();
-                rootURL = wcClient.getReposRoot(new File("").getAbsoluteFile(), null, SVNRevision.BASE);
+                rootURL = wcClient.getReposRoot(new File("").getAbsoluteFile(), null, SVNRevision.BASE, null, null);
             }
             for (Iterator targetsIter = targets.iterator(); targetsIter.hasNext();) {
                 String target = (String) targetsIter.next();
@@ -297,8 +292,8 @@ public abstract class AbstractSVNCommandEnvironment implements ISVNCanceller {
                     if (pegRevisionString != null) {
                         target += pegRevisionString;
                     }
-                }
-
+                } 
+                
                 canonical.add(target);
             }
         } else {
@@ -313,10 +308,10 @@ public abstract class AbstractSVNCommandEnvironment implements ISVNCanceller {
         boolean colon = ":".equals(matcher.group(3));
         SVNRevision r1 = SVNRevision.parse(matcher.group(1));
         SVNRevision r2 = SVNRevision.parse(matcher.group(4));
-        return (colon && (r1 == SVNRevision.UNDEFINED || r2 == SVNRevision.UNDEFINED)) ||
+        return (colon && (r1 == SVNRevision.UNDEFINED || r2 == SVNRevision.UNDEFINED)) || 
                r1 == SVNRevision.UNDEFINED ? null : new SVNRevision[]{r1, r2};
     }
-
+    
     public byte[] readFromFile(File file) throws SVNException {
         InputStream is = null;
         ByteArrayOutputStream bos = null;
@@ -345,13 +340,12 @@ public abstract class AbstractSVNCommandEnvironment implements ISVNCanceller {
         Collection codes = new SVNHashSet();
         int count = 0;
         while(err != null && count < 2) {
-            SVNErrorCode errorCode = err.getErrorCode();
-            if ("".equals(err.getMessageTemplate()) && codes.contains(errorCode)) {
+            if ("".equals(err.getMessageTemplate()) && codes.contains(err.getErrorCode())) {
                 err = err.hasChildErrorMessage() ? err.getChildErrorMessage() : null;
                 continue;
             }
             if ("".equals(err.getMessageTemplate())) {
-                codes.add(errorCode);
+                codes.add(err.getErrorCode());
             }
             Object[] objects = err.getRelatedObjects();
             if (objects != null && objects.length > 0) {
@@ -372,13 +366,9 @@ public abstract class AbstractSVNCommandEnvironment implements ISVNCanceller {
                     }
                 }
                 if (err.getType() == SVNErrorMessage.TYPE_WARNING) {
-                    String msg = getCommandLineClientName() +": warning: " +
-                        (err.isErrorCodeShouldShown() ? "W" + errorCode.getCode() + ": " : "") + message;
-                    getErr().println(msg);
+                    getErr().println(getCommandLineClientName() +": warning: " + message);
                 } else {
-                    String msg = getCommandLineClientName() + ": " +
-                        (err.isErrorCodeShouldShown() ? "E" + errorCode.getCode() + ": " : "") + message;
-                    getErr().println(msg);
+                    getErr().println(getCommandLineClientName() + ": " + message);
                     count++;
                 }
             } else {
@@ -391,7 +381,7 @@ public abstract class AbstractSVNCommandEnvironment implements ISVNCanceller {
 
     public boolean handleWarning(SVNErrorMessage err, SVNErrorCode[] warningCodes, boolean quiet) throws SVNException {
         if (err == null) {
-            return true;
+            return true; 
         }
         SVNErrorCode code = err.getErrorCode();
         for (int i = 0; i < warningCodes.length; i++) {
@@ -400,13 +390,13 @@ public abstract class AbstractSVNCommandEnvironment implements ISVNCanceller {
                     err.setType(SVNErrorMessage.TYPE_WARNING);
                     err.setChildErrorMessage(null);
                     handleError(err);
-                }
+                } 
                 return false;
             }
         }
         throw new SVNException(err);
     }
-
+    
     public String getRelativePath(File file) {
         String inPath = file.getAbsolutePath().replace(File.separatorChar, '/');
         String basePath = new File("").getAbsolutePath().replace(File.separatorChar, '/');
@@ -441,37 +431,17 @@ public abstract class AbstractSVNCommandEnvironment implements ISVNCanceller {
     }
 
     public boolean isVersioned(String target) throws SVNException {
+        SVNWCAccess wcAccess = null;
         SVNPath commandTarget = new SVNPath(target);
-        if (SVNBasicClient.isWC17Supported()) {
-            SVNWCContext context = null;
-            try {
-                context = new SVNWCContext(getOptions(), null);
-                File file = commandTarget.getFile();
-                if (file != null) {
-                    SVNNodeKind kind = context.readKind(file.getAbsoluteFile(), false);
-                    return kind != null && kind != SVNNodeKind.NONE && kind != SVNNodeKind.UNKNOWN;
-                }
-            } catch (SVNException e) {
-                //
-            } finally {
-                if (context != null) {
-                    context.close();
-                }
-            }
-        } else {
-            SVNWCAccess wcAccess = null;
-            try {
-                wcAccess = SVNWCAccess.newInstance(null);
-                wcAccess.probeOpen(commandTarget.getFile(), false, 0);
-                SVNEntry entry = wcAccess.getVersionedEntry(commandTarget.getFile(), false);
-                return entry != null;
-            } catch (SVNException e) {
-                //
-            } finally {
-                if (wcAccess != null) {
-                    wcAccess.close();
-                }
-            }
+        try {
+            wcAccess = SVNWCAccess.newInstance(null);
+            wcAccess.probeOpen(commandTarget.getFile(), false, 0);
+            SVNEntry entry = wcAccess.getVersionedEntry(commandTarget.getFile(), false);
+            return entry != null;
+        } catch (SVNException e) {
+            //
+        } finally {
+            wcAccess.close();
         }
         return false;
     }
@@ -484,18 +454,18 @@ public abstract class AbstractSVNCommandEnvironment implements ISVNCanceller {
             }
         }
     }
-
+    
     private SVNURL resolveRepositoryRelativeURL(SVNURL rootURL, String relativeURL) throws SVNException {
         if (!isReposRelative(relativeURL)) {
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.BAD_URL, "Improper relative URL ''{0}''", relativeURL);
             SVNErrorManager.error(err, SVNLogType.CLIENT);
         }
-
+        
         relativeURL = relativeURL.substring(2);
         SVNURL url = rootURL.appendPath(relativeURL, true);
         return url;
     }
-
+    
     private SVNURL checkRootURLOfTarget(SVNURL rootURL, String target) throws SVNException {
         SVNPath svnPath = new SVNPath(target, true);
         SVNWCClient client = getClientManager().getWCClient();
@@ -503,7 +473,7 @@ public abstract class AbstractSVNCommandEnvironment implements ISVNCanceller {
         SVNURL url = svnPath.isURL() ? svnPath.getURL() : null;
         SVNURL tmpRootURL = null;
         try {
-            tmpRootURL = client.getReposRoot(path, url, svnPath.getPegRevision());
+            tmpRootURL = client.getReposRoot(path, url, svnPath.getPegRevision(), null, null); 
         } catch (SVNException svne) {
             SVNErrorMessage err = svne.getErrorMessage();
             if (err.getErrorCode() == SVNErrorCode.ENTRY_NOT_FOUND || err.getErrorCode() == SVNErrorCode.WC_NOT_DIRECTORY) {
@@ -511,7 +481,7 @@ public abstract class AbstractSVNCommandEnvironment implements ISVNCanceller {
             }
             throw svne;
         }
-
+        
         if (rootURL != null) {
             if (!rootURL.equals(tmpRootURL)) {
                 SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ILLEGAL_TARGET, "All non-relative targets must have the same root URL");
@@ -519,14 +489,14 @@ public abstract class AbstractSVNCommandEnvironment implements ISVNCanceller {
             }
             return rootURL;
         }
-
+        
         return tmpRootURL;
     }
-
+    
     private static boolean isReposRelative(String path) {
         return path != null && path.startsWith("^/");
     }
-
+     
     private static boolean startsWith(String p1, String p2) {
         if (SVNFileUtil.isWindows || SVNFileUtil.isOpenVMS) {
             return p1.toLowerCase().startsWith(p2.toLowerCase());
@@ -563,7 +533,7 @@ public abstract class AbstractSVNCommandEnvironment implements ISVNCanceller {
             }
         }
     }
-
+    
     public void setCancelled() {
         synchronized (AbstractSVNCommandEnvironment.class) {
             ourIsCancelled = true;
