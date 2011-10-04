@@ -13,8 +13,8 @@ import org.tmatesoft.svn.core.wc.SVNRevision;
 public class SVNEntryHashMap extends SVNHashMap {
     
     private static final long serialVersionUID = 1L;    
-    private static final Set<String> ourNonPoolableKeys = new HashSet<String>();
-    private static final Set<String> ourURLKeys = new HashSet<String>();
+    private static final Set ourNonPoolableKeys = new HashSet();
+    private static final Set ourURLKeys = new HashSet();
     
     static {
         ourNonPoolableKeys.add(SVNProperty.CHECKSUM);
@@ -36,20 +36,18 @@ public class SVNEntryHashMap extends SVNHashMap {
         this(null, pool);
     }
     
-    public SVNEntryHashMap(Map<?, ?> map, SVNObjectsPool pool) {
+    public SVNEntryHashMap(Map map, SVNObjectsPool pool) {
         myObjectsPool = pool;
         
         init();
         putAll(map);
     }
     
-    @Override
     public Object put(Object key, Object value) {
         key = getObjectFromPool(key);
         return super.put(key, value);
     }
 
-    @Override
     protected TableEntry createTableEntry(Object key, Object value, int hash) {
         return new PooledTableEntry(myObjectsPool, key, value, hash);
     }
@@ -117,7 +115,7 @@ public class SVNEntryHashMap extends SVNHashMap {
     }
     
     private static Object[] split(String url) {
-        ArrayList<String> segments = new ArrayList<String>();
+        ArrayList segments = new ArrayList();
         int startIndex = 0;
         int count = 0;
         for(int i = 0; i < url.length(); i++) {

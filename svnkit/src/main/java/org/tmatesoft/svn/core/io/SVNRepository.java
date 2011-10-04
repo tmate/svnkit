@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2009 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2011 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -148,7 +148,7 @@ public abstract class SVNRepository {
     /**
      * Is used as an initialization value in cases, when revision is not defined, often represents HEAD revision
      */
-    public static final long INVALID_REVISION = -1L;
+    public static final long INVALID_REVISION = -1;
         
     protected String myRepositoryUUID;
     protected SVNURL myRepositoryRoot;
@@ -2978,9 +2978,15 @@ public abstract class SVNRepository {
             endRevision = 0;
         }
         
-
-        SVNErrorManager.assertionFailure(pegRevision >= startRevision, null, SVNLogType.NETWORK);
-        SVNErrorManager.assertionFailure(startRevision >= endRevision, null, SVNLogType.NETWORK);
+        if (pegRevision < startRevision || startRevision < endRevision) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.UNKNOWN, 
+                    "assertion failure in getLocationSegmentsFromLog:\n" +
+                    "  pegRevision is {0}\n" +
+                    "  startRevision is {1}\n" +
+                    "  endRevision is {2}", new Object[] { new Long(pegRevision), 
+                    new Long(startRevision), new Long(endRevision) });
+            SVNErrorManager.error(err, SVNLogType.NETWORK);
+        }
         
         SVNNodeKind kind = checkPath(path, pegRevision);
         if (kind == SVNNodeKind.NONE) {

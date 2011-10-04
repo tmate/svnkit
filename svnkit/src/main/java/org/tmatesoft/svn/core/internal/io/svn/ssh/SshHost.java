@@ -28,12 +28,12 @@ public class SshHost {
     private boolean myIsLocked;
     private boolean myIsDisposed;
     
-    private List<SshConnection> myConnections;
+    private List myConnections;
     private Object myOpenerLock = new Object();
     private int myOpenersCount;
     
     public SshHost(String host, int port) {
-        myConnections = new LinkedList<SshConnection>();
+        myConnections = new LinkedList();
         myHost = host;
         myPort = port;
     }
@@ -58,8 +58,8 @@ public class SshHost {
             lock();
             int size = myConnections.size();
             long time = System.currentTimeMillis();
-            for (Iterator<SshConnection> connections = myConnections.iterator(); connections.hasNext();) {
-                SshConnection connection = connections.next();
+            for (Iterator connections = myConnections.iterator(); connections.hasNext();) {
+                SshConnection connection = (SshConnection) connections.next();
                 if (connection.getSessionsCount() == 0) {
                     if (myConnections.size() == 1) {
                         long timeout = time - connection.lastAcccessTime();
@@ -90,8 +90,8 @@ public class SshHost {
     public void setDisposed(boolean disposed) {
         myIsDisposed = disposed;
         if (disposed) {
-            for (SshConnection connection : myConnections) {
-                connection.close();
+            for (Iterator connections = myConnections.iterator(); connections.hasNext();) {
+                ((SshConnection) connections.next()).close();
             }
             myConnections.clear();
         }
@@ -131,17 +131,21 @@ public class SshHost {
     }
     
     public SshSession openSession() throws IOException {
-        SshSession session = useExistingConnection();
-        if (session != null) {
-            return session;
-        }        
+        lock();
+        try {
+            for (Iterator connections = myConnections.iterator(); connections.hasNext();) {
+                SshConnection connection = (SshConnection) connections.next();
+                if (connection.getSessionsCount() < MAX_SESSIONS_PER_CONNECTION) {
+                    return connection.openSession();
+                }
+            }
+        } finally {
+            unlock();
+        }
+        
         SshConnection newConnection = null;
         addOpener();
         try {
-            session = useExistingConnection();
-            if (session != null) {
-                return session;
-            }
             newConnection = openConnection();
         } finally {
             removeOpener();
@@ -153,7 +157,8 @@ public class SshHost {
                 if (isDisposed()) {
                     newConnection.close();
                     throw new SshHostDisposedException();
-                }                
+                }
+                
                 myConnections.add(newConnection);
                 return newConnection.openSession();
             } finally {
@@ -161,23 +166,6 @@ public class SshHost {
             }
         }
         throw new IOException("Cannot establish SSH connection with " + myHost + ":" + myPort);
-    }
-
-    private SshSession useExistingConnection() throws IOException {
-        lock();
-        try {
-            if (isDisposed()) {
-                throw new SshHostDisposedException();
-            }
-            for (SshConnection connection : myConnections) {
-                if (connection.getSessionsCount() < MAX_SESSIONS_PER_CONNECTION) {
-                    return connection.openSession();
-                }
-            }
-        } finally {
-            unlock();
-        }
-        return null;
     }
 
     
