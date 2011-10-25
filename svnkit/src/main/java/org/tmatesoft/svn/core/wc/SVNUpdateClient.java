@@ -901,7 +901,7 @@ public class SVNUpdateClient extends SVNBasicClient {
         
         export.setUpdateLocksOnDemand(isUpdateLocksOnDemand());
         export.setSingleTarget(SvnTarget.fromURL(url));
-        export.setDestination(dstPath);
+        export.setSource(dstPath);
         export.setPegRevision(pegRevision);
         export.setRevision(revision);
         export.setEolStyle(eolStyle);
@@ -1048,7 +1048,7 @@ public class SVNUpdateClient extends SVNBasicClient {
         SvnExport export = getOperationsFactory().createExport();
         export.setUpdateLocksOnDemand(isUpdateLocksOnDemand());
         export.setSingleTarget(SvnTarget.fromFile(srcPath));
-        export.setDestination(dstPath);
+        export.setSource(dstPath);
         export.setPegRevision(pegRevision);
         export.setRevision(revision);
         export.setEolStyle(eolStyle);
