@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2009 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2011 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -89,9 +89,7 @@ public class SVNDeleteCommand extends SVNCommand {
             }
             try {
                 SVNCommitInfo info = client.doDelete(urls, getSVNEnvironment().getMessage(), getSVNEnvironment().getRevisionProperties());
-                if (!getSVNEnvironment().isQuiet()) {
-                    getSVNEnvironment().printCommitInfo(info);
-                }
+                getSVNEnvironment().printCommitInfo(info);
             } catch (SVNException e) {
                 SVNErrorMessage err = e.getErrorMessage();
                 SVNErrorManager.error(err, SVNLogType.CLIENT);

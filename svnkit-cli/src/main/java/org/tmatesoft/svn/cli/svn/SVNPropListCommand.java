@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2009 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2011 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -63,15 +63,9 @@ public class SVNPropListCommand extends SVNPropertiesCommand {
         }
 
         if (getSVNEnvironment().isRevprop()) {
+            SVNURL url = getRevpropURL(getSVNEnvironment().getStartRevision(), targets);
             SVNWCClient wcClient = getSVNEnvironment().getClientManager().getWCClient();
-            String target = checkRevPropTarget(getSVNEnvironment().getStartRevision(), targets);            
-            long rev;
-            if (SVNCommandUtil.isURL(target)) {
-                rev = wcClient.doGetRevisionProperty(SVNURL.parseURIEncoded(target), null, getSVNEnvironment().getStartRevision(), this);
-            } else {
-                File targetPath = new SVNPath(target).getFile();
-                rev = wcClient.doGetRevisionProperty(targetPath, null, getSVNEnvironment().getStartRevision(), this);
-            }
+            long rev = wcClient.doGetRevisionProperty(url, null, getSVNEnvironment().getStartRevision(), this);
             Map revisionPropertiesMap = getRevisionProperties();
             List revisionProperties = (List) revisionPropertiesMap.get(new Long(rev));
             if (revisionProperties == null) {

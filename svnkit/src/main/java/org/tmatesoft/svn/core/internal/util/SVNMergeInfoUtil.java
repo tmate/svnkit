@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2009 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2011 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -200,7 +200,7 @@ public class SVNMergeInfoUtil {
 		return removedSomeRanges;
 	}
 	
-    public static Map<String, SVNMergeRangeList> mergeMergeInfos(Map<String, SVNMergeRangeList> originalSrcsToRangeLists, Map<String, SVNMergeRangeList> changedSrcsToRangeLists) throws SVNException {
+    public static Map mergeMergeInfos(Map originalSrcsToRangeLists, Map changedSrcsToRangeLists) throws SVNException {
         originalSrcsToRangeLists = originalSrcsToRangeLists == null ? new TreeMap() : originalSrcsToRangeLists;
         changedSrcsToRangeLists = changedSrcsToRangeLists == null ? Collections.EMPTY_MAP : changedSrcsToRangeLists;
         String[] paths1 = (String[]) originalSrcsToRangeLists.keySet().toArray(new String[originalSrcsToRangeLists.size()]);
@@ -303,23 +303,8 @@ public class SVNMergeInfoUtil {
         return target;
     }
     
-    public static boolean isNonInheritable(Map<String, SVNMergeRangeList> mergeInfo) {
-        if (mergeInfo != null) {
-            for (String path : mergeInfo.keySet()) {
-                SVNMergeRangeList rangeList = mergeInfo.get(path);
-                SVNMergeRange[] ranges = rangeList.getRanges();
-                for (int i = 0; ranges != null && i < ranges.length; i++) {
-                    if (ranges[i] != null && !ranges[i].isInheritable()) {
-                        return true;
-                    }
-                }
-            }
-        }
-        return false;
-    }
-    
-    public static Map<String, SVNMergeRangeList> parseMergeInfo(StringBuffer mergeInfo, Map<String, SVNMergeRangeList> srcPathsToRangeLists) throws SVNException {
-        srcPathsToRangeLists = srcPathsToRangeLists == null ? new TreeMap<String, SVNMergeRangeList>() : srcPathsToRangeLists;
+    public static Map parseMergeInfo(StringBuffer mergeInfo, Map srcPathsToRangeLists) throws SVNException {
+        srcPathsToRangeLists = srcPathsToRangeLists == null ? new TreeMap() : srcPathsToRangeLists;
         if (mergeInfo.length() == 0) {
             return srcPathsToRangeLists;
         }

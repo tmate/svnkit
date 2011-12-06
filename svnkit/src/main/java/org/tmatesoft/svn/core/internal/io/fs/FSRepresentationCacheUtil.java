@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2009 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2011 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -12,10 +12,10 @@
 package org.tmatesoft.svn.core.internal.io.fs;
 
 import java.io.File;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 
 import org.tmatesoft.svn.core.SVNException;
-import org.tmatesoft.svn.core.internal.io.fs.repcache.IFSRepresentationCacheManagerFactory;
-import org.tmatesoft.svn.core.internal.wc.SVNClassLoader;
 import org.tmatesoft.svn.util.SVNDebugLog;
 import org.tmatesoft.svn.util.SVNLogType;
 
@@ -30,8 +30,10 @@ public class FSRepresentationCacheUtil {
     
     private static final String SQLJET_DB_CLASS_NAME = "org.tmatesoft.sqljet.core.table.SqlJetDb";
     private static final String ANTLR_CLASS_NAME = "org.antlr.runtime.Token";
+    private static final String REPCACHE_MANAGER_CLASS_NAME = "org.tmatesoft.svn.core.internal.io.fs.repcache.FSRepresentationCacheManager";
 
-    private static IFSRepresentationCacheManagerFactory ourRepCacheManagerFactory;
+    private static Method ourOpenMethod = null;
+    private static Method ourCreateMethod = null;
     
     static {
         Boolean option = Boolean.valueOf(System.getProperty("svnkit.fsfs.repcache", "true"));
@@ -43,13 +45,10 @@ public class FSRepresentationCacheUtil {
                 } else {
                     Class clazz = FSRepresentationCacheUtil.class.getClassLoader().loadClass(SQLJET_DB_CLASS_NAME);
                     ourIsAvailable = clazz != null;
-                    if (ourIsAvailable) {
-                        ourRepCacheManagerFactory = SVNClassLoader.getFSRepresentationCacheManagerFactory();
-                        if (ourRepCacheManagerFactory != null) {
-                            ourIsAvailable = true;
-                        } else {
-                            ourIsAvailable = false;
-                        }
+                    clazz = FSRepresentationCacheUtil.class.getClassLoader().loadClass(REPCACHE_MANAGER_CLASS_NAME);
+                    if (clazz != null) {
+                        ourOpenMethod = clazz.getMethod("openRepresentationCache", new Class[] {FSFS.class});
+                        ourCreateMethod = clazz.getMethod("createRepresentationCache", new Class[] {File.class});
                     }
                 }
             } catch (Throwable e) {
@@ -65,8 +64,19 @@ public class FSRepresentationCacheUtil {
         if (!isAvailable()) {
             return null;
         }
-        if (ourRepCacheManagerFactory != null) {
-            return ourRepCacheManagerFactory.openRepresentationCache(fsfs);
+        if (ourOpenMethod != null) {
+            try {
+                Object result = ourOpenMethod.invoke(null, new Object[] {fsfs});
+                if (result instanceof IFSRepresentationCacheManager) {
+                    return (IFSRepresentationCacheManager) result;
+                }
+            } catch (InvocationTargetException e) {
+                if (e.getCause() instanceof SVNException) {
+                    throw ((SVNException) e.getCause());
+                }
+            } catch (Throwable th) {
+                
+            }
         }
         return null;
     }
@@ -75,8 +85,16 @@ public class FSRepresentationCacheUtil {
         if (!isAvailable()) {
             return;
         }
-        if (ourRepCacheManagerFactory != null) {
-            ourRepCacheManagerFactory.createRepresentationCache(path);
+        if (ourCreateMethod != null) {
+            try {
+                ourCreateMethod.invoke(null, new Object[] {path});
+            } catch (InvocationTargetException e) {
+                if (e.getCause() instanceof SVNException) {
+                    throw ((SVNException) e.getCause());
+                }
+            } catch (Throwable th) {
+                
+            }
         }
     }
     

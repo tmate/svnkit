@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2009 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2011 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -28,24 +28,6 @@ public class SVNURLUtil {
         String childURLAsString = child.toString();
         String relativePath = SVNPathUtil.getPathAsChild(parentURLAsString, childURLAsString);
         return relativePath == null ? "" : relativePath;
-    }
-    
-    public static boolean isAncestor(SVNURL ancestor, SVNURL descendant) {
-        if (ancestor == null || descendant == null) {
-            return false;
-        }
-        String aStr = ancestor.toString();
-        String dStr = descendant.toString();
-        if (aStr.length() > dStr.length()) {
-            return false;
-        }
-        if (dStr.startsWith(aStr)) {
-            if (aStr.length() == dStr.length()) {
-                return true;
-            }
-            return dStr.charAt(aStr.length()) == '/';
-        }
-        return false;
     }
     
     public static SVNURL getCommonURLAncestor(SVNURL url1, SVNURL url2) {

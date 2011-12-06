@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2009 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2011 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -19,15 +19,11 @@ import java.util.LinkedList;
 import java.util.List;
 
 import org.tmatesoft.svn.core.SVNDepth;
-import org.tmatesoft.svn.core.SVNErrorCode;
-import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
-import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.internal.wc.SVNPath;
 import org.tmatesoft.svn.core.wc.ISVNChangelistHandler;
 import org.tmatesoft.svn.core.wc.SVNChangelistClient;
 import org.tmatesoft.svn.core.wc.SVNUpdateClient;
-import org.tmatesoft.svn.util.SVNLogType;
 
 
 /**
@@ -53,7 +49,6 @@ public class SVNUpdateCommand extends SVNCommand {
         options.add(SVNOption.CHANGELIST);
         options.add(SVNOption.EDITOR_CMD);
         options.add(SVNOption.ACCEPT);
-        options.add(SVNOption.PARENTS);
         return options;
     }
 
@@ -92,9 +87,8 @@ public class SVNUpdateCommand extends SVNCommand {
         }
         
         SVNUpdateClient client = getSVNEnvironment().getClientManager().getUpdateClient();
-        SVNNotifyPrinter printer = new SVNNotifyPrinter(getSVNEnvironment());
         if (!getSVNEnvironment().isQuiet()) {
-            client.setEventHandler(printer);
+            client.setEventHandler(new SVNNotifyPrinter(getSVNEnvironment()));
         }
         
         SVNDepth depth = getSVNEnvironment().getDepth();
@@ -117,12 +111,7 @@ public class SVNUpdateCommand extends SVNCommand {
         }
         File[] filesArray = (File[]) files.toArray(new File[files.size()]);
         client.doUpdate(filesArray, getSVNEnvironment().getStartRevision(), depth, 
-                getSVNEnvironment().isForce(), depthIsSticky, getSVNEnvironment().isParents());
-
-        if (printer.hasExternalErrors()) {
-            SVNErrorManager.error(SVNErrorMessage.create(SVNErrorCode.CL_ERROR_PROCESSING_EXTERNALS, 
-                "Failure occurred processing one or more externals definitions"), SVNLogType.CLIENT);
-        }
+                getSVNEnvironment().isForce(), depthIsSticky); 
     } 
 
 }

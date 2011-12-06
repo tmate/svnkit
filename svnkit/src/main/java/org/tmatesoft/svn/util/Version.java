@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2009 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2011 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -13,7 +13,6 @@ package org.tmatesoft.svn.util;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.URL;
 import java.util.Properties;
 
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
@@ -31,14 +30,15 @@ public class Version {
     private static final String VERSION_MINOR_PROPERTY = "svnkit.version.minor";
     private static final String VERSION_MICRO_PROPERTY = "svnkit.version.micro";
     private static final String VERSION_REVISION_PROPERTY = "svnkit.version.revision";
+
+    private static final String VERSION_STRING_DEFAULT = "SVN/1.6.17 SVNKit/1.3.7-SNAPSHOT (http://svnkit.com/) rSNAPSHOT";
     private static final String SVN_VERSION_PROPERTY = "svnkit.svn.version";  
     
-    private static final String VERSION_STRING_DEFAULT = "SVN/1.7.0 SVNKit/1.7.0-dev (http://svnkit.com/) rSNAPSHOT";
     private static final String VERSION_MAJOR_DEFAULT = "1";
-    private static final String VERSION_MINOR_DEFAULT = "7";
-    private static final String VERSION_MICRO_DEFAULT = "0";
+    private static final String VERSION_MINOR_DEFAULT = "3";
+    private static final String VERSION_MICRO_DEFAULT = "7";
     private static final String VERSION_REVISION_DEFAULT = "SNAPSHOT";
-    private static final String SVN_VERSION_DEFAULT = "1.7.0";
+    private static final String SVN_VERSION_DEFAULT = "1.6.17";
     private static String ourUserAgent;
 
     private static Properties ourProperties;
@@ -101,16 +101,26 @@ public class Version {
         return Integer.parseInt(VERSION_MICRO_DEFAULT);
     }
 
-    /**
-     * @deprecated use getRevisionString instead
-     * @return
-     */
-    @Deprecated    
     public static long getRevisionNumber() {
         loadProperties();
+        String propertyValue = ourProperties.getProperty(VERSION_REVISION_PROPERTY);
+        if (propertyValue != null) {
+            if (propertyValue.startsWith("r")) {
+                String revValue = ""; 
+                for (int i = 1; i < propertyValue.length(); i++) {
+                    if (Character.isDigit(propertyValue.charAt(i))) {
+                        revValue += propertyValue.charAt(i);
+                    } else {
+                        break;
+                    }
+                }
+                propertyValue = revValue;
+            }
+        } else {
+            propertyValue = VERSION_REVISION_DEFAULT;
+        }
         try {
-            return Long.parseLong(ourProperties.getProperty(
-                    VERSION_REVISION_PROPERTY, VERSION_REVISION_DEFAULT));
+            return Long.parseLong(propertyValue);
         } catch (NumberFormatException nfe) {
             //
         }
@@ -122,23 +132,12 @@ public class Version {
         return -1;
     }
 
-    public static String getRevisionString() {
-        loadProperties();
-        return ourProperties.getProperty(VERSION_REVISION_PROPERTY, VERSION_REVISION_DEFAULT);
-    }
-
     private static void loadProperties() {
         if (ourProperties != null) {
             return;
         }
-        ourProperties = new Properties();
-        URL resourceURL = Version.class.getResource(PROPERTIES_PATH);
-        if (resourceURL != null) {
-            if (resourceURL.toString().lastIndexOf(".jar!/") < 0) {
-                return;
-            }
-        }
         InputStream is = Version.class.getResourceAsStream(PROPERTIES_PATH);
+        ourProperties = new Properties();
         if (is == null) {
             return;
         }
