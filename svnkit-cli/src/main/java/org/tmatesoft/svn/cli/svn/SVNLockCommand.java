@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2009 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2011 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -86,18 +86,7 @@ public class SVNLockCommand extends SVNCommand {
         }
         if (!paths.isEmpty()) {
             File[] filesArray = (File[]) paths.toArray(new File[paths.size()]);
-            try {
-                client.doLock(filesArray, getSVNEnvironment().isForce(), message);
-            } catch (SVNException e) {
-                if (e.getErrorMessage().getErrorCode() == SVNErrorCode.WC_PATH_NOT_FOUND) {
-                    if (e.getErrorMessage().getRelatedObjects() != null
-                            && e.getErrorMessage().getRelatedObjects().length > 0
-                            && e.getErrorMessage().getRelatedObjects()[0] instanceof File) {
-                        e.getErrorMessage().getRelatedObjects()[0] = ((File) e.getErrorMessage().getRelatedObjects()[0]).getAbsolutePath();
-                    }
-                }
-                throw e;
-            }
+            client.doLock(filesArray, getSVNEnvironment().isForce(), message);
         }
         if (!urls.isEmpty()) {
             SVNURL[] urlsArray = (SVNURL[]) urls.toArray(new SVNURL[urls.size()]);

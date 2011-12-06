@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2009 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2011 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -57,7 +57,7 @@ public class SVNTranslator {
 
     private static final Charset UTF8_CHARSET = Charset.forName("UTF-8");
 
-    public static String translateString(String str, byte[] eol, Map keywords, boolean repair, boolean expand) throws SVNException {
+    public static String transalteString(String str, byte[] eol, Map keywords, boolean repair, boolean expand) throws SVNException {
         ByteArrayOutputStream bufferOS = new ByteArrayOutputStream();
         OutputStream resultOS = null;
         try {
@@ -68,10 +68,10 @@ public class SVNTranslator {
         } finally {
             SVNFileUtil.closeFile(resultOS);
         }
-
+        
         return new String(bufferOS.toByteArray());
     }
-
+    
     public static void translate(SVNAdminArea adminArea, String name, String srcPath,
                                  String dstPath, boolean expand) throws SVNException {
         translate(adminArea, name, srcPath, dstPath, false, expand);
@@ -360,7 +360,7 @@ public class SVNTranslator {
         copyAndTranslate(source, destination, charset, eol, keywordsMap, isSpecial, false, repair);
     }
 
-    public static void copyAndTranslate(File source, File destination, String charset, byte[] eol, Map keywords, boolean special, boolean expand, boolean repair) throws SVNException {
+    private static void copyAndTranslate(File source, File destination, String charset, byte[] eol, Map keywords, boolean special, boolean expand, boolean repair) throws SVNException {
         boolean isSpecialPath = false;
         if (SVNFileUtil.symlinksSupported()) {
             SVNFileType type = SVNFileType.getType(source);
@@ -405,37 +405,16 @@ public class SVNTranslator {
         } catch (IOException e) {
             translationError(destination, e);
         } finally {
-            try {
-                if (dst != null) {
-                    try {
-                        dst.flush();
-                    } catch (IOException ioe) {
-                        checkWrappedException(ioe, source);
-                    }
+            if (dst != null) {
+                try {
+                    dst.flush();
+                } catch (IOException ioe) {
+                    //
                 }
-                if (translatingStream != null) {
-                    try {
-                        translatingStream.flush();
-                    } catch (IOException ioe) {
-                        checkWrappedException(ioe, source);
-                    }
-                }
-            } finally {
-                SVNFileUtil.closeFile(src);
-                SVNFileUtil.closeFile(translatingStream);
-                SVNFileUtil.closeFile(dst);
             }
-        }
-    }
-
-    private static void checkWrappedException(IOException ioe, File file) throws SVNException {
-        if(ioe instanceof IOExceptionWrapper) {
-            IOExceptionWrapper ew = (IOExceptionWrapper)ioe;
-            if (ew.getOriginalException().getErrorMessage().getErrorCode() == SVNErrorCode.IO_INCONSISTENT_EOL) {
-                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_INCONSISTENT_EOL, "File ''{0}'' has inconsistent newlines", file);
-                SVNErrorManager.error(err, SVNLogType.DEFAULT);
-            }
-            throw ew.getOriginalException();
+            SVNFileUtil.closeFile(src);
+            SVNFileUtil.closeFile(translatingStream);
+            SVNFileUtil.closeFile(dst);
         }
     }
 
@@ -685,9 +664,9 @@ public class SVNTranslator {
         if (charset == null) {
             return null;
         }
-        boolean isSupported;
+        boolean isSupported = true;
         try {
-            isSupported = Charset.isSupported(charset);
+            isSupported = charset == null || Charset.isSupported(charset);
         } catch (IllegalCharsetNameException e) {
             isSupported = false;
         }

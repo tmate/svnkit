@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2009 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2011 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -11,7 +11,6 @@
  */
 package org.tmatesoft.svn.core.internal.util;
 
-import java.io.File;
 import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -23,9 +22,7 @@ import java.util.Map;
 import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
-import org.tmatesoft.svn.core.SVNPropertyValue;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
-import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 import org.tmatesoft.svn.util.SVNLogType;
 
 /**
@@ -183,7 +180,7 @@ public class SVNSkel {
         if (data == null) {
             return null;
         }
-        return createAtom(data, 0, data.length);
+        return createAtom(data);
     }
 
     public static SVNSkel createAtom(byte[] data, int offset, int length) {
@@ -199,25 +196,17 @@ public class SVNSkel {
         return new SVNSkel();
     }
 
-    public static SVNSkel createPropList(Map<String, SVNPropertyValue> props) throws SVNException {
+    public static SVNSkel createPropList(Map props) throws SVNException {
         SVNSkel list = createEmptyList();
         if (props == null) {
             return list;
         }
-        for(String propertyName : props.keySet()) {
-            SVNSkel name = createAtom(propertyName);
-            SVNPropertyValue pv = props.get(propertyName);
-            SVNSkel value = null;
-            if (pv != null && pv.getString() != null) {
-                value = createAtom(pv.getString());
-            } else if (pv != null && pv.getBytes() != null) {
-                value = createAtom(pv.getBytes());
-            } else {
-                value = createAtom("");
-            }
+        for (Iterator iterator = props.entrySet().iterator(); iterator.hasNext();) {
+            Map.Entry entry = (Map.Entry) iterator.next();
+            SVNSkel name = createAtom((String) entry.getKey());
+            SVNSkel value = createAtom((String) entry.getValue());
             list.addChild(value);
             list.addChild(name);
-            
         }
         if (!list.isValidPropList()) {
             error("proplist");
@@ -258,7 +247,7 @@ public class SVNSkel {
         return (SVNSkel) myList.get(i);
     }
 
-    public void appendChild(SVNSkel child) throws SVNException {
+    private void appendChild(SVNSkel child) throws SVNException {
         if (isAtom()) {
             SVNErrorMessage error = SVNErrorMessage.create(SVNErrorCode.FS_MALFORMED_SKEL, "Unable to add a child to atom");
             SVNErrorManager.error(error, SVNLogType.DEFAULT);
@@ -272,16 +261,6 @@ public class SVNSkel {
             SVNErrorManager.error(error, SVNLogType.DEFAULT);
         }
         myList.add(0, child);
-    }
-
-    public void prependString(String str) throws SVNException {
-        SVNSkel skel = SVNSkel.createAtom(str);
-        addChild(skel);
-    }
-
-    public void prependPath(File path) throws SVNException {        
-        String str = path != null ? SVNFileUtil.getFilePath(path) : "";
-        prependString(str);
     }
 
     public int getListSize() {
@@ -390,7 +369,7 @@ public class SVNSkel {
                 }
                 buffer = allocate(buffer, sizeBytes.length + 1 + data.length);
                 buffer.put(sizeBytes);
-
+                
                 try {
                     buffer.put(" ".getBytes("UTF-8"));
                 } catch (UnsupportedEncodingException e) {

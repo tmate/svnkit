@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2009 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2011 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -123,10 +123,10 @@ public class SVNLogCommand extends SVNXMLCommand implements ISVNLogEntryHandler 
                 SVNRevisionRange revRange = (SVNRevisionRange) revisionsIter.next();
                 SVNRevision startRev = revRange.getStartRevision();
                 SVNRevision endRev = revRange.getEndRevision();
-                if (startRev.getNumber() < endRev.getNumber() && startRev.getNumber() >= 0 && endRev.getNumber() >= 0) {
-                    revRange = new SVNRevisionRange(SVNRevision.create(startRev.getNumber() + 1), endRev);
+                if (startRev.getNumber() < endRev.getNumber()) {
+                    revRange = new SVNRevisionRange(endRev, endRev);
                 } else {
-                    revRange = new SVNRevisionRange(startRev, SVNRevision.create(endRev.getNumber() + 1));
+                    revRange = new SVNRevisionRange(startRev, startRev);
                 }
                 editedRevisionRangesList.add(revRange);
             }
@@ -328,9 +328,7 @@ public class SVNLogCommand extends SVNXMLCommand implements ISVNLogEntryHandler 
         }
         
         if (myMergeStack != null && !myMergeStack.isEmpty()) {
-            
-            buffer.append(logEntry.isSubtractiveMerge() ? "Reverse merged via:" : "Merged via:");
-            
+            buffer.append("Merged via:");
             for (Iterator revs = myMergeStack.iterator(); revs.hasNext();) {
                 long rev = ((Long) revs.next()).longValue();
                 buffer.append(" r");
