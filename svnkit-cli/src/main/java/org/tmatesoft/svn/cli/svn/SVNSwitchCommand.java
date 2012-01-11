@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2009 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2011 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -33,7 +33,7 @@ import org.tmatesoft.svn.util.SVNLogType;
 public class SVNSwitchCommand extends SVNCommand {
 
     public SVNSwitchCommand() {
-        super("switch", new String[] {"sw", "relocate"});
+        super("switch", new String[] {"sw"});
     }
 
     protected Collection createSupportedOptions() {
@@ -46,7 +46,6 @@ public class SVNSwitchCommand extends SVNCommand {
         options.add(SVNOption.DIFF3_CMD);
         options.add(SVNOption.RELOCATE);
         options.add(SVNOption.IGNORE_EXTERNALS);
-        options.add(SVNOption.IGNORE_ANCESTRY);
         options.add(SVNOption.FORCE);
         options.add(SVNOption.ACCEPT);
         return options;
@@ -80,10 +79,14 @@ public class SVNSwitchCommand extends SVNCommand {
         } else {
             target = new SVNPath((String) targets.get(1));
         }
+        if (!getSVNEnvironment().isVersioned(target.getTarget())) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_NOT_FOUND,
+                    "''{0}'' does not appear to be a working copy path", target.getTarget());
+            SVNErrorManager.error(err, SVNLogType.CLIENT);
+        }
         SVNUpdateClient client = getSVNEnvironment().getClientManager().getUpdateClient();
-        SVNNotifyPrinter printer = new SVNNotifyPrinter(getSVNEnvironment(), false, false, false);
         if (!getSVNEnvironment().isQuiet()) {
-            client.setEventHandler(printer);
+            client.setEventHandler(new SVNNotifyPrinter(getSVNEnvironment(), false, false, false));
         }
         
         SVNDepth depth = getSVNEnvironment().getDepth();
@@ -92,49 +95,31 @@ public class SVNSwitchCommand extends SVNCommand {
             depth = getSVNEnvironment().getSetDepth();
             depthIsSticky = true;
         }
-        boolean ignoreAncestry = getSVNEnvironment().isIgnoreAncestry();
+        
         client.doSwitch(target.getFile(), switchURL.getURL(), switchURL.getPegRevision(), 
                 getSVNEnvironment().getStartRevision(), depth, 
-                getSVNEnvironment().isForce(), depthIsSticky, ignoreAncestry);    
-
-        if (printer.hasExternalErrors()) {
-            SVNErrorManager.error(SVNErrorMessage.create(SVNErrorCode.CL_ERROR_PROCESSING_EXTERNALS, 
-                    "Failure occurred processing one or more externals definitions"), SVNLogType.CLIENT);
-        }
+                getSVNEnvironment().isForce(), depthIsSticky);    
     }
     
     protected void relocate(List targets) throws SVNException {
-        if (targets.size() < 1) {
+        if (targets.size() < 2) {
             SVNErrorManager.error(SVNErrorMessage.create(SVNErrorCode.CL_INSUFFICIENT_ARGS), SVNLogType.CLIENT);
         }
+        SVNPath from = new SVNPath((String) targets.get(0));
+        SVNPath to = new SVNPath((String) targets.get(1));
+        if (from.isURL() != to.isURL() || !from.isURL()) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.INCORRECT_PARAMS, 
+                    "''{0}'' to ''{1}'' is not a valid relocation", new Object[] {from.getTarget(), to.getTarget()});
+            SVNErrorManager.error(err, SVNLogType.CLIENT);
+        }
         SVNUpdateClient client = getSVNEnvironment().getClientManager().getUpdateClient();
-        if (targets.size() == 1 ||
-                (targets.size() == 2 
-                && new SVNPath((String) targets.get(0)).isURL() 
-                && !new SVNPath((String) targets.get(1)).isURL())) {
-            SVNPath target = targets.size() == 2 ? new SVNPath((String) targets.get(1)) : new SVNPath("");
-            SVNPath to = new SVNPath((String) targets.get(0));
-            client.doRelocate(target.getFile(), null, to.getURL(), getSVNEnvironment().getDepth().isRecursive());
+        if (targets.size() == 2) {
+            SVNPath target = new SVNPath("");
+            client.doRelocate(target.getFile(), from.getURL(), to.getURL(), getSVNEnvironment().getDepth().isRecursive());
         } else {
-            if (targets.get(0).equals(targets.get(1))) {
-                return;
-            }
-            SVNPath from = new SVNPath((String) targets.get(0));
-            SVNPath to = new SVNPath((String) targets.get(1));
-            
-            if (from.isURL() != to.isURL() || !from.isURL()) {
-                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.INCORRECT_PARAMS, 
-                        "''{0}'' to ''{1}'' is not a valid relocation", new Object[] {from.getTarget(), to.getTarget()});
-                SVNErrorManager.error(err, SVNLogType.CLIENT);
-            }
-            if (targets.size() == 2) {
-                SVNPath target = new SVNPath("");
+            for(int i = 2; i < targets.size(); i++) {
+                SVNPath target = new SVNPath((String) targets.get(i));
                 client.doRelocate(target.getFile(), from.getURL(), to.getURL(), getSVNEnvironment().getDepth().isRecursive());
-            } else {
-                for(int i = 2; i < targets.size(); i++) {
-                    SVNPath target = new SVNPath((String) targets.get(i));
-                    client.doRelocate(target.getFile(), from.getURL(), to.getURL(), getSVNEnvironment().getDepth().isRecursive());
-                }
             }
         }
     }

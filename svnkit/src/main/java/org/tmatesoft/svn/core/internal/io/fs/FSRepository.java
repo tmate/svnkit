@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2009 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2011 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -75,22 +75,9 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
     private FSFS myFSFS;
     private SVNMergeInfoManager myMergeInfoManager;
     private FSLog myLogDriver;
-    private boolean myIsHooksEnabled;
     
     protected FSRepository(SVNURL location, ISVNSession options) {
         super(location, options);
-        setHooksEnabled(true);
-    }
-
-    public void setHooksEnabled(boolean enabled) {
-        myIsHooksEnabled = enabled;
-        if (getFSFS() != null) {
-            getFSFS().setHooksEnabled(isHooksEnabled());
-        }
-    }
-    
-    public boolean isHooksEnabled() {
-        return myIsHooksEnabled;
     }
 
     public FSFS getFSFS() {
@@ -174,11 +161,11 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
             }
 
             byte[] bytes = SVNPropertyValue.getPropertyAsBytes(propertyValue);
-            if (isHooksEnabled() && FSHooks.isHooksEnabled() && !bypassPreRevpropHook) {
+            if (FSHooks.isHooksEnabled() && !bypassPreRevpropHook) {
                 FSHooks.runPreRevPropChangeHook(myReposRootDir, propertyName, bytes, userName, revision, action);
             }
             myFSFS.setRevisionProperty(revision, propertyName, propertyValue);
-            if (isHooksEnabled() && FSHooks.isHooksEnabled() && !bypassPostRevpropHook) {
+            if (FSHooks.isHooksEnabled() && !bypassPostRevpropHook) {
                 FSHooks.runPostRevPropChangeHook(myReposRootDir, propertyName, bytes, userName, revision, action);
             }
         } finally {
@@ -342,7 +329,7 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
         try {
             openRepository();
             if (targetPaths == null || targetPaths.length == 0) {
-                targetPaths = new String[] {""};
+                targetPaths = new String[] {"/"};
             }
             String[] absPaths = new String[targetPaths.length];
             for (int i = 0; i < targetPaths.length; i++) {
@@ -361,11 +348,11 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
             long histEnd = endRevision;
 
             if (startRevision > youngestRev) {
-                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_NO_SUCH_REVISION, "No such revision {0}", String.valueOf(startRevision));
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_NO_SUCH_REVISION, "No such revision {0}", new Long(startRevision));
                 SVNErrorManager.error(err, SVNLogType.FSFS);
             }
             if (endRevision > youngestRev) {
-                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_NO_SUCH_REVISION, "No such revision {0}", String.valueOf(endRevision));
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_NO_SUCH_REVISION, "No such revision {0}", new Long(endRevision));
                 SVNErrorManager.error(err, SVNLogType.FSFS);
             }
 
@@ -457,7 +444,8 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
         }
         // fetch user name!
         String author = getUserName();
-        return new FSCommitEditor(getRepositoryPath(""), logMessage, author, locks, keepLocks, null, myFSFS, this);
+        FSCommitEditor commitEditor = new FSCommitEditor(getRepositoryPath(""), logMessage, author, locks, keepLocks, null, myFSFS, this);
+        return commitEditor;
     }
 
     public SVNLock getLock(String path) throws SVNException {
@@ -784,7 +772,6 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
         myReposRootDir = hasCustomHostName ? new File("\\\\" + hostName, dirPath).getAbsoluteFile() :
                                              new File(dirPath).getAbsoluteFile();
         myFSFS = new FSFS(myReposRootDir);
-        myFSFS.setHooksEnabled(isHooksEnabled());
         myFSFS.open();
         setRepositoryCredentials(myFSFS.getUUID(), getLocation().setPath(rootPath, false));
     }
@@ -930,7 +917,6 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
                 while (auth != null) {
                     String userName = auth.getUserName();
                     if (userName == null) {
-                        // anonymous.
                         return null;
                     }
                     if ("".equals(userName.trim())) {
@@ -956,7 +942,6 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
                 throw e;
             }
         }
-        // anonymous
         return null;
     }
 

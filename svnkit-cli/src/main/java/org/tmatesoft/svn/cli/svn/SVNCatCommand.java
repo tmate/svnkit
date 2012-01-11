@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2009 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2011 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -47,8 +47,6 @@ public class SVNCatCommand extends SVNCommand {
         }
         SVNWCClient client = getSVNEnvironment().getClientManager().getWCClient();
 
-        boolean seenNonExistentTarget = false;
-        
         for(int i = 0; i < targets.size(); i++) {
             SVNPath target = new SVNPath((String) targets.get(i), true);
             try {
@@ -60,15 +58,9 @@ public class SVNCatCommand extends SVNCommand {
             } catch (SVNException e) {
                 SVNErrorMessage err = e.getErrorMessage();
                 getSVNEnvironment().handleWarning(err, 
-                        new SVNErrorCode[] {SVNErrorCode.UNVERSIONED_RESOURCE, SVNErrorCode.ENTRY_NOT_FOUND, SVNErrorCode.CLIENT_IS_DIRECTORY, SVNErrorCode.FS_NOT_FOUND}, 
+                        new SVNErrorCode[] {SVNErrorCode.UNVERSIONED_RESOURCE, SVNErrorCode.ENTRY_NOT_FOUND, SVNErrorCode.CLIENT_IS_DIRECTORY}, 
                         getSVNEnvironment().isQuiet());
-                seenNonExistentTarget = true;
             }
-        }
-        
-        if (seenNonExistentTarget) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ILLEGAL_TARGET, "Could not cat all targets because some targets don't exist");
-            SVNErrorManager.error(err, SVNLogType.CLIENT);
         }
     }
 

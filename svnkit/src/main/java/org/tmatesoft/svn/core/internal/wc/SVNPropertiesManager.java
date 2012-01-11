@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2009 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2011 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -11,20 +11,10 @@
  */
 package org.tmatesoft.svn.core.internal.wc;
 
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.util.Collection;
-import java.util.Iterator;
-import java.util.Map;
-import java.util.StringTokenizer;
-
 import org.tmatesoft.svn.core.SVNDepth;
 import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
-import org.tmatesoft.svn.core.SVNMergeRangeList;
 import org.tmatesoft.svn.core.SVNNodeKind;
 import org.tmatesoft.svn.core.SVNProperties;
 import org.tmatesoft.svn.core.SVNProperty;
@@ -45,6 +35,15 @@ import org.tmatesoft.svn.core.wc.SVNEvent;
 import org.tmatesoft.svn.core.wc.SVNEventAction;
 import org.tmatesoft.svn.core.wc.SVNStatusType;
 import org.tmatesoft.svn.util.SVNLogType;
+
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.util.Collection;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.StringTokenizer;
 
 
 /**
@@ -238,7 +237,7 @@ public class SVNPropertiesManager {
         dir.runLogs();
         final boolean modified = oldValue == null ? propValue != null : !oldValue.equals(propValue);
         if (modified || action == SVNEventAction.PROPERTY_DELETE_NONEXISTENT) {
-            dir.getWCAccess().handleEvent(new SVNEvent(path, entry.getKind(), null, -1, null, null, null, null, action, action, null, null, null, null, null));
+            dir.getWCAccess().handleEvent(new SVNEvent(path, entry.getKind(), null, -1, null, null, null, null, action, action, null, null, null));
         }
         return modified;
     }
@@ -446,7 +445,7 @@ public class SVNPropertiesManager {
                 SVNErrorMessage error = SVNErrorMessage.create(SVNErrorCode.ILLEGAL_TARGET, "Charset ''{0}'' is not supported on this computer", value.getString());
                 SVNErrorManager.error(error, SVNLogType.DEFAULT);
             }
-            if (fileContentFetcher != null && fileContentFetcher.fileIsBinary()) {
+            if (fileContentFetcher.fileIsBinary()) {
                 SVNErrorMessage error = SVNErrorMessage.create(SVNErrorCode.ILLEGAL_TARGET, "File ''{0}'' has binary mime type property", path);
                 SVNErrorManager.error(error, SVNLogType.DEFAULT);
             }
@@ -454,7 +453,7 @@ public class SVNPropertiesManager {
             value = SVNPropertyValue.create(value.getString().trim());
             validateMimeType(value.getString());
             if (SVNProperty.isBinaryMimeType(value.getString())) {
-                if (fileContentFetcher != null && fileContentFetcher.getProperty(SVNProperty.EOL_STYLE) != null) {
+                if (fileContentFetcher.getProperty(SVNProperty.EOL_STYLE) != null) {
                     SVNErrorMessage error = SVNErrorMessage.create(SVNErrorCode.ILLEGAL_TARGET, "File ''{0}'' has svn:eol-style property set and thus cannot have binary mime type", path);
                     SVNErrorManager.error(error, SVNLogType.DEFAULT);
                 }
@@ -468,19 +467,11 @@ public class SVNPropertiesManager {
             }
         } else if (SVNProperty.KEYWORDS.equals(name)) {
             value = SVNPropertyValue.create(value.getString().trim());
-        } else if (SVNProperty.EXECUTABLE.equals(name) || SVNProperty.SPECIAL.equals(name) || SVNProperty.NEEDS_LOCK.equals(name)) {
+        } else
+        if (SVNProperty.EXECUTABLE.equals(name) || SVNProperty.SPECIAL.equals(name) || SVNProperty.NEEDS_LOCK.equals(name)) {
             value = SVNPropertyValue.create("*");
         } else if (SVNProperty.MERGE_INFO.equals(name)) {
-            Map<String, SVNMergeRangeList> mergeInfo = SVNMergeInfoUtil.parseMergeInfo(new StringBuffer(value.getString()), null);
-            
-            if (kind != SVNNodeKind.DIR && SVNMergeInfoUtil.isNonInheritable(mergeInfo)) {
-                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.MERGE_INFO_PARSE_ERROR,
-                        "Cannot set non-inheritable mergeinfo on a non-directory (''{0}'')", path);
-                SVNErrorManager.error(err, SVNLogType.WC);
-            }
-            if (mergeInfo != null) {
-                value = SVNPropertyValue.create(SVNMergeInfoUtil.formatMergeInfoToString(mergeInfo, null));
-            }
+            SVNMergeInfoUtil.parseMergeInfo(new StringBuffer(value.getString()), null);
         }
         return value;
     }
@@ -554,9 +545,6 @@ public class SVNPropertiesManager {
     }
 
     public static void validateEOLProperty(Object path, ISVNFileContentFetcher fetcher) throws SVNException {
-        if (fetcher == null) {
-            return;
-        }
         SVNTranslatorOutputStream out = new SVNTranslatorOutputStream(SVNFileUtil.DUMMY_OUT, new byte[0], false, null, false);
 
         try {

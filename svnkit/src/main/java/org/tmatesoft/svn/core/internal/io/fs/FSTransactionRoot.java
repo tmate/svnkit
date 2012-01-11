@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2009 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2011 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -166,9 +166,7 @@ public class FSTransactionRoot extends FSRoot {
         List caps = new ArrayList();
         caps.add("mergeinfo");
         String author = revisionProperties.getStringValue(SVNRevisionProperty.AUTHOR);
-        if (owner != null && owner.isHooksEnabled()) {
-            FSHooks.runStartCommitHook(owner.getRepositoryRoot(), author, caps);
-        }
+        FSHooks.runStartCommitHook(owner.getRepositoryRoot(), author, caps);
         FSTransactionInfo txn = FSTransactionRoot.beginTransaction(baseRevision, FSTransactionRoot.SVN_FS_TXN_CHECK_LOCKS, owner);
         owner.changeTransactionProperties(txn.getTxnId(), revisionProperties);
         return txn;

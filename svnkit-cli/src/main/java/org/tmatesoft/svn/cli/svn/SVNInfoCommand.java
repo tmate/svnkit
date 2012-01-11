@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2009 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2011 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -105,9 +105,10 @@ public class SVNInfoCommand extends SVNXMLCommand implements ISVNInfoHandler {
                 SVNErrorMessage err = e.getErrorMessage();
                 if (err.getErrorCode() == SVNErrorCode.UNVERSIONED_RESOURCE) {
                     getSVNEnvironment().getErr().print(SVNCommandUtil.getLocalPath(target.getTarget()) + ": (Not a versioned resource)\n\n");
+                } else if (err.getErrorCode() == SVNErrorCode.RA_ILLEGAL_URL) {
+                    getSVNEnvironment().getErr().print(target.getTarget() + ": (Not a valid URL)\n\n");
                 } else {
-                    getSVNEnvironment().handleWarning(err, new SVNErrorCode[] {SVNErrorCode.RA_ILLEGAL_URL, SVNErrorCode.WC_PATH_NOT_FOUND}, 
-                        getSVNEnvironment().isQuiet());
+                    throw e;
                 }
             }
         }

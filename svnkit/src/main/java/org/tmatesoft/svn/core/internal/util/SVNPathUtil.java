@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2009 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2011 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -121,9 +121,6 @@ public class SVNPathUtil {
         if (path == null){
             return null;           
         }
-        
-        boolean isUrl = isURL(path);
-        
         StringBuffer result = new StringBuffer();
         int i = 0;
         for (; i < path.length(); i++) {
@@ -149,30 +146,22 @@ public class SVNPathUtil {
         int segmentCount = 0;
         while (index < path.length()) {
             int nextIndex = index;
-            while (nextIndex < path.length() && path.charAt(nextIndex) != '/' 
-            		 && !(isUrl && (nextIndex + 2) < path.length() && path.charAt(nextIndex) == '%' && path.charAt(nextIndex + 1) == '2' &&
-    				Character.toUpperCase(path.charAt(nextIndex + 2)) == 'F')) {
-            	nextIndex++;
-            }
-            int slashLength = 0;
-            if (nextIndex < path.length()) {
-            	if (path.charAt(nextIndex) == '/')
-            		slashLength = 1;
-            	else if (path.charAt(nextIndex) == '%')
-            		slashLength = 3;
+            while (nextIndex < path.length() && path.charAt(nextIndex) != '/') {
+                nextIndex++;
             }
             int segmentLength = nextIndex - index;
-            if (segmentLength == 0 || (segmentLength == 1 && path.charAt(index) == '.')
-            		|| (isUrl && segmentLength == 3 && path.charAt(index) == '%' && path.charAt(index + 1) == '2' && Character.toUpperCase(path.charAt(index + 2))  == 'E')) {
+            if (segmentLength == 0 || (segmentLength == 1 && path.charAt(index) == '.')) {
+
             } else {
+                if (nextIndex < path.length()) {
+                    segmentLength++;
+                }
                 result.append(path.substring(index, index + segmentLength));
-            	if (slashLength > 0)
-            		result.append('/');
-            	segmentCount++;
+                segmentCount++;
             }
             index = nextIndex;
             if (index < path.length()) {
-                index += slashLength;
+                index++;
             }
         }
         if ((segmentCount > 0 || scheme != null) && result.charAt(result.length() - 1) == '/') {
@@ -501,5 +490,4 @@ public class SVNPathUtil {
         }
         return false;
     }
-
 }

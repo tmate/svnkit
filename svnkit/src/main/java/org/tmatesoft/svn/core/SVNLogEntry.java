@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2009 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2011 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -53,8 +53,6 @@ public class SVNLogEntry implements Serializable {
     private Map myChangedPaths;
     private SVNProperties myRevisionProperties;
     private boolean myHasChildren;
-    private boolean myIsSubtractiveMerge;
-    private boolean myIsNonInheritable;
     
     /**
      * Constructs an <b>SVNLogEntry</b> object. 
@@ -125,7 +123,7 @@ public class SVNLogEntry implements Serializable {
      *              were changed in the revision and values represent information about each changed path
      * 
      */
-    public Map<String, SVNLogEntryPath> getChangedPaths() {
+    public Map getChangedPaths() {
         return myChangedPaths;
     }
     
@@ -281,20 +279,4 @@ public class SVNLogEntry implements Serializable {
         return o1.equals(o2);
     }
 
-    public void setSubtractiveMerge(boolean substractiveMerge) {
-        myIsSubtractiveMerge = substractiveMerge;
-    }
-    
-    public boolean isSubtractiveMerge() {
-        return myIsSubtractiveMerge;
-    }
-
-
-    public void setNonInheriable(boolean nonInheritable) {
-        myIsNonInheritable = nonInheritable;
-    }
-    
-    public boolean isNonInheritable() {
-        return myIsNonInheritable;
-    }
 }
