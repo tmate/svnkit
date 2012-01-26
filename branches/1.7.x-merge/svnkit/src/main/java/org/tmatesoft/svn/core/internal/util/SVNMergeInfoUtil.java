@@ -98,14 +98,14 @@ public class SVNMergeInfoUtil {
         return filteredCatalog;
     }
     
-    public static Map filterMergeInfoByRanges(Map mergeInfo, long youngestRev, long oldestRev) {
-        Map filteredMergeInfo = new TreeMap();
+    public static Map<String, SVNMergeRangeList> filterMergeInfoByRanges(Map<String, SVNMergeRangeList> mergeInfo, long youngestRev, long oldestRev) {
+        Map<String, SVNMergeRangeList> filteredMergeInfo = new TreeMap<String, SVNMergeRangeList>();
         if (mergeInfo != null) {
             SVNMergeRange range = new SVNMergeRange(oldestRev, youngestRev, true);
             SVNMergeRangeList filterRangeList = new SVNMergeRangeList(range);
-            for (Iterator mergeInfoIter = mergeInfo.keySet().iterator(); mergeInfoIter.hasNext();) {
-                String path = (String) mergeInfoIter.next();
-                SVNMergeRangeList rangeList = (SVNMergeRangeList) mergeInfo.get(path);
+            for (Iterator<String> mergeInfoIter = mergeInfo.keySet().iterator(); mergeInfoIter.hasNext();) {
+                String path = mergeInfoIter.next();
+                SVNMergeRangeList rangeList = mergeInfo.get(path);
                 if (!rangeList.isEmpty()) {
                     SVNMergeRangeList newRangeList = filterRangeList.intersect(rangeList, false);
                     if (!newRangeList.isEmpty()) {
@@ -143,10 +143,10 @@ public class SVNMergeInfoUtil {
         return rangePoints;
     }
     
-	public static Map elideMergeInfoCatalog(Map mergeInfoCatalog) throws SVNException {
-	    Map adjustedMergeInfoCatalog = new TreeMap();
-	    for (Iterator pathsIter = mergeInfoCatalog.keySet().iterator(); pathsIter.hasNext();) {
-	        String path = (String) pathsIter.next();
+	public static Map<String, Map<String, SVNMergeRangeList>> elideMergeInfoCatalog(Map<String, Map<String, SVNMergeRangeList>> mergeInfoCatalog) throws SVNException {
+	    Map<String, Map<String, SVNMergeRangeList>> adjustedMergeInfoCatalog = new TreeMap<String, Map<String, SVNMergeRangeList>>();
+	    for (Iterator<String> pathsIter = mergeInfoCatalog.keySet().iterator(); pathsIter.hasNext();) {
+	        String path = pathsIter.next();
 	        String adjustedPath = path;
 	        if (path.startsWith("/")) {
 	            adjustedPath = path.substring(1);
@@ -163,8 +163,8 @@ public class SVNMergeInfoUtil {
             mergeInfoCatalog.remove(elidablePath);
         }
         
-	    adjustedMergeInfoCatalog = new TreeMap();
-        for (Iterator pathsIter = mergeInfoCatalog.keySet().iterator(); pathsIter.hasNext();) {
+	    adjustedMergeInfoCatalog = new TreeMap<String, Map<String, SVNMergeRangeList>>();
+        for (Iterator<String> pathsIter = mergeInfoCatalog.keySet().iterator(); pathsIter.hasNext();) {
             String path = (String) pathsIter.next();
             String adjustedPath = path;
             if (!path.startsWith("/")) {
