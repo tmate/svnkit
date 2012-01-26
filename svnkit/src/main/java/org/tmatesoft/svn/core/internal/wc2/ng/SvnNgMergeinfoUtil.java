@@ -292,4 +292,28 @@ public class SvnNgMergeinfoUtil {
         }
     }
     
+    public static Map<String, Map<String, SVNMergeRangeList>> convertToCatalog(Map<String, SVNMergeInfo> catalog) {
+        if (catalog == null) {
+            return new TreeMap<String, Map<String,SVNMergeRangeList>>();
+        }
+        Map<String, Map<String, SVNMergeRangeList>> result = new TreeMap<String, Map<String,SVNMergeRangeList>>();
+        for (String path : catalog.keySet()) {
+            SVNMergeInfo mi = catalog.get(path);
+            result.put(path, mi.getMergeSourcesToMergeLists());
+        }
+        return result;
+    }
+    
+    public static Map<String, Map<String, SVNMergeRangeList>> addPrefixToCatalog(Map<String, Map<String, SVNMergeRangeList>> catalog, File prefix) {
+        Map<String, Map<String, SVNMergeRangeList>> result = new TreeMap<String, Map<String,SVNMergeRangeList>>();
+        for (String path : catalog.keySet()) {
+            Map<String, SVNMergeRangeList> mi = catalog.get(path);
+            if (path.startsWith("/")) {
+                path = path.substring(1);
+            }
+            String prefixedPath = SVNFileUtil.createFilePath(prefix, path).getPath();
+            result.put(prefixedPath, mi);
+        }
+        return result;
+    }
  }
