@@ -544,8 +544,8 @@ public class SVNMergeInfoUtil {
         return removeMergeInfo(eraser, whiteBoard, true);
     }
 
-    public static Map removeMergeInfo(Map eraser, Map whiteBoard, boolean considerInheritance) {
-        Map mergeInfo = new TreeMap();
+    public static Map<String, SVNMergeRangeList> removeMergeInfo(Map<String, SVNMergeRangeList> eraser, Map<String, SVNMergeRangeList> whiteBoard, boolean considerInheritance) {
+        Map<String, SVNMergeRangeList> mergeInfo = new TreeMap<String, SVNMergeRangeList>();
         walkMergeInfoHashForDiff(mergeInfo, null, whiteBoard, eraser, considerInheritance);
         return mergeInfo;
     }
