@@ -2,6 +2,7 @@ package org.tmatesoft.svn.core.internal.wc2.ng;
 
 import java.io.File;
 import java.io.OutputStream;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -12,12 +13,15 @@ import org.tmatesoft.svn.core.ISVNDirEntryHandler;
 import org.tmatesoft.svn.core.SVNCommitInfo;
 import org.tmatesoft.svn.core.SVNDepth;
 import org.tmatesoft.svn.core.SVNDirEntry;
+import org.tmatesoft.svn.core.SVNErrorCode;
+import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNNodeKind;
 import org.tmatesoft.svn.core.SVNProperties;
 import org.tmatesoft.svn.core.SVNProperty;
 import org.tmatesoft.svn.core.SVNPropertyValue;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
+import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.internal.wc.SVNEventFactory;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 import org.tmatesoft.svn.core.internal.wc.admin.SVNChecksumOutputStream;
@@ -30,16 +34,15 @@ import org.tmatesoft.svn.core.wc.SVNEvent;
 import org.tmatesoft.svn.core.wc.SVNEventAction;
 import org.tmatesoft.svn.core.wc.SVNStatusType;
 import org.tmatesoft.svn.core.wc2.SvnChecksum;
+import org.tmatesoft.svn.util.SVNLogType;
 
 public class SvnNgRemoteDiffEditor implements ISVNEditor {
     
     private SVNWCContext context;
     private File target;
-    private SVNDepth depth;
     private SVNRepository repository;
     private long revision;
     private boolean walkDeletedDirs;
-    private boolean dryRun;
     private ISvnDiffCallback diffCallback;
     
     private long targetRevision;
@@ -49,6 +52,8 @@ public class SvnNgRemoteDiffEditor implements ISVNEditor {
     private DirBaton currentDir;
     private SvnDiffCallbackResult currentResult;
     private FileBaton currentFile;
+    
+    private Collection<File> tmpFiles;
 
     public static ISVNEditor createEditor(SVNWCContext context, File target, SVNDepth depth, SVNRepository repository, long revision, 
             boolean walkDeletedDirs, boolean dryRun, ISvnDiffCallback diffCallback) {
@@ -56,14 +61,13 @@ public class SvnNgRemoteDiffEditor implements ISVNEditor {
         
         editor.context = context;
         editor.target = target;
-        editor.depth = depth;
         editor.repository = repository;
         editor.revision = revision;
         editor.walkDeletedDirs = walkDeletedDirs;
-        editor.dryRun = dryRun;
         editor.diffCallback = diffCallback;
         
         editor.deletedPaths = new HashMap<File, DeletedPath>();
+        editor.tmpFiles = new ArrayList<File>();
         editor.currentResult = new SvnDiffCallbackResult();
         
         return editor;
@@ -73,7 +77,6 @@ public class SvnNgRemoteDiffEditor implements ISVNEditor {
         SVNNodeKind kind;
         SVNEventAction action;
         SVNStatusType state;
-        boolean isTreeConflicted;
     }
     
     private static class DirBaton {
@@ -81,7 +84,6 @@ public class SvnNgRemoteDiffEditor implements ISVNEditor {
         boolean treeConflicted;
         boolean skip;
         boolean skipChildren;
-        String repoPath;
         File wcPath;
         DirBaton parent;
         SVNProperties propChanges;
@@ -104,16 +106,17 @@ public class SvnNgRemoteDiffEditor implements ISVNEditor {
         SVNProperties pristineProps;
         long baseRevision;
         
-        SvnChecksum startMd5Checksum;
+//        SvnChecksum startMd5Checksum;
         SvnChecksum resultMd5Checksum;
         
         SVNProperties propChanges;
         public SVNDeltaProcessor deltaProcessor;
         
-        public void loadFile(SVNWCContext context, SVNRepository repos, boolean propsOnly) throws SVNException {
+        public void loadFile(SVNWCContext context, SVNRepository repos, boolean propsOnly, Collection<File> tmpFiles) throws SVNException {
             if (!propsOnly) {
                 File tmpDir = context.getDb().getWCRootTempDir(wcPath);
                 startRevisionFile = SVNFileUtil.createUniqueFile(tmpDir, "diff.", ".tmp", false);
+                tmpFiles.add(startRevisionFile);
                 OutputStream os = null;
                 try {
                     os = SVNFileUtil.openFileForWriting(startRevisionFile);
@@ -145,7 +148,6 @@ public class SvnNgRemoteDiffEditor implements ISVNEditor {
         final DirBaton baton = new DirBaton();
         baton.parent = parent;
         baton.added = added;
-        baton.repoPath = path;
         baton.wcPath = SVNFileUtil.createFilePath(target, path);
         baton.propChanges = new SVNProperties();
         return baton;
@@ -168,12 +170,13 @@ public class SvnNgRemoteDiffEditor implements ISVNEditor {
         }
         currentFile.deltaProcessor = new SVNDeltaProcessor();
         if (!currentFile.added) {
-            currentFile.loadFile(context, repository, false);
+            currentFile.loadFile(context, repository, false, tmpFiles);
         } else {
             currentFile.startRevisionFile = getEmptyFile();
         }
         File tmpDir = context.getDb().getWCRootTempDir(target);
         currentFile.endRevisionFile = SVNFileUtil.createUniqueFile(tmpDir, SVNPathUtil.tail(path), ".tmp", false);
+        tmpFiles.add(currentFile.endRevisionFile);
         currentFile.deltaProcessor.applyTextDelta(currentFile.startRevisionFile, currentFile.endRevisionFile, true);
     }
 
@@ -215,14 +218,14 @@ public class SvnNgRemoteDiffEditor implements ISVNEditor {
         
         if (kind == SVNNodeKind.FILE) {
             FileBaton b = makeFileBaton(path, false);
-            b.loadFile(context, repository, false);
+            b.loadFile(context, repository, false, tmpFiles);
             b.endRevisionFile = getEmptyFile();
             String[] mTypes = b.getMimeTypes();
             
-            diffCallback.fileDeleted(currentResult, path, b.startRevisionFile, 
+            diffCallback.fileDeleted(currentResult, b.wcPath, b.startRevisionFile, 
                     b.endRevisionFile, mTypes[0], mTypes[1], b.pristineProps);
         } else if (kind == SVNNodeKind.DIR) {
-            diffCallback.dirDeleted(currentResult, path);
+            diffCallback.dirDeleted(currentResult, SVNFileUtil.createFilePath(target, path));
             if (walkDeletedDirs) {
                 diffDeletedDir(path, this.revision, repository);
             }
@@ -235,7 +238,6 @@ public class SvnNgRemoteDiffEditor implements ISVNEditor {
             dp.action = currentResult.treeConflicted ? SVNEventAction.TREE_CONFLICT : action;
             dp.kind = kind;
             dp.state = currentResult.contentState;
-            dp.isTreeConflicted = currentResult.treeConflicted;
             deletedPaths.put(SVNFileUtil.createFilePath(target, path), dp);
         }
     }
@@ -250,10 +252,10 @@ public class SvnNgRemoteDiffEditor implements ISVNEditor {
             String entryPath = SVNPathUtil.append(path, entry.getName());
             if (entry.getKind() == SVNNodeKind.FILE) {
                 FileBaton fb = makeFileBaton(entryPath, false);
-                fb.loadFile(context, repository, false);
+                fb.loadFile(context, repository, false, tmpFiles);
                 File emptyFile = getEmptyFile();
                 String[] mTypes = fb.getMimeTypes();
-                diffCallback.fileDeleted(null, entryPath, 
+                diffCallback.fileDeleted(null, fb.wcPath, 
                         fb.startRevisionFile, emptyFile, 
                         mTypes[0], mTypes[1], 
                         fb.pristineProps);
@@ -267,6 +269,7 @@ public class SvnNgRemoteDiffEditor implements ISVNEditor {
         if (emptyFile == null) {
             emptyFile = context.getDb().getWCRootTempDir(target);
             emptyFile = SVNFileUtil.createUniqueFile(emptyFile, "empty.", ".tmp", false);
+            tmpFiles.add(emptyFile);
             SVNFileUtil.createEmptyFile(emptyFile);
         }
         return emptyFile;
@@ -311,7 +314,7 @@ public class SvnNgRemoteDiffEditor implements ISVNEditor {
             return;
         }
         
-        diffCallback.dirAdded(currentResult.reset(), path, targetRevision, copyFromPath, copyFromRevision);
+        diffCallback.dirAdded(currentResult.reset(), db.wcPath, targetRevision, copyFromPath, copyFromRevision);
         db.skip = currentResult.skip;
         db.skipChildren = currentResult.skipChildren;
         db.treeConflicted = currentResult.treeConflicted;
@@ -360,7 +363,7 @@ public class SvnNgRemoteDiffEditor implements ISVNEditor {
             return;
         }
         db.loadProperties(repository, revision);
-        diffCallback.dirOpened(currentResult.reset(), path, revision);
+        diffCallback.dirOpened(currentResult.reset(), db.wcPath, revision);
         db.skip = currentResult.skip;
         db.skipChildren = currentResult.skipChildren;
         db.treeConflicted = currentResult.treeConflicted;
@@ -374,6 +377,64 @@ public class SvnNgRemoteDiffEditor implements ISVNEditor {
     }
 
     public void closeDir() throws SVNException {
+        boolean skipped = false;
+        currentResult.reset();
+        currentResult.contentState = SVNStatusType.UNKNOWN;
+        currentResult.propState = SVNStatusType.UNKNOWN;
+        DirBaton b = currentDir;
+        if (b.skip) {
+            currentDir = b.parent;
+            return;
+        }
+        if (!b.added && b.propChanges.size() > 0) {
+            removeNonPropChanges(b.pristineProperties, b.propChanges);
+        }
+        if (b.propChanges.size() > 0) {
+            diffCallback.dirPropsChanged(currentResult, b.wcPath, b.added, b.propChanges, b.pristineProperties);
+            if (currentResult.propState == SVNStatusType.OBSTRUCTED || currentResult.propState == SVNStatusType.MISSING) {
+                currentResult.contentState = currentResult.propState;
+                skipped = true;
+            }
+        }
+        diffCallback.dirClosed(null, b.wcPath, b.added);
+        if (!skipped && !b.added && context.getEventHandler() != null) {
+            Collection<File> ds = new ArrayList<File>();
+            for (File d : deletedPaths.keySet()) {
+                DeletedPath dp = deletedPaths.get(d);
+                
+                SVNEvent event = SVNEventFactory.createSVNEvent(d, 
+                        dp.kind, null, -1, 
+                        dp.state, 
+                        dp.state, 
+                        SVNStatusType.INAPPLICABLE, 
+                        dp.action, 
+                        dp.action, null, null, null);
+                context.getEventHandler().handleEvent(event, -1);
+                ds.add(d);
+            }
+            for (File file : ds) {
+                deletedPaths.put(file, null);
+            }
+        }
+        if (!b.added && context.getEventHandler() != null) {
+            SVNEventAction action = null;
+            if (b.treeConflicted) {
+                action = SVNEventAction.TREE_CONFLICT;
+            } else if (skipped) {
+                action = SVNEventAction.SKIP;
+            } else {
+                action = SVNEventAction.UPDATE_UPDATE;
+            }
+            SVNEvent event = SVNEventFactory.createSVNEvent(b.wcPath, 
+                    SVNNodeKind.DIR, null, -1, 
+                    currentResult.contentState, 
+                    currentResult.propState, 
+                    SVNStatusType.INAPPLICABLE, 
+                    action, 
+                    action, null, null, null);
+            context.getEventHandler().handleEvent(event, -1);
+        }
+        currentDir = b.parent;
     }
 
     public void addFile(String path, String copyFromPath, long copyFromRevision) throws SVNException {
@@ -412,9 +473,16 @@ public class SvnNgRemoteDiffEditor implements ISVNEditor {
             return;
         }
         FileBaton b = currentFile;
+        if (textChecksum != null) {
+            SvnChecksum expected = SvnChecksum.fromString("$md5 $" + textChecksum);
+            if (b.resultMd5Checksum != null && !expected.equals(b.resultMd5Checksum)) {
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.CHECKSUM_MISMATCH, "Checksum mismatch for ''{0}''", b.repoPath);
+                SVNErrorManager.error(err, SVNLogType.WC);
+            }
+        }
         if (!b.added && b.propChanges.size() > 0) {
             if (b.pristineProps == null) {
-                b.loadFile(context, repository, true);
+                b.loadFile(context, repository, true, tmpFiles);
             }
             removeNonPropChanges(b.pristineProps, b.propChanges);
         }
@@ -422,7 +490,7 @@ public class SvnNgRemoteDiffEditor implements ISVNEditor {
             String[] mTypes = b.getMimeTypes();
             if (b.added) {
                 diffCallback.fileAdded(currentResult.reset(),
-                        path,
+                        b.wcPath,
                         b.endRevisionFile != null ? b.startRevisionFile : null, 
                         b.endRevisionFile, 
                         0, 
@@ -435,7 +503,7 @@ public class SvnNgRemoteDiffEditor implements ISVNEditor {
                 b.treeConflicted = currentResult.treeConflicted;
             } else {
                 diffCallback.fileChanged(currentResult.reset(),
-                        path,
+                        b.wcPath,
                         b.endRevisionFile != null ? b.startRevisionFile : null, 
                         b.endRevisionFile, 
                         0, 
@@ -452,7 +520,32 @@ public class SvnNgRemoteDiffEditor implements ISVNEditor {
             DeletedPath dp = deletedPaths.get(b.wcPath);
             if (dp != null) {
                 deletedPaths.remove(b.wcPath);
+                kind = dp.kind;
+                currentResult.contentState = dp.state;
+                currentResult.propState = dp.state;
             }
+            if (b.treeConflicted) {
+                action = SVNEventAction.TREE_CONFLICT;
+            } else if (dp != null) {
+                if (dp.action == SVNEventAction.UPDATE_DELETE && b.added) {
+                    action = SVNEventAction.UPDATE_REPLACE;
+                } else {
+                    action = dp.action;
+                }
+            } else if (b.added) {
+                action = SVNEventAction.UPDATE_ADD;
+            } else {
+                action = SVNEventAction.UPDATE_UPDATE;
+            }
+            SVNEvent event = SVNEventFactory.createSVNEvent(b.wcPath, 
+                    kind, null, -1, 
+                    currentResult.contentState, 
+                    currentResult.propState, 
+                    SVNStatusType.INAPPLICABLE, 
+                    action, 
+                    action, 
+                    null, null, null);
+            context.getEventHandler().handleEvent(event, -1);
         }
     }
 
@@ -471,6 +564,9 @@ public class SvnNgRemoteDiffEditor implements ISVNEditor {
     }
 
     public SVNCommitInfo closeEdit() throws SVNException {
+        for (File tmpFile : tmpFiles) {
+            SVNFileUtil.deleteFile(tmpFile);
+        }
         return null;
     }
 
