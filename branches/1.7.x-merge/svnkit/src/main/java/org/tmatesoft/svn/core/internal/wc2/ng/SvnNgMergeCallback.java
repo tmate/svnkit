@@ -1,8 +1,11 @@
 package org.tmatesoft.svn.core.internal.wc2.ng;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
@@ -22,12 +25,16 @@ import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 import org.tmatesoft.svn.core.internal.wc17.SVNWCContext;
 import org.tmatesoft.svn.core.internal.wc17.SVNWCContext.ConflictInfo;
 import org.tmatesoft.svn.core.internal.wc17.db.ISVNWCDb;
-import org.tmatesoft.svn.core.internal.wc17.db.Structure;
 import org.tmatesoft.svn.core.internal.wc17.db.ISVNWCDb.SVNWCDbKind;
 import org.tmatesoft.svn.core.internal.wc17.db.ISVNWCDb.SVNWCDbStatus;
+import org.tmatesoft.svn.core.internal.wc17.db.Structure;
 import org.tmatesoft.svn.core.internal.wc17.db.StructureFields.NodeInfo;
+import org.tmatesoft.svn.core.internal.wc2.SvnRepositoryAccess;
+import org.tmatesoft.svn.core.internal.wc2.SvnRepositoryAccess.LocationsInfo;
 import org.tmatesoft.svn.core.io.SVNRepository;
+import org.tmatesoft.svn.core.wc.SVNRevision;
 import org.tmatesoft.svn.core.wc.SVNStatusType;
+import org.tmatesoft.svn.core.wc2.SvnTarget;
 
 public class SvnNgMergeCallback implements ISvnDiffCallback {
     
@@ -37,6 +44,7 @@ public class SvnNgMergeCallback implements ISvnDiffCallback {
     
     private Collection<File> dryRunDeletions;
     private Collection<File> dryRunAdditions;
+    
     private boolean recordOnly;
     private boolean sourcesAncestral;
     private long mergeSource2Rev;
@@ -85,6 +93,7 @@ public class SvnNgMergeCallback implements ISvnDiffCallback {
         
         if (!propChanges.isEmpty()) {
             boolean treeConflicted2 = false;
+            mergePropChanges(path, propChanges, originalProperties);
 //            merge
         }
     }
@@ -174,7 +183,11 @@ public class SvnNgMergeCallback implements ISvnDiffCallback {
             SVNURL oldUrl = repos.getLocation();
             repos.setLocation(targetUrl, false);
             String mi = props.getStringValue(propName);
+            
             Map<String, SVNMergeRangeList> mergeinfo = null;
+            Map<String, SVNMergeRangeList> filteredYoungerMergeinfo = null;
+            Map<String, SVNMergeRangeList> filteredMergeinfo = null;
+            
             try {
                 mergeinfo = SVNMergeInfoUtil.parseMergeInfo(new StringBuffer(mi), null);
             } catch (SVNException e) {
@@ -186,15 +199,81 @@ public class SvnNgMergeCallback implements ISvnDiffCallback {
                 throw e;
             }
             Map<String, SVNMergeRangeList>[] splitted = splitMergeInfoOnRevision(mergeinfo, baseRevision);
-            Map<String, SVNMergeRangeList> youngerMergeinfo = splitted[0];
+            Map<String, SVNMergeRangeList> youngerMergeInfo = splitted[0];
             mergeinfo = splitted[1];
-            if (youngerMergeinfo != null) {
+            
+            if (youngerMergeInfo != null) {
+                SVNURL mergeSourceRootUrl = repos.getRepositoryRoot(true);
                 
+                for (Iterator<String> youngerMergeInfoIter = youngerMergeInfo.keySet().iterator(); youngerMergeInfoIter.hasNext();) {
+                    String sourcePath = youngerMergeInfoIter.next();
+                    SVNMergeRangeList rangeList = (SVNMergeRangeList) youngerMergeInfo.get(sourcePath);
+                    SVNMergeRange ranges[] = rangeList.getRanges();
+                    List<SVNMergeRange> adjustedRanges = new ArrayList<SVNMergeRange>();
+                    
+                    SVNURL mergeSourceURL = mergeSourceRootUrl.appendPath(sourcePath, false);
+                    for (int i = 0; i < ranges.length; i++) {
+                        SVNMergeRange range = ranges[i];
+                        Structure<LocationsInfo> locations = null;
+                        try {
+                            locations = new SvnNgRepositoryAccess(null, context).getLocations(
+                                    repos, 
+                                    SvnTarget.fromURL(targetUrl), 
+                                    SVNRevision.create(baseRevision), 
+                                    SVNRevision.create(range.getStartRevision() + 1), 
+                                    SVNRevision.UNDEFINED);
+                            SVNURL startURL = locations.get(LocationsInfo.startUrl);
+                            if (!mergeSourceURL.equals(startURL)) {
+                                adjustedRanges.add(range);
+                            }
+                            locations.release();
+                        } catch (SVNException svne) {
+                            SVNErrorCode code = svne.getErrorMessage().getErrorCode();
+                            if (code == SVNErrorCode.CLIENT_UNRELATED_RESOURCES || 
+                                    code == SVNErrorCode.RA_DAV_PATH_NOT_FOUND ||
+                                    code == SVNErrorCode.FS_NOT_FOUND ||
+                                    code == SVNErrorCode.FS_NO_SUCH_REVISION) {
+                                adjustedRanges.add(range);
+                            } else {
+                                throw svne;
+                            }
+                        }
+                    }
+
+                    if (!adjustedRanges.isEmpty()) {
+                        if (filteredYoungerMergeinfo == null) {
+                            filteredYoungerMergeinfo = new TreeMap<String, SVNMergeRangeList>();
+                        }
+                        SVNMergeRangeList adjustedRangeList = SVNMergeRangeList.fromCollection(adjustedRanges); 
+                        filteredYoungerMergeinfo.put(sourcePath, adjustedRangeList);
+                    }
+                }
+            }
+            if (mergeinfo != null && !mergeinfo.isEmpty()) {
+                
+                Map<String, SVNMergeRangeList> implicitMergeInfo = 
+                        new SvnNgRepositoryAccess(null, context).getHistoryAsMergeInfo(repos2, SvnTarget.fromFile(localAbsPath),  
+                                baseRevision, -1);                         
+                filteredMergeinfo = SVNMergeInfoUtil.removeMergeInfo(implicitMergeInfo, mergeinfo, true);
             }
             
+            if (oldUrl != null) {
+                repos.setLocation(oldUrl, false);
+            }
+            
+            if (filteredMergeinfo != null && filteredYoungerMergeinfo != null) {
+                filteredMergeinfo = SVNMergeInfoUtil.mergeMergeInfos(filteredMergeinfo, filteredYoungerMergeinfo);
+            } else if (filteredYoungerMergeinfo != null) {
+                filteredMergeinfo = filteredYoungerMergeinfo;
+            }
+
+            if (filteredMergeinfo != null && !filteredMergeinfo.isEmpty()) {
+                String filteredMergeInfoStr = SVNMergeInfoUtil.formatMergeInfoToString(filteredMergeinfo, null);
+                adjustedProps.put(SVNProperty.MERGE_INFO, filteredMergeInfoStr);
+            }
         }
         
-        return props;
+        return adjustedProps;
     }
 
     private Map<String, SVNMergeRangeList>[] splitMergeInfoOnRevision(Map<String, SVNMergeRangeList> mergeinfo, long revision) {
