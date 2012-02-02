@@ -55,7 +55,7 @@ public class SvnNgRemoteDiffEditor implements ISVNEditor {
     
     private Collection<File> tmpFiles;
 
-    public static ISVNEditor createEditor(SVNWCContext context, File target, SVNDepth depth, SVNRepository repository, long revision, 
+    public static SvnNgRemoteDiffEditor createEditor(SVNWCContext context, File target, SVNDepth depth, SVNRepository repository, long revision, 
             boolean walkDeletedDirs, boolean dryRun, ISvnDiffCallback diffCallback) {
         SvnNgRemoteDiffEditor editor = new SvnNgRemoteDiffEditor();
         
@@ -564,10 +564,14 @@ public class SvnNgRemoteDiffEditor implements ISVNEditor {
     }
 
     public SVNCommitInfo closeEdit() throws SVNException {
+        cleanup();
+        return null;
+    }
+
+    public void cleanup() throws SVNException {
         for (File tmpFile : tmpFiles) {
             SVNFileUtil.deleteFile(tmpFile);
         }
-        return null;
     }
 
     public void abortEdit() throws SVNException {
