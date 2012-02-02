@@ -82,6 +82,10 @@ public class SvnNgMergeCallback implements ISvnDiffCallback {
     private File addedPath;
     private SVNURL reposRootUrl;
     private boolean force;
+    
+    public Collection<File> getConflictedPaths() {
+        return conflictedPaths;
+    }
 
     public void fileOpened(SvnDiffCallbackResult result, File path, long revision) throws SVNException {
         // do nothing
