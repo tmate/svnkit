@@ -32,6 +32,28 @@ public class SvnWcDbReader extends SvnWcDbShared {
         replaceRoot
     }
     
+    public static Collection<File> getServerExcludedNodes(SVNWCDb db, File path) throws SVNException {
+        DirParsedInfo dirInfo = db.obtainWcRoot(path);
+        SVNSqlJetDb sdb = dirInfo.wcDbDir.getWCRoot().getSDb();
+        long wcId = dirInfo.wcDbDir.getWCRoot().getWcId();
+        File localRelPath = dirInfo.localRelPath;
+        
+        Collection<File> result = new ArrayList<File>();
+        SVNSqlJetStatement stmt = sdb.getStatement(SVNWCDbStatements.SELECT_ALL_SERVER_EXCLUDED_NODES);
+        try {
+            stmt.bindf("isi", wcId, localRelPath, 0);
+            while(stmt.next()) {
+                final File localPath = getColumnPath(stmt, NODES__Fields.local_relpath);
+                final File absPath = dirInfo.wcDbDir.getWCRoot().getAbsPath(localPath);
+                result.add(absPath);
+            }
+        } finally {
+            reset(stmt);
+        }
+        return result;
+        
+    }
+
     public static Collection<File> getNotPresentDescendants(SVNWCDb db, File parentPath) throws SVNException {
         DirParsedInfo dirInfo = db.obtainWcRoot(parentPath);
         SVNSqlJetDb sdb = dirInfo.wcDbDir.getWCRoot().getSDb();

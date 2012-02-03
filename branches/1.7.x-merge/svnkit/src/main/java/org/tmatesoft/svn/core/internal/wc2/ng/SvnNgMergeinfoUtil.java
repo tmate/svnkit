@@ -33,7 +33,7 @@ import org.tmatesoft.svn.core.wc2.SvnTarget;
 
 public class SvnNgMergeinfoUtil {
     
-    private static class SvnMergeInfoInfo {
+    public static class SvnMergeInfoInfo {
         Map<String, SVNMergeRangeList> mergeinfo;
         boolean inherited;
         String walkRelPath;
@@ -53,7 +53,7 @@ public class SvnNgMergeinfoUtil {
         return null;
     }
     
-    private static SvnMergeInfoInfo getWCMergeInfo(SVNWCContext context, File localAbsPath, File limitAbsPath, SVNMergeInfoInheritance inheritance, 
+    public static SvnMergeInfoInfo getWCMergeInfo(SVNWCContext context, File localAbsPath, File limitAbsPath, SVNMergeInfoInheritance inheritance, 
             boolean ignoreInvalidMergeInfo) throws SVNException {
         long baseRevision = context.getNodeBaseRev(localAbsPath);
         Map<String, SVNMergeRangeList> wcMergeInfo = null;
@@ -290,6 +290,14 @@ public class SvnNgMergeinfoUtil {
         } else {
             return getWcOrReposMergeInfoCatalog(context, repository, target.getFile(), includeDescendants, false, ignoreInvalidMergeInfo, SVNMergeInfoInheritance.INHERITED).catalog;
         }
+    }
+    
+    public static Map<String, SVNMergeRangeList> getWCOrReposMergeInfo(SVNWCContext context, File wcPath, SVNRepository repository, boolean reposOnly, SVNMergeInfoInheritance inheritance) throws SVNException {
+        SvnMergeInfoCatalogInfo catalog = getWcOrReposMergeInfoCatalog(context, repository, wcPath, false, reposOnly, false, inheritance);
+        if (catalog != null && catalog.catalog != null) {
+            return catalog.catalog.values().iterator().next();
+        }
+        return null;
     }
     
     public static Map<String, Map<String, SVNMergeRangeList>> convertToCatalog(Map<String, SVNMergeInfo> catalog) {
