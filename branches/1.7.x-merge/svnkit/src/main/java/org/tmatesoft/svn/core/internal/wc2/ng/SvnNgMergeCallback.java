@@ -39,6 +39,7 @@ import org.tmatesoft.svn.core.internal.wc17.db.ISVNWCDb.SVNWCDbKind;
 import org.tmatesoft.svn.core.internal.wc17.db.ISVNWCDb.SVNWCDbStatus;
 import org.tmatesoft.svn.core.internal.wc17.db.Structure;
 import org.tmatesoft.svn.core.internal.wc17.db.StructureFields.NodeInfo;
+import org.tmatesoft.svn.core.internal.wc2.SvnRepositoryAccess;
 import org.tmatesoft.svn.core.internal.wc2.SvnRepositoryAccess.LocationsInfo;
 import org.tmatesoft.svn.core.io.SVNRepository;
 import org.tmatesoft.svn.core.wc.SVNConflictAction;
@@ -52,37 +53,13 @@ import org.tmatesoft.svn.util.SVNLogType;
 
 public class SvnNgMergeCallback implements ISvnDiffCallback {
     
-    private boolean dryRun;
-    private File targetAbsPath;
-    private SVNWCContext context;
-    
-    private Collection<File> dryRunDeletions;
-    private Collection<File> dryRunAdditions;
-    
-    private Collection<File> pathsWithDeletedMergeInfo;
-    private Collection<File> pathsWithAddedMergeInfo;
-
-    private boolean recordOnly;
-    private boolean sourcesAncestral;
-    
-    private long mergeSource2Rev;
-    private SVNURL mergeSource2Url;
-    private long mergeSource1Rev;
-    private SVNURL mergeSource1Url;
-    
-    private boolean sameRepos;
-    private boolean ignoreAncestry;
-    private boolean mergeinfoCapable;
-    private boolean reintegrateMerge;
-    
-    private SVNRepository repos1;
-    private SVNRepository repos2;
-    private SVNDiffOptions diffOptions;
     private Collection<File> conflictedPaths;
-    private File addedPath;
-    private SVNURL reposRootUrl;
-    private boolean force;
+    private SvnNgMergeDriver driver;
     
+    public SvnNgMergeCallback(SvnNgMergeDriver driver) {
+        this.driver = driver;
+    }
+
     public Collection<File> getConflictedPaths() {
         return conflictedPaths;
     }
@@ -108,7 +85,7 @@ public class SvnNgMergeCallback implements ISvnDiffCallback {
         
         if (wcKind != SVNNodeKind.FILE  || isDeleted) {
             if (wcKind == SVNNodeKind.NONE) {
-                SVNDepth parentDepth = context.getNodeDepth(SVNFileUtil.getParentFile(path));
+                SVNDepth parentDepth = getContext().getNodeDepth(SVNFileUtil.getParentFile(path));
                 if (parentDepth != SVNDepth.UNKNOWN && parentDepth.compareTo(SVNDepth.FILES) < 0) {
                     result.contentState = SVNStatusType.MISSING;
                     result.propState = SVNStatusType.MISSING;
@@ -135,19 +112,19 @@ public class SvnNgMergeCallback implements ISvnDiffCallback {
             result.propState = SVNStatusType.UNCHANGED;
         }
         
-        if (recordOnly) {
+        if (isRecordOnly()) {
             result.contentState = SVNStatusType.UNCHANGED;
             return;
         }
         
         if (tmpFile1 != null) {
-            boolean hasLocalMods = context.isTextModified(path, false);
+            boolean hasLocalMods = getContext().isTextModified(path, false);
             String targetLabel = ".working";
             String leftLabel = ".merge-left.r" + rev1;
             String rightLabel = ".merge-right.r" + rev2;
             SVNConflictVersion[] cvs = makeConflictVersions(path, SVNNodeKind.FILE);
             
-            MergeInfo mergeOutcome = context.mergeText(tmpFile1, tmpFile2, path, leftLabel, rightLabel, targetLabel, cvs[0], cvs[1], dryRun, diffOptions, propChanges);
+            MergeInfo mergeOutcome = getContext().mergeText(tmpFile1, tmpFile2, path, leftLabel, rightLabel, targetLabel, cvs[0], cvs[1], isDryRun(), getDiffOptions(), propChanges);
             if (mergeOutcome.mergeOutcome == SVNStatusType.CONFLICTED) {
                 result.contentState = SVNStatusType.CONFLICTED;
             } else if (hasLocalMods && mergeOutcome.mergeOutcome != SVNStatusType.UNCHANGED) {
@@ -167,7 +144,7 @@ public class SvnNgMergeCallback implements ISvnDiffCallback {
             String mimetype1, String mimeType2, File copyFromPath,
             long copyFromRevision, SVNProperties propChanges,
             SVNProperties originalProperties) throws SVNException {
-        if (recordOnly) {
+        if (isRecordOnly()) {
             result.contentState = SVNStatusType.UNCHANGED;
             result.propState = SVNStatusType.UNCHANGED;
             return;
@@ -178,10 +155,10 @@ public class SvnNgMergeCallback implements ISvnDiffCallback {
             if (SVNProperty.isWorkingCopyProperty(propName)) {
                 continue;
             }
-            if (!sameRepos && !SVNProperty.isRegularProperty(propName)) {
+            if (!isSameRepos() && !SVNProperty.isRegularProperty(propName)) {
                 continue;
             }
-            if (!sameRepos && SVNProperty.MERGE_INFO.equals(propName)) {
+            if (!isSameRepos() && SVNProperty.MERGE_INFO.equals(propName)) {
                 continue;
             }
             if (propChanges.getSVNPropertyValue(propName) != null) {
@@ -193,7 +170,7 @@ public class SvnNgMergeCallback implements ISvnDiffCallback {
         
         ObstructionState os = performObstructionCheck(path, SVNNodeKind.UNKNOWN);
         if (os.obstructionState != SVNStatusType.INAPPLICABLE) {
-            if (dryRun && addedPath != null && SVNWCUtils.isChild(addedPath, path)) {
+            if (isDryRun() && getAddedPath() != null && SVNWCUtils.isChild(getAddedPath(), path)) {
                 result.contentState = SVNStatusType.CHANGED;
                 if (!fileProps.isEmpty()) {
                     result.propState = SVNStatusType.CHANGED;
@@ -207,19 +184,19 @@ public class SvnNgMergeCallback implements ISvnDiffCallback {
         SVNNodeKind kind = SVNFileType.getNodeKind(SVNFileType.getType(path));
         
         if (kind == SVNNodeKind.NONE) {
-            if (!dryRun) {
+            if (!isDryRun()) {
                 SVNURL copyFromUrl = null;
                 long copyFromRev = -1;
                 InputStream newBaseContents = null;
                 InputStream newContents = null;
                 SVNProperties newBaseProps, newProps;
                 try {
-                    if (sameRepos) {
-                        String child = SVNWCUtils.getPathAsChild(targetAbsPath, path);
+                    if (isSameRepos()) {
+                        String child = SVNWCUtils.getPathAsChild(getTargetPath(), path);
                         if (child != null) {
-                            copyFromUrl = mergeSource2Url.appendPath(child, false);
+                            copyFromUrl = getSource2URL().appendPath(child, false);
                         } else {
-                            copyFromUrl = mergeSource2Url;
+                            copyFromUrl = getSource2URL();
                         }
                         copyFromRev = rev2;
                         checkReposMatch(path, copyFromUrl);
@@ -233,12 +210,12 @@ public class SvnNgMergeCallback implements ISvnDiffCallback {
                         newBaseContents = SVNFileUtil.DUMMY_IN;
                         newContents = SVNFileUtil.openFileForReading(tmpFile2);
                     }
-                    SVNTreeConflictDescription tc = context.getTreeConflict(path);
+                    SVNTreeConflictDescription tc = getContext().getTreeConflict(path);
                     if (tc != null) {
                         treeConflictOnAdd(path, SVNNodeKind.FILE, SVNConflictAction.ADD, SVNConflictReason.ADDED);
                         result.treeConflicted = true;
                     } else {
-                        SvnNgReposToWcCopy.addFileToWc(context, path, newBaseContents, newContents, newBaseProps, newProps, copyFromUrl, copyFromRev);
+                        SvnNgReposToWcCopy.addFileToWc(getContext(), path, newBaseContents, newContents, newBaseProps, newProps, copyFromUrl, copyFromRev);
                     }
                 } finally {
                     SVNFileUtil.closeFile(newBaseContents);
@@ -252,7 +229,7 @@ public class SvnNgMergeCallback implements ISvnDiffCallback {
         } else if (kind == SVNNodeKind.DIR) {
             treeConflictOnAdd(path, SVNNodeKind.FILE, SVNConflictAction.ADD, SVNConflictReason.OBSTRUCTED);
             result.treeConflicted = true;
-            SVNNodeKind wcKind = context.readKind(path, false);
+            SVNNodeKind wcKind = getContext().readKind(path, false);
             if (wcKind != SVNNodeKind.NONE && isDryRunDeletion(path)) {
                 result.contentState = SVNStatusType.CHANGED;
             } else {
@@ -274,10 +251,13 @@ public class SvnNgMergeCallback implements ISvnDiffCallback {
             File tmpFile1, File tmpFile2, String mimetype1, String mimeType2,
             SVNProperties originalProperties) throws SVNException {
         
-        if (dryRun) {
-            dryRunDeletions.add(path);
+        if (isDryRun()) {
+            if (getDryRunDeletions() == null) {
+                setDryRunDeletions(new HashSet<File>());
+            }
+            getDryRunDeletions().add(path);
         }
-        if (recordOnly) {
+        if (isRecordOnly()) {
             result.contentState = SVNStatusType.UNCHANGED;
             return;
         }
@@ -290,9 +270,9 @@ public class SvnNgMergeCallback implements ISvnDiffCallback {
         SVNNodeKind kind = SVNFileType.getNodeKind(SVNFileType.getType(path));
         if (kind == SVNNodeKind.FILE) {
             boolean same = compareFiles(tmpFile1, originalProperties, path);
-            if (same || force || recordOnly) {
-                if (!dryRun) {
-                    SvnNgRemove.delete(context, path, false, true, null);
+            if (same || isForce() || isRecordOnly()) {
+                if (!isDryRun()) {
+                    SvnNgRemove.delete(getContext(), path, false, true, null);
                 }
                 result.contentState = SVNStatusType.CHANGED;
             } else {
@@ -313,8 +293,16 @@ public class SvnNgMergeCallback implements ISvnDiffCallback {
         }
     }
 
+    private void setDryRunDeletions(Collection<File> set) {
+        driver.dryRunDeletions = set;
+    }
+
+    private void setDryRunAddtions(Collection<File> set) {
+        driver.dryRunAdded = set;
+    }
+
     public void dirDeleted(SvnDiffCallbackResult result, File path) throws SVNException {
-        if (recordOnly) {
+        if (isRecordOnly()) {
             result.contentState = SVNStatusType.UNCHANGED;
             return;
         }
@@ -327,20 +315,20 @@ public class SvnNgMergeCallback implements ISvnDiffCallback {
         if (os.deleted) {
             os.kind = SVNNodeKind.NONE;
         }
-        if (dryRun) {
-            if (dryRunDeletions == null) {
-                dryRunDeletions = new HashSet<File>();
+        if (isDryRun()) {
+            if (getDryRunDeletions() == null) {
+                setDryRunDeletions(new HashSet<File>());
             }
-            dryRunDeletions.add(path);
+            getDryRunDeletions().add(path);
         }
         if (os.kind == SVNNodeKind.DIR) {
             if (isVersioned && !os.deleted) {
                 try {
-                    if (!force) {
+                    if (!isForce()) {
                         // TODO check it could be deleted.
                     }
-                    if (!dryRun) {
-                        SvnNgRemove.delete(context, path, false, false, null);
+                    if (!isDryRun()) {
+                        SvnNgRemove.delete(getContext(), path, false, false, null);
                     }
                     result.contentState = SVNStatusType.CHANGED;
                 } catch (SVNException e) {
@@ -371,7 +359,7 @@ public class SvnNgMergeCallback implements ISvnDiffCallback {
         }
         if (os.kind != SVNNodeKind.DIR || os.deleted) {
             if (os.kind == SVNNodeKind.NONE) {
-                SVNDepth parentDepth = context.getNodeDepth(SVNFileUtil.getParentFile(path));
+                SVNDepth parentDepth = getContext().getNodeDepth(SVNFileUtil.getParentFile(path));
                 if (parentDepth != SVNDepth.UNKNOWN && parentDepth.compareTo(SVNDepth.IMMEDIATES) < 0) {
                     result.skipChildren = true;
                     return;
@@ -388,16 +376,16 @@ public class SvnNgMergeCallback implements ISvnDiffCallback {
     }
 
     public void dirAdded(SvnDiffCallbackResult result, File path, long revision, String copyFromPath, long copyFromRevision) throws SVNException {
-        if (recordOnly) {
+        if (isRecordOnly()) {
             result.contentState = SVNStatusType.UNCHANGED;
             return;
         }
         File parentPath = SVNFileUtil.getParentFile(path);
-        String child = SVNWCUtils.getPathAsChild(targetAbsPath, path);
+        String child = SVNWCUtils.getPathAsChild(getTargetPath(), path);
         SVNURL copyFromUrl = null;
         long copyFromRev = -1;
-        if (sameRepos) {
-            copyFromUrl = mergeSource2Url.appendPath(child, false);
+        if (isSameRepos()) {
+            copyFromUrl = getSource2URL().appendPath(child, false);
             copyFromRev = revision;
             checkReposMatch(parentPath, copyFromUrl);
         }
@@ -411,7 +399,7 @@ public class SvnNgMergeCallback implements ISvnDiffCallback {
             }
         }
         if (os.obstructionState != SVNStatusType.INAPPLICABLE) {
-            if (dryRun && addedPath != null && SVNWCUtils.isChild(addedPath, path)) {
+            if (isDryRun() && getAddedPath() != null && SVNWCUtils.isChild(getAddedPath(), path)) {
                 result.contentState = SVNStatusType.CHANGED;
             } else {
                 result.contentState = os.obstructionState;
@@ -423,17 +411,17 @@ public class SvnNgMergeCallback implements ISvnDiffCallback {
         }
         
         if (os.kind == SVNNodeKind.NONE) {
-            if (dryRun) {
-                if (dryRunAdditions == null) {
-                    dryRunAdditions = new HashSet<File>();
+            if (isDryRun()) {
+                if (getDryRunAdditions() == null) {
+                    setDryRunAddtions(new HashSet<File>());
                 }
-                dryRunAdditions.add(path);
+                getDryRunAdditions().add(path);
             } else {
                 path.mkdir();
                 if (copyFromUrl != null) {
-                    SVNWCNodeReposInfo reposInfo = context.getNodeReposInfo(parentPath);
+                    SVNWCNodeReposInfo reposInfo = getContext().getNodeReposInfo(parentPath);
                     File reposRelPath = new File(SVNURLUtil.getRelativeURL(reposInfo.reposRootUrl, copyFromUrl));
-                    context.getDb().opCopyDir(path, new SVNProperties(), 
+                    getContext().getDb().opCopyDir(path, new SVNProperties(), 
                             copyFromRev, new SVNDate(0, 0), null, 
                             reposRelPath, 
                             reposInfo.reposRootUrl, 
@@ -444,17 +432,17 @@ public class SvnNgMergeCallback implements ISvnDiffCallback {
                             null, 
                             null);
                 } else {
-                    context.getDb().opAddDirectory(path, null);
+                    getContext().getDb().opAddDirectory(path, null);
                 }
             }
             result.contentState = SVNStatusType.CHANGED;
         } else if (os.kind == SVNNodeKind.DIR) {
             if (!isVersioned || os.deleted) {
-                if (!dryRun) {
+                if (!isDryRun()) {
                     if (copyFromUrl != null) {
-                        SVNWCNodeReposInfo reposInfo = context.getNodeReposInfo(parentPath);
+                        SVNWCNodeReposInfo reposInfo = getContext().getNodeReposInfo(parentPath);
                         File reposRelPath = new File(SVNURLUtil.getRelativeURL(reposInfo.reposRootUrl, copyFromUrl));
-                        context.getDb().opCopyDir(path, new SVNProperties(), 
+                        getContext().getDb().opCopyDir(path, new SVNProperties(), 
                                 copyFromRev, new SVNDate(0, 0), null, 
                                 reposRelPath, 
                                 reposInfo.reposRootUrl, 
@@ -465,10 +453,10 @@ public class SvnNgMergeCallback implements ISvnDiffCallback {
                                 null, 
                                 null);
                     } else {
-                        context.getDb().opAddDirectory(path, null);
+                        getContext().getDb().opAddDirectory(path, null);
                     }
                 } else {
-                    addedPath = path;
+                    setAddedPath(path);
                 }
                 result.contentState = SVNStatusType.CHANGED;
             } else {
@@ -481,8 +469,8 @@ public class SvnNgMergeCallback implements ISvnDiffCallback {
                 }
             }
         } else if (os.kind == SVNNodeKind.FILE) {
-            if (dryRun) {
-                addedPath = null;
+            if (isDryRun()) {
+                setAddedPath(null);
             }
             if (isVersioned && isDryRunDeletion(path)) {
                 result.contentState = SVNStatusType.CHANGED;
@@ -492,8 +480,8 @@ public class SvnNgMergeCallback implements ISvnDiffCallback {
                 result.contentState = SVNStatusType.OBSTRUCTED;
             }
         } else {
-            if (dryRun) {
-                addedPath = null;
+            if (isDryRun()) {
+                setAddedPath(null);
             }
             result.contentState = SVNStatusType.UNKNOWN;
         }
@@ -505,7 +493,7 @@ public class SvnNgMergeCallback implements ISvnDiffCallback {
             result.contentState = os.obstructionState;
             return;
         }
-        if (isAdded && dryRun && isDryRunAddition(path)) {
+        if (isAdded && isDryRun() && isDryRunAddition(path)) {
             return;
         }
         MergePropertiesInfo info = mergePropChanges(path, propChanges, originalProperties);
@@ -514,22 +502,22 @@ public class SvnNgMergeCallback implements ISvnDiffCallback {
     }
 
     public void dirClosed(SvnDiffCallbackResult result, File path, boolean isAdded) throws SVNException {
-        if (dryRun && dryRunDeletions != null) {
-            dryRunDeletions.clear();
+        if (isDryRun() && getDryRunDeletions() != null) {
+            getDryRunDeletions().clear();
         }
     }
     
     private boolean isDryRunAddition(File path) {
-        return dryRun && dryRunAdditions != null && dryRunAdditions.contains(path);
+        return isDryRun() && getDryRunAdditions() != null && getDryRunAdditions().contains(path);
     }
     
     private boolean isDryRunDeletion(File path) {
-        return dryRun && dryRunDeletions != null && dryRunDeletions.contains(path);
+        return isDryRun() && getDryRunDeletions() != null && getDryRunDeletions().contains(path);
     }
     
     private void checkReposMatch(File path, SVNURL url) throws SVNException {
-        if (!SVNURLUtil.isAncestor(reposRootUrl, url)) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.UNSUPPORTED_FEATURE, "Url ''{0}'' of ''{1}'' is not in repository ''{2}''", url, path, reposRootUrl);
+        if (!SVNURLUtil.isAncestor(getReposRootURL(), url)) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.UNSUPPORTED_FEATURE, "Url ''{0}'' of ''{1}'' is not in repository ''{2}''", url, path, getReposRootURL());
             SVNErrorManager.error(err, SVNLogType.WC);
         }
     }
@@ -538,7 +526,7 @@ public class SvnNgMergeCallback implements ISvnDiffCallback {
         SVNProperties props = new SVNProperties();
         SvnNgPropertiesManager.categorizeProperties(propChanges, props, null, null);
         
-        if (recordOnly && !props.isEmpty()) {
+        if (isRecordOnly() && !props.isEmpty()) {
             SVNProperties mergeinfoProps = new SVNProperties();
             if (props.containsName(SVNProperty.MERGE_INFO)) {
                 mergeinfoProps.put(SVNProperty.MERGE_INFO, props.getStringValue(SVNProperty.MERGE_INFO));
@@ -548,36 +536,30 @@ public class SvnNgMergeCallback implements ISvnDiffCallback {
         
         MergePropertiesInfo mergeOutcome = null;
         if (!props.isEmpty()) {
-            if (mergeSource1Rev < mergeSource2Rev || !sourcesAncestral) {
-                props = filterSelfReferentialMergeInfo(props, localAbsPath, isHonorMergeInfo(), sameRepos, reintegrateMerge, repos2);
+            if (getSource1Rev() < getSource2Rev() || !areSourcesAncestral()) {
+                props = filterSelfReferentialMergeInfo(props, localAbsPath, isHonorMergeInfo(), isSameRepos(), isReintegrateMerge(), getRepos2());
             }
             SVNException err = null;
             try {
-                mergeOutcome = context.mergeProperties(localAbsPath, null, null, originalProperties, propChanges, dryRun);
+                mergeOutcome = getContext().mergeProperties(localAbsPath, null, null, originalProperties, propChanges, isDryRun());
             } catch (SVNException e) {
                 err = e;
             }
             
-            if (!dryRun) {
+            if (!isDryRun()) {
                 for (String propName : props.nameSet()) {
                     if (!SVNProperty.MERGE_INFO.equals(propName)) {
                         continue;
                     }
-                    SVNProperties pristineProps = context.getPristineProps(localAbsPath);
+                    SVNProperties pristineProps = getContext().getPristineProps(localAbsPath);
                     boolean hasPristineMergeInfo = false;
                     if (pristineProps != null && pristineProps.containsName(SVNProperty.MERGE_INFO)) {
                         hasPristineMergeInfo = true;
                     }
                     if (!hasPristineMergeInfo && props.getSVNPropertyValue(propName) != null) {
-                        if (pathsWithAddedMergeInfo == null) {
-                            pathsWithAddedMergeInfo = new HashSet<File>();
-                        }
-                        pathsWithAddedMergeInfo.add(localAbsPath);
+                        addPathWithAddedMergeInfo(localAbsPath);
                     } else if (hasPristineMergeInfo && props.getSVNPropertyValue(propName) == null) {
-                        if (pathsWithDeletedMergeInfo == null) {
-                            pathsWithDeletedMergeInfo = new HashSet<File>();
-                        }
-                        pathsWithDeletedMergeInfo.add(localAbsPath);
+                        addPathWithDeletedMergeInfo(localAbsPath);
                     }
                 }
             }
@@ -594,7 +576,21 @@ public class SvnNgMergeCallback implements ISvnDiffCallback {
         }
         return mergeOutcome;
     }
-    
+
+    private void addPathWithAddedMergeInfo(File localAbsPath) {
+        if (driver.pathsWithNewMergeInfo == null) {
+            driver.pathsWithNewMergeInfo = new HashSet<File>();
+        }
+        driver.pathsWithNewMergeInfo.add(localAbsPath);
+    }
+
+    private void addPathWithDeletedMergeInfo(File localAbsPath) {
+        if (driver.pathsWithDeletedMergeInfo == null) {
+            driver.pathsWithDeletedMergeInfo = new HashSet<File>();
+        }
+        driver.pathsWithDeletedMergeInfo.add(localAbsPath);
+    }
+
     private SVNProperties filterSelfReferentialMergeInfo(SVNProperties props, File localAbsPath, boolean honorMergeInfo, boolean sameRepos,
             boolean reintegrateMerge, SVNRepository repos) throws SVNException {
         if (!sameRepos) {
@@ -604,11 +600,11 @@ public class SvnNgMergeCallback implements ISvnDiffCallback {
             return props;
         }
         
-        boolean isAdded = context.isNodeAdded(localAbsPath);
+        boolean isAdded = getContext().isNodeAdded(localAbsPath);
         if (isAdded) {
             return props;
         }
-        long baseRevision = context.getNodeBaseRev(localAbsPath);        
+        long baseRevision = getContext().getNodeBaseRev(localAbsPath);        
         SVNProperties adjustedProps = new SVNProperties();
         
         for (String propName : props.nameSet()) {
@@ -616,7 +612,7 @@ public class SvnNgMergeCallback implements ISvnDiffCallback {
                 adjustedProps.put(propName, props.getSVNPropertyValue(propName));
                 continue;
             }
-            SVNURL targetUrl = context.getUrlFromPath(localAbsPath);
+            SVNURL targetUrl = getContext().getUrlFromPath(localAbsPath);
             SVNURL oldUrl = repos.getLocation();
             repos.setLocation(targetUrl, false);
             String mi = props.getStringValue(propName);
@@ -653,7 +649,7 @@ public class SvnNgMergeCallback implements ISvnDiffCallback {
                         SVNMergeRange range = ranges[i];
                         Structure<LocationsInfo> locations = null;
                         try {
-                            locations = new SvnNgRepositoryAccess(null, context).getLocations(
+                            locations = new SvnNgRepositoryAccess(null, getContext()).getLocations(
                                     repos, 
                                     SvnTarget.fromURL(targetUrl), 
                                     SVNRevision.create(baseRevision), 
@@ -689,7 +685,7 @@ public class SvnNgMergeCallback implements ISvnDiffCallback {
             if (mergeinfo != null && !mergeinfo.isEmpty()) {
                 
                 Map<String, SVNMergeRangeList> implicitMergeInfo = 
-                        new SvnNgRepositoryAccess(null, context).getHistoryAsMergeInfo(repos2, SvnTarget.fromFile(localAbsPath),  
+                        getRepositoryAccess().getHistoryAsMergeInfo(getRepos2(), SvnTarget.fromFile(localAbsPath),  
                                 baseRevision, -1);                         
                 filteredMergeinfo = SVNMergeInfoUtil.removeMergeInfo(implicitMergeInfo, mergeinfo, true);
             }
@@ -762,7 +758,7 @@ public class SvnNgMergeCallback implements ISvnDiffCallback {
     }
 
     private boolean isHonorMergeInfo() {
-        return sourcesAncestral && sameRepos && !ignoreAncestry && mergeinfoCapable;
+        return driver.isHonorMergeInfo();
     }
     
     private ObstructionState performObstructionCheck(File localAbsPath, SVNNodeKind expectedKind) throws SVNException {
@@ -770,7 +766,7 @@ public class SvnNgMergeCallback implements ISvnDiffCallback {
         result.obstructionState = SVNStatusType.INAPPLICABLE;
         result.kind = SVNNodeKind.NONE;
 
-        if (dryRun) {
+        if (isDryRun()) {
             if (isDryRunDeletion(localAbsPath)) {
                 result.deleted = true;
                 if (expectedKind != SVNNodeKind.UNKNOWN &&
@@ -779,13 +775,13 @@ public class SvnNgMergeCallback implements ISvnDiffCallback {
                 }
                 return result;
             } else if (isDryRunAddition(localAbsPath)) {
-                result.added = true;
+//                result.added = true;
                 result.kind = SVNNodeKind.DIR;
                 return result;
             }
         }
         
-        boolean checkRoot = !localAbsPath.equals(targetAbsPath);
+        boolean checkRoot = !localAbsPath.equals(getTargetPath());
         checkWcForObstruction(result, localAbsPath, checkRoot);
         if (result.obstructionState == SVNStatusType.INAPPLICABLE &&
                 expectedKind != SVNNodeKind.UNKNOWN &&
@@ -803,7 +799,7 @@ public class SvnNgMergeCallback implements ISvnDiffCallback {
         SVNWCDbKind dbKind = null;
         boolean conflicted = false;
         try {
-            Structure<NodeInfo> info = context.getDb().readInfo(localAbsPath, NodeInfo.status, NodeInfo.kind, NodeInfo.conflicted);
+            Structure<NodeInfo> info = getContext().getDb().readInfo(localAbsPath, NodeInfo.status, NodeInfo.kind, NodeInfo.conflicted);
             status = info.get(NodeInfo.status);
             dbKind = info.get(NodeInfo.kind);
             conflicted = info.is(NodeInfo.conflicted);
@@ -819,7 +815,7 @@ public class SvnNgMergeCallback implements ISvnDiffCallback {
             }
             
             try {
-                Structure<NodeInfo> parentInfo = context.getDb().readInfo(SVNFileUtil.getParentFile(localAbsPath), NodeInfo.status, NodeInfo.kind);
+                Structure<NodeInfo> parentInfo = getContext().getDb().readInfo(SVNFileUtil.getParentFile(localAbsPath), NodeInfo.status, NodeInfo.kind);
                 ISVNWCDb.SVNWCDbStatus parentStatus = parentInfo.get(NodeInfo.status);
                 ISVNWCDb.SVNWCDbKind parentDbKind = parentInfo.get(NodeInfo.kind);
                 if (parentDbKind != SVNWCDbKind.Dir ||
@@ -838,7 +834,7 @@ public class SvnNgMergeCallback implements ISvnDiffCallback {
             return;
         }
         if (!noWcRootCheck && dbKind == SVNWCDbKind.Dir && status == SVNWCDbStatus.Normal) {
-            boolean isRoot = context.getDb().isWCRoot(localAbsPath);
+            boolean isRoot = getContext().getDb().isWCRoot(localAbsPath);
             if (isRoot) {
                 result.obstructionState = SVNStatusType.OBSTRUCTED;
                 return;
@@ -872,47 +868,47 @@ public class SvnNgMergeCallback implements ISvnDiffCallback {
         }
         
         if (conflicted) {
-            ConflictInfo ci = context.getConflicted(localAbsPath, true, true, true);
+            ConflictInfo ci = getContext().getConflicted(localAbsPath, true, true, true);
             result.conflicted = ci != null && (ci.propConflicted || ci.textConflicted || ci.treeConflicted);
         }
     }
     
     private SVNConflictVersion[] makeConflictVersions(File target, SVNNodeKind kind) throws SVNException {
-        SVNURL srcReposUrl = repos1.getRepositoryRoot(true);
-        String child = SVNWCUtils.getPathAsChild(targetAbsPath, target);
+        SVNURL srcReposUrl = getRepos1().getRepositoryRoot(true);
+        String child = SVNWCUtils.getPathAsChild(getTargetPath(), target);
         SVNURL leftUrl;
         SVNURL rightUrl;
         if (child != null) {
-            leftUrl = mergeSource1Url.appendPath(child, false);
-            rightUrl = mergeSource2Url.appendPath(child, false);
+            leftUrl = getSource1URL().appendPath(child, false);
+            rightUrl = getSource2URL().appendPath(child, false);
         } else {
-            leftUrl = mergeSource1Url;
-            rightUrl = mergeSource2Url;
+            leftUrl = getSource1URL();
+            rightUrl = getSource2URL();
         }
         String leftPath = SVNWCUtils.isChild(srcReposUrl, leftUrl);
         String rightPath = SVNWCUtils.isChild(srcReposUrl, rightUrl);
-        SVNConflictVersion lv = new SVNConflictVersion(srcReposUrl, leftPath, mergeSource1Rev, kind);
-        SVNConflictVersion rv = new SVNConflictVersion(srcReposUrl, rightPath, mergeSource2Rev, kind);
+        SVNConflictVersion lv = new SVNConflictVersion(srcReposUrl, leftPath, getSource1Rev(), kind);
+        SVNConflictVersion rv = new SVNConflictVersion(srcReposUrl, rightPath, getSource2Rev(), kind);
         
         return new SVNConflictVersion[] {lv, rv};
     }
     
     private void treeConflictOnAdd(File path, SVNNodeKind kind, SVNConflictAction action, SVNConflictReason reason) throws SVNException {
-        if (recordOnly || dryRun) {
+        if (isRecordOnly() || isDryRun()) {
             return;
         }
         SVNTreeConflictDescription tc = makeTreeConflict(path, kind, action, reason);
-        SVNTreeConflictDescription existingTc = context.getTreeConflict(path);
+        SVNTreeConflictDescription existingTc = getContext().getTreeConflict(path);
         
         if (existingTc == null) {
-            context.getDb().opSetTreeConflict(path, tc);
+            getContext().getDb().opSetTreeConflict(path, tc);
             if (conflictedPaths == null) {
                 conflictedPaths = new HashSet<File>();
             }
             conflictedPaths.add(path);
         } else if (existingTc.getConflictAction() == SVNConflictAction.DELETE && tc.getConflictAction() == SVNConflictAction.ADD) {
             existingTc.setConflictAction(SVNConflictAction.REPLACE);
-            context.getDb().opSetTreeConflict(path, existingTc);
+            getContext().getDb().opSetTreeConflict(path, existingTc);
         }
     }
     
@@ -923,13 +919,13 @@ public class SvnNgMergeCallback implements ISvnDiffCallback {
     }
     
     private void treeConflict(File path, SVNNodeKind kind, SVNConflictAction action, SVNConflictReason reason) throws SVNException {
-        if (recordOnly || dryRun) {
+        if (isRecordOnly() || isDryRun()) {
             return;
         }
-        SVNTreeConflictDescription tc = context.getTreeConflict(path);
+        SVNTreeConflictDescription tc = getContext().getTreeConflict(path);
         if (tc == null) {
             tc = makeTreeConflict(path, kind, action, reason);
-            context.getDb().opSetTreeConflict(path, tc);
+            getContext().getDb().opSetTreeConflict(path, tc);
             
             if (conflictedPaths == null) {
                 conflictedPaths = new HashSet<File>();
@@ -952,12 +948,12 @@ public class SvnNgMergeCallback implements ISvnDiffCallback {
     }
     
     private boolean compareFiles(File oldPath, SVNProperties oldProps, File minePath) throws SVNException {
-        boolean same = compareProps(oldProps, context.getActualProps(minePath));
+        boolean same = compareProps(oldProps, getContext().getActualProps(minePath));
         if (same) {
             InputStream is = null;
             InputStream old = null;
             try {
-                is = context.getTranslatedStream(minePath, minePath, true, false);
+                is = getContext().getTranslatedStream(minePath, minePath, true, false);
                 old = SVNFileUtil.openFileForReading(oldPath);
                 same = SVNFileUtil.compare(is, old);
             } finally {
@@ -966,6 +962,86 @@ public class SvnNgMergeCallback implements ISvnDiffCallback {
             }
         }
         return same;
+    }
+    
+    private SVNWCContext getContext() {
+        return driver.context;
+    }
+    
+    private boolean isReintegrateMerge() {
+        return driver.reintegrateMerge;
+    }
+    
+    private boolean isRecordOnly() {
+        return driver.recordOnly;
+    }
+    
+    private boolean isDryRun() {
+        return driver.dryRun;
+    }
+    
+    private boolean isForce() {
+        return driver.force;
+    }
+
+    private boolean isSameRepos() {
+        return driver.sameRepos;
+    }
+    
+    private SVNDiffOptions getDiffOptions() {
+        return driver.diffOptions;
+    }
+    
+    private File getAddedPath() {
+        return driver.addedPath;
+    }
+    
+    private void setAddedPath(File path) {
+        driver.addedPath = path;
+    }
+    
+    private boolean areSourcesAncestral() {
+        return driver.sourcesAncestral;
+    }
+    
+    private File getTargetPath() {
+        return driver.targetAbsPath;
+    }
+    
+    private SVNRepository getRepos1() {
+        return driver.repos1;
+    }
+
+    private SVNRepository getRepos2() {
+        return driver.repos2;
+    }
+    
+    private SVNURL getReposRootURL() {
+        return driver.reposRootUrl;
+    }
+    
+    private SvnRepositoryAccess getRepositoryAccess() {
+        return driver.repositoryAccess;
+    }
+    
+    private SVNURL getSource1URL() {
+        return driver.mergeSource1Url;
+    }
+    private SVNURL getSource2URL() {
+        return driver.mergeSource2Url;
+    }
+    private long getSource1Rev() {
+        return driver.mergeSource1Rev;
+    }
+    private long getSource2Rev() {
+        return driver.mergeSource2Rev;
+    }
+    
+    private Collection<File> getDryRunDeletions() {
+        return driver.dryRunDeletions;
+    }
+    private Collection<File> getDryRunAdditions() {
+        return driver.dryRunAdded;
     }
 
     
