@@ -48,6 +48,7 @@ import org.tmatesoft.svn.core.internal.wc2.SvnRepositoryAccess.LocationsInfo;
 import org.tmatesoft.svn.core.internal.wc2.ng.SvnNgMergeinfoUtil.SvnMergeInfoInfo;
 import org.tmatesoft.svn.core.io.ISVNReporter;
 import org.tmatesoft.svn.core.io.ISVNReporterBaton;
+import org.tmatesoft.svn.core.io.SVNCapability;
 import org.tmatesoft.svn.core.io.SVNLocationSegment;
 import org.tmatesoft.svn.core.io.SVNRepository;
 import org.tmatesoft.svn.core.wc.ISVNEventHandler;
@@ -65,6 +66,14 @@ import org.tmatesoft.svn.util.SVNDebugLog;
 import org.tmatesoft.svn.util.SVNLogType;
 
 public class SvnNgMergeDriver implements ISVNEventHandler {
+
+    public static class MergeSource {
+        SVNURL url1;
+        long rev1;
+        SVNURL url2;
+        long rev2;
+    }
+
     boolean force;
 
     boolean dryRun;
@@ -81,10 +90,7 @@ public class SvnNgMergeDriver implements ISVNEventHandler {
     SVNURL reposRootUrl;
 
     // TODO use merge source instead.
-    long mergeSource2Rev;
-    SVNURL mergeSource2Url;
-    long mergeSource1Rev;
-    SVNURL mergeSource1Url;
+    MergeSource source;
     
     private SVNMergeRangeList implicitSrcGap;
     SVNWCContext context;
@@ -110,6 +116,136 @@ public class SvnNgMergeDriver implements ISVNEventHandler {
 
     private int currentAncestorIndex;
     private boolean singleFileMerge;
+    
+    protected void doMerge(SVNWCContext context,
+            Map<File, Map<String, SVNMergeRangeList>> resultCatalog, 
+            List<MergeSource> mergeSources, 
+            File targetAbsPath, 
+            boolean sourcesAncestral, 
+            boolean sourcesRelated, 
+            boolean sameRepository, 
+            boolean ignoreAncestry, 
+            boolean force, 
+            boolean dryRun, 
+            boolean recordOnly, 
+            Collection<File> recordOnlyPaths,
+            boolean reintegrateMerge, 
+            boolean squelcheMergeInfoNotifications,
+            SVNDepth depth,
+            SVNDiffOptions diffOptions) throws SVNException {
+        
+        if (recordOnly) {
+            if (!sourcesAncestral) {
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.INCORRECT_PARAMS,
+                        "Use of two URLs is not compatible with mergeinfo modification"); 
+                SVNErrorManager.error(err, SVNLogType.DEFAULT);
+            }
+            if (!sameRepository) {
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.INCORRECT_PARAMS,
+                        "Merge from foreign repository is not compatible with mergeinfo modification");
+                SVNErrorManager.error(err, SVNLogType.WC);
+            }
+            if (dryRun) {
+                return;
+            }
+        }
+        
+        SVNNodeKind targetKind = context.readKind(targetAbsPath, false);
+        if (targetKind != SVNNodeKind.DIR && targetKind != SVNNodeKind.FILE) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ILLEGAL_TARGET,
+                    "Merge target ''{0}'' does not exist in the working copy");
+            SVNErrorManager.error(err, SVNLogType.WC);
+        }
+        
+        if (depth == SVNDepth.UNKNOWN) {
+            depth = SVNDepth.INFINITY;
+        }
+        this.context = context;
+        
+        this.force = force;
+        this.dryRun = dryRun;
+        this.recordOnly = recordOnly;
+        this.ignoreAncestry = ignoreAncestry;
+        this.sameRepos = sameRepository;
+        this.mergeinfoCapable = false;
+        this.sourcesAncestral = sourcesAncestral;
+        this.targetMissingChild = false;
+        this.reintegrateMerge = reintegrateMerge;
+        this.targetAbsPath = targetAbsPath;
+        this.reposRootUrl = context.getNodeReposInfo(targetAbsPath).reposRootUrl;
+        this.diffOptions = diffOptions;
+        
+        this.notifications = 0;
+        this.operativeNotifications = 0;
+        if (recordOnly && recordOnlyPaths != null) {
+            this.mergedPaths = recordOnlyPaths;
+        } else {
+            this.mergedPaths = null;
+        }
+        this.skippedPaths = null;
+        this.addedPaths = null;
+        this.treeConflictedPaths = null;
+        this.singleFileMerge = false;
+        this.childrenWithMergeInfo = null;
+        this.currentAncestorIndex = -1;
+        
+        boolean checkedMergeInfoCapability = false;
+        for (int i = 0; i < mergeSources.size(); i++) {
+            MergeSource mergeSource = mergeSources.get(i);
+            SVNURL url1 = mergeSource.url1;
+            SVNURL url2 = mergeSource.url2;
+            long revision1 = mergeSource.rev1;
+            long revision2 = mergeSource.rev2;
+            if (revision1 == revision2 && mergeSource.url1.equals(mergeSource.url2)) {
+                continue;
+            }
+            
+            try {
+                this.repos1 = ensureRepository(repos1, url1);
+                this.repos2 = ensureRepository(repos2, url2);
+                this.source = mergeSource;
+                this.implicitSrcGap = null;                
+                this.addedPath = null;
+                this.addNecessiatedMerge = false;
+                this.dryRunDeletions = dryRun ? new HashSet<File>() : null;
+                this.dryRunAdded = dryRun ? new HashSet<File>() : null;
+                this.conflictedPaths = null;
+                this.pathsWithDeletedMergeInfo = null;
+                this.pathsWithNewMergeInfo = null;
+
+                if (!checkedMergeInfoCapability) {
+                    this.mergeinfoCapable = repos1.hasCapability(SVNCapability.MERGE_INFO);
+                    checkedMergeInfoCapability = true;
+                }
+                
+                if (targetKind == SVNNodeKind.FILE) {
+                    // TODO single file merge.
+                } else if (targetKind == SVNNodeKind.DIR) {
+                    boolean abortOnConflicts = i < mergeSources.size() - 1; 
+                    doDirectoryMerge(targetAbsPath, resultCatalog, url1, revision1, url2, revision2, depth, abortOnConflicts, squelcheMergeInfoNotifications);
+                }
+                
+                // TODO report modified subtrees
+                
+                if (!dryRun) {
+                    SvnNgMergeinfoUtil.elideMergeInfo(context, targetAbsPath, null);
+                }
+                if (context.getEventHandler() != null) {
+                    SVNEvent mergeCompletedEvent = SVNEventFactory.createSVNEvent(targetAbsPath, SVNNodeKind.NONE, null, SVNRepository.INVALID_REVISION, 
+                            SVNStatusType.INAPPLICABLE, SVNStatusType.INAPPLICABLE, SVNStatusType.LOCK_INAPPLICABLE, SVNEventAction.MERGE_COMPLETE, 
+                            null, null, null); 
+                    context.getEventHandler().handleEvent(mergeCompletedEvent, ISVNEventHandler.UNKNOWN);
+                }
+            } finally {
+                if (repos1 != null) {
+                    repos1.closeSession();
+                }
+                if (repos2 != null) {
+                    repos2.closeSession();
+                }
+            }
+        }
+    }
 
     protected void doMergeInfoUnawareDirectoryMerge(File targetPath, SVNURL url1, long revision1, SVNURL url2, long revision2, SVNDepth depth) throws SVNException {
         boolean isRollBack = revision1 > revision2;
@@ -124,7 +260,6 @@ public class SvnNgMergeDriver implements ISVNEventHandler {
         SvnNgMergeCallback mergeCallback = new SvnNgMergeCallback(this);
         driveMergeReportEditor(targetPath, url1, revision1, url2, revision2, childrenWithMergeInfo, isRollBack,  depth, mergeCallback);
     }
-
 
     protected void doDirectoryMerge(File targetPath, Map<File, Map<String, SVNMergeRangeList>> resultCatalog, SVNURL url1, long revision1, SVNURL url2, long revision2, SVNDepth depth, boolean abortOnConflicts, boolean squelchMergeinfoNotifications) throws SVNException {        
         boolean isRollBack = revision1 > revision2;
@@ -1433,8 +1568,7 @@ public class SvnNgMergeDriver implements ISVNEventHandler {
                         }
                     }
                 }
-                // TODO elide merge info.
-//                SVNMergeInfoUtil.elideMergeInfo(parentMergeInfo, childMergeInfo, child.absPath, pathSuffix, access)
+                SvnNgMergeinfoUtil.elideMergeInfo(context, child.absPath, inSwitchedSubtree ? null : targetAbsPath);
             }
             index++;            
         } 
@@ -1952,5 +2086,21 @@ public class SvnNgMergeDriver implements ISVNEventHandler {
             
         }
         context.getEventHandler().handleEvent(event, -1);
+    }
+
+    protected SVNRepository ensureRepository(SVNRepository repository, SVNURL url) throws SVNException {
+        if (repository != null) {
+            try {
+                ensureSessionURL(repository, url);
+                return repository;
+            } catch (SVNException e) {
+                //
+            }
+            repository = null;
+        }
+        if (repository == null) {
+            repository = repositoryAccess.createRepository(url, null, false);
+        }
+        return repository; 
     }
 }

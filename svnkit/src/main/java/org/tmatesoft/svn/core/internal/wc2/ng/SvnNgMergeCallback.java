@@ -1025,16 +1025,16 @@ public class SvnNgMergeCallback implements ISvnDiffCallback {
     }
     
     private SVNURL getSource1URL() {
-        return driver.mergeSource1Url;
+        return driver.source.url1;
     }
     private SVNURL getSource2URL() {
-        return driver.mergeSource2Url;
+        return driver.source.url2;
     }
     private long getSource1Rev() {
-        return driver.mergeSource1Rev;
+        return driver.source.rev1;
     }
     private long getSource2Rev() {
-        return driver.mergeSource2Rev;
+        return driver.source.rev2;
     }
     
     private Collection<File> getDryRunDeletions() {
