@@ -302,7 +302,7 @@ public class SVNWCContext {
     }
     
     public ISVNEventHandler getEventHandler() {
-        return eventHandler.peek();
+        return eventHandler.isEmpty() ? null : eventHandler.peek();
     }
     
     public void pushEventHandler(ISVNEventHandler handler) {
