@@ -760,8 +760,8 @@ public class SvnNgMergeCallback implements ISvnDiffCallback {
     private boolean isHonorMergeInfo() {
         return driver.isHonorMergeInfo();
     }
-    
-    private ObstructionState performObstructionCheck(File localAbsPath, SVNNodeKind expectedKind) throws SVNException {
+
+    public ObstructionState performObstructionCheck(File localAbsPath, SVNNodeKind expectedKind) throws SVNException {
         ObstructionState result = new ObstructionState();
         result.obstructionState = SVNStatusType.INAPPLICABLE;
         result.kind = SVNNodeKind.NONE;
@@ -775,7 +775,7 @@ public class SvnNgMergeCallback implements ISvnDiffCallback {
                 }
                 return result;
             } else if (isDryRunAddition(localAbsPath)) {
-//                result.added = true;
+                result.added = true;
                 result.kind = SVNNodeKind.DIR;
                 return result;
             }
