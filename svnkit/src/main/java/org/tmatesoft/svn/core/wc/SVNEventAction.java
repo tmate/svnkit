@@ -409,4 +409,6 @@ public class SVNEventAction {
     
     public static final SVNEventAction WC_PATH_NONEXISTENT = new SVNEventAction(51, "wc_path_nonexistent");
 
+    public static final SVNEventAction RECORD_MERGE_BEGIN = new SVNEventAction(52, "record_merge_begin");
+    public static final SVNEventAction RECORD_MERGE_COMPLETE = new SVNEventAction(53, "record_merge_complete");
 }
