@@ -3,6 +3,8 @@ package org.tmatesoft.svn.core.internal.wc2.ng;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -45,10 +47,12 @@ import org.tmatesoft.svn.core.internal.wc17.db.SvnWcDbExternals;
 import org.tmatesoft.svn.core.internal.wc17.db.SvnWcDbReader;
 import org.tmatesoft.svn.core.internal.wc2.SvnRepositoryAccess;
 import org.tmatesoft.svn.core.internal.wc2.SvnRepositoryAccess.LocationsInfo;
+import org.tmatesoft.svn.core.internal.wc2.SvnRepositoryAccess.RevisionsPair;
 import org.tmatesoft.svn.core.internal.wc2.ng.SvnNgMergeinfoUtil.SvnMergeInfoInfo;
 import org.tmatesoft.svn.core.io.ISVNReporter;
 import org.tmatesoft.svn.core.io.ISVNReporterBaton;
 import org.tmatesoft.svn.core.io.SVNCapability;
+import org.tmatesoft.svn.core.io.SVNLocationEntry;
 import org.tmatesoft.svn.core.io.SVNLocationSegment;
 import org.tmatesoft.svn.core.io.SVNRepository;
 import org.tmatesoft.svn.core.wc.ISVNEventHandler;
@@ -118,6 +122,13 @@ public class SvnNgMergeDriver implements ISVNEventHandler {
     private int currentAncestorIndex;
     private boolean singleFileMerge;
     
+    public SvnNgMergeDriver(SVNWCContext context, SvnMerge operation, SvnRepositoryAccess repositoryAccess, SVNDiffOptions diffOptions) {
+        this.context = context;
+        this.operation = operation;
+        this.repositoryAccess = repositoryAccess;
+        this.diffOptions = diffOptions;
+    }
+    
     public void mergeCousinsAndSupplementMergeInfo(File targetWCPath, 
             SVNRepository repository1, SVNRepository repository2, 
             SVNURL url1, long rev1, SVNURL url2, long rev2, long youngestCommonRev, 
@@ -132,16 +143,15 @@ public class SvnNgMergeDriver implements ISVNEventHandler {
         List<SVNRevisionRange> ranges = new LinkedList<SVNRevisionRange>();
         ranges.add(range);
         repository1.setLocation(url1, false);
-        // TODO
-//        removeSources = normalizeMergeSources(null, url1, sourceReposRoot, sRev, ranges, repository1);
+        removeSources = normalizeMergeSources(SvnTarget.fromURL(url1), url1, sourceReposRoot, sRev, ranges, repository1);
+        
         sRev = eRev;
         eRev = SVNRevision.create(rev2);
         range = new SVNRevisionRange(sRev, eRev);
         ranges.clear();
         ranges.add(range);
         repository2.setLocation(url2, false);
-        // TODO
-//        addSources = normalizeMergeSources(null, url2, sourceReposRoot, eRev, ranges, repository2);
+        addSources = normalizeMergeSources(SvnTarget.fromURL(url2), url2, sourceReposRoot, eRev, ranges, repository2);
 
         boolean sameRepos = sourceReposRoot.equals(wcReposRoot);
         Collection<File> modifiedSubtrees = null;
@@ -197,6 +207,164 @@ public class SvnNgMergeDriver implements ISVNEventHandler {
                 }
             }
         }
+    }
+    
+    private List<MergeSource> normalizeMergeSources(SvnTarget source, SVNURL sourceURL, SVNURL sourceRootURL, 
+            SVNRevision pegRevision, Collection<SVNRevisionRange> rangesToMerge, SVNRepository repository) throws SVNException {
+        Structure<RevisionsPair> pair = repositoryAccess.getRevisionNumber(repository, source, pegRevision, null);
+        long pegRevNum = pair.lng(RevisionsPair.revNumber);
+        
+        if (pegRevNum < 0) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.CLIENT_BAD_REVISION);
+            SVNErrorManager.error(err, SVNLogType.DEFAULT);
+        }
+        List<SVNMergeRange> mergeRanges = new ArrayList<SVNMergeRange>();
+        for (Iterator<SVNRevisionRange> rangesIter = rangesToMerge.iterator(); rangesIter.hasNext();) {
+            SVNRevisionRange revRange = rangesIter.next();
+            SVNRevision rangeStart = revRange.getStartRevision();
+            SVNRevision rangeEnd = revRange.getEndRevision();
+            
+            if (!rangeStart.isValid() || !rangeEnd.isValid()) {
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.CLIENT_BAD_REVISION, 
+                        "Not all required revisions are specified");
+                SVNErrorManager.error(err, SVNLogType.DEFAULT);
+            }            
+            pair = repositoryAccess.getRevisionNumber(repository, source, rangeStart, pair);
+            long startRev = pair.lng(RevisionsPair.revNumber);
+            pair = repositoryAccess.getRevisionNumber(repository, source, rangeEnd, pair); 
+            long endRev = pair.lng(RevisionsPair.revNumber);
+            if (startRev != endRev) {
+                mergeRanges.add(new SVNMergeRange(startRev, endRev, true));
+            }
+        }
+        pair.release();
+        
+        if (mergeRanges.isEmpty()) {
+            return Collections.emptyList();
+        }
+        
+        long oldestRequested = -1;
+        long youngesRequested = -1;
+        for (SVNMergeRange mergeRange : mergeRanges) {
+            long minRev = Math.min(mergeRange.getStartRevision(), mergeRange.getEndRevision());
+            long maxRev = Math.max(mergeRange.getStartRevision(), mergeRange.getEndRevision());
+            if (oldestRequested < 0 || minRev < oldestRequested) {
+                oldestRequested = minRev;
+            }
+            if (youngesRequested < 0 || maxRev > youngesRequested) {
+                youngesRequested = maxRev;
+            }
+        }
+        if (pegRevNum < youngesRequested) {
+            repositoryAccess.getLocations(repository, SvnTarget.fromURL(sourceURL), SVNRevision.create(pegRevNum), SVNRevision.create(youngesRequested), SVNRevision.UNDEFINED);
+            pegRevNum = youngesRequested;            
+        }
+        
+        List<SVNLocationSegment> segments = repository.getLocationSegments("", pegRevNum, youngesRequested, oldestRequested);
+        long trimRevision = -1;
+        if (!segments.isEmpty()) {
+            SVNLocationSegment segment = segments.get(0);
+            if (segment.getStartRevision() != oldestRequested) {
+                trimRevision = segment.getStartRevision();
+            } else if (segment.getPath() == null) {
+                if (segments.size() > 1) {
+                    SVNLocationSegment segment2 = (SVNLocationSegment) segments.get(1);
+                    SVNURL segmentURL = sourceRootURL.appendPath(segment2.getPath(), false);
+                    SVNLocationEntry copyFromLocation = repositoryAccess.getCopySource(SvnTarget.fromURL(segmentURL), SVNRevision.create(segment2.getStartRevision()));
+                    String copyFromPath = copyFromLocation.getPath();
+                    long copyFromRevision = copyFromLocation.getRevision();
+                    if (copyFromPath != null && SVNRevision.isValidRevisionNumber(copyFromRevision)) {
+                        SVNLocationSegment newSegment = new SVNLocationSegment(copyFromRevision, 
+                                copyFromRevision, copyFromPath);
+                        segment.setStartRevision(copyFromRevision + 1);
+                        segments.add(0, newSegment);
+                    }
+                }
+                
+            }
+        }
+        SVNLocationSegment[] segmentsArray = (SVNLocationSegment[]) segments.toArray(new SVNLocationSegment[segments.size()]);
+        List<MergeSource> resultMergeSources = new ArrayList<MergeSource>();
+        for (Iterator<SVNMergeRange> rangesIter = mergeRanges.iterator(); rangesIter.hasNext();) {
+            SVNMergeRange range = (SVNMergeRange) rangesIter.next();
+            if (SVNRevision.isValidRevisionNumber(trimRevision)) {
+                if (Math.max(range.getStartRevision(), range.getEndRevision()) < trimRevision) {
+                    continue;
+                }
+                if (range.getStartRevision() < trimRevision) {
+                    range.setStartRevision(trimRevision);
+                }
+                if (range.getEndRevision() < trimRevision) {
+                    range.setEndRevision(trimRevision);
+                }
+            }
+            List<MergeSource> mergeSources = combineRangeWithSegments(range, segmentsArray, sourceRootURL);
+            resultMergeSources.addAll(mergeSources);
+        }
+        return resultMergeSources;
+    }
+
+    private List<MergeSource> combineRangeWithSegments(SVNMergeRange range, SVNLocationSegment[] segments,  SVNURL sourceRootURL) throws SVNException {
+        long minRev = Math.min(range.getStartRevision(), range.getEndRevision()) + 1;
+        long maxRev = Math.max(range.getStartRevision(), range.getEndRevision());
+        boolean subtractive = range.getStartRevision() > range.getEndRevision();
+        List<MergeSource> mergeSources = new ArrayList<MergeSource>();
+        for (int i = 0; i < segments.length; i++) {
+            SVNLocationSegment segment = segments[i];
+            if (segment.getEndRevision() < minRev || segment.getStartRevision() > maxRev || 
+                    segment.getPath() == null) {
+                continue;
+            }
+            
+            String path1 = null;
+            long rev1 = Math.max(segment.getStartRevision(), minRev) - 1;
+            if (minRev <= segment.getStartRevision()) {
+                if (i > 0) {
+                    path1 = segments[i - 1].getPath();
+                }
+                if (path1 == null && i > 1) {
+                    path1 = segments[i - 2].getPath();
+                    rev1 = segments[i - 2].getEndRevision();
+                }
+            } else {
+                path1 = segment.getPath();
+            }
+            
+            if (path1 == null || segment.getPath() == null) {
+                continue;
+            }
+            
+            MergeSource mergeSource = new MergeSource();
+            mergeSource.url1 = sourceRootURL.appendPath(path1, false);
+            mergeSource.url2 = sourceRootURL.appendPath(segment.getPath(), false);
+            mergeSource.rev1 = rev1;
+            mergeSource.rev2 = Math.min(segment.getEndRevision(), maxRev);
+            if (subtractive) {
+                long tmpRev = mergeSource.rev1;
+                SVNURL tmpURL = mergeSource.url1;
+                mergeSource.rev1 = mergeSource.rev2;
+                mergeSource.url1 = mergeSource.url2;
+                mergeSource.rev2 = tmpRev;
+                mergeSource.url2 = tmpURL;
+            }
+            mergeSources.add(mergeSource);
+        }
+        
+        if (subtractive && !mergeSources.isEmpty()) {
+            Collections.sort(mergeSources, new Comparator<MergeSource>() {
+                public int compare(MergeSource o1, MergeSource o2) {
+                    MergeSource source1 = (MergeSource) o1;
+                    MergeSource source2 = (MergeSource) o2;
+                    long src1Rev1 = source1.rev1;
+                    long src2Rev1 = source2.rev2;
+                    if (src1Rev1 == src2Rev1) {
+                        return 0;
+                    }
+                    return src1Rev1 < src2Rev1 ? 1 : -1;
+                }
+            });
+        }
+        return mergeSources;
     }
 /*
     private List<MergeSource> normalizeMergeSources(File source, SVNURL sourceURL, SVNURL sourceRootURL, 

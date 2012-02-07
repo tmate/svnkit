@@ -27,6 +27,7 @@ import org.tmatesoft.svn.core.internal.wc17.db.Structure;
 import org.tmatesoft.svn.core.internal.wc2.SvnRepositoryAccess;
 import org.tmatesoft.svn.core.internal.wc2.SvnRepositoryAccess.LocationsInfo;
 import org.tmatesoft.svn.core.internal.wc2.SvnRepositoryAccess.RepositoryInfo;
+import org.tmatesoft.svn.core.internal.wc2.SvnWcGeneration;
 import org.tmatesoft.svn.core.io.SVNLocationSegment;
 import org.tmatesoft.svn.core.io.SVNRepository;
 import org.tmatesoft.svn.core.wc.SVNRevision;
@@ -39,11 +40,20 @@ import org.tmatesoft.svn.util.SVNLogType;
 public class SvnNgMergeReintegrate extends SvnNgOperationRunner<Void, SvnMerge>{
 
     @Override
+    public boolean isApplicable(SvnMerge operation, SvnWcGeneration wcGeneration) throws SVNException {
+        if (super.isApplicable(operation, wcGeneration)) {
+            return operation.isReintegrate();
+        }
+        return false;
+    }
+
+    @Override
     protected Void run(SVNWCContext context) throws SVNException {
+        merge(context, getOperation().getSource(), getFirstTarget(), getOperation().isDryRun());
         return null;
     }
     
-    private void merge(SVNWCContext context, SvnTarget mergeSource, File mergeTarget, boolean dryRun, MergeOptions options) throws SVNException {
+    private void merge(SVNWCContext context, SvnTarget mergeSource, File mergeTarget, boolean dryRun) throws SVNException {
         SVNFileType targetKind = SVNFileType.getType(mergeTarget);
         if (targetKind == SVNFileType.NONE) {
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_PATH_NOT_FOUND, "Path ''{0}'' does not exist", mergeTarget);
@@ -133,7 +143,19 @@ public class SvnNgMergeReintegrate extends SvnNgOperationRunner<Void, SvnMerge>{
             // TODO check already merged revs for continuosity.
         }
         
-        // TODO real merge of cousins and supplement mergeinfo.
+        SvnNgMergeDriver mergeDriver = new SvnNgMergeDriver(getWcContext(), getOperation(), getRepositoryAccess(), getOperation().getMergeOptions());
+        mergeDriver.mergeCousinsAndSupplementMergeInfo(mergeTarget, 
+                targetRepository, sourceRepository, 
+                url1.getURL(), rev1, 
+                url2, rev2, 
+                yc.getStartRevision(), 
+                sourceReposRoot, 
+                wcReposRoot, 
+                SVNDepth.INFINITY, 
+                false, 
+                false, 
+                false, 
+                dryRun);
         sleepForTimestamp();
         
     }
@@ -306,9 +328,4 @@ public class SvnNgMergeReintegrate extends SvnNgOperationRunner<Void, SvnMerge>{
         private boolean neverSynced;
         private long youngestMergedRevision; 
     }
-
-    private static class MergeOptions {
-        
-    }
-
 }

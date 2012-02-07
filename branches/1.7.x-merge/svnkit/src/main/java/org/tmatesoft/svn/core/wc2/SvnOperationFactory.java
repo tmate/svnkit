@@ -75,6 +75,7 @@ import org.tmatesoft.svn.core.internal.wc2.ng.SvnNgGetMergeInfo;
 import org.tmatesoft.svn.core.internal.wc2.ng.SvnNgGetProperties;
 import org.tmatesoft.svn.core.internal.wc2.ng.SvnNgGetStatus;
 import org.tmatesoft.svn.core.internal.wc2.ng.SvnNgLogMergeInfo;
+import org.tmatesoft.svn.core.internal.wc2.ng.SvnNgMergeReintegrate;
 import org.tmatesoft.svn.core.internal.wc2.ng.SvnNgRelocate;
 import org.tmatesoft.svn.core.internal.wc2.ng.SvnNgRemove;
 import org.tmatesoft.svn.core.internal.wc2.ng.SvnNgReposToWcCopy;
@@ -299,6 +300,7 @@ public class SvnOperationFactory {
         registerOperationRunner(SvnRemoteSetProperty.class, new SvnRemoteSetPropertyImpl());
         
         registerOperationRunner(SvnMerge.class, new SvnOldMerge());
+        registerOperationRunner(SvnMerge.class, new SvnNgMergeReintegrate());
 
         registerOperationRunner(SvnCleanup.class, new SvnOldCleanup());
         registerOperationRunner(SvnCleanup.class, new SvnNgCleanup());
