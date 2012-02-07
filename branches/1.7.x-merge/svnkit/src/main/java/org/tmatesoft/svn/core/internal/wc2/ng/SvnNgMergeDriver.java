@@ -129,6 +129,10 @@ public class SvnNgMergeDriver implements ISVNEventHandler {
         this.diffOptions = diffOptions;
     }
     
+    public void ensureWcIsSuitableForMerge(File targetAbsPath, boolean allowMixedRevs, boolean allowLocalMods, boolean allowSwitchedSubtrees) throws SVNException {
+        // TODO
+    }
+    
     public void mergeCousinsAndSupplementMergeInfo(File targetWCPath, 
             SVNRepository repository1, SVNRepository repository2, 
             SVNURL url1, long rev1, SVNURL url2, long rev2, long youngestCommonRev, 

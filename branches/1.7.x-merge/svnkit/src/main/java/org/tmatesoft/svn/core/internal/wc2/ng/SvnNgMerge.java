@@ -40,10 +40,6 @@ public class SvnNgMerge extends SvnNgOperationRunner<Void, SvnMerge> {
 
     @Override
     protected Void run(SVNWCContext context) throws SVNException {
-        System.out.println("running merge");
-        if (getOperation().getRevisionRanges() == null || getOperation().getRevisionRanges().isEmpty()) {
-            return null;
-        }
         File lockPath = getLockPath(getFirstTarget());
         if (getOperation().isDryRun()) {
             merge(getFirstTarget());
@@ -144,14 +140,14 @@ public class SvnNgMerge extends SvnNgOperationRunner<Void, SvnMerge> {
                     SVNRevisionRange range = new SVNRevisionRange(SVNRevision.create(rev1), SVNRevision.create(yc.getStartRevision()));
                     Collection<SVNRevisionRange> ranges = new ArrayList<SVNRevisionRange>();
                     ranges.add(range);
-                    mergeDriver.normalizeMergeSources(SvnTarget.fromURL(url1), url1, sourceReposRootURL, 
+                    sources = mergeDriver.normalizeMergeSources(SvnTarget.fromURL(url1), url1, sourceReposRootURL, 
                             SVNRevision.create(rev1), ranges, repos1);
                 } else if (url1.equals(ycURL) && yc.getStartRevision() == rev1) {
                     sourcesAncestral = true;
                     SVNRevisionRange range = new SVNRevisionRange(SVNRevision.create(yc.getStartRevision()), SVNRevision.create(rev2));
                     Collection<SVNRevisionRange> ranges = new ArrayList<SVNRevisionRange>();
                     ranges.add(range);
-                    mergeDriver.normalizeMergeSources(SvnTarget.fromURL(url2), url2, sourceReposRootURL, 
+                    sources = mergeDriver.normalizeMergeSources(SvnTarget.fromURL(url2), url2, sourceReposRootURL, 
                             SVNRevision.create(rev2), ranges, repos2);
                 } else {
                     mergeDriver.mergeCousinsAndSupplementMergeInfo(target, 
