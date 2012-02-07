@@ -75,11 +75,11 @@ public class SvnNgMergePegged extends SvnNgOperationRunner<Void, SvnMerge> {
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ILLEGAL_TARGET, "Merge target ''{0}'' does not exist in the working copy", target);
             SVNErrorManager.error(err, SVNLogType.WC);
         }
-        // TODO check if target is suitable for merge.
+        SvnNgMergeDriver mergeDriver = new SvnNgMergeDriver(getWcContext(), getOperation(), getRepositoryAccess(), getOperation().getMergeOptions());
+        mergeDriver.ensureWcIsSuitableForMerge(target, getOperation().isAllowMixedRevisions(), true, true);
         SVNURL wcReposRootURL = getWcContext().getNodeReposInfo(target).reposRootUrl;
         
         boolean sameRepos = true;
-        SvnNgMergeDriver mergeDriver = new SvnNgMergeDriver(getWcContext(), getOperation(), getRepositoryAccess(), getOperation().getMergeOptions());
 
         SVNRepository repos = getRepositoryAccess().createRepository(url, null, false);
         List<MergeSource> sources = null;

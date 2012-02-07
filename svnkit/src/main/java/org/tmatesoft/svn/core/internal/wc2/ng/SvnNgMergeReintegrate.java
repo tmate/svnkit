@@ -97,7 +97,10 @@ public class SvnNgMergeReintegrate extends SvnNgOperationRunner<Void, SvnMerge>{
                     "''{0}'' must be from the same repositor as ''{1}''", mergeSource.getURL(), mergeTarget);
             SVNErrorManager.error(err, SVNLogType.WC);
         }
-        // TODO ensure wc is single-revision
+        SvnNgMergeDriver mergeDriver = new SvnNgMergeDriver(getWcContext(), getOperation(), getRepositoryAccess(), getOperation().getMergeOptions());
+
+        mergeDriver.ensureWcIsSuitableForMerge(mergeTarget, false, false, false);
+        
         long targetBaseRev = context.getNodeBaseRev(mergeTarget);
         long rev1 = targetBaseRev;
         File sourceReposRelPath = new File(SVNURLUtil.getRelativeURL(wcReposRoot, url2));
@@ -165,7 +168,6 @@ public class SvnNgMergeReintegrate extends SvnNgOperationRunner<Void, SvnMerge>{
                 // TODO check already merged revs for continuosity.
             }
             
-            SvnNgMergeDriver mergeDriver = new SvnNgMergeDriver(getWcContext(), getOperation(), getRepositoryAccess(), getOperation().getMergeOptions());
             mergeDriver.mergeCousinsAndSupplementMergeInfo(mergeTarget, 
                     targetRepository, sourceRepository, 
                     url1.getURL(), rev1, 

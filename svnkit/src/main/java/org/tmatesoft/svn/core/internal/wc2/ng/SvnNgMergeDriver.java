@@ -130,7 +130,22 @@ public class SvnNgMergeDriver implements ISVNEventHandler {
     }
     
     public void ensureWcIsSuitableForMerge(File targetAbsPath, boolean allowMixedRevs, boolean allowLocalMods, boolean allowSwitchedSubtrees) throws SVNException {
-        // TODO
+        if (!allowMixedRevs) {
+            long[] revs = SvnWcDbReader.getMinAndMaxRevisions((SVNWCDb) context.getDb(), targetAbsPath);
+            if (revs[0] < 0 && revs[1] >= 0) {
+                if (!context.isNodeAdded(targetAbsPath)) {
+                    SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.CLIENT_NOT_READY_TO_MERGE, 
+                            "Cannot determine revision of working copy");
+                    SVNErrorManager.error(err, SVNLogType.WC);
+                }
+            } else if (revs[0] != revs[1]) {
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.CLIENT_MERGE_UPDATE_REQUIRED, 
+                        "Cannot merge into mixed-revision working copy [{0}:{1}]; " +
+                		"try updating first", revs[0], revs[1]);
+                SVNErrorManager.error(err, SVNLogType.WC);
+            }
+        }
+        // TODO check for local mods and switches.
     }
     
     public void mergeCousinsAndSupplementMergeInfo(File targetWCPath, 
@@ -1819,7 +1834,7 @@ public class SvnNgMergeDriver implements ISVNEventHandler {
         }
     }
 
-    protected void recordMergeInfoForDirectoryMerge(Map resultCatalog, SVNMergeRange mergeRange, String mergeInfoPath, SVNDepth depth, boolean squelchMergeinfoNotifications) throws SVNException {
+    protected void recordMergeInfoForDirectoryMerge(Map<File, Map<String, SVNMergeRangeList>> resultCatalog, SVNMergeRange mergeRange, String mergeInfoPath, SVNDepth depth, boolean squelchMergeinfoNotifications) throws SVNException {
         
         boolean isRollBack = mergeRange.getStartRevision() > mergeRange.getEndRevision();
         boolean operativeMerge = false;
@@ -1865,6 +1880,9 @@ public class SvnNgMergeDriver implements ISVNEventHandler {
                     childReposPath = "";
                 }
                 String childMergeSrcCanonPath = SVNPathUtil.append(mergeInfoPath, childReposPath);
+                if (!childMergeSrcCanonPath.startsWith("/")) {
+                    childMergeSrcCanonPath = "/" + childMergeSrcCanonPath;
+                }
                 SVNMergeRangeList childMergeRangelist = filterNaturalHistoryFromMergeInfo(childMergeSrcCanonPath, child.implicitMergeInfo, range);
                 if (childMergeRangelist.isEmpty()) {
                     index++;

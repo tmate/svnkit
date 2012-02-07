@@ -513,6 +513,8 @@ public class SVNErrorCode implements Serializable {
             "A file external cannot overwrite an existing versioned item");
     
     public static final SVNErrorCode CLIENT_INVALID_MERGEINFO_NO_MERGETRACKING = new SVNErrorCode(CLIENT_CATEGORY, 18, "");
+    public static final SVNErrorCode CLIENT_MERGE_UPDATE_REQUIRED = new SVNErrorCode(CLIENT_CATEGORY, 19, "");
+
     
     public static final SVNErrorCode BASE = new SVNErrorCode(MISC_CATEGORY, 0, "A problem occurred; see later errors for details");
     public static final SVNErrorCode PLUGIN_LOAD_FAILURE = new SVNErrorCode(MISC_CATEGORY, 1, "Failure loading plugin");    
@@ -615,6 +617,7 @@ public class SVNErrorCode implements Serializable {
      * @since New in 1.7. 
      */
     public static final SVNErrorCode BAD_CHANGELIST_NAME = new SVNErrorCode(BAD_CATEGORY, 14, "Invalid changelist name");
+
 
 }
 

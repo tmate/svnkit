@@ -387,9 +387,21 @@ public class SVNClientImpl implements ISVNClient {
         return eventHandler;
     }
 
-    public void setConflictResolver(ConflictResolverCallback callback) {
+    public void setConflictResolver(final ConflictResolverCallback callback) {
         conflictResolverCallback = callback;
-        conflictHandler = null;
+        conflictHandler = callback != null ? new ISVNConflictHandler() {
+            public SVNConflictResult handleConflict(SVNConflictDescription conflictDescription) throws SVNException {
+                ConflictResult result = null;
+                try {
+                    result = callback.resolve(getConflictDescription(conflictDescription));
+                } catch (ClientException e) {
+                    throwSvnException(e);
+                } catch (SubversionException e) {
+                    throwSvnException(e);
+                }
+                return result != null ? getSVNConflictResult(result) : null;
+            }
+        } : null;
         updateSvnOperationsFactory();
     }
 
