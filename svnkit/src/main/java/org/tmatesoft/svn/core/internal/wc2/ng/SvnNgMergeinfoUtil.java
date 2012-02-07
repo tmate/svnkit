@@ -21,7 +21,6 @@ import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNEventFactory;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 import org.tmatesoft.svn.core.internal.wc17.SVNWCContext;
-import org.tmatesoft.svn.core.internal.wc17.SVNWCContext.MergeInfo;
 import org.tmatesoft.svn.core.internal.wc17.SVNWCContext.SVNWCNodeReposInfo;
 import org.tmatesoft.svn.core.internal.wc17.SVNWCUtils;
 import org.tmatesoft.svn.core.internal.wc17.db.SVNWCDb;
@@ -58,7 +57,7 @@ public class SvnNgMergeinfoUtil {
         return null;
     }
     
-    public static void elideMergeInfo(SVNWCContext context, File targetAbsPath, File limitAbsPath) throws SVNException {
+    public static void elideMergeInfo(SVNWCContext context, SVNRepository repos, File targetAbsPath, File limitAbsPath) throws SVNException {
         if (limitAbsPath == null || !limitAbsPath.equals(targetAbsPath)) {
             
             SvnMergeInfoInfo targetMergeinfo = null;
@@ -83,7 +82,7 @@ public class SvnNgMergeinfoUtil {
             if ((mergeinfo == null || mergeinfo.mergeinfo == null) && limitAbsPath == null) {
                 mergeinfo = new SvnMergeInfoInfo();
                 try {
-                    mergeinfo.mergeinfo = getWCOrReposMergeInfo(context, targetAbsPath, null, true, SVNMergeInfoInheritance.NEAREST_ANCESTOR);
+                    mergeinfo.mergeinfo = getWCOrReposMergeInfo(context, targetAbsPath, repos, true, SVNMergeInfoInheritance.NEAREST_ANCESTOR);
                 } catch (SVNException e) {
                     if (e.getErrorMessage().getErrorCode() != SVNErrorCode.MERGE_INFO_PARSE_ERROR) {
                         throw e;

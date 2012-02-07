@@ -85,12 +85,12 @@ public class SVNMergeInfoUtil {
         }
     }
 
-    public static Map filterCatalogByRanges(Map catalog, long youngestRev, long oldestRev) {
-        Map filteredCatalog = new TreeMap();
-        for (Iterator catalogIter = catalog.keySet().iterator(); catalogIter.hasNext();) {
-            String path = (String) catalogIter.next();
-            Map mergeInfo = (Map) catalog.get(path);
-            Map filteredMergeInfo = filterMergeInfoByRanges(mergeInfo, youngestRev, oldestRev);
+    public static Map<String, Map<String,SVNMergeRangeList>> filterCatalogByRanges(Map<String, Map<String,SVNMergeRangeList>> catalog, long youngestRev, long oldestRev) {
+        Map<String, Map<String,SVNMergeRangeList>> filteredCatalog = new TreeMap<String, Map<String,SVNMergeRangeList>>();
+        for (Iterator<String> catalogIter = catalog.keySet().iterator(); catalogIter.hasNext();) {
+            String path = catalogIter.next();
+            Map<String, SVNMergeRangeList> mergeInfo = catalog.get(path);
+            Map<String, SVNMergeRangeList> filteredMergeInfo = filterMergeInfoByRanges(mergeInfo, youngestRev, oldestRev);
             if (!filteredMergeInfo.isEmpty()) {
                 filteredCatalog.put(path, filteredMergeInfo);
             }
