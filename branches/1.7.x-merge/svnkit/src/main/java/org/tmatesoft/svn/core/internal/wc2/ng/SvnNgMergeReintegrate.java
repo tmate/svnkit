@@ -49,10 +49,32 @@ public class SvnNgMergeReintegrate extends SvnNgOperationRunner<Void, SvnMerge>{
 
     @Override
     protected Void run(SVNWCContext context) throws SVNException {
-        merge(context, getOperation().getSource(), getFirstTarget(), getOperation().isDryRun());
+        File lockPath = getLockPath(getFirstTarget());
+        if (getOperation().isDryRun()) {
+            merge(context, getOperation().getSource(), getFirstTarget(), getOperation().isDryRun());
+            
+        } else {
+            
+            try {
+                lockPath = getWcContext().acquireWriteLock(lockPath, false, true);
+                merge(context, getOperation().getSource(), getFirstTarget(), getOperation().isDryRun());
+            } finally {
+                getWcContext().releaseWriteLock(lockPath);
+                sleepForTimestamp();
+            }
+        }
         return null;
     }
     
+    private File getLockPath(File firstTarget) throws SVNException {
+        SVNNodeKind kind = getWcContext().readKind(firstTarget, false);
+        if (kind == SVNNodeKind.DIR) {
+            return firstTarget;
+        } else {
+            return SVNFileUtil.getParentFile(firstTarget);
+        }
+    }
+
     private void merge(SVNWCContext context, SvnTarget mergeSource, File mergeTarget, boolean dryRun) throws SVNException {
         SVNFileType targetKind = SVNFileType.getType(mergeTarget);
         if (targetKind == SVNFileType.NONE) {
@@ -99,7 +121,7 @@ public class SvnNgMergeReintegrate extends SvnNgOperationRunner<Void, SvnMerge>{
             }
         });
         
-        sourceReposInfo = getRepositoryAccess().createRepositoryFor(SvnTarget.fromURL(url2), null, mergeSource.getPegRevision(), null);
+        sourceReposInfo = getRepositoryAccess().createRepositoryFor(SvnTarget.fromURL(url2), SVNRevision.UNDEFINED, mergeSource.getPegRevision(), null);
         SVNRepository sourceRepository = sourceReposInfo.get(RepositoryInfo.repository);
         long rev2 = sourceReposInfo.lng(RepositoryInfo.revision);
         url2 = sourceReposInfo.get(RepositoryInfo.url);
@@ -108,56 +130,57 @@ public class SvnNgMergeReintegrate extends SvnNgOperationRunner<Void, SvnMerge>{
         SVNURL targetUrl = context.getNodeUrl(mergeTarget);
         SVNRepository targetRepository = getRepositoryAccess().createRepository(targetUrl, null, false);
         //
-        
-        SvnTarget url1 = calculateLeftHandSide(context,
-                new HashMap<String, Map<String,SVNMergeRangeList>>(),
-                new HashMap<String, Map<String,SVNMergeRangeList>>(), 
-                mergeTarget,
-                targetReposRelPath,
-                explicitMergeInfo,
-                targetBaseRev,
-                sourceReposRelPath,
-                sourceReposRoot,
-                wcReposRoot,
-                rev2,
-                sourceRepository,
-                targetRepository);
-        
-        if (url1 == null) {
-            return;
+        try {
+            SvnTarget url1 = calculateLeftHandSide(context,
+                    new HashMap<String, Map<String,SVNMergeRangeList>>(),
+                    new HashMap<String, Map<String,SVNMergeRangeList>>(), 
+                    mergeTarget,
+                    targetReposRelPath,
+                    explicitMergeInfo,
+                    targetBaseRev,
+                    sourceReposRelPath,
+                    sourceReposRoot,
+                    wcReposRoot,
+                    rev2,
+                    sourceRepository,
+                    targetRepository);
+            
+            if (url1 == null) {
+                return;
+            }
+            
+            if (!url1.equals(targetUrl)) {
+                targetRepository.setLocation(url1.getURL(), false);
+            }
+            rev1 = url1.getPegRevision().getNumber();
+            SVNLocationSegment yc = getRepositoryAccess().getYoungestCommonAncestor(url2, rev2, url1.getURL(), rev1);
+            
+            if (yc == null || !(yc.getPath() != null && yc.getStartRevision() >= 0)) {
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.CLIENT_NOT_READY_TO_MERGE, 
+                        "'{0}'@'{1}' must be ancestrally related to '{2}'@'{3}'", url1, new Long(rev1), url2, new Long(rev2));
+                SVNErrorManager.error(err, SVNLogType.WC);
+            }
+            
+            if (rev1 > yc.getStartRevision()) {
+                // TODO check already merged revs for continuosity.
+            }
+            
+            SvnNgMergeDriver mergeDriver = new SvnNgMergeDriver(getWcContext(), getOperation(), getRepositoryAccess(), getOperation().getMergeOptions());
+            mergeDriver.mergeCousinsAndSupplementMergeInfo(mergeTarget, 
+                    targetRepository, sourceRepository, 
+                    url1.getURL(), rev1, 
+                    url2, rev2, 
+                    yc.getStartRevision(), 
+                    sourceReposRoot, 
+                    wcReposRoot, 
+                    SVNDepth.INFINITY, 
+                    false, 
+                    false, 
+                    false, 
+                    dryRun);
+        } finally {
+            targetRepository.closeSession();
         }
-        
-        if (!url1.equals(targetUrl)) {
-            targetRepository.setLocation(url1.getURL(), false);
-        }
-        rev1 = url1.getPegRevision().getNumber();
-        SVNLocationSegment yc = getRepositoryAccess().getYoungestCommonAncestor(url2, rev2, url1.getURL(), rev1);
-        
-        if (yc == null || !(yc.getPath() != null && yc.getStartRevision() >= 0)) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.CLIENT_NOT_READY_TO_MERGE, 
-                    "'{0}'@'{1}' must be ancestrally related to '{2}'@'{3}'", url1, new Long(rev1), url2, new Long(rev2));
-            SVNErrorManager.error(err, SVNLogType.WC);
-        }
-        
-        if (rev1 > yc.getStartRevision()) {
-            // TODO check already merged revs for continuosity.
-        }
-        
-        SvnNgMergeDriver mergeDriver = new SvnNgMergeDriver(getWcContext(), getOperation(), getRepositoryAccess(), getOperation().getMergeOptions());
-        mergeDriver.mergeCousinsAndSupplementMergeInfo(mergeTarget, 
-                targetRepository, sourceRepository, 
-                url1.getURL(), rev1, 
-                url2, rev2, 
-                yc.getStartRevision(), 
-                sourceReposRoot, 
-                wcReposRoot, 
-                SVNDepth.INFINITY, 
-                false, 
-                false, 
-                false, 
-                dryRun);
-        sleepForTimestamp();
-        
     }
     
     private SvnTarget calculateLeftHandSide(SVNWCContext context,
@@ -193,7 +216,10 @@ public class SvnNgMergeReintegrate extends SvnNgOperationRunner<Void, SvnMerge>{
                 throw e;
             }
             File pathReposRelPath = context.getNodeReposRelPath(path);
-            File pathSessionRelPath = SVNWCUtils.skipAncestor(SVNFileUtil.createFilePath(targetRepository.getLocation().getPath()), pathReposRelPath);
+            File pathSessionRelPath = SVNWCUtils.skipAncestor(targetReposRelPath, pathReposRelPath);
+            if (pathSessionRelPath == null && pathReposRelPath.equals(targetReposRelPath)) {
+                pathSessionRelPath = new File("");
+            }
             
             List<SVNLocationSegment> segments = targetRepository.getLocationSegments(pathSessionRelPath.getPath(), targetRev, targetRev, -1);
             segmentsMap.put(pathReposRelPath, segments);
@@ -244,6 +270,9 @@ public class SvnNgMergeReintegrate extends SvnNgOperationRunner<Void, SvnMerge>{
         for (File path : targetSegments.keySet()) {
             List<SVNLocationSegment> segments = targetSegments.get(path);
             File sourcePathRelToSession = SVNWCUtils.skipAncestor(targetReposRelPath, path);
+            if (sourcePathRelToSession == null && targetReposRelPath.equals(path)) {
+                sourcePathRelToSession = new File("");
+            }
             File sourcePath = SVNFileUtil.createFilePath(sourceReposRelPath, sourcePathRelToSession);
             Map<String, SVNMergeRangeList> targetHistoryAsMergeInfo = SvnRepositoryAccess.getMergeInfoFromSegments(segments);
             targetHistoryAsMergeInfo = SVNMergeInfoUtil.filterMergeInfoByRanges(targetHistoryAsMergeInfo, sourceRev, ycAncestorRev);

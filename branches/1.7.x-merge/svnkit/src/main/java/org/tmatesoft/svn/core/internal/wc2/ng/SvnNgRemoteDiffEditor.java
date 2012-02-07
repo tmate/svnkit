@@ -93,6 +93,7 @@ public class SvnNgRemoteDiffEditor implements ISVNEditor {
         SVNProperties pristineProperties;
         
         public void loadProperties(SVNRepository repos, long revision) throws SVNException {
+            pristineProperties = new SVNProperties();
             repos.getDir("", revision, pristineProperties, 0, (ISVNDirEntryHandler) null);
         }
     }
@@ -124,11 +125,13 @@ public class SvnNgRemoteDiffEditor implements ISVNEditor {
                 try {
                     os = SVNFileUtil.openFileForWriting(startRevisionFile);
                     os = new SVNChecksumOutputStream(os, "MD5", true);
+                    this.pristineProps = new SVNProperties();
                     repos.getFile(this.repoPath, this.baseRevision, this.pristineProps, os);
                 } finally {
                     SVNFileUtil.closeFile(os);
                 }
             } else {
+                this.pristineProps = new SVNProperties();
                 repos.getFile(this.repoPath, this.baseRevision, this.pristineProps, null);
             }
                 
@@ -289,7 +292,7 @@ public class SvnNgRemoteDiffEditor implements ISVNEditor {
         SVNEvent event = SVNEventFactory.createSVNEvent(file, SVNNodeKind.DIR, null, -1, 
                 SVNStatusType.MISSING, 
                 SVNStatusType.MISSING, 
-                SVNStatusType.INAPPLICABLE, 
+                SVNStatusType.LOCK_INAPPLICABLE, 
                 SVNEventAction.SKIP, 
                 SVNEventAction.SKIP, null, null, null);
         handleEvent(event);
@@ -300,7 +303,7 @@ public class SvnNgRemoteDiffEditor implements ISVNEditor {
         SVNEvent event = SVNEventFactory.createSVNEvent(file, SVNNodeKind.FILE, null, -1, 
                 SVNStatusType.MISSING, 
                 SVNStatusType.MISSING, 
-                SVNStatusType.INAPPLICABLE, 
+                SVNStatusType.LOCK_INAPPLICABLE, 
                 SVNEventAction.SKIP, 
                 SVNEventAction.SKIP, null, null, null);
         handleEvent(event);
@@ -347,7 +350,7 @@ public class SvnNgRemoteDiffEditor implements ISVNEditor {
                 kind, null, -1, 
                 currentResult.contentState, 
                 currentResult.contentState, 
-                SVNStatusType.INAPPLICABLE, 
+                SVNStatusType.LOCK_INAPPLICABLE, 
                 action, 
                 action, null, null, null);
         handleEvent(event);
@@ -407,7 +410,7 @@ public class SvnNgRemoteDiffEditor implements ISVNEditor {
                         dp.kind, null, -1, 
                         dp.state, 
                         dp.state, 
-                        SVNStatusType.INAPPLICABLE, 
+                        SVNStatusType.LOCK_INAPPLICABLE, 
                         dp.action, 
                         dp.action, null, null, null);
                 handleEvent(event);
@@ -430,7 +433,7 @@ public class SvnNgRemoteDiffEditor implements ISVNEditor {
                     SVNNodeKind.DIR, null, -1, 
                     currentResult.contentState, 
                     currentResult.propState, 
-                    SVNStatusType.INAPPLICABLE, 
+                    SVNStatusType.LOCK_INAPPLICABLE, 
                     action, 
                     action, null, null, null);
             handleEvent(event);
@@ -541,7 +544,7 @@ public class SvnNgRemoteDiffEditor implements ISVNEditor {
                 kind, null, -1, 
                 currentResult.contentState, 
                 currentResult.propState, 
-                SVNStatusType.INAPPLICABLE, 
+                SVNStatusType.LOCK_INAPPLICABLE, 
                 action, 
                 action, 
                 null, null, null);

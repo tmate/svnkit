@@ -103,8 +103,8 @@ public class SvnNgMergeCallback implements ISvnDiffCallback {
         
         if (!propChanges.isEmpty()) {
             MergePropertiesInfo mergeOutcome = mergePropChanges(path, propChanges, originalProperties);
-            result.propState = mergeOutcome.mergeOutcome;
-            if (mergeOutcome.treeConflicted) {
+            result.propState = mergeOutcome != null ? mergeOutcome.mergeOutcome : null;
+            if (mergeOutcome != null && mergeOutcome.treeConflicted) {
                 result.treeConflicted = true;
                 return;
             }
@@ -497,8 +497,8 @@ public class SvnNgMergeCallback implements ISvnDiffCallback {
             return;
         }
         MergePropertiesInfo info = mergePropChanges(path, propChanges, originalProperties);
-        result.treeConflicted = info.treeConflicted;
-        result.contentState = info.mergeOutcome;
+        result.treeConflicted = info != null ? info.treeConflicted : false;
+        result.contentState = info != null ? info.mergeOutcome : null;
     }
 
     public void dirClosed(SvnDiffCallbackResult result, File path, boolean isAdded) throws SVNException {
@@ -541,7 +541,7 @@ public class SvnNgMergeCallback implements ISvnDiffCallback {
             }
             SVNException err = null;
             try {
-                mergeOutcome = getContext().mergeProperties(localAbsPath, null, null, originalProperties, propChanges, isDryRun());
+                mergeOutcome = getContext().mergeProperties(localAbsPath, null, null, originalProperties, props, isDryRun());
             } catch (SVNException e) {
                 err = e;
             }
@@ -564,8 +564,8 @@ public class SvnNgMergeCallback implements ISvnDiffCallback {
                 }
             }
             
-            if (err != null && err.getErrorMessage().getErrorCode() == SVNErrorCode.WC_PATH_NOT_FOUND ||
-                    err.getErrorMessage().getErrorCode() == SVNErrorCode.WC_PATH_UNEXPECTED_STATUS) {
+            if (err != null && (err.getErrorMessage().getErrorCode() == SVNErrorCode.WC_PATH_NOT_FOUND ||
+                    err.getErrorMessage().getErrorCode() == SVNErrorCode.WC_PATH_UNEXPECTED_STATUS)) {
                 if (mergeOutcome != null) {
                     mergeOutcome.mergeOutcome = SVNStatusType.MISSING;
                     mergeOutcome.treeConflicted = true;
