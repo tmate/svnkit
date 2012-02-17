@@ -1,0 +1,6 @@
+# repository.url=
+# temp.dir=
+sqlite3.command=sqlite3
+large.update.step=10
+svn.command=svn
+# update.schedule=1,2-3,4-5,6
