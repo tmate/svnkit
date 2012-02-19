@@ -5,7 +5,7 @@ import java.util.Map;
 
 public class SVNObjectsPool {
     
-    private Map<Object, Object> objectsPool = new HashMap<Object, Object>();
+    private Map objectsPool = new HashMap();
     
     public Object getObject(Object value) {
         if (value != null) {
@@ -20,7 +20,7 @@ public class SVNObjectsPool {
     }
     
     public void clear() {
-        objectsPool = new HashMap<Object, Object>();
+        objectsPool = new HashMap();
     }
 
     public int size() {

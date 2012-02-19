@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2009 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2011 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -243,7 +243,7 @@ public class SVNPropertyValue implements Serializable {
         if (obj instanceof SVNPropertyValue) {
             SVNPropertyValue value = (SVNPropertyValue) obj;
             if (isString()) {
-                return myValue.equals(getPropertyAsString(value));
+                return myValue.equals(value.getString());
             } else if (isBinary()) {
                 return Arrays.equals(myData, getPropertyAsBytes(value));
             }

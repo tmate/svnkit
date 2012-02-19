@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2009 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2011 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -36,9 +36,7 @@ import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNLock;
 import org.tmatesoft.svn.core.SVNLogEntry;
 import org.tmatesoft.svn.core.SVNLogEntryPath;
-import org.tmatesoft.svn.core.SVNMergeInfo;
 import org.tmatesoft.svn.core.SVNMergeInfoInheritance;
-import org.tmatesoft.svn.core.SVNMergeRangeList;
 import org.tmatesoft.svn.core.SVNNodeKind;
 import org.tmatesoft.svn.core.SVNProperties;
 import org.tmatesoft.svn.core.SVNPropertyValue;
@@ -150,7 +148,7 @@ public abstract class SVNRepository {
     /**
      * Is used as an initialization value in cases, when revision is not defined, often represents HEAD revision
      */
-    public static final long INVALID_REVISION = -1L;
+    public static final long INVALID_REVISION = -1;
         
     protected String myRepositoryUUID;
     protected SVNURL myRepositoryRoot;
@@ -1153,7 +1151,7 @@ public abstract class SVNRepository {
      * @throws SVNException 
      * @since                  1.2.0, New in Subversion 1.5.0
      */
-    public List<SVNLocationSegment> getLocationSegments(String path, long pegRevision, long startRevision, long endRevision) throws SVNException {
+    public List getLocationSegments(String path, long pegRevision, long startRevision, long endRevision) throws SVNException {
         
         final List result = new LinkedList();
         getLocationSegments(path, pegRevision, startRevision, endRevision, new ISVNLocationSegmentHandler() {
@@ -1300,7 +1298,7 @@ public abstract class SVNRepository {
      * @see                 #getDir(String, long, boolean, Collection)
      * @see                 org.tmatesoft.svn.core.SVNDirEntry
      */
-    public Collection<SVNDirEntry> getDir(String path, long revision, SVNProperties properties, int entryFields, Collection dirEntries) throws SVNException {
+    public Collection getDir(String path, long revision, SVNProperties properties, int entryFields, Collection dirEntries) throws SVNException {
         final Collection result = dirEntries != null ? dirEntries : new LinkedList();
         ISVNDirEntryHandler handler;
         handler = new ISVNDirEntryHandler() {
@@ -2534,7 +2532,7 @@ public abstract class SVNRepository {
  
      * @since SVNKit 1.2.0, SVN 1.5.0 
      */
-    public Map<String, SVNMergeInfo> getMergeInfo(String[] paths, long revision, SVNMergeInfoInheritance inherit, 
+    public Map getMergeInfo(String[] paths, long revision, SVNMergeInfoInheritance inherit, 
             boolean includeDescendants) throws SVNException {
         if (paths == null) {
             return null;
@@ -3003,9 +3001,15 @@ public abstract class SVNRepository {
             endRevision = 0;
         }
         
-
-        SVNErrorManager.assertionFailure(pegRevision >= startRevision, null, SVNLogType.NETWORK);
-        SVNErrorManager.assertionFailure(startRevision >= endRevision, null, SVNLogType.NETWORK);
+        if (pegRevision < startRevision || startRevision < endRevision) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.UNKNOWN, 
+                    "assertion failure in getLocationSegmentsFromLog:\n" +
+                    "  pegRevision is {0}\n" +
+                    "  startRevision is {1}\n" +
+                    "  endRevision is {2}", new Object[] { new Long(pegRevision), 
+                    new Long(startRevision), new Long(endRevision) });
+            SVNErrorManager.error(err, SVNLogType.NETWORK);
+        }
         
         SVNNodeKind kind = checkPath(path, pegRevision);
         if (kind == SVNNodeKind.NONE) {
