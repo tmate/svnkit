@@ -184,6 +184,7 @@ public class SvnNgCommit extends SvnNgOperationRunner<SVNCommitInfo, SvnCommit> 
                 handleEvent(SVNEventFactory.createSVNEvent(null, SVNNodeKind.NONE, null, info.getNewRevision(), SVNEventAction.COMMIT_COMPLETED, 
                         SVNEventAction.COMMIT_COMPLETED, null, null, -1, -1));
             } catch (SVNException e) {
+                e.printStackTrace();
                 if (e instanceof SVNCancelException) {
                     throw e;
                 }
