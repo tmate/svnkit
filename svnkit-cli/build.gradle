@@ -2,9 +2,9 @@ configurations {
     scripts
 }
 
-project.ext.packageName = 'org.tmatesoft.svn.cli'
+packageName = 'org.tmatesoft.svn.cli'
 
-project.ext.scripts = ['jsvn' : "${packageName}.SVN",  
+scripts = ['jsvn' : "${packageName}.SVN",  
            'jsvnadmin' : "${packageName}.SVNAdmin", 
            'jsvndumpfilter' : "${packageName}.SVNDumpFilter", 
            'jsvnlook' : "${packageName}.SVNLook", 
@@ -56,6 +56,6 @@ jar << {
         }
     }
 
-    configurations.scripts.artifacts.add(new
+    configurations.scripts.addArtifact(new
         org.gradle.api.internal.artifacts.publish.DefaultPublishArtifact("svn-cli-scripts", "dir", "dir", null, new  Date(), scriptsDir))
 }

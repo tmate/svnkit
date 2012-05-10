@@ -1,10 +1,9 @@
 apply plugin: 'osgi'
-project.ext {
-    bundleName = rootProject.group
-    bundleSymbolicName = 'SVNKit pure Java Subversion Library'
-    bundleVersion = buildVersion.getFullOSGIVersion()
-    bundleVendor = 'TMate Software'
-}
+
+bundleName = rootProject.group
+bundleSymbolicName = 'SVNKit pure Java Subversion Library'
+bundleVersion = buildVersion.getFullOSGIVersion()
+bundleVendor = 'TMate Software'
 
 configurations {
     embedOsgi
@@ -17,18 +16,16 @@ dependencies {
 
     embedOsgi project(path: ':svnkit', transitive: false, configuration: 'archives')
     embedOsgi project(path: ':svnkit-javahl16', transitive: false, configuration: 'archives')
-    embedOsgi 'de.regnis.q.sequence:sequence-library:1.0.2'
+    embedOsgi 'de.regnis.q.sequence:sequence-library:1.0.0'
 }
 
 classes << {
     configurations.embedOsgi.files.each {
         f ->
-        if (f.name.endsWith('.jar') || f.name.endsWith('.zip')) {
         copy {
             into 'build/classes/main'
             from zipTree(f)
             exclude 'META-INF/**'
-        }
         }
     }
 }
