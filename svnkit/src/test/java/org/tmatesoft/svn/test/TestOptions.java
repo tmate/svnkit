@@ -1,17 +1,17 @@
 package org.tmatesoft.svn.test;
 
-import org.tmatesoft.svn.core.SVNException;
-import org.tmatesoft.svn.core.SVNURL;
-import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
-import org.tmatesoft.svn.core.wc.SVNRevision;
-import org.tmatesoft.svn.core.wc.SVNRevisionRange;
-
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
+
+import org.tmatesoft.svn.core.SVNException;
+import org.tmatesoft.svn.core.SVNURL;
+import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
+import org.tmatesoft.svn.core.wc.SVNRevision;
+import org.tmatesoft.svn.core.wc.SVNRevisionRange;
 
 public class TestOptions {
 
@@ -30,8 +30,7 @@ public class TestOptions {
         final String apacheCtlCommand = getApacheCtlCommand(properties);
         final File apacheRoot = getApacheRoot(properties);
         final String htpasswdCommand = getHtpasswdCommand(properties);
-        final String svnserveCommand = getSvnserveCommand(properties);
-        return new TestOptions(repositoryUrl, tempDirectory, sqlite3Command, largeUpdateStep, svnCommand, updateSchedule, apacheCtlCommand, apacheRoot, htpasswdCommand, svnserveCommand);
+        return new TestOptions(repositoryUrl, tempDirectory, sqlite3Command, largeUpdateStep, svnCommand, updateSchedule, apacheCtlCommand, apacheRoot, htpasswdCommand);
     }
 
     private final SVNURL repositoryUrl;
@@ -49,9 +48,7 @@ public class TestOptions {
     private final String apacheCtlCommand;
     private final File apacheRoot;
     private final String htpasswdCommand;
-    private final String svnserveCommand;
-
-    public TestOptions(SVNURL repositoryUrl, File tempDirectory, String sqlite3Command, long largeUpdateStep, String svnCommand, List<SVNRevisionRange> updateSchedule, String apacheCtlCommand, File apacheRoot, String htpasswdCommand, String svnserveCommand) {
+    public TestOptions(SVNURL repositoryUrl, File tempDirectory, String sqlite3Command, long largeUpdateStep, String svnCommand, List<SVNRevisionRange> updateSchedule, String apacheCtlCommand, File apacheRoot, String htpasswdCommand) {
         this.repositoryUrl = repositoryUrl;
         this.tempDirectory = tempDirectory;
         this.sqlite3Command = sqlite3Command;
@@ -61,7 +58,6 @@ public class TestOptions {
         this.apacheCtlCommand = apacheCtlCommand;
         this.apacheRoot = apacheRoot;
         this.htpasswdCommand = htpasswdCommand;
-        this.svnserveCommand = svnserveCommand;
     }
 
     public SVNURL getRepositoryUrl() {
@@ -93,14 +89,11 @@ public class TestOptions {
 
     public File getApacheRoot() {
         return apacheRoot;
+
     }
 
     public String getHtpasswdCommand() {
         return htpasswdCommand;
-    }
-
-    public String getSvnserveCommand() {
-        return svnserveCommand;
     }
 
     public static TestOptions getInstance() {
@@ -215,9 +208,5 @@ public class TestOptions {
 
     private static String getHtpasswdCommand(Properties properties) {
         return properties.getProperty("htpasswd.command");
-    }
-
-    private static String getSvnserveCommand(Properties properties) {
-        return properties.getProperty("svnserve.command");
     }
 }

@@ -549,11 +549,7 @@ public class SvnNgReposToWcCopy extends SvnNgOperationRunner<Void, SvnCopy> {
             }
             originalUuid = reposInfo.reposUuid;
             originalURL = reposInfo.reposRootUrl;
-            String reposPath = SVNURLUtil.getRelativeURL(originalURL, copyFromURL, false);
-            if (reposPath.startsWith("/")) {
-                reposPath = reposPath.substring("/".length());
-            }
-            originalReposPath = new File(reposPath);
+            originalReposPath = SVNWCUtils.skipAncestor(new File(originalURL.getPath()), new File(copyFromURL.getPath()));
         } else {
             copyFromRev = -1;
         }

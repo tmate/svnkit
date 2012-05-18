@@ -2,7 +2,6 @@ package org.tmatesoft.svn.test;
 
 import org.tmatesoft.svn.core.*;
 import org.tmatesoft.svn.core.auth.BasicAuthenticationManager;
-import org.tmatesoft.svn.core.auth.ISVNAuthenticationManager;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
 import org.tmatesoft.svn.core.io.ISVNEditor;
 import org.tmatesoft.svn.core.io.SVNRepository;
@@ -25,7 +24,7 @@ public class CommitBuilder {
     private final Map<String, Long> directoriesToCopyFromRevision;
     private final Set<String> directoriesToAdd;
     private final Set<String> entriesToDelete;
-    private ISVNAuthenticationManager authenticationManager;
+    private BasicAuthenticationManager authenticationManager;
 
     public CommitBuilder(SVNURL url) {
         this.filesToAdd = new HashMap<String, byte[]>();
@@ -115,11 +114,11 @@ public class CommitBuilder {
             deleteEntries(commitEditor, directory);
             addChildrensFiles(commitEditor, directory);
         }
-        closeUntilCommonAncestor(commitEditor, currentDirectory, "");
-        currentDirectory = "";
 
         deleteEntries(commitEditor, "");
         addChildrensFiles(commitEditor, "");
+
+        closeUntilCommonAncestor(commitEditor, currentDirectory, "");
 
         commitEditor.closeDir();
         return commitEditor.closeEdit();
@@ -346,7 +345,7 @@ public class CommitBuilder {
         entriesToDelete.add(path);
     }
 
-    public void setAuthenticationManager(ISVNAuthenticationManager authenticationManager) {
+    public void setAuthenticationManager(BasicAuthenticationManager authenticationManager) {
         this.authenticationManager = authenticationManager;
     }
 }

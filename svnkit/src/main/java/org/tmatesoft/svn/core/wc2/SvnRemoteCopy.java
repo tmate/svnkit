@@ -279,13 +279,4 @@ public class SvnRemoteCopy extends AbstractSvnCommit {
      public boolean isChangesWorkingCopy() {
          return false;
      }
-
-     @Override
-     protected File getOperationalWorkingCopy() {
-         SvnCopySource firstSource = getSources().iterator().next();
-         if (firstSource.getSource().isLocal()) {
-             return firstSource.getSource().getFile();
-         }
-         return null;
-     }
 }

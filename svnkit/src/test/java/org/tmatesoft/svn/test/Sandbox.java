@@ -31,7 +31,6 @@ public class Sandbox {
     private final List<WorkingCopy> workingCopies;
     private File testDirectory;
     private final List<ApacheProcess> apacheProcesses;
-    private final List<SvnserveProcess> svnserveProcesses;
     private final Map<SVNURL, File> urlToRepositoryRoot;
 
     private Sandbox(String testName, TestOptions testOptions) {
@@ -39,7 +38,6 @@ public class Sandbox {
         this.testOptions = testOptions;
         this.workingCopies = new ArrayList<WorkingCopy>();
         this.apacheProcesses = new ArrayList<ApacheProcess>();
-        this.svnserveProcesses = new ArrayList<SvnserveProcess>();
         this.urlToRepositoryRoot = new HashMap<SVNURL, File>();
     }
 
@@ -49,9 +47,6 @@ public class Sandbox {
         }
         for (ApacheProcess apacheProcess : apacheProcesses) {
             ApacheProcess.shutdown(apacheProcess);
-        }
-        for (SvnserveProcess svnserveProcess : svnserveProcesses) {
-            SvnserveProcess.shutdown(svnserveProcess);
         }
     }
 
@@ -79,7 +74,7 @@ public class Sandbox {
     public WorkingCopy checkoutOrUpdateExistingWorkingCopy(SVNURL repositoryUrl, long revision) throws SVNException {
         return checkoutOrUpdateExistingWorkingCopy(repositoryUrl, revision, SvnWcGeneration.V17);
     }
-
+    
     public WorkingCopy checkoutOrUpdateExistingWorkingCopy(SVNURL repositoryUrl, long revision, SvnWcGeneration wcGeneration) throws SVNException {
         final WorkingCopy workingCopy = new WorkingCopy(getTestOptions(), getWorkingCopyDirectory());
         workingCopy.setWcGeneration(wcGeneration);
@@ -95,7 +90,7 @@ public class Sandbox {
     public WorkingCopy checkoutNewWorkingCopy(SVNURL repositoryUrl, long revision) throws SVNException {
         return checkoutNewWorkingCopy(repositoryUrl, revision, true, TestUtil.getDefaultWcGeneration());
     }
-
+    
     public WorkingCopy checkoutNewWorkingCopy(SVNURL repositoryUrl, long revision, boolean ignoreExternals, SvnWcGeneration wcGeneration) throws SVNException {
         final WorkingCopy workingCopy = new WorkingCopy(getTestOptions(), createWorkingCopyDirectory());
         workingCopy.setWcGeneration(wcGeneration);
@@ -149,24 +144,11 @@ public class Sandbox {
         return createSvnRepositoryWithDavAccess(null);
     }
 
-    public SVNURL createSvnRepositoryWithSvnAccess() throws SVNException {
-        return createSvnRepositoryWithSvnAccess(null);
-    }
-
     public SVNURL createSvnRepositoryWithDavAccess(Map<String, String> loginToPassword) throws SVNException {
         final File repositoryDirectory = createDirectory("svn.repo");
         createSvnRepository(repositoryDirectory);
         final ApacheProcess apacheProcess = runApacheForSvnRepository(repositoryDirectory, loginToPassword);
         SVNURL url = apacheProcess.getUrl();
-        urlToRepositoryRoot.put(url, repositoryDirectory);
-        return url;
-    }
-
-    public SVNURL createSvnRepositoryWithSvnAccess(Map<String, String> loginToPassword) throws SVNException {
-        final File repositoryDirectory = createDirectory("svn.repo");
-        createSvnRepository(repositoryDirectory);
-        final SvnserveProcess svnserveProcess = runSvnserveForSvnRepository(repositoryDirectory, loginToPassword);
-        SVNURL url = svnserveProcess.getUrl();
         urlToRepositoryRoot.put(url, repositoryDirectory);
         return url;
     }
@@ -185,50 +167,24 @@ public class Sandbox {
     }
 
     public File writeActiveAuthzContents(SVNURL url, String contents) throws SVNException {
-        //maybe url is served by apache?
         final ApacheProcess apacheProcess = findApacheProcess(url);
-        if (apacheProcess != null) {
-
-            final File activeAuthzFile = apacheProcess.getAuthzFile();
-            if (activeAuthzFile == null) {
-                return null;
-            }
-            TestUtil.writeFileContentsString(activeAuthzFile, contents);
-            apacheProcess.reload(); //reload apache configuration
-            return activeAuthzFile;
+        if (apacheProcess == null) {
+            return null;
         }
 
-        //maybe url is served by svnserve?
-        final SvnserveProcess svnserveProcess = findSvnserveProcess(url);
-        if (svnserveProcess != null) {
-
-            final File activeAuthzFile = svnserveProcess.getAuthzFile();
-            if (activeAuthzFile == null) {
-                return null;
-            }
-
-            TestUtil.writeFileContentsString(activeAuthzFile, contents);
-            //no reload is required
-            return activeAuthzFile;
+        final File activeAuthzFile = apacheProcess.getAuthzFile();
+        if (activeAuthzFile == null) {
+            return null;
         }
-
-        //authz for FSFS is useless
-        return null;
+        TestUtil.writeFileContentsString(activeAuthzFile, contents);
+        apacheProcess.reload(); //reload apache configuration
+        return activeAuthzFile;
     }
 
     private ApacheProcess findApacheProcess(SVNURL url) {
         for (ApacheProcess apacheProcess : apacheProcesses) {
             if (apacheProcess.getUrl().equals(url)) {
                 return apacheProcess;
-            }
-        }
-        return null;
-    }
-
-    private SvnserveProcess findSvnserveProcess(SVNURL url) {
-        for (SvnserveProcess svnserveProcess : svnserveProcesses) {
-            if (svnserveProcess.getUrl().equals(url)) {
-                return svnserveProcess;
             }
         }
         return null;
@@ -276,12 +232,6 @@ public class Sandbox {
         final ApacheProcess apacheProcess = ApacheProcess.run(getTestOptions(), repositoryDirectory, loginToPassword);
         apacheProcesses.add(apacheProcess);
         return apacheProcess;
-    }
-
-    private SvnserveProcess runSvnserveForSvnRepository(File repositoryDirectory, Map<String, String> loginToPassword) throws SVNException {
-        final SvnserveProcess svnserveProcess = SvnserveProcess.run(getTestOptions(), repositoryDirectory, loginToPassword);
-        svnserveProcesses.add(svnserveProcess);
-        return svnserveProcess;
     }
 
     private void createSvnRepository(File repositoryDirectory) throws SVNException {
