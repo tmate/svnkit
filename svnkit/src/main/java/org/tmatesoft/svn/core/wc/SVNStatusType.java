@@ -356,7 +356,5 @@ public class SVNStatusType {
      *  
      */
     public static final SVNStatusType STATUS_MERGED = new SVNStatusType(8, "merged", 'G');
-    
-    public static final SVNStatusType NO_MERGE = new SVNStatusType(14, "no_merge");
 
 }

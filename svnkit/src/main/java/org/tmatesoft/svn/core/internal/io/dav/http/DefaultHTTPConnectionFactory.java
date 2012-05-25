@@ -40,14 +40,12 @@ public class DefaultHTTPConnectionFactory implements IHTTPConnectionFactory {
     }
 
     public IHTTPConnection createHTTPConnection(SVNRepository repository) throws SVNException {
-        String charset = myHTTPCharset != null ? myHTTPCharset : System.getProperty("svnkit.http.encoding", "UTF-8");
+        String charset = myHTTPCharset != null ? myHTTPCharset : System.getProperty("svnkit.http.encoding", "US-ASCII");
         File spoolLocation = mySpoolDirectory;
         if (mySpoolDirectory != null && !mySpoolDirectory.isDirectory()) {
             spoolLocation = null;
         }
         return new HTTPConnection(repository, charset, spoolLocation, myIsSpoolAll);
-
-//        return new HttpConnection(repository, charset, spoolLocation, myIsSpoolAll);
     }
 
     public boolean useSendAllForDiff(SVNRepository repository) throws SVNException {

@@ -103,9 +103,7 @@ public class SVNInfo {
     private long myRepositorySize;
     private SVNTreeConflictDescription myTreeConflict;
     
-    private File myWorkingCopyRoot;
-    
-    public static SVNInfo createInfo(File file, SVNEntry entry) throws SVNException {
+    static SVNInfo createInfo(File file, SVNEntry entry) throws SVNException {
         if (entry == null) {
             return null;
         }
@@ -126,7 +124,7 @@ public class SVNInfo {
                 lock, entry.getDepth(), entry.getChangelistName(), entry.getWorkingSize(), tc);
     }
 
-    public static SVNInfo createInfo(File file, SVNTreeConflictDescription tc) {
+    static SVNInfo createInfo(File file, SVNTreeConflictDescription tc) {
         return new SVNInfo(file, null, null, 
                 -1, SVNNodeKind.NONE, null, -1,
                 null, null, null, 
@@ -135,7 +133,7 @@ public class SVNInfo {
                 null, SVNDepth.UNKNOWN, null, -1, tc);
     }
 
-    public static SVNInfo createInfo(String path, SVNURL reposRootURL, String uuid,
+    static SVNInfo createInfo(String path, SVNURL reposRootURL, String uuid,
             SVNURL url, SVNRevision revision, SVNDirEntry dirEntry, SVNLock lock) {
         if (dirEntry == null) {
             return null;
@@ -145,7 +143,7 @@ public class SVNInfo {
                 dirEntry.getAuthor(), lock, SVNDepth.UNKNOWN, dirEntry.getSize());
     }
 
-    public SVNInfo(File file, SVNURL url, SVNURL rootURL, long revision, SVNNodeKind kind,
+    protected SVNInfo(File file, SVNURL url, SVNURL rootURL, long revision, SVNNodeKind kind,
             String uuid, long committedRevision, String committedDate,
             String author, String schedule, SVNURL copyFromURL,
             long copyFromRevision, String textTime, String propTime,
@@ -199,7 +197,7 @@ public class SVNInfo {
         myRepositorySize = -1;
     }
 
-    public SVNInfo(String path, SVNURL url, SVNRevision revision,
+    protected SVNInfo(String path, SVNURL url, SVNRevision revision,
             SVNNodeKind kind, String uuid, SVNURL reposRootURL,
             long comittedRevision, Date date, String author, SVNLock lock, 
             SVNDepth depth, long size) {
@@ -532,14 +530,6 @@ public class SVNInfo {
      */
     public long getRepositorySize() {
         return myRepositorySize;
-    }
-    
-    public File getWorkingCopyRoot() {
-        return myWorkingCopyRoot;
-    }
-    
-    public void setWorkingCopyRoot(File root) {
-        myWorkingCopyRoot = root;
     }
 
 }

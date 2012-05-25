@@ -23,9 +23,8 @@ public interface IHTTPConnectionFactory {
     public IHTTPConnectionFactory DEFAULT = new IHTTPConnectionFactory() {
 
         public IHTTPConnection createHTTPConnection(SVNRepository repository) throws SVNException {
-            String charset = System.getProperty("svnkit.http.encoding", "UTF-8");
+            String charset = System.getProperty("svnkit.http.encoding", "US-ASCII");
             return new HTTPConnection(repository, charset, null, false);
-//            return new HttpConnection(repository, charset, null, false);
         }
 
         public boolean useSendAllForDiff(SVNRepository repository) throws SVNException {

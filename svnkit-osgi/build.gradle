@@ -1,4 +1,5 @@
 apply plugin: 'osgi'
+
 project.ext {
     bundleName = rootProject.group
     bundleSymbolicName = 'SVNKit pure Java Subversion Library'
@@ -17,7 +18,7 @@ dependencies {
 
     embedOsgi project(path: ':svnkit', transitive: false, configuration: 'archives')
     embedOsgi project(path: ':svnkit-javahl16', transitive: false, configuration: 'archives')
-    embedOsgi 'de.regnis.q.sequence:sequence-library:1.0.2'
+    embedOsgi 'de.regnis.q.sequence:sequence-library:1.0.0'
 }
 
 classes << {
@@ -43,7 +44,6 @@ jar {
         'Bundle-RequiredExecutionEnvironment' : 'J2SE-' + targetCompatibility,
         'Bundle-Activator' : 'org.tmatesoft.svn.core.SVNKitActivator',
         'Bundle-ActivationPolicy' : 'lazy',
-        'Eclipse-BundleShape' : 'jar',
         'Require-Bundle': 'net.java.dev.jna;bundle-version="[3.2.7,4.0.0)";resolution:=optional,' +
         	'com.trilead.ssh2;bundle-version="[1.0.0,2.0.0)",' +
 			'org.tmatesoft.sqljet;bundle-version="[1.0.5,2.0.0)",' +

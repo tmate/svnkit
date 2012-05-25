@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -17,19 +18,19 @@ public class SshSessionPool {
     
     private static final long PURGE_INTERVAL = 10*1000;
     
-    private Map<String, SshHost> myPool;
+    private Map myPool;
     private Timer myTimer;
     
     public SshSessionPool() {
-        myPool = new HashMap<String, SshHost>();
+        myPool = new HashMap();
         myTimer = new Timer(true);
         
         myTimer.schedule(new TimerTask() {
-            @Override
             public void run() {
                 synchronized (myPool) {
-                    Collection<SshHost> hosts = new ArrayList<SshHost>(myPool.values());
-                    for (SshHost host : hosts) {
+                    Collection hosts = new ArrayList(myPool.values());
+                    for (Iterator hostsIterator = hosts.iterator(); hostsIterator.hasNext();) {
+                        SshHost host= (SshHost) hostsIterator.next();
                         if (host.purge()) {
                             myPool.remove(host.getKey());
                         }
@@ -43,8 +44,9 @@ public class SshSessionPool {
     
     public void shutdown() {
         synchronized (myPool) {
-            Collection<SshHost> hosts = new ArrayList<SshHost>(myPool.values());
-            for (SshHost host : hosts) {
+            Collection hosts = new ArrayList(myPool.values());
+            for (Iterator hostsIterator = hosts.iterator(); hostsIterator.hasNext();) {
+                SshHost host= (SshHost) hostsIterator.next();
                 try {
                     host.lock();
                     host.setDisposed(true);
@@ -73,7 +75,7 @@ public class SshSessionPool {
                if (!myPool.containsKey(sshHost.getKey())) {
                    myPool.put(sshHost.getKey(), sshHost);
                } else {
-                   sshHost = myPool.get(sshHost.getKey());
+                   sshHost = (SshHost) myPool.get(sshHost.getKey());
                }
             }
             

@@ -15,7 +15,7 @@ import java.io.File;
 
 
 /**
- * ISVNCommitParameters is the interface for parameters 
+ * The <b>ISVNCommitParameters</b> is the interface for parameters 
  * which set behaviour for a commit operation that touches 
  * still versioned files or dirs that are somehow missing.  
  * 
