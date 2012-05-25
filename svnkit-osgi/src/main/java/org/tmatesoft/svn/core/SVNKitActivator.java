@@ -17,7 +17,7 @@ import org.eclipse.osgi.service.debug.DebugOptions;
 import org.osgi.framework.BundleActivator;
 import org.osgi.framework.BundleContext;
 import org.osgi.util.tracker.ServiceTracker;
-import org.tmatesoft.svn.core.internal.io.svn.SVNSSHConnector;
+import org.tmatesoft.svn.core.internal.io.svn.SVNSSHSession;
 import org.tmatesoft.svn.util.ISVNDebugLog;
 import org.tmatesoft.svn.util.SVNDebugLog;
 
@@ -74,7 +74,7 @@ public class SVNKitActivator implements BundleActivator {
     }
 
     public void stop(BundleContext context) throws Exception {
-        SVNSSHConnector.shutdown();
+        SVNSSHSession.shutdown();
         
         try {
             if (myDebugTracker != null) {

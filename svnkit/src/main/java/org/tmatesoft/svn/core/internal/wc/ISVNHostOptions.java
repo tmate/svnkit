@@ -23,7 +23,7 @@ import org.tmatesoft.svn.core.auth.SVNAuthentication;
  */
 public interface ISVNHostOptions {
 
-    Collection<String> getAuthTypes();
+    Collection getAuthTypes();
 
     boolean isAuthStorageEnabled();
 

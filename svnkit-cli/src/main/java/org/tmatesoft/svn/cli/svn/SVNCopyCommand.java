@@ -85,9 +85,7 @@ public class SVNCopyCommand extends SVNCommand {
                 client.setEventHandler(new SVNNotifyPrinter(getSVNEnvironment()));
             }
         } else if (!sourceIsURL && dst.isURL()){
-            SVNNotifyPrinter printer = new SVNNotifyPrinter(getSVNEnvironment());
-            printer.setWcToReposCopy(true);
-            client.setEventHandler(printer);
+            // skip
         } else if (sourceIsURL && !dst.isURL()) {
             if (!getSVNEnvironment().isQuiet()) {
                 client.setEventHandler(new SVNNotifyPrinter(getSVNEnvironment(), true, false, false));

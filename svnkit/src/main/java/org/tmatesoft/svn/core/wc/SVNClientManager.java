@@ -378,6 +378,12 @@ public class SVNClientManager implements ISVNRepositoryPool {
         if (myChangelistClient != null) {
             myChangelistClient.setIgnoreExternals(myIsIgnoreExternals);
         }
+        if (myAdminClient != null) {
+            myAdminClient.setIgnoreExternals(myIsIgnoreExternals);
+        }
+        if (myLookClient != null) {
+            myLookClient.setIgnoreExternals(myIsIgnoreExternals);
+        }
     }
     
     /**
@@ -469,6 +475,7 @@ public class SVNClientManager implements ISVNRepositoryPool {
             myAdminClient = new SVNAdminClient(this, myOptions);
             myAdminClient.setEventHandler(myEventHandler);
             myAdminClient.setDebugLog(getDebugLog());
+            myAdminClient.setIgnoreExternals(myIsIgnoreExternals);
         }
         return myAdminClient;
     }
@@ -490,6 +497,7 @@ public class SVNClientManager implements ISVNRepositoryPool {
             myLookClient = new SVNLookClient(this, myOptions);
             myLookClient.setEventHandler(myEventHandler);
             myLookClient.setDebugLog(getDebugLog());
+            myLookClient.setIgnoreExternals(myIsIgnoreExternals);
         }
         return myLookClient;
     }
@@ -538,7 +546,6 @@ public class SVNClientManager implements ISVNRepositoryPool {
         return myDiffClient;
     }
 
-    
     /**
      * Returns an instance of the {@link SVNLogClient} class. 
      * 

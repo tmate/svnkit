@@ -35,8 +35,6 @@ import javax.net.ssl.X509TrustManager;
 
 import org.tmatesoft.svn.core.ISVNCanceller;
 import org.tmatesoft.svn.core.SVNCancelException;
-import org.tmatesoft.svn.core.SVNException;
-import org.tmatesoft.svn.core.internal.wc.SVNClassLoader;
 
 /**
  * <code>SVNSocketFactory</code> is a utility class that represents a custom
@@ -54,10 +52,9 @@ public class SVNSocketFactory {
 
     private static boolean ourIsSocketStaleCheck = false;
     private static int ourSocketReceiveBufferSize = 0; // default
-    private static ISVNThreadPool ourThreadPool = SVNClassLoader.getThreadPool(); 
     private static String ourSSLProtocols = System.getProperty("svnkit.http.sslProtocols");
-    
-    public static Socket createPlainSocket(String host, int port, int connectTimeout, int readTimeout, ISVNCanceller cancel) throws IOException, SVNException {
+
+    public static Socket createPlainSocket(String host, int port, int connectTimeout, int readTimeout, ISVNCanceller cancel) throws IOException, SVNCancelException {
         InetAddress address = createAddres(host);
         Socket socket = new Socket();
         int bufferSize = getSocketReceiveBufferSize();
@@ -74,7 +71,7 @@ public class SVNSocketFactory {
         return socket;
     }
 
-    public static Socket createSSLSocket(KeyManager[] keyManagers, TrustManager trustManager, String host, int port, int connectTimeout, int readTimeout, ISVNCanceller cancel) throws IOException, SVNException {
+    public static Socket createSSLSocket(KeyManager[] keyManagers, TrustManager trustManager, String host, int port, int connectTimeout, int readTimeout, ISVNCanceller cancel) throws IOException, SVNCancelException {
         InetAddress address = createAddres(host);
         Socket sslSocket = createSSLContext(keyManagers, trustManager).getSocketFactory().createSocket();
         int bufferSize = getSocketReceiveBufferSize();
@@ -103,26 +100,18 @@ public class SVNSocketFactory {
         return sslSocket;
     }
 
-    public static ISVNThreadPool getThreadPool() {
-        return ourThreadPool;
-    }
-    
-    public static void connect(Socket socket, InetSocketAddress address, int timeout, ISVNCanceller cancel) throws IOException, SVNException {
+    private static void connect(Socket socket, InetSocketAddress address, int timeout, ISVNCanceller cancel) throws IOException, SVNCancelException {
         if (cancel == null || cancel == ISVNCanceller.NULL) {
             socket.connect(address, timeout);
             return;
         }
 
         SVNSocketConnection socketConnection = new SVNSocketConnection(socket, address, timeout);
-        ISVNTask task = ourThreadPool.run(socketConnection, true);
+        Thread connectionThread = new Thread(socketConnection);
+        connectionThread.start();
 
         while (!socketConnection.isSocketConnected()) {
-            try {
-                cancel.checkCancelled();
-            } catch (SVNCancelException e) {
-                task.cancel(true);
-                throw e;
-            }
+            cancel.checkCancelled();
         }
         
         if (socketConnection.getError() != null) {
@@ -206,7 +195,7 @@ public class SVNSocketFactory {
         return isStale;
     }
 
-	public static SSLContext createSSLContext(KeyManager[] keyManagers, TrustManager trustManager) throws IOException {
+	private static SSLContext createSSLContext(KeyManager[] keyManagers, TrustManager trustManager) throws IOException {
 		if (trustManager == null) {
 			trustManager = new X509TrustManager() {
 				public X509Certificate[] getAcceptedIssuers() {

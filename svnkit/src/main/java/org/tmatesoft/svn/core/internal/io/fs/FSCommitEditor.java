@@ -413,9 +413,7 @@ public class FSCommitEditor implements ISVNEditor {
     private static class DirBaton {
 
         private long myBaseRevision;
-
         private String myPath;
-
         private boolean isCopied;
 
         public DirBaton(long revision, String path, boolean copied) {

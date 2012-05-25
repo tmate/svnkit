@@ -78,7 +78,6 @@ public class SVNListCommand extends SVNXMLCommand implements ISVNDirEntryHandler
                 SVNDirEntry.DIRENT_ALL : SVNDirEntry.DIRENT_KIND | SVNDirEntry.DIRENT_TIME;
         boolean fetchLocks = getSVNEnvironment().isXML() || getSVNEnvironment().isVerbose();
         SVNLogClient client = getSVNEnvironment().getClientManager().getLogClient();
-        boolean seenNonExistentPaths = false;
         for (int i = 0; i < targets.size(); i++) {
             String targetName = (String) targets.get(i);
             SVNPath target = new SVNPath(targetName, true);
@@ -87,17 +86,10 @@ public class SVNListCommand extends SVNXMLCommand implements ISVNDirEntryHandler
                         "".equals(target.getTarget()) ? "." : target.getTarget(), new StringBuffer());
                 getSVNEnvironment().getOut().print(buffer.toString());
             }
-            try {
-                if (!target.isURL()) {
-                    client.doList(target.getFile(), target.getPegRevision(), getSVNEnvironment().getStartRevision(), fetchLocks, depth, fields, this);
-                } else {
-                    client.doList(target.getURL(), target.getPegRevision(), getSVNEnvironment().getStartRevision(), fetchLocks, depth, fields, this);
-                }
-            } catch (SVNException e) {
-                getSVNEnvironment().handleWarning(e.getErrorMessage(), 
-                        new SVNErrorCode[] {SVNErrorCode.WC_PATH_NOT_FOUND, SVNErrorCode.FS_NOT_FOUND},
-                        getSVNEnvironment().isQuiet());
-                seenNonExistentPaths = true;
+            if (!target.isURL()) {
+                client.doList(target.getFile(), target.getPegRevision(), getSVNEnvironment().getStartRevision(), fetchLocks, depth, fields, this);
+            } else {
+                client.doList(target.getURL(), target.getPegRevision(), getSVNEnvironment().getStartRevision(), fetchLocks, depth, fields, this);
             }
             if (getSVNEnvironment().isXML()) {
                 StringBuffer buffer = closeXMLTag("list", new StringBuffer());
@@ -107,10 +99,6 @@ public class SVNListCommand extends SVNXMLCommand implements ISVNDirEntryHandler
         
         if (getSVNEnvironment().isXML() && !getSVNEnvironment().isIncremental()) {
             printXMLFooter("lists");
-        }
-        if (seenNonExistentPaths) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ILLEGAL_TARGET, "Could not list all targets because some targets don't exist");
-            SVNErrorManager.error(err, SVNLogType.CLIENT);
         }
     }
 

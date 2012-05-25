@@ -1,17 +1,16 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2010 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2012 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
- * are also available at http://svnkit.com/license.html.
+ * are also available at http://svnkit.com/license.html
  * If newer versions of this license are posted there, you may use a
  * newer version instead, at your option.
  * ====================================================================
  */
 package org.tmatesoft.svn.core.internal.wc.admin;
 
-import java.io.File;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.Map;
@@ -26,16 +25,19 @@ import org.tmatesoft.svn.core.internal.util.SVNEncodingUtil;
 import org.tmatesoft.svn.core.internal.util.SVNHashMap;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNTreeConflictUtil;
+import org.tmatesoft.svn.core.io.SVNRepository;
 import org.tmatesoft.svn.core.wc.SVNRevision;
-import org.tmatesoft.svn.core.wc.SVNTreeConflictDescription;
+
 
 /**
  * @version 1.3
  * @author  TMate Software Ltd.
  */
-public abstract class SVNEntry {
+public class SVNEntry {
 
-    private String myName;
+    private SVNAdminArea myAdminArea;
+    private String myName;    
+    
     private String author;
     private String[] cachableProperties;
     private String changelistName;
@@ -76,9 +78,28 @@ public abstract class SVNEntry {
     private boolean hasPropertiesModifications;
     private String parentURL;
 
-    public abstract boolean isThisDir(); 
+    public SVNEntry(Map attributes, SVNAdminArea adminArea, String name) {
+        myName = name;
+        myAdminArea = adminArea;
+        
+        workingSize = SVNProperty.WORKING_SIZE_UNKNOWN;
+        committedRevision = SVNRepository.INVALID_REVISION;
+        revision = SVNRepository.INVALID_REVISION;
+        copyFromRevision = SVNRepository.INVALID_REVISION;
+        
+        depth = SVNDepth.INFINITY;
+        
+        if (attributes != null) {
+            applyChanges(attributes);
+        }
+    }
     
-    public abstract SVNAdminArea getAdminArea();
+    public boolean isThisDir() {
+        if (myAdminArea != null) {
+            return myAdminArea.getThisDirName().equals(getName());
+        }
+        return "".equals(getName());
+    }
 
     public String getURL() {
         if (url == null && parentURL != null) {
@@ -86,7 +107,7 @@ public abstract class SVNEntry {
         }
         return url;
     }
-
+    
     public SVNURL getSVNURL() throws SVNException {
         String url = getURL();
         if (url != null) {
@@ -120,7 +141,7 @@ public abstract class SVNEntry {
     }
 
     public boolean isHidden() {
-        return (isDeleted() && !isScheduledForAddition() && !isScheduledForReplacement()) ||
+        return (isDeleted() && !isScheduledForAddition() && !isScheduledForReplacement()) || 
             isAbsent() || getDepth() == SVNDepth.EXCLUDE;
     }
 
@@ -167,15 +188,18 @@ public abstract class SVNEntry {
         this.changelistName = changelistName;
         return changed;
     }
-
+    
     public String getChangelistName() {
         return this.changelistName;
     }
-
+    
     public boolean setWorkingSize(long size) {
-        boolean changed = workingSize != size;
-        workingSize = size;
-        return changed;
+        if (getKind() == SVNNodeKind.FILE) {
+            boolean changed = workingSize != size;
+            workingSize = size;
+            return changed;
+        }
+        return false;
     }
 
     public long getWorkingSize() {
@@ -192,7 +216,7 @@ public abstract class SVNEntry {
         }
         this.depth = depth;
     }
-
+    
     public boolean setURL(String url) {
         boolean changed = url != null ? !url.equals(this.url) : url != this.url;
         this.url = url;
@@ -246,7 +270,6 @@ public abstract class SVNEntry {
     public void setCommittedDate(String date) {
         committedDate = date != null ? SVNDate.parseDate(date) : null;
     }
-
     public String getCommittedDate() {
         return committedDate != null ? committedDate.format() : null;
     }
@@ -384,7 +407,7 @@ public abstract class SVNEntry {
         }
         return null;
     }
-
+    
     public boolean setRepositoryRoot(String url) {
         boolean changed = url != null ? !url.equals(repositoryRoot) : url != repositoryRoot;
         this.repositoryRoot = url;
@@ -414,7 +437,7 @@ public abstract class SVNEntry {
     public void setCachableProperties(String[] cachableProps) {
         this.cachableProperties = cachableProps;
     }
-
+    
     public void setPresentProperties(String[] properties) {
         presentProperties = properties;
     }
@@ -438,15 +461,15 @@ public abstract class SVNEntry {
     public String getExternalFilePath() {
         return externalFilePath;
     }
-
+    
     public SVNRevision getExternalFileRevision() {
         return externalFileRevision;
     }
-
+    
     public SVNRevision getExternalFilePegRevision() {
         return externalFilePegRevision;
     }
-
+    
     public void setExternalFilePath(String path) {
         externalFilePath = path;
     }
@@ -463,12 +486,15 @@ public abstract class SVNEntry {
         return treeConflictData;
     }
 
-    public abstract Map<File, SVNTreeConflictDescription> getTreeConflicts() throws SVNException;
+    public Map getTreeConflicts() throws SVNException {
+        String conflictData = getTreeConflictData();
+        return SVNTreeConflictUtil.readTreeConflicts(getAdminArea().getRoot(), conflictData);
+    }
 
     public void setTreeConflictData(String conflictData) {
         treeConflictData = conflictData;
     }
-
+    
     public void setTreeConflicts(Map treeConflicts) throws SVNException {
         String conflictData = SVNTreeConflictUtil.getTreeConflictData(treeConflicts);
         setTreeConflictData(conflictData);
@@ -493,21 +519,17 @@ public abstract class SVNEntry {
     public void setParentURL(String url) {
         parentURL = url;
     }
-    
-    public void setName(String name) {
-        myName  = name;
-    }
-
+   
     public void applyChanges(Map attributes) {
         if (attributes == null || attributes.isEmpty()) {
             return;
         }
-        for(Iterator<?> names = attributes.keySet().iterator(); names.hasNext();) {
+        for(Iterator names = attributes.keySet().iterator(); names.hasNext();) {
             String name = (String) names.next();
             setAttribute(name, attributes.get(name));
         }
     }
-
+    
     private void setAttribute(String name, Object value) {
         if (SVNProperty.ABSENT.equals(name)) {
             setAbsent(SVNProperty.booleanValue((String) value));
@@ -526,7 +548,7 @@ public abstract class SVNEntry {
         } else if (SVNProperty.COMMITTED_DATE.equals(name)) {
             setCommittedDate((String) value);
         } else if (SVNProperty.COMMITTED_REVISION.equals(name)) {
-            setCommittedRevision(SVNProperty.longValue((String) value));
+            setCommittedRevision(fromString(value));
         } else if (SVNProperty.CONFLICT_NEW.equals(name)) {
             setConflictNew((String) value);
         } else if (SVNProperty.CONFLICT_OLD.equals(name)) {
@@ -536,7 +558,7 @@ public abstract class SVNEntry {
         } else if (SVNProperty.COPIED.equals(name)) {
             setCopied(SVNProperty.booleanValue((String) value));
         } else if (SVNProperty.COPYFROM_REVISION.equals(name)) {
-            setCopyFromRevision(SVNProperty.longValue((String) value));
+            setCopyFromRevision(fromString(value));
         } else if (SVNProperty.COPYFROM_URL.equals(name)) {
             setCopyFromURL((String) value);
         } else if (SVNProperty.DELETED.equals(name)) {
@@ -594,7 +616,7 @@ public abstract class SVNEntry {
         } else if (SVNProperty.REPOS.equals(name)) {
             setRepositoryRoot((String) value);
         } else if (SVNProperty.REVISION.equals(name)) {
-            setRevision(SVNProperty.longValue((String) value));
+            setRevision(fromString(value));
         } else if (SVNProperty.SCHEDULE.equals(name)) {
             setSchedule((String) value);
         } else if (SVNProperty.TEXT_TIME.equals(name)) {
@@ -606,10 +628,19 @@ public abstract class SVNEntry {
         } else if (SVNProperty.UUID.equals(name)) {
             setUUID((String) value);
         } else if (SVNProperty.WORKING_SIZE.equals(name)) {            
-            setWorkingSize(SVNProperty.longValue((String) value));
+            setWorkingSize(fromString(value));
         }
     }
+    
+    private static long fromString(Object longValue) {
+        long size = -1;
+        if (longValue instanceof String) {
+            return SVNProperty.longValue((String) longValue);
+        }
+        return size;
 
+    }
+    
     public Map asMap() {
         Map map = new SVNHashMap();
         if (isAbsent()) {
@@ -733,4 +764,8 @@ public abstract class SVNEntry {
         return map;
     }
 
+    public SVNAdminArea getAdminArea() {
+        return myAdminArea;
+    }
+   
 }

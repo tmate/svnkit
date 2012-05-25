@@ -57,7 +57,6 @@ class JNALibraryLoader {
                         ISVNSecurityLibrary.class) : null;
                 ourWin32Library = (ISVNWin32Library) Native.loadLibrary("Shell32", ISVNWin32Library.class);
             } catch (Throwable th) {
-                SVNDebugLog.getDefaultLog().logFine(SVNLogType.DEFAULT, th);
                 ourWinCryptLibrary = null;
                 ourKenrelLibrary = null;
                 ourSecurityLibrary = null;
@@ -68,22 +67,18 @@ class JNALibraryLoader {
         if (SVNFileUtil.isOSX || SVNFileUtil.isLinux || SVNFileUtil.isBSD || SVNFileUtil.isSolaris) {
             try {
                 ourCLibrary = (ISVNCLibrary) Native.loadLibrary("c", ISVNCLibrary.class);
-                SVNDebugLog.getDefaultLog().logFine(SVNLogType.DEFAULT, "C Library loaded with JNA: " + ourCLibrary);
                 try {
                     ourUID = ourCLibrary.getuid();
                 } catch (Throwable th) {
-                    SVNDebugLog.getDefaultLog().logFine(SVNLogType.DEFAULT, th);
                     ourUID = -1;
                 }
                 try {
                     ourGID = ourCLibrary.getgid();
                 } catch (Throwable th) {
-                    SVNDebugLog.getDefaultLog().logFine(SVNLogType.DEFAULT, th);
                     ourGID = -1;
                 }
 
             } catch (Throwable th) {
-                SVNDebugLog.getDefaultLog().logFine(SVNLogType.DEFAULT, th);
                 ourCLibrary = null;
             }
 
@@ -91,7 +86,7 @@ class JNALibraryLoader {
                 ISVNGnomeKeyringLibrary gnomeKeyringLibrary = (ISVNGnomeKeyringLibrary) Native.loadLibrary(getGnomeKeyringLibraryName(), ISVNGnomeKeyringLibrary.class);
                 ISVNGLibrary gLibrary = (ISVNGLibrary) Native.loadLibrary(getGLibraryName(), ISVNGLibrary.class);
 
-                Class<?>[] callSites = new Class[]{SVNGnomeKeyring.class, JNALibraryLoader.class};
+                Class[] callSites = new Class[]{SVNGnomeKeyring.class, JNALibraryLoader.class};
                 if (gnomeKeyringLibrary != null) {
                     ourGnomeKeyringLibrary = (ISVNGnomeKeyringLibrary) SVNMethodCallLogger.newInstance(gnomeKeyringLibrary, callSites);
                 } else {
@@ -106,7 +101,6 @@ class JNALibraryLoader {
                 
                 SVNGnomeKeyring.initialize();
             } catch (Throwable th) {
-                SVNDebugLog.getDefaultLog().logFine(SVNLogType.DEFAULT, th);
                 ourGnomeKeyringLibrary = null;
                 ourGLibrary = null;
             }
@@ -117,7 +111,6 @@ class JNALibraryLoader {
                 ourMacOsSecurityLibrary = (ISVNMacOsSecurityLibrary) Native.loadLibrary("Security", ISVNMacOsSecurityLibrary.class);
                 ourMacOsCFLibrary = (ISVNMacOsCFLibrary) Native.loadLibrary("CoreFoundation", ISVNMacOsCFLibrary.class);
             } catch (Throwable th) {
-                SVNDebugLog.getDefaultLog().logFine(SVNLogType.DEFAULT, th);
                 ourMacOsSecurityLibrary = null;
                 ourMacOsCFLibrary = null;
             }

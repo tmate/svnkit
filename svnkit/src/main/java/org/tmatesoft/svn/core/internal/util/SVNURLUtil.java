@@ -23,29 +23,11 @@ import org.tmatesoft.svn.core.SVNURL;
  */
 public class SVNURLUtil {
 
-    public static String getRelativeURL(SVNURL parent, SVNURL child, boolean encoded) {
-        String parentURLAsString = encoded ? parent.toString() : parent.toDecodedString();
-        String childURLAsString = encoded ? child.toString() : child.toDecodedString();
+    public static String getRelativeURL(SVNURL parent, SVNURL child) {
+        String parentURLAsString = parent.toString();
+        String childURLAsString = child.toString();
         String relativePath = SVNPathUtil.getPathAsChild(parentURLAsString, childURLAsString);
         return relativePath == null ? "" : relativePath;
-    }
-    
-    public static boolean isAncestor(SVNURL ancestor, SVNURL descendant) {
-        if (ancestor == null || descendant == null) {
-            return false;
-        }
-        String aStr = ancestor.toString();
-        String dStr = descendant.toString();
-        if (aStr.length() > dStr.length()) {
-            return false;
-        }
-        if (dStr.startsWith(aStr)) {
-            if (aStr.length() == dStr.length()) {
-                return true;
-            }
-            return dStr.charAt(aStr.length()) == '/';
-        }
-        return false;
     }
     
     public static SVNURL getCommonURLAncestor(SVNURL url1, SVNURL url2) {

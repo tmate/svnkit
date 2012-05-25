@@ -39,7 +39,6 @@ import org.tmatesoft.svn.core.SVNProperty;
 import org.tmatesoft.svn.core.SVNPropertyValue;
 import org.tmatesoft.svn.core.SVNRevisionProperty;
 import org.tmatesoft.svn.core.SVNURL;
-import org.tmatesoft.svn.core.auth.BasicAuthenticationManager;
 import org.tmatesoft.svn.core.auth.ISVNAuthenticationManager;
 import org.tmatesoft.svn.core.auth.SVNAuthentication;
 import org.tmatesoft.svn.core.auth.SVNUserNameAuthentication;
@@ -343,7 +342,7 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
         try {
             openRepository();
             if (targetPaths == null || targetPaths.length == 0) {
-                targetPaths = new String[] {""};
+                targetPaths = new String[] {"/"};
             }
             String[] absPaths = new String[targetPaths.length];
             for (int i = 0; i < targetPaths.length; i++) {
@@ -362,11 +361,11 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
             long histEnd = endRevision;
 
             if (startRevision > youngestRev) {
-                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_NO_SUCH_REVISION, "No such revision {0}", String.valueOf(startRevision));
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_NO_SUCH_REVISION, "No such revision {0}", new Long(startRevision));
                 SVNErrorManager.error(err, SVNLogType.FSFS);
             }
             if (endRevision > youngestRev) {
-                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_NO_SUCH_REVISION, "No such revision {0}", String.valueOf(endRevision));
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_NO_SUCH_REVISION, "No such revision {0}", new Long(endRevision));
                 SVNErrorManager.error(err, SVNLogType.FSFS);
             }
 
@@ -440,7 +439,7 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
             String fullPath = getFullPath(path);
             String parentFullPath = "/".equals(path) ? fullPath : SVNPathUtil.removeTail(fullPath);
             SVNURL url = getLocation().setPath(parentFullPath, false);
-            String name = "/".equals(path) ? "" : SVNPathUtil.tail(path);
+            String name = SVNPathUtil.tail(path);
             FSEntry fsEntry = new FSEntry(revNode.getId(), revNode.getType(), name);
             SVNDirEntry entry = buildDirEntry(fsEntry, url, revNode, SVNDirEntry.DIRENT_ALL);
             return entry;
@@ -458,7 +457,8 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
         }
         // fetch user name!
         String author = getUserName();
-        return new FSCommitEditor(getRepositoryPath(""), logMessage, author, locks, keepLocks, null, myFSFS, this);
+        FSCommitEditor commitEditor = new FSCommitEditor(getRepositoryPath(""), logMessage, author, locks, keepLocks, null, myFSFS, this);
+        return commitEditor;
     }
 
     public SVNLock getLock(String path) throws SVNException {
@@ -931,7 +931,6 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
                 while (auth != null) {
                     String userName = auth.getUserName();
                     if (userName == null) {
-                        // anonymous.
                         return null;
                     }
                     if ("".equals(userName.trim())) {
@@ -939,11 +938,11 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
                     }
                     auth = new SVNUserNameAuthentication(userName, auth.isStorageAllowed(), getLocation(), false);
                     if (userName != null && !"".equals(userName.trim())) {
-                        BasicAuthenticationManager.acknowledgeAuthentication(true, ISVNAuthenticationManager.USERNAME, realm, null, auth, myLocation, authManager);
+                        authManager.acknowledgeAuthentication(true, ISVNAuthenticationManager.USERNAME, realm, null, auth);
                         return auth.getUserName();
                     }
                     SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.AUTHN_CREDS_UNAVAILABLE, "Empty user name is not allowed");
-                    BasicAuthenticationManager.acknowledgeAuthentication(false, ISVNAuthenticationManager.USERNAME, realm, err, auth, myLocation, authManager);
+                    authManager.acknowledgeAuthentication(false, ISVNAuthenticationManager.USERNAME, realm, err, auth);
                     auth = authManager.getNextAuthentication(ISVNAuthenticationManager.USERNAME, realm, getLocation());
                 }
                 // auth manager returned null - that is cancellation.
@@ -957,7 +956,6 @@ public class FSRepository extends SVNRepository implements ISVNReporter {
                 throw e;
             }
         }
-        // anonymous
         return null;
     }
 

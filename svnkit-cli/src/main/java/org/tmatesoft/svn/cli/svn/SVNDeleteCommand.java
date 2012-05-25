@@ -89,9 +89,7 @@ public class SVNDeleteCommand extends SVNCommand {
             }
             try {
                 SVNCommitInfo info = client.doDelete(urls, getSVNEnvironment().getMessage(), getSVNEnvironment().getRevisionProperties());
-                if (!getSVNEnvironment().isQuiet()) {
-                    getSVNEnvironment().printCommitInfo(info);
-                }
+                getSVNEnvironment().printCommitInfo(info);
             } catch (SVNException e) {
                 SVNErrorMessage err = e.getErrorMessage();
                 SVNErrorManager.error(err, SVNLogType.CLIENT);
