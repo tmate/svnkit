@@ -1,5 +1,3 @@
-== version 1.7.6 ==
-
 == version 1.7.5 ==
 
 + File externals merge issues fixed.
