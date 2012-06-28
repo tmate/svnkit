@@ -41,10 +41,6 @@ public class SVNCancelException extends SVNException {
      *                      was cancelled
      */
     public SVNCancelException(SVNErrorMessage errorMessage) {
-        this(errorMessage, errorMessage.getCause());
-    }
-
-    public SVNCancelException(SVNErrorMessage errorMessage, Throwable cause) {
-        super(errorMessage, cause != null ? cause : errorMessage.getCause());
+        super(errorMessage);
     }
 }
