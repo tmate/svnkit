@@ -508,10 +508,4 @@ public class SVNErrorMessage implements Serializable {
     public boolean hasChildWithErrorCode(SVNErrorCode errorCode) {
         return findChildWithErrorCode(errorCode) != null;
     }
-
-    public void initCause(Throwable cause) {
-        if (myThrowable == null) {
-            myThrowable = cause;
-        }
-    }
 }
