@@ -6,18 +6,30 @@ import java.lang.reflect.Method;
 
 public class SVNJava6FileUtil extends SVNJava5FileUtil {
 
-    private Method setWritableMethod;
     private Method canExecuteMethod;
     private Method setExecutableMethod;
+    private Method canWriteMethod;
+    private Method setWritableMethod;
+    private Method setReadOnlyMethod;
 
     public SVNJava6FileUtil() {
+        canExecuteMethod = getMethodWithReflection(File.class, "canExecute");
+        setExecutableMethod = getMethodWithReflection(File.class, "setExecutable", Boolean.TYPE);
+        canWriteMethod = getMethodWithReflection(File.class, "canWrite");
         setWritableMethod = getMethodWithReflection(File.class, "setWritable", Boolean.TYPE);
-        canExecuteMethod = getMethodWithReflection(File.class, "canExecute", File.class);
-        setExecutableMethod = getMethodWithReflection(File.class, "setExecutable", File.class, Boolean.TYPE);
+        setReadOnlyMethod = getMethodWithReflection(File.class, "setReadOnly");
     }
 
     protected static Method getMethodWithReflection(Class clazz, String methodName, Class... argTypes) {
         try {
+            //make sure all return types are loaded
+            if (argTypes != null) {
+                for (Class argType : argTypes) {
+                    if (argType == null) {
+                        return null;
+                    }
+                }
+            }
             return clazz.getMethod(methodName, argTypes);
         } catch (SecurityException e) {
         } catch (NoSuchMethodException e) {
@@ -45,15 +57,35 @@ public class SVNJava6FileUtil extends SVNJava5FileUtil {
         throw new UnsupportedOperationException();
     }
 
-    public boolean isExecutable(File file) {
-        Object value = invokeStaticMethodWithReflection(canExecuteMethod, file);
+    protected static boolean convertToBoolean(Object value) {
         if (value == null || !(value instanceof Boolean)) {
             throw new UnsupportedOperationException();
         }
         return (Boolean) value;
     }
 
-    public void setExecutable(File file, boolean executable) {
-        invokeStaticMethodWithReflection(setExecutableMethod, file, executable);
+    @Override
+    public boolean isExecutable(File file) {
+        return convertToBoolean(invokeMethodWithReflection(canExecuteMethod, file));
+    }
+
+    @Override
+    public boolean setExecutable(File file, boolean executable) {
+        return convertToBoolean(invokeMethodWithReflection(setExecutableMethod, file, executable));
+    }
+
+    @Override
+    public boolean isWritable(File file) {
+        return convertToBoolean(invokeMethodWithReflection(canWriteMethod, file));
+    }
+
+    @Override
+    public boolean setWritable(File file) {
+        return convertToBoolean(invokeMethodWithReflection(setWritableMethod, file, true /*writable*/));
+    }
+
+    @Override
+    public boolean setReadOnly(File file) {
+        return convertToBoolean(invokeMethodWithReflection(setReadOnlyMethod, file));
     }
 }
