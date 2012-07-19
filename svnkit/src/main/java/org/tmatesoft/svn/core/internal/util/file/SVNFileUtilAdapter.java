@@ -8,7 +8,19 @@ public class SVNFileUtilAdapter {
         throw new UnsupportedOperationException();
     }
 
-    public void setExecutable(File file, boolean executable) {
+    public boolean setExecutable(File file, boolean executable) {
+        throw new UnsupportedOperationException();
+    }
+
+    public boolean isWritable(File file) {
+        throw new UnsupportedOperationException();
+    }
+
+    public boolean setWritable(File file) {
+        throw new UnsupportedOperationException();
+    }
+
+    public boolean setReadOnly(File file) {
         throw new UnsupportedOperationException();
     }
 
@@ -16,11 +28,15 @@ public class SVNFileUtilAdapter {
         throw new UnsupportedOperationException();
     }
 
-    public void createSymlink(File link, File linkName) {
+    public boolean createSymlink(File link, File linkName) {
         throw new UnsupportedOperationException();
     }
 
     public File readSymlink(File link) {
+        throw new UnsupportedOperationException();
+    }
+
+    public boolean setHidden(File file) {
         throw new UnsupportedOperationException();
     }
 }
