@@ -143,6 +143,14 @@ public class SVNLinuxUtil {
         return null;
     }
 
+    public static boolean isSymlink(File file) {
+        SVNFileType fileType = getFileType(file);
+        if (fileType == null) {
+            return false;
+        }
+        return fileType == SVNFileType.SYMLINK;
+    }
+
     public static String getLinkTarget(File file) {
         if (file == null || ourSharedMemory == null) {
             return null;
