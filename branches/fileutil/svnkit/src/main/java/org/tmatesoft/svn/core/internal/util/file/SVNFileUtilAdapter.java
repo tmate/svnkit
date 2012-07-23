@@ -56,4 +56,14 @@ public class SVNFileUtilAdapter {
         }
         return environment.getProperty(varibaleName);
     }
+
+    public Long getFileLength(File file) {
+        //this methods cares about symlinks
+        throw new UnsupportedOperationException();
+    }
+
+    public Long getFileLastModified(File file) {
+        //this methods cares about symlinks
+        throw new UnsupportedOperationException();
+    }
 }
