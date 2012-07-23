@@ -31,4 +31,9 @@ public class SVNUnixJNAFileUtil extends SVNFileUtilAdapter {
     public boolean setSGID(File directory) {
         return SVNLinuxUtil.setSGID(directory);
     }
+
+    @Override
+    public Long getFileLastModified(File file) {
+        return SVNLinuxUtil.getSymlinkLastModified(file);
+    }
 }

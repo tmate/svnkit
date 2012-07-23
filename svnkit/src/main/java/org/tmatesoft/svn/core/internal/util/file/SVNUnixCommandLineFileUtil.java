@@ -18,11 +18,13 @@ public class SVNUnixCommandLineFileUtil extends SVNFileUtilAdapter {
     private String lsCommand;
     private String lnCommand;
     private String chmodCommand;
+    private String statCommand;
 
     public SVNUnixCommandLineFileUtil(String prefix) {
         lsCommand = prefix + "ls";
         lnCommand = prefix + "ln";
         chmodCommand = prefix + "chmod";
+        statCommand = prefix + "stat";
     }
 
     static String execCommand(String... commandLine) {
@@ -123,6 +125,19 @@ public class SVNUnixCommandLineFileUtil extends SVNFileUtilAdapter {
     @Override
     public Properties getEnvironment() {
         return getEnvironmentFromCommandOutput("env");
+    }
+
+    @Override
+    public Long getFileLastModified(File file) {
+        String output = execCommand(statCommand, "-c", "%Y", file.getAbsolutePath());
+        if (output != null) {
+            try {
+                return Long.parseLong(output) * 1000;
+            } catch (NumberFormatException e) {
+                //ignore
+            }
+        }
+        return null;
     }
 
     static Properties getEnvironmentFromCommandOutput(String command) {
