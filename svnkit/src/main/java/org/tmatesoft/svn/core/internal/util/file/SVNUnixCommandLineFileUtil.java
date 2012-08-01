@@ -15,6 +15,18 @@ import java.util.logging.Level;
 
 public class SVNUnixCommandLineFileUtil extends SVNFileUtilAdapter {
 
+    private static int SYMLINK_MASK = 0120000;
+    private static int REGULAR_FILE_MASK = 0100000;
+    private static int DIRECTORY_MASK = 0040000;
+    private static int BLOCK_DEVICE_MASK = 0060000;
+    private static int CHARACTER_DEVICE_MASK = 0020000;
+    private static int FIFO_MASK = 0020000;
+    private static int SOCKET_MASK = 0140000;
+
+    private static int OTHER_MASK = 0140000 | 0060000 | 0020000 | 0010000;
+    private static int SUID_MASK = 0004000;
+    private static int SGID_MASK = 0002000;
+
     private String lsCommand;
     private String lnCommand;
     private String chmodCommand;
@@ -132,12 +144,80 @@ public class SVNUnixCommandLineFileUtil extends SVNFileUtilAdapter {
         String output = execCommand(statCommand, "-c", "%Y", file.getAbsolutePath());
         if (output != null) {
             try {
-                return Long.parseLong(output) * 1000;
+                return parseSecondsConvertToMilliseconds(output);
             } catch (NumberFormatException e) {
                 //ignore
             }
         }
         return null;
+    }
+
+    public SVNFileAttributes readFileAttributes(File file, boolean followSymlinks) {
+        String format = "%Y %X %W %s %f %U %G %A";
+        String output = followSymlinks ? execCommand(statCommand, "--dereference", "-c", format, file.getAbsolutePath()) :
+                execCommand(statCommand, "-c", format, file.getAbsolutePath());
+        if (output != null) {
+            return parseAttributes(output);
+        }
+        return null;
+    }
+
+    protected SVNFileAttributes parseAttributes(String output) {
+        SVNFileAttributes attributes = new SVNFileAttributes();
+        String[] attributesArray = output.split(" ");
+
+        long lastModifiedTime = parseSecondsConvertToMilliseconds(attributesArray[0]);
+        long lastAccessedTime = parseSecondsConvertToMilliseconds(attributesArray[1]);
+        long creationTime = parseSecondsConvertToMilliseconds(attributesArray[2]);
+
+        if (creationTime == 0) {
+            creationTime = lastModifiedTime;
+        }
+
+        attributes.setLastModifiedTime(lastModifiedTime);
+        attributes.setLastAccessTime(lastAccessedTime);
+        attributes.setCreationTime(creationTime);
+        try {
+            attributes.setSize(Long.parseLong(attributesArray[3]));
+        } catch (NumberFormatException e) {
+            attributes.setSize(-1);
+        }
+
+        int fileMode = Integer.parseInt(attributesArray[4], 16);
+        boolean isDirectory = (fileMode & DIRECTORY_MASK) == DIRECTORY_MASK;
+        boolean isRegularFile = (fileMode & REGULAR_FILE_MASK) == REGULAR_FILE_MASK;
+        boolean isSymlink = (fileMode & SYMLINK_MASK) == SYMLINK_MASK;
+        boolean isBlockDevice = (fileMode & BLOCK_DEVICE_MASK) == BLOCK_DEVICE_MASK;
+        boolean isCharacterDevice = (fileMode & CHARACTER_DEVICE_MASK) == CHARACTER_DEVICE_MASK;
+        boolean isFifo = (fileMode & FIFO_MASK) == FIFO_MASK;
+        boolean isSocket = (fileMode & SOCKET_MASK) == SOCKET_MASK;
+
+        boolean suid = (fileMode & SUID_MASK) != 0;
+        boolean sgid = (fileMode & SGID_MASK) != 0;
+
+        attributes.setIsDirectory(isDirectory);
+        attributes.setIsRegularFile(isRegularFile);
+        attributes.setSymbolicLink(isSymlink);
+        attributes.setIsOther(isBlockDevice || isCharacterDevice || isFifo || isSocket);
+
+        attributes.setSuid(suid);
+        attributes.setSgid(sgid);
+
+        attributes.setPosixOwner(attributesArray[5]);
+        attributes.setPosixGroup(attributesArray[6]);
+
+        String typePermissionsString = attributesArray[7];
+        attributes.setPosixPermissions(SVNFilePermissions.parseString(typePermissionsString.substring(1)));
+
+        return attributes;
+    }
+
+    private long parseSecondsConvertToMilliseconds(String s) {
+        try {
+            return Long.parseLong(s) * 1000;
+        } catch (NumberFormatException e) {
+            return 0;
+        }
     }
 
     static Properties getEnvironmentFromCommandOutput(String command) {

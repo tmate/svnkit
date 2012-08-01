@@ -1,6 +1,25 @@
 package org.tmatesoft.svn.core.internal.util.file;
 
 public class SVNFilePermissions {
+
+    public static SVNFilePermissions parseString(String permissionsString) {
+        final SVNFilePermissions permissions = new SVNFilePermissions();
+
+        permissions.setOwnerCanRead(permissionsString.charAt(0) == 'r');
+        permissions.setOwnerCanWrite(permissionsString.charAt(1) == 'w');
+        permissions.setOwnerCanExecute(permissionsString.charAt(2) == 'x');
+
+        permissions.setGroupCanRead(permissionsString.charAt(3) == 'r');
+        permissions.setGroupCanWrite(permissionsString.charAt(4) == 'w');
+        permissions.setGroupCanExecute(permissionsString.charAt(5) == 'x');
+
+        permissions.setOthersCanRead(permissionsString.charAt(6) == 'r');
+        permissions.setOthersCanWrite(permissionsString.charAt(7) == 'w');
+        permissions.setOthersCanExecute(permissionsString.charAt(8) == 'x');
+
+        return permissions;
+    }
+
     private boolean ownerCanRead;
     private boolean ownerCanWrite;
     private boolean ownerCanExecute;

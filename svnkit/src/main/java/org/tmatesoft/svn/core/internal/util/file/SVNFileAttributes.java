@@ -19,6 +19,9 @@ public class SVNFileAttributes {
     private String posixOwner;
     private String posixGroup;
 
+    private boolean suid;
+    private boolean sgid;
+
     public void setSize(long size) {
         this.size = size;
     }
@@ -137,5 +140,21 @@ public class SVNFileAttributes {
 
     public long getSize() {
         return size;
+    }
+
+    public boolean getSgid() {
+        return sgid;
+    }
+
+    public void setSgid(boolean sgid) {
+        this.sgid = sgid;
+    }
+
+    public boolean getSuid() {
+        return suid;
+    }
+
+    public void setSuid(boolean suid) {
+        this.suid = suid;
     }
 }
