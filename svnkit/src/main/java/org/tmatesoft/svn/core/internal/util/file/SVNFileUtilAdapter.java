@@ -66,4 +66,8 @@ public class SVNFileUtilAdapter {
         //this methods cares about symlinks
         throw new UnsupportedOperationException();
     }
+
+    public SVNFileAttributes readFileAttributes(File file, boolean followSymlinks) {
+        throw new UnsupportedOperationException();
+    }
 }

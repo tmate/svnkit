@@ -234,4 +234,8 @@ public class TestUtil {
             db.close();
         }
     }
+
+    public static boolean areTimestampsNearlyEqual(long timestamp1, long timestamp2) {
+        return Math.abs(timestamp1 - timestamp2) < 100000;
+    }
 }
