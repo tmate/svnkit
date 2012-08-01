@@ -1,10 +1,13 @@
-package org.tmatesoft.svn.test;
+package org.tmatesoft.svn.test.fileutil;
 
 import org.junit.Assert;
 import org.junit.Assume;
 import org.junit.Test;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 import org.tmatesoft.svn.core.wc2.SvnOperationFactory;
+import org.tmatesoft.svn.test.Sandbox;
+import org.tmatesoft.svn.test.TestOptions;
+import org.tmatesoft.svn.test.TestUtil;
 
 import java.io.File;
 
@@ -26,7 +29,7 @@ public class FileUtilTest {
             final long currentTime = System.currentTimeMillis();
 
             Assert.assertEquals("target".getBytes().length, SVNFileUtil.getFileLength(link));
-            Assert.assertTrue(Math.abs(SVNFileUtil.getFileLastModified(link) - currentTime) < 100000);
+            Assert.assertTrue(TestUtil.areTimestampsNearlyEqual(SVNFileUtil.getFileLastModified(link), currentTime));
 
         } finally {
             svnOperationFactory.dispose();
@@ -51,8 +54,8 @@ public class FileUtilTest {
             Assert.assertEquals(file.length(), SVNFileUtil.getFileLength(file));
 
             final long lastModified = SVNFileUtil.getFileLastModified(file);
-            Assert.assertTrue(Math.abs(lastModified - currentTime) < 100000);
-            Assert.assertTrue(Math.abs(lastModified - file.lastModified()) < 100000);
+            Assert.assertTrue(TestUtil.areTimestampsNearlyEqual(lastModified, currentTime));
+            Assert.assertTrue(TestUtil.areTimestampsNearlyEqual(lastModified, file.lastModified()));
 
         } finally {
             svnOperationFactory.dispose();
