@@ -114,6 +114,34 @@ public class Java7FileUtilTest {
         }
     }
 
+    @Test
+    public void testSymlink() throws Exception {
+        final TestOptions options = TestOptions.getInstance();
+
+        Assume.assumeTrue(SVNFileUtil.symlinksSupported());
+
+        final SvnOperationFactory svnOperationFactory = new SvnOperationFactory();
+        final Sandbox sandbox = Sandbox.createWithCleanup(getTestName() + ".testSymlink", options);
+        try {
+            final SVNJava7FileUtil java7FileUtil = new SVNJava7FileUtil();
+
+            final File directory = sandbox.createDirectory("directory");
+            final File symlink = new File(directory, "symlink");
+
+            java7FileUtil.createSymlink(symlink, directory.getAbsoluteFile());
+
+            Assert.assertTrue(java7FileUtil.isSymlink(symlink));
+            Assert.assertEquals(directory, java7FileUtil.readSymlink(symlink));
+
+            final SVNFileAttributes attributes = java7FileUtil.readFileAttributes(symlink, false);
+            Assert.assertTrue(attributes.isSymbolicLink());
+
+        } finally {
+            svnOperationFactory.dispose();
+            sandbox.dispose();
+        }
+    }
+
     private void checkAttributes(boolean isRegularFile, boolean isDirectory, boolean isSymbolicLink, boolean isOther, File file, SVNJava7FileUtil java7FileUtil) {
         final SVNFileAttributes attributes = java7FileUtil.readFileAttributes(file, false);
         Assert.assertEquals(isRegularFile, attributes.isRegularFile());
