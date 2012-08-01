@@ -17,10 +17,14 @@ public class SVNJava7FileUtil extends SVNJava6FileUtil {
     private Class linkOptionsArrayClass;
     private Class fileTimeClass;
     private Class posixFilePermissionClass;
+    private Class fileAttributeClass;
+    private Class fileAttributesArrayClass;
 
     private Enum noFollowSymlinkEnum;
     private Object linkOptionFollowSymlinksArray;
     private Object linkOptionNoFollowSymlinksArray;
+
+    private Object noAttributesArray;
 
     //posix permissions constants
     private Enum groupExecuteEnum;
@@ -52,6 +56,8 @@ public class SVNJava7FileUtil extends SVNJava6FileUtil {
             linkOptionsArrayClass = Class.forName("[Ljava.nio.file.LinkOption;");
             fileTimeClass = Class.forName("java.nio.file.attribute.FileTime");
             posixFilePermissionClass = Class.forName("java.nio.file.attribute.PosixFilePermission");
+            fileAttributeClass = Class.forName("java.nio.file.attribute.FileAttribute");
+            fileAttributesArrayClass = Class.forName("[Ljava.nio.file.attribute.FileAttribute;");
         } catch (ClassNotFoundException e) {
         }
 
@@ -59,6 +65,8 @@ public class SVNJava7FileUtil extends SVNJava6FileUtil {
         linkOptionFollowSymlinksArray = Array.newInstance(linkOptionClass, 0);
         linkOptionNoFollowSymlinksArray = Array.newInstance(linkOptionClass, 1);
         Array.set(linkOptionNoFollowSymlinksArray, 0, noFollowSymlinkEnum);
+
+        noAttributesArray = Array.newInstance(fileAttributeClass, 0);
 
         groupExecuteEnum = Enum.valueOf(posixFilePermissionClass, "GROUP_EXECUTE");
         groupReadEnum = Enum.valueOf(posixFilePermissionClass, "GROUP_READ");
@@ -80,7 +88,7 @@ public class SVNJava7FileUtil extends SVNJava6FileUtil {
         fromMillisMethod = getMethodWithReflection(fileTimeClass, "fromMillis", Long.TYPE);
 
         isSymbolicLinkMethod = getMethodWithReflection(filesClass, "isSymbolicLink", pathClass);
-        createSymbolicLinkMethod = getMethodWithReflection(filesClass, "createSymbolicLink", pathClass, pathClass);
+        createSymbolicLinkMethod = getMethodWithReflection(filesClass, "createSymbolicLink", pathClass, pathClass, fileAttributesArrayClass);
         readSymbolicLinkMethod = getMethodWithReflection(filesClass, "readSymbolicLink", pathClass);
         setAttributeMethod = getMethodWithReflection(filesClass, "setAttribute", pathClass, String.class, Object.class, linkOptionsArrayClass);
         readAttributesMethod = getMethodWithReflection(filesClass, "readAttributes", pathClass, String.class, linkOptionsArrayClass);
@@ -159,7 +167,8 @@ public class SVNJava7FileUtil extends SVNJava6FileUtil {
 
     @Override
     public boolean createSymlink(File link, File linkName) {
-        return convertToBoolean(invokeStaticMethodWithReflection(createSymbolicLinkMethod, convertFileToPath(link), convertFileToPath(linkName)));
+        final File symlink = convertPathToFile(invokeStaticMethodWithReflection(createSymbolicLinkMethod, convertFileToPath(link), convertFileToPath(linkName), noAttributesArray));
+        return symlink != null;
     }
 
     @Override
