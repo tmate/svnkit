@@ -11,21 +11,20 @@
  */
 package org.tmatesoft.svn.core.internal.util.jna;
 
-import java.io.File;
-
-import org.tmatesoft.svn.core.internal.util.jna.ISVNWin32Library.HRESULT;
-import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
-
 import com.sun.jna.NativeLong;
 import com.sun.jna.Pointer;
 import com.sun.jna.WString;
+import org.tmatesoft.svn.core.internal.util.jna.ISVNWin32Library.HRESULT;
+import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
+
+import java.io.File;
 
 
 /**
  * @version 1.3
  * @author  TMate Software Ltd.
  */
-class SVNWin32Util {
+public class SVNWin32Util {
     
     public static boolean setWritable(File file) {
         if (file == null) {

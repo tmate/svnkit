@@ -1,6 +1,6 @@
-package org.tmatesoft.svn.core.internal.util.jna;
+package org.tmatesoft.svn.core.internal.util.file;
 
-import org.tmatesoft.svn.core.internal.util.file.SVNFileUtilAdapter;
+import org.tmatesoft.svn.core.internal.util.jna.SVNWin32Util;
 
 import java.io.File;
 
