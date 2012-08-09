@@ -132,23 +132,18 @@ public abstract class SVNLog {
         if (myCache == null) {
             return;
         }
-
         for (Iterator iterator = myCache.iterator(); iterator.hasNext(); ) {
             Object command = iterator.next();
             if (!(command instanceof SVNProperties)) {
                 continue;
             }
-
             SVNProperties attributes = (SVNProperties) command;
             String commandName = attributes.getStringValue("");
-
             if (!name.equals(commandName)) {
                 continue;
             }
-
             iterator.remove();
         }
-
         if (save) {
             save();
         }
@@ -158,7 +153,6 @@ public abstract class SVNLog {
         if (myCache == null) {
             return;
         }
-
         int size = myCache.size();
         int commandIdex = 0;
         for (Iterator iterator = myCache.iterator(); iterator.hasNext(); ) {
@@ -167,7 +161,6 @@ public abstract class SVNLog {
             }
             commandIdex++;
         }
-
         if (save) {
             save();
         }
@@ -183,21 +176,16 @@ public abstract class SVNLog {
             if (!(command instanceof SVNProperties)) {
                 continue;
             }
-
             SVNProperties commandAttributes = (SVNProperties) command;
             String commandName = commandAttributes.getStringValue("");
-
             if (!name.equals(commandName)) {
                 continue;
             }
-
             SVNProperties commandAttributesWithoutName = new SVNProperties(commandAttributes);
             commandAttributesWithoutName.remove("");
-
             if (!commandAttributesWithoutName.equals(attributes)) {
                 continue;
             }
-
             iterator.remove();
         }
 

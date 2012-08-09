@@ -32,7 +32,6 @@ import org.tmatesoft.svn.core.SVNProperties;
 import org.tmatesoft.svn.core.SVNProperty;
 import org.tmatesoft.svn.core.SVNPropertyValue;
 import org.tmatesoft.svn.core.internal.util.SVNHashMap;
-import org.tmatesoft.svn.core.internal.util.SVNHashSet;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
@@ -41,9 +40,6 @@ import org.tmatesoft.svn.core.io.SVNRepository;
 import org.tmatesoft.svn.core.io.SVNRepositoryFactory;
 import org.tmatesoft.svn.core.io.diff.SVNDiffWindow;
 import org.tmatesoft.svn.util.SVNLogType;
-
-import java.io.OutputStream;
-import java.util.*;
 
 /**
  * The <b>SVNReplicationEditor</b> is an editor implementation used by a 
@@ -67,7 +63,6 @@ public class SVNReplicationEditor implements ISVNEditor {
     private ISVNEditor myCommitEditor;
     private Map myCopiedPaths;
     private Map myChangedPaths;
-    private Set myDeletedPaths;
     private SVNRepository myRepos;
     private Map myPathsToFileBatons;
     private Stack myDirsStack;
@@ -96,7 +91,6 @@ public class SVNReplicationEditor implements ISVNEditor {
         myDirsStack = new Stack();
         myCopiedPaths = new SVNHashMap();
         myChangedPaths = revision.getChangedPaths();
-        myDeletedPaths = new SVNHashSet();
 
         for(Iterator paths = myChangedPaths.keySet().iterator(); paths.hasNext();){
             String path = (String)paths.next();
@@ -158,10 +152,7 @@ public class SVNReplicationEditor implements ISVNEditor {
                     new Object[]{absPath, new Long(myPreviousRevision)});
             SVNErrorManager.error(err, SVNLogType.FSFS);
         }
-        if (!myDeletedPaths.contains(path)) {
-            myCommitEditor.deleteEntry(path, myPreviousRevision);
-            myDeletedPaths.add(path);
-        }
+        myCommitEditor.deleteEntry(path, myPreviousRevision);
     }
 
     /**
@@ -202,10 +193,7 @@ public class SVNReplicationEditor implements ISVNEditor {
             baton.myProps = props;
             
             if (changedPath.getType() == SVNLogEntryPath.TYPE_REPLACED) {
-                if (!myDeletedPaths.contains(path)) {
-                    myCommitEditor.deleteEntry(path, myPreviousRevision);
-                    myDeletedPaths.add(path);
-                }
+                myCommitEditor.deleteEntry(path, myPreviousRevision);
                 myChangedPaths.remove(absPath);
             }
             myCommitEditor.addDir(path, changedPath.getCopyPath(), changedPath.getCopyRevision());
@@ -307,10 +295,7 @@ public class SVNReplicationEditor implements ISVNEditor {
             }
             baton.myProps = props;
             if(changedPath.getType() == SVNLogEntryPath.TYPE_REPLACED){
-                if (!myDeletedPaths.contains(path)) {
-                    myCommitEditor.deleteEntry(path, myPreviousRevision);
-                    myDeletedPaths.add(path);
-                }
+                myCommitEditor.deleteEntry(path, myPreviousRevision);
                 myChangedPaths.remove(absPath);
             }
             myCommitEditor.addFile(path, changedPath.getCopyPath(), changedPath.getCopyRevision());
@@ -318,10 +303,7 @@ public class SVNReplicationEditor implements ISVNEditor {
             baton.myPropsAct = ACCEPT;
             baton.myTextAct = ACCEPT;
             if(changedPath.getType() == SVNLogEntryPath.TYPE_REPLACED){
-                if (!myDeletedPaths.contains(path)) {
-                    myCommitEditor.deleteEntry(path, myPreviousRevision);
-                    myDeletedPaths.add(path);
-                }
+                myCommitEditor.deleteEntry(path, myPreviousRevision);
                 myChangedPaths.remove(absPath);
             }
             myCommitEditor.addFile(path, null, -1);
@@ -541,10 +523,7 @@ public class SVNReplicationEditor implements ISVNEditor {
             }
             String pathToDelete = SVNPathUtil.append(currentOpened, entries[j]);
             String absPathToDelete = SVNPathUtil.append(dirPath, pathToDelete);
-            if (!myDeletedPaths.contains(absPathToDelete)) {
-                myCommitEditor.deleteEntry(absPathToDelete, myPreviousRevision);
-                myDeletedPaths.add(absPathToDelete);
-            }
+            myCommitEditor.deleteEntry(absPathToDelete, myPreviousRevision);
             myChangedPaths.remove(absPathToDelete);
         }
         while(!"".equals(currentOpened)){

@@ -51,7 +51,7 @@ public class SVNExportEditor implements ISVNEditor {
     private File myCurrentFile;
     private File myCurrentTmpFile;
     private String myCurrentPath;
-    private Map<String,String> myExternals;
+    private Map myExternals;
     private SVNProperties myFileProperties;
     private ISVNEventHandler myEventDispatcher;
     private String myURL;
@@ -73,7 +73,7 @@ public class SVNExportEditor implements ISVNEditor {
         myIsExpandKeywords = expandKeywords;
     }
 
-    public Map<String,String> getCollectedExternals() {
+    public Map getCollectedExternals() {
         return myExternals;
     }
 

@@ -18,9 +18,7 @@ import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNURL;
-import org.tmatesoft.svn.core.auth.BasicAuthenticationManager;
 import org.tmatesoft.svn.core.auth.ISVNAuthenticationManager;
-import org.tmatesoft.svn.core.auth.SVNAuthentication;
 import org.tmatesoft.svn.core.auth.SVNPasswordAuthentication;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.util.SVNLogType;
@@ -36,10 +34,10 @@ public class SVNPlainAuthenticator extends SVNAuthenticator {
         super(connection);
     }
 
-    public SVNAuthentication authenticate(List mechs, String realm, SVNRepositoryImpl repos) throws SVNException {
+    public void authenticate(List mechs, String realm, SVNRepositoryImpl repos) throws SVNException {
         SVNErrorMessage failureReason = null;
         if (mechs == null || mechs.size() == 0) {
-            return null;
+            return;
         }
         ISVNAuthenticationManager authManager = repos.getAuthenticationManager();
         if (authManager != null && authManager.isAuthenticationForced() && mechs.contains("ANONYMOUS") && mechs.contains("CRAM-MD5")) {
@@ -65,7 +63,7 @@ public class SVNPlainAuthenticator extends SVNAuthenticator {
                     if (auth == null && authManager != null) {
                         auth = (SVNPasswordAuthentication) authManager.getFirstAuthentication(ISVNAuthenticationManager.PASSWORD, realm, location);
                     } else if (authManager != null) {
-                        BasicAuthenticationManager.acknowledgeAuthentication(false, ISVNAuthenticationManager.PASSWORD, realm, failureReason, auth, location, authManager);
+                        authManager.acknowledgeAuthentication(false, ISVNAuthenticationManager.PASSWORD, realm, failureReason, auth);
                         auth = (SVNPasswordAuthentication) authManager.getNextAuthentication(ISVNAuthenticationManager.PASSWORD, realm, location);
                     }
                 } catch (SVNException e) {
@@ -92,8 +90,8 @@ public class SVNPlainAuthenticator extends SVNAuthenticator {
                     List items = getConnection().readTuple("w(?s)", true);
                     String status = SVNReader.getString(items, 0);
                     if (SVNAuthenticator.SUCCESS.equals(status)) {
-                        BasicAuthenticationManager.acknowledgeAuthentication(true, ISVNAuthenticationManager.PASSWORD, realm, null, auth, location, authManager);
-                        return auth;
+                        authManager.acknowledgeAuthentication(true, ISVNAuthenticationManager.PASSWORD, realm, null, auth);
+                        return;
                     } else if (SVNAuthenticator.FAILURE.equals(status)) {                        
                         failureReason = SVNErrorMessage.create(SVNErrorCode.RA_NOT_AUTHORIZED, "Authentication error from server: {0}", SVNReader.getString(items, 1));
                         String message = SVNReader.getString(items, 1);
@@ -121,8 +119,6 @@ public class SVNPlainAuthenticator extends SVNAuthenticator {
             }
             SVNErrorManager.error(failureReason, SVNLogType.NETWORK);
         }
-
-        return auth;
     }
     
     protected SVNErrorMessage readAuthResponse() throws SVNException {

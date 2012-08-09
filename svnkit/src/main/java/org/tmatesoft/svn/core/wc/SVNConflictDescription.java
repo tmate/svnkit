@@ -128,8 +128,21 @@ public abstract class SVNConflictDescription {
      * @return conflicted property name 
      */
     public abstract String getPropertyName();
-    
-    public void setConflictAction(SVNConflictAction action) {
-        myConflictAction = action;
+    public String toString() {
+        final StringBuffer buffer = new StringBuffer();
+        buffer.append("[Conflict descriptor: merge files = ");
+        buffer.append(getMergeFiles());
+        buffer.append("; kind = ");
+        buffer.append(getNodeKind());
+        buffer.append("; reason = ");
+        buffer.append(getConflictReason());
+        buffer.append("; action = ");
+        buffer.append(getConflictAction());
+        buffer.append("; property conflicts = ");
+        buffer.append(isPropertyConflict());
+        buffer.append("; property name = ");
+        buffer.append(getPropertyName());
+        buffer.append("]");
+        return buffer.toString();
     }
 }

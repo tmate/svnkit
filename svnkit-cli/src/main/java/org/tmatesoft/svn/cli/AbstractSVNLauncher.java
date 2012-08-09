@@ -27,7 +27,7 @@ import org.tmatesoft.svn.util.SVNLogType;
 public abstract class AbstractSVNLauncher {
 
     private static volatile boolean ourIsCompleted;
-    private static volatile Thread ourShutdownHook;
+    private static Thread ourShutdownHook;
 
     protected void run(String[] args) {
         ourIsCompleted = false;

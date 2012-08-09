@@ -23,7 +23,6 @@ import org.tmatesoft.svn.core.SVNURL;
 import org.tmatesoft.svn.core.internal.util.SVNDate;
 import org.tmatesoft.svn.core.internal.util.SVNEncodingUtil;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
-import org.tmatesoft.svn.core.internal.util.SVNURLUtil;
 import org.tmatesoft.svn.core.internal.wc.admin.SVNAdminArea;
 import org.tmatesoft.svn.core.internal.wc.admin.SVNAdminAreaInfo;
 import org.tmatesoft.svn.core.internal.wc.admin.SVNEntry;
@@ -159,19 +158,15 @@ public class SVNStatusUtil {
             fileKind = SVNFileType.getNodeKind(fileType);
             special = !SVNFileUtil.symlinksSupported() ? false : fileType == SVNFileType.SYMLINK;
         }
-
-        int wcFormatNumber = dir != null ? dir.getWorkingCopyFormatVersion() : -1;
         
         SVNTreeConflictDescription treeConflict = wcAccess.getTreeConflict(file);
         if (entry == null) {
             SVNStatus status = new SVNStatus(null, file, SVNNodeKind.UNKNOWN,
                     SVNRevision.UNDEFINED, SVNRevision.UNDEFINED, null, null, SVNStatusType.STATUS_NONE, 
                     SVNStatusType.STATUS_NONE, SVNStatusType.STATUS_NONE, SVNStatusType.STATUS_NONE, false,
-                    false, false, false, null, null, null, null, null, SVNRevision.UNDEFINED, repositoryLock, null, 
-                    null, null, wcFormatNumber, treeConflict);
-            status.setDepth(SVNDepth.UNKNOWN);
+                    false, false, false, null, null, null, null, null, SVNRevision.UNDEFINED, repositoryLock, 
+                    null, null, null, -1, treeConflict);
             status.setRemoteStatus(SVNStatusType.STATUS_NONE, SVNStatusType.STATUS_NONE, repositoryLock, SVNNodeKind.NONE);
-            status.setRepositoryRootURL(reposRoot);
             SVNStatusType text = SVNStatusType.STATUS_NONE;
             SVNFileType fileType = SVNFileType.getType(file);
             if (fileType != SVNFileType.NONE) {
@@ -181,14 +176,6 @@ public class SVNStatusUtil {
                 text = SVNStatusType.STATUS_MISSING;
             }
             status.setContentsStatus(text);
-            if (status.getURL() != null && status.getRepositoryRelativePath() == null && reposRoot != null) {
-                status.setRepositoryRelativePath(SVNURLUtil.getRelativeURL(reposRoot, status.getURL(), false));
-            }
-            if (treeConflict != null) {
-                status.setNodeStatus(SVNStatusType.STATUS_CONFLICTED);
-                status.setIsConflicted(true);
-            }
-
             return status;
         }
         if (entry.getKind() == SVNNodeKind.DIR) {
@@ -282,26 +269,16 @@ public class SVNStatusUtil {
         File conflictOld = dir != null ? dir.getFile(entry.getConflictOld()) : null;
         File conflictWrk = dir != null ? dir.getFile(entry.getConflictWorking()) : null;
         File conflictProp = dir != null ? dir.getFile(entry.getPropRejectFile()) : null;
-
+        int wcFormatNumber = dir != null ? dir.getWorkingCopyFormatVersion() : -1;
+        
         SVNStatus status = new SVNStatus(entry.getSVNURL(), file, entry.getKind(),
                 SVNRevision.create(entry.getRevision()), SVNRevision.create(entry.getCommittedRevision()),
                 SVNDate.parseDate(entry.getCommittedDate()), entry.getAuthor(),
                 textStatus,  propStatus, SVNStatusType.STATUS_NONE, SVNStatusType.STATUS_NONE, 
                 isLocked, entry.isCopied(), isSwitched, isFileExternal, conflictNew, conflictOld, conflictWrk, conflictProp, 
                 entry.getCopyFromURL(), SVNRevision.create(entry.getCopyFromRevision()),
-                repositoryLock, localLock, entry.asMap(), entry.getChangelistName(), wcFormatNumber, treeConflict);
+                repositoryLock, localLock, null, entry.getChangelistName(), wcFormatNumber, treeConflict);
         status.setEntry(entry);
-        status.setDepth(entry.isDirectory() ? entry.getDepth() : SVNDepth.UNKNOWN);
-        if (reposRoot == null) {
-        	reposRoot = entry.getRepositoryRootURL();
-        }
-        status.setRepositoryRootURL(reposRoot);
-        if (reposRoot != null && status.getURL() != null && status.getRepositoryRelativePath() == null) {
-            status.setRepositoryRelativePath(SVNURLUtil.getRelativeURL(reposRoot, status.getURL(), false));
-        }
-        if (textStatus == SVNStatusType.STATUS_CONFLICTED || propStatus == SVNStatusType.STATUS_CONFLICTED || treeConflict != null) {
-            status.setIsConflicted(true);
-        }
         return status;
     }
 

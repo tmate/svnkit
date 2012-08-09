@@ -80,7 +80,7 @@ public class SVNDate extends Date {
 
     private int myMicroSeconds;
 
-    public SVNDate(long time, int micro) {
+    private SVNDate(long time, int micro) {
         super((1000 * time + micro) / 1000);
         myMicroSeconds = micro >= 0 ? micro % 1000 : 1000 + (micro % 1000);
     }
@@ -334,16 +334,6 @@ public class SVNDate extends Date {
             CALENDAR.set(Calendar.MILLISECOND, ms);
             return CALENDAR.getTimeInMillis();
         }
-    }
-    
-    public static SVNDate fromDate(Date d) {
-        if (d == null) {
-            return SVNDate.NULL;
-        }
-        if (d instanceof SVNDate) {
-            return (SVNDate) d;
-        }
-        return new SVNDate(d.getTime(), 0);
     }
 
     public int hashCode() {

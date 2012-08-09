@@ -11,14 +11,12 @@
  */
 package org.tmatesoft.svn.core.internal.util.jna;
 
+import java.io.File;
+
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.internal.wc.ISVNGnomeKeyringPasswordProvider;
 import org.tmatesoft.svn.core.internal.wc.SVNFileType;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
-import org.tmatesoft.svn.util.SVNDebugLog;
-import org.tmatesoft.svn.util.SVNLogType;
-
-import java.io.File;
 
 
 /**
@@ -45,8 +43,6 @@ public class SVNJNAUtil {
         }
         String jnaEnabledProperty = System.getProperty("svnkit.useJNA", "true");
         ourIsJNAEnabled = Boolean.valueOf(jnaEnabledProperty).booleanValue();
-        
-        SVNDebugLog.getDefaultLog().logFine(SVNLogType.WC, "JNA present/enabled: " + ourIsJNAPresent + "/" + ourIsJNAEnabled);
     }
     
     public static void setJNAEnabled(boolean enabled) {
@@ -103,13 +99,6 @@ public class SVNJNAUtil {
             return SVNLinuxUtil.createSymlink(file, linkName);
         }
         return false;
-    }
-
-    public static Long getSymlinkLastModified(File file) {
-        if (isJNAPresent()) {
-            return SVNLinuxUtil.getSymlinkLastModified(file);
-        }
-        return null;
     }
 
     // linux and win32.

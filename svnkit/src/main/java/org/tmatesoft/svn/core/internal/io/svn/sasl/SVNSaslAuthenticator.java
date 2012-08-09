@@ -37,7 +37,6 @@ import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNURL;
-import org.tmatesoft.svn.core.auth.BasicAuthenticationManager;
 import org.tmatesoft.svn.core.auth.ISVNAuthenticationManager;
 import org.tmatesoft.svn.core.auth.SVNAuthentication;
 import org.tmatesoft.svn.core.auth.SVNPasswordAuthentication;
@@ -66,7 +65,7 @@ public class SVNSaslAuthenticator extends SVNAuthenticator {
         super(connection);
     }
 
-    public SVNAuthentication authenticate(List mechs, String realm, SVNRepositoryImpl repository) throws SVNException {
+    public void authenticate(List mechs, String realm, SVNRepositoryImpl repository) throws SVNException {
         boolean failed = true;
         setLastError(null);
         myAuthenticationManager = repository.getAuthenticationManager();
@@ -92,13 +91,14 @@ public class SVNSaslAuthenticator extends SVNAuthenticator {
             myClient = createSaslClient(mechs, realm, repository, repository.getLocation());
             while(true) {
                 if (myClient == null) {
-                    return new SVNPlainAuthenticator(getConnection()).authenticate(mechs, realm, repository);
+                    new SVNPlainAuthenticator(getConnection()).authenticate(mechs, realm, repository);
+                    return;
                 }
                 try {
                     if (tryAuthentication(repository, getMechanismName(myClient, isAnonymous))) {
                         if (myAuthenticationManager != null && myAuthentication != null) {
                             String realmName = getFullRealmName(repository.getLocation(), realm);
-                            BasicAuthenticationManager.acknowledgeAuthentication(true, myAuthentication.getKind(), realmName, null, myAuthentication, repository.getLocation(), myAuthenticationManager);
+                            myAuthenticationManager.acknowledgeAuthentication(true, myAuthentication.getKind(), realmName, null, myAuthentication);
                         }
                         failed = false;
                         setLastError(null);
@@ -119,7 +119,7 @@ public class SVNSaslAuthenticator extends SVNAuthenticator {
                     }
                     if (myAuthentication != null) {
                         String realmName = getFullRealmName(repository.getLocation(), realm);
-                        BasicAuthenticationManager.acknowledgeAuthentication(false, myAuthentication.getKind(), realmName, getLastError(), myAuthentication, repository.getLocation(), myAuthenticationManager);
+                        myAuthenticationManager.acknowledgeAuthentication(false, myAuthentication.getKind(), realmName, getLastError(), myAuthentication);
                     } else {
                         // automatically generated authentication, do not try this mech again, will lead to the same error.
                         // 
@@ -141,8 +141,6 @@ public class SVNSaslAuthenticator extends SVNAuthenticator {
         if (getLastError() != null) {
             SVNErrorManager.error(getLastError(), SVNLogType.NETWORK);
         }
-
-        return myAuthentication;
     }
     
     public void dispose() {

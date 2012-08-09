@@ -686,9 +686,6 @@ public class JavaHLObjectFactory {
             path = path.replace(File.separatorChar, '/');
         }
         int depth = info.getDepth() != null ? info.getDepth().getId() : Depth.unknown;
-        if (info.getKind() == SVNNodeKind.FILE) {
-        	depth = 0;
-        }
         return new Info2(
                 path,
                 info.getURL() != null ? info.getURL().toString() : null,
@@ -733,10 +730,6 @@ public class JavaHLObjectFactory {
     }
 
     public static NotifyInformation createNotifyInformation(SVNEvent event, String path) {
-        final int actionId = getNotifyActionValue(event.getAction());
-        if (actionId == -1) {
-            return null;
-        }
         // include full error message.
         String errMsg = null;
         if (event.getErrorMessage() != null) {
@@ -745,7 +738,7 @@ public class JavaHLObjectFactory {
         // TODO 16
         return new NotifyInformation(
                 path,
-                actionId,
+                getNotifyActionValue(event.getAction()),
                 getNodeKind(event.getNodeKind()),
                 event.getMimeType(),
                 createLock(event.getLock()),

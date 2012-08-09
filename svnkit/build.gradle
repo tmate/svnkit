@@ -1,15 +1,9 @@
-project.ext.svnVersion  = project.hasProperty('svnVersion') ? project.getProperty('svnVersion') : '16'
 processResources {
     eachFile {
         if (it.name == 'svnkit.build.properties') {
             it.expand(project : project)
         }
     }
-}
-
-test {
-    enableAssertions = true
-    systemProperty 'svnkit.wc.17', (project.svnVersion == '17')
 }
 
 javadoc {

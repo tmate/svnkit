@@ -48,6 +48,7 @@ import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNNodeEditor;
 import org.tmatesoft.svn.core.wc.ISVNOptions;
 import org.tmatesoft.svn.core.wc.ISVNRepositoryPool;
+import org.tmatesoft.svn.core.wc.SVNBasicClient;
 import org.tmatesoft.svn.core.wc.SVNRevision;
 import org.tmatesoft.svn.util.SVNLogType;
 
@@ -122,7 +123,7 @@ import org.tmatesoft.svn.util.SVNLogType;
  * @author  TMate Software Ltd.
  * @since   1.2
  */
-public class SVNLookClient extends SVNAdminBasicClient {
+public class SVNLookClient extends SVNBasicClient {
     private ISVNGNUDiffGenerator myDiffGenerator;
     
     /**
@@ -560,10 +561,6 @@ public class SVNLookClient extends SVNAdminBasicClient {
             long revNum = SVNAdminHelper.getRevisionNumber(revision, fsfs.getYoungestRevision(), fsfs);
             FSRoot root = fsfs.createRevisionRoot(revNum);
             long baseRevision = revNum - 1;
-            if (!SVNRevision.isValidRevisionNumber(baseRevision)) {
-                //r0, no changed directories
-                return;
-            }
             SVNNodeEditor editor = generateDeltaTree(fsfs, root, baseRevision);
             editor.traverseChangedDirs(handler);
         } finally {

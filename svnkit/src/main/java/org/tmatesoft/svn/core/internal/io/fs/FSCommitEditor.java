@@ -43,15 +43,15 @@ import org.tmatesoft.svn.util.SVNLogType;
  */
 public class FSCommitEditor implements ISVNEditor {
 
-    private Map<String, String> myPathsToLockTokens;
-    private Collection<String> myLockTokens;
+    private Map myPathsToLockTokens;
+    private Collection myLockTokens;
     private String myBasePath;
     private FSTransactionInfo myTxn;
     private FSTransactionRoot myTxnRoot;
     private boolean isTxnOwner;
     private FSFS myFSFS;
     private FSRepository myRepository;
-    private Stack<DirBaton> myDirsStack;
+    private Stack myDirsStack;
     private FSDeltaConsumer myDeltaConsumer;
     private SVNProperties myCurrentFileProps;
     private String myCurrentFilePath;
@@ -59,7 +59,7 @@ public class FSCommitEditor implements ISVNEditor {
     private SVNProperties myRevProps;
     private String myAuthor;
     
-    public FSCommitEditor(String path, String logMessage, String userName, Map<String, String> lockTokens, boolean keepLocks, FSTransactionInfo txn, FSFS owner, FSRepository repository) {
+    public FSCommitEditor(String path, String logMessage, String userName, Map lockTokens, boolean keepLocks, FSTransactionInfo txn, FSFS owner, FSRepository repository) {
         this(path, lockTokens, keepLocks, txn, owner, repository, null);
         myRevProps = new SVNProperties();
         if (userName != null) {
@@ -71,15 +71,15 @@ public class FSCommitEditor implements ISVNEditor {
         }
     }
 
-    public FSCommitEditor(String path, Map<String, String> lockTokens, boolean keepLocks, FSTransactionInfo txn, FSFS owner, FSRepository repository, SVNProperties revProps) {
+    public FSCommitEditor(String path, Map lockTokens, boolean keepLocks, FSTransactionInfo txn, FSFS owner, FSRepository repository, SVNProperties revProps) {
         myPathsToLockTokens = !keepLocks ? lockTokens : null;
-        myLockTokens = lockTokens != null ? lockTokens.values() : new HashSet<String>();
+        myLockTokens = lockTokens != null ? lockTokens.values() : new HashSet();
         myBasePath = path;
         myTxn = txn;
         isTxnOwner = txn == null;
         myRepository = repository;
         myFSFS = owner;
-        myDirsStack = new Stack<DirBaton>();
+        myDirsStack = new Stack();
         myRevProps = revProps != null ? revProps : new SVNProperties();
     }
 
@@ -188,7 +188,7 @@ public class FSCommitEditor implements ISVNEditor {
         SVNProperties properties = null;
         boolean done = false;
         boolean haveRealChanges = false;
-        for (Iterator<String> propNames = propNamesToValues.nameSet().iterator(); propNames.hasNext();) {
+        for (Iterator propNames = propNamesToValues.nameSet().iterator(); propNames.hasNext();) {
             String propName = (String)propNames.next();
             SVNPropertyValue propValue = propNamesToValues.getSVNPropertyValue(propName);
 
@@ -380,15 +380,15 @@ public class FSCommitEditor implements ISVNEditor {
 
     private void releaseLocks() {
         releaseLocks(myPathsToLockTokens, false, true);
-        final Map<String, String> autoUnlockPaths = myCommitter.getAutoUnlockPaths();
+        final Map autoUnlockPaths = myCommitter.getAutoUnlockPaths();
         releaseLocks(autoUnlockPaths, true, false);
     }
 
-    private void releaseLocks(Map<String, String> pathsToLockTokens, boolean breakLocks, boolean runHooks) {
+    private void releaseLocks(Map pathsToLockTokens, boolean breakLocks, boolean runHooks) {
         if (pathsToLockTokens == null) {
             return;
         }
-        for (Iterator<String> paths = pathsToLockTokens.keySet().iterator(); paths.hasNext();) {
+        for (Iterator paths = pathsToLockTokens.keySet().iterator(); paths.hasNext();) {
             String path = (String) paths.next();
             String token = (String) pathsToLockTokens.get(path);
             String absPath = !path.startsWith("/") ? SVNPathUtil.getAbsolutePath(SVNPathUtil.append(myBasePath, path)) : path;
@@ -420,9 +420,7 @@ public class FSCommitEditor implements ISVNEditor {
     private static class DirBaton {
 
         private long myBaseRevision;
-
         private String myPath;
-
         private boolean isCopied;
 
         public DirBaton(long revision, String path, boolean copied) {

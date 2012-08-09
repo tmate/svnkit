@@ -47,20 +47,11 @@ import org.tmatesoft.svn.core.io.SVNRepository;
  * @see     ISVNAuthenticationProvider
  */
 public class BasicAuthenticationManager implements ISVNAuthenticationManager, ISVNProxyManager, ISVNSSHHostVerifier {
-
-	public static void acknowledgeAuthentication(boolean accepted, String kind, String realm, SVNErrorMessage errorMessage, SVNAuthentication authentication, SVNURL accessedURL, ISVNAuthenticationManager authManager) throws SVNException {
-		if (authManager instanceof ISVNAuthenticationManagerExt) {
-			((ISVNAuthenticationManagerExt)authManager).acknowledgeAuthentication(accepted, kind, realm, errorMessage, authentication, accessedURL);
-		}
-		else {
-			authManager.acknowledgeAuthentication(accepted, kind, realm, errorMessage, authentication);
-		}
-	}
-
-    private List<SVNAuthentication> myPasswordAuthentications;
-    private List<SVNAuthentication> mySSHAuthentications;
-    private List<SVNAuthentication> myUserNameAuthentications;
-    private List<SVNAuthentication> mySSLAuthentications;
+    
+    private List myPasswordAuthentications;
+    private List mySSHAuthentications;
+    private List myUserNameAuthentications;
+    private List mySSLAuthentications;
     
     private int mySSHIndex;
     private int myPasswordIndex;
@@ -119,10 +110,10 @@ public class BasicAuthenticationManager implements ISVNAuthenticationManager, IS
      * @param authentications user credentials
      */
     public void setAuthentications(SVNAuthentication[] authentications) {
-        myPasswordAuthentications = new ArrayList<SVNAuthentication>();
-        mySSHAuthentications = new ArrayList<SVNAuthentication>();
-        myUserNameAuthentications = new ArrayList<SVNAuthentication>();
-        mySSLAuthentications = new ArrayList<SVNAuthentication>();
+        myPasswordAuthentications = new ArrayList();
+        mySSHAuthentications = new ArrayList();
+        myUserNameAuthentications = new ArrayList();
+        mySSLAuthentications = new ArrayList();
         myPasswordIndex = 0;
         mySSHIndex = 0;
         mySSLIndex = 0;
