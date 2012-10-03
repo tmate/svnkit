@@ -25,7 +25,6 @@ import java.util.regex.PatternSyntaxException;
 
 import org.tmatesoft.svn.cli.SVNCommandUtil;
 import org.tmatesoft.svn.core.ISVNLogEntryHandler;
-import org.tmatesoft.svn.core.SVNDepth;
 import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
@@ -35,13 +34,9 @@ import org.tmatesoft.svn.core.SVNProperties;
 import org.tmatesoft.svn.core.SVNRevisionProperty;
 import org.tmatesoft.svn.core.internal.util.SVNDate;
 import org.tmatesoft.svn.core.internal.util.SVNEncodingUtil;
-import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
 import org.tmatesoft.svn.core.internal.util.SVNXMLUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.internal.wc.SVNPath;
-import org.tmatesoft.svn.core.wc.ISVNDiffGenerator;
-import org.tmatesoft.svn.core.wc.SVNClientManager;
-import org.tmatesoft.svn.core.wc.SVNDiffClient;
 import org.tmatesoft.svn.core.wc.SVNLogClient;
 import org.tmatesoft.svn.core.wc.SVNRevision;
 import org.tmatesoft.svn.core.wc.SVNRevisionRange;
@@ -59,8 +54,6 @@ public class SVNLogCommand extends SVNXMLCommand implements ISVNLogEntryHandler 
     private LinkedList myMergeStack;
     private String myAuthorOfInterest;
     private String myLogRegularExpression;
-    private SVNPath myTarget;
-    private SVNDepth myDepth;
     
     public SVNLogCommand() {
         super("log", null);
@@ -73,7 +66,6 @@ public class SVNLogCommand extends SVNXMLCommand implements ISVNLogEntryHandler 
     protected Collection createSupportedOptions() {
         Collection options = new LinkedList();
         options.add(SVNOption.REVISION);
-        options.add(SVNOption.DIFF);
         options.add(SVNOption.QUIET);
         options.add(SVNOption.VERBOSE);
         options.add(SVNOption.USE_MERGE_HISTORY);
@@ -103,39 +95,9 @@ public class SVNLogCommand extends SVNXMLCommand implements ISVNLogEntryHandler 
                         "'with-revprop' option only valid in XML mode");
                 SVNErrorManager.error(err, SVNLogType.CLIENT);
             }
-        } else {
-            if (getSVNEnvironment().isShowDiff()) {
-                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.CL_ARG_PARSING_ERROR,
-                        "'diff' option is not supported in XML mode");
-                SVNErrorManager.error(err, SVNLogType.CLIENT);
-            }
         }
-
-        if (getSVNEnvironment().isQuiet() && getSVNEnvironment().isShowDiff()) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.CL_ARG_PARSING_ERROR,
-                    "'quiet' and 'diff' options are mutually exclusive");
-            SVNErrorManager.error(err, SVNLogType.CLIENT);
-        }
-
-        if (getSVNEnvironment().getDiffCommand() != null && !getSVNEnvironment().isShowDiff()) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.CL_ARG_PARSING_ERROR,
-                    "'diff-cmd' option requires 'diff' option");
-            SVNErrorManager.error(err, SVNLogType.CLIENT);
-        }
-
-        if (getSVNEnvironment().getExtensions() != null && !getSVNEnvironment().isShowDiff()) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.CL_ARG_PARSING_ERROR,
-                    "'extensions' option requires 'diff' option");
-            SVNErrorManager.error(err, SVNLogType.CLIENT);
-        }
-
-        if (getSVNEnvironment().getDepth() != SVNDepth.UNKNOWN && !getSVNEnvironment().isShowDiff()) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.CL_ARG_PARSING_ERROR,
-                    "'depth' option requires 'diff' option");
-            SVNErrorManager.error(err, SVNLogType.CLIENT);
-        }
-
-        List targets = new ArrayList();
+        
+        List targets = new ArrayList(); 
         if (getSVNEnvironment().getTargets() != null) {
             targets.addAll(getSVNEnvironment().getTargets());
         }
@@ -161,10 +123,10 @@ public class SVNLogCommand extends SVNXMLCommand implements ISVNLogEntryHandler 
                 SVNRevisionRange revRange = (SVNRevisionRange) revisionsIter.next();
                 SVNRevision startRev = revRange.getStartRevision();
                 SVNRevision endRev = revRange.getEndRevision();
-                if (startRev.getNumber() < endRev.getNumber() && startRev.getNumber() >= 0 && endRev.getNumber() >= 0) {
-                    revRange = new SVNRevisionRange(SVNRevision.create(startRev.getNumber() + 1), endRev);
+                if (startRev.getNumber() < endRev.getNumber()) {
+                    revRange = new SVNRevisionRange(endRev, endRev);
                 } else {
-                    revRange = new SVNRevisionRange(startRev, SVNRevision.create(endRev.getNumber() + 1));
+                    revRange = new SVNRevisionRange(startRev, startRev);
                 }
                 editedRevisionRangesList.add(revRange);
             }
@@ -207,12 +169,7 @@ public class SVNLogCommand extends SVNXMLCommand implements ISVNLogEntryHandler 
 
         myAuthorOfInterest = getSVNEnvironment().getAuthorOfInterest();
         myLogRegularExpression = getSVNEnvironment().getRegularExpression();
-        myDepth = getSVNEnvironment().getDepth() == SVNDepth.UNKNOWN ? SVNDepth.INFINITY : getSVNEnvironment().getDepth();
-        myTarget = new SVNPath(target.getTarget(), target.getPegRevision() == SVNRevision.UNDEFINED ?
-                (target.isURL() ? SVNRevision.HEAD : SVNRevision.WORKING) :
-                target.getPegRevision());
-
-
+        
         SVNLogClient client = getSVNEnvironment().getClientManager().getLogClient();
         if (!getSVNEnvironment().isQuiet()) {
             client.setEventHandler(new SVNNotifyPrinter(getSVNEnvironment()));
@@ -371,9 +328,7 @@ public class SVNLogCommand extends SVNXMLCommand implements ISVNLogEntryHandler 
         }
         
         if (myMergeStack != null && !myMergeStack.isEmpty()) {
-            
-            buffer.append(logEntry.isSubtractiveMerge() ? "Reverse merged via:" : "Merged via:");
-            
+            buffer.append("Merged via:");
             for (Iterator revs = myMergeStack.iterator(); revs.hasNext();) {
                 long rev = ((Long) revs.next()).longValue();
                 buffer.append(" r");
@@ -389,89 +344,17 @@ public class SVNLogCommand extends SVNXMLCommand implements ISVNLogEntryHandler 
         if (message != null) {
             buffer.append("\n" + message + "\n");
         }
-
+        
         if (logEntry.hasChildren()) {
             Long rev = new Long(logEntry.getRevision());
             if (myMergeStack == null) {
                 myMergeStack = new LinkedList();
             }
             myMergeStack.addLast(rev);
-        }
+        } 
         getSVNEnvironment().getOut().print(buffer.toString());
-
-        if (getSVNEnvironment().isShowDiff()) {
-
-            getSVNEnvironment().getOut().println();
-
-            SVNClientManager diffClientManager = getEnvironment().createClientManager();
-            try {
-                //TODO: parse diff options here
-                SVNDiffClient client = diffClientManager.getDiffClient();
-                client.setShowCopiesAsAdds(false);
-
-                final ISVNDiffGenerator diffGenerator = SVNDiffCommand.createDiffGenerator(getSVNEnvironment());
-                diffGenerator.setDiffDeleted(false);
-
-                client.setDiffGenerator(diffGenerator);
-
-                try {
-                    doDiff(client, logEntry, myTarget, myDepth);
-                } catch (SVNException e) {
-                    if (e.getErrorMessage().getErrorCode() == SVNErrorCode.FS_NOT_FOUND) {
-                        SVNPath parent = getParentPath(myTarget);
-                        while (!myTarget.equals(parent)) {
-                            try {
-                                doDiff(client, logEntry, parent, myDepth);
-                            } catch (SVNException e1) {
-                                if (e1.getErrorMessage().getErrorCode() == SVNErrorCode.FS_NOT_FOUND) {
-                                    parent = getParentPath(parent);
-                                } else if (e1.getErrorMessage().getErrorCode() == SVNErrorCode.RA_ILLEGAL_URL
-                                        || e1.getErrorMessage().getErrorCode() == SVNErrorCode.AUTHZ_UNREADABLE
-                                        || e1.getErrorMessage().getErrorCode() == SVNErrorCode.RA_LOCAL_REPOS_OPEN_FAILED) {
-                                    break;
-                                } else {
-                                    throw e1;
-                                }
-                            }
-                            break;
-                        }
-                    } else {
-                        throw e;
-                    }
-                }
-            } finally {
-                diffClientManager.dispose();
-            }
-
-            getSVNEnvironment().getOut().println();
-        }
     }
-
-    private SVNPath getParentPath(SVNPath target) {
-        return new SVNPath(SVNPathUtil.removeTail(target.getTarget()), target.getPegRevision());
-    }
-
-    private void doDiff(SVNDiffClient client, SVNLogEntry logEntry, SVNPath target, SVNDepth depth) throws SVNException {
-        if (target.isFile()) {
-        client.doDiff(target.getFile(),
-                target.getPegRevision(),
-                SVNRevision.create(logEntry.getRevision() - 1),
-                SVNRevision.create(logEntry.getRevision()),
-                depth,
-                true,
-                getSVNEnvironment().getOut(),
-                getSVNEnvironment().getChangelistsCollection());
-        } else {
-            client.doDiff(target.getURL(),
-                    target.getPegRevision(),
-                    SVNRevision.create(logEntry.getRevision() - 1),
-                    SVNRevision.create(logEntry.getRevision()),
-                    depth,
-                    true,
-                    getSVNEnvironment().getOut());
-        }
-    }
-
+    
     protected void printLogEntryXML(SVNLogEntry logEntry) throws SVNException {
         if (logEntry == null) {
             return;

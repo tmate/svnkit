@@ -17,7 +17,6 @@ import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNLock;
 import org.tmatesoft.svn.core.SVNMergeRange;
 import org.tmatesoft.svn.core.SVNNodeKind;
-import org.tmatesoft.svn.core.SVNProperties;
 import org.tmatesoft.svn.core.io.SVNRepository;
 import org.tmatesoft.svn.core.wc.SVNEvent;
 import org.tmatesoft.svn.core.wc.SVNEventAction;
@@ -36,32 +35,24 @@ public class SVNEventFactory {
     }
 
     public static SVNEvent createLockEvent(File file, SVNEventAction action, SVNLock lock, SVNErrorMessage error){
-        return new SVNEvent(file, SVNNodeKind.FILE, null, SVNRepository.INVALID_REVISION, null, null, null, lock, action, null, error, null, null, null, null);
+        return new SVNEvent(file, SVNNodeKind.FILE, null, SVNRepository.INVALID_REVISION, null, null, null, lock, action, null, error, null, null);
     }
 
     public static SVNEvent createSVNEvent(File file, SVNNodeKind kind , String mimetype, long revision, SVNStatusType cstatus, SVNStatusType pstatus,
             SVNStatusType lstatus, SVNEventAction action, SVNEventAction expected, SVNErrorMessage error, SVNMergeRange range, String changelistName){
-        return new SVNEvent(file, kind, mimetype, revision, cstatus, pstatus, lstatus, null, action, expected, error, range, changelistName, null, null);
+        return new SVNEvent(file, kind, mimetype, revision, cstatus, pstatus, lstatus, null, action, expected, error, range, changelistName);
     }
 
     public static SVNEvent createSVNEvent(File file, SVNNodeKind kind , String mimetype, long revision, SVNStatusType cstatus, SVNStatusType pstatus,
             SVNStatusType lstatus, SVNEventAction action, SVNEventAction expected, SVNErrorMessage error, SVNMergeRange range){
-        return new SVNEvent(file, kind, mimetype, revision, cstatus, pstatus, lstatus, null, action, expected, error, range, null, null, null);
+        return new SVNEvent(file, kind, mimetype, revision, cstatus, pstatus, lstatus, null, action, expected, error, range, null);
     }
 
     public static SVNEvent createSVNEvent(File file, SVNNodeKind kind , String mimetype, long revision, SVNEventAction action, SVNEventAction expected, SVNErrorMessage error, SVNMergeRange range){
-        return new SVNEvent(file, kind, mimetype, revision, SVNStatusType.INAPPLICABLE, SVNStatusType.INAPPLICABLE, SVNStatusType.LOCK_INAPPLICABLE, null, action, expected, error, range, null, null, null);
-    }
-
-    public static SVNEvent createSVNEvent(File file, SVNNodeKind kind , String mimetype, long revision, SVNEventAction action, SVNEventAction expected, SVNErrorMessage error, SVNMergeRange range, long processedItemsCount, long totalItemsCount, SVNProperties revisionProperties, String propertyName) {
-        return new SVNEventExt(file, kind, mimetype, revision, SVNStatusType.INAPPLICABLE, SVNStatusType.INAPPLICABLE, SVNStatusType.LOCK_INAPPLICABLE, null, action, expected, error, range, null, processedItemsCount, totalItemsCount, revisionProperties, propertyName);
+        return new SVNEvent(file, kind, mimetype, revision, SVNStatusType.INAPPLICABLE, SVNStatusType.INAPPLICABLE, SVNStatusType.LOCK_INAPPLICABLE, null, action, expected, error, range, null);
     }
 
     public static SVNEvent createSVNEvent(File file, SVNNodeKind kind , String mimetype, long revision, SVNEventAction action, SVNEventAction expected, SVNErrorMessage error, SVNMergeRange range, long processedItemsCount, long totalItemsCount) {
-        return new SVNEventExt(file, kind, mimetype, revision, SVNStatusType.INAPPLICABLE, SVNStatusType.INAPPLICABLE, SVNStatusType.LOCK_INAPPLICABLE, null, action, expected, error, range, null, processedItemsCount, totalItemsCount, null, null);
-    }
-
-    public static SVNEvent createSVNEvent(File file, SVNNodeKind kind , String mimetype, long revision, SVNEventAction action, SVNEventAction expected, SVNErrorMessage error, SVNMergeRange range, SVNProperties revisionProperties, String propertyName) {
-        return new SVNEvent(file, kind, mimetype, revision, SVNStatusType.INAPPLICABLE, SVNStatusType.INAPPLICABLE, SVNStatusType.LOCK_INAPPLICABLE, null, action, expected, error, range, null, revisionProperties, propertyName);
+        return new SVNEventExt(file, kind, mimetype, revision, SVNStatusType.INAPPLICABLE, SVNStatusType.INAPPLICABLE, SVNStatusType.LOCK_INAPPLICABLE, null, action, expected, error, range, null, processedItemsCount, totalItemsCount);
     }
 }

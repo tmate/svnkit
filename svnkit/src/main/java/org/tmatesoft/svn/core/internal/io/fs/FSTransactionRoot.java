@@ -507,7 +507,7 @@ public class FSTransactionRoot extends FSRoot {
     }
 
     public FSID writeFinalRevision(FSID newId, final CountingOutputStream protoFile, long revision, FSID id, 
-            String startNodeId, String startCopyId, Collection<FSRepresentation> representations) throws SVNException, IOException {
+            String startNodeId, String startCopyId, Collection representations) throws SVNException, IOException {
         newId = null;
         if (!id.isTxn()) {
             return newId;

@@ -11,13 +11,6 @@
  */
 package org.tmatesoft.svn.core.internal.wc;
 
-import java.io.File;
-import java.io.IOException;
-import java.io.OutputStream;
-import java.io.UnsupportedEncodingException;
-import java.nio.charset.Charset;
-import java.nio.charset.CodingErrorAction;
-
 import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
@@ -29,6 +22,13 @@ import org.tmatesoft.svn.core.wc.DefaultSVNDiffGenerator;
 import org.tmatesoft.svn.core.wc.ISVNDiffGenerator;
 import org.tmatesoft.svn.core.wc.SVNStatusType;
 import org.tmatesoft.svn.util.SVNLogType;
+
+import java.io.File;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.io.UnsupportedEncodingException;
+import java.nio.charset.Charset;
+import java.nio.charset.CodingErrorAction;
 
 
 /**
@@ -170,7 +170,7 @@ public class SVNDiffCallback extends AbstractDiffCallback {
         diff = diff == null ? new SVNProperties() : diff;
         SVNProperties regularDiff = new SVNProperties();
         categorizeProperties(diff, regularDiff, null, null);
-        if (regularDiff.isEmpty()) {
+        if (diff.isEmpty()) {
             return SVNStatusType.UNKNOWN;
         }
         myGenerator.displayPropDiff(getDisplayPath(path), originalProperties, regularDiff, myResult);

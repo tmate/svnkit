@@ -48,7 +48,6 @@ public class SVNExportCommand extends SVNCommand {
         options.add(SVNOption.FORCE);
         options.add(SVNOption.NATIVE_EOL);
         options.add(SVNOption.IGNORE_EXTERNALS);
-        options.add(SVNOption.IGNORE_KEYWORDS);
         return options;
     }
 
@@ -83,8 +82,6 @@ public class SVNExportCommand extends SVNCommand {
             SVNPath dst = new SVNPath(to);
             String eol = getSVNEnvironment().getNativeEOL();
             SVNRevision revision = getSVNEnvironment().getStartRevision();
-            client.setExportExpandsKeywords(!getSVNEnvironment().isIgnoreKeywords());
-            
             if (from.isFile()) {
                 client.doExport(from.getFile(), dst.getFile(), pegRevision, revision, eol, getSVNEnvironment().isForce(), depth);
             } else {

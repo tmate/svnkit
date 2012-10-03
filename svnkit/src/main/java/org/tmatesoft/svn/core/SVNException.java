@@ -12,6 +12,7 @@
 
 package org.tmatesoft.svn.core;
 
+
 /**
  * A main exception class that is used in the SVNKit library. All other
  * SVNKit exception classes extend this one. Detailed information 
@@ -44,12 +45,7 @@ public class SVNException extends Exception {
      * @param cause        the real cause of the error
      */
     public SVNException(SVNErrorMessage errorMessage, Throwable cause) {
-        super(cause != null ? cause : errorMessage.getCause());
-        
-        if (cause == null) {
-            cause = errorMessage.getCause();
-        }
-        
+        super(cause);
         if (cause instanceof SVNException) {
             SVNErrorMessage childMessages = ((SVNException) cause).getErrorMessage();
             SVNErrorMessage parent = errorMessage;
@@ -61,9 +57,6 @@ public class SVNException extends Exception {
             }
         }
         myErrorMessage = errorMessage;
-        if (getCause() == null && errorMessage != null) {
-            errorMessage.initCause(this);
-        }
     }
     
     /**
@@ -87,10 +80,5 @@ public class SVNException extends Exception {
             return error.getFullMessage();
         }
         return super.getMessage();
-    }
-    
-    public boolean isEnoent() {
-    	SVNErrorCode errorCode = getErrorMessage().getErrorCode();
-        return errorCode == SVNErrorCode.ENTRY_NOT_FOUND || errorCode == SVNErrorCode.FS_NOT_FOUND || errorCode == SVNErrorCode.FS_NOT_OPEN || errorCode == SVNErrorCode.FS_NOT_FILE;
     }
 }

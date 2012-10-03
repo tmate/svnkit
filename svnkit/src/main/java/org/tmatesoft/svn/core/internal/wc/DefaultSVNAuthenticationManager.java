@@ -103,10 +103,6 @@ public class DefaultSVNAuthenticationManager implements ISVNAuthenticationManage
         myProviders[3] = provider; 
     }
 
-    protected File getConfigDirectory() {
-	    return myConfigDirectory;
-    }
-
     public DefaultSVNOptions getDefaultOptions() {
         if (myDefaultOptions == null) {
             myDefaultOptions = new DefaultSVNOptions(myConfigDirectory, true);
@@ -125,7 +121,7 @@ public class DefaultSVNAuthenticationManager implements ISVNAuthenticationManage
         myHostOptionsProvider = hostOptionsProvider;
     }
 
-    public Collection<String> getAuthTypes(SVNURL url) {
+    public Collection getAuthTypes(SVNURL url) {
         return getHostOptionsProvider().getHostOptions(url).getAuthTypes();
     }
     
@@ -408,23 +404,15 @@ public class DefaultSVNAuthenticationManager implements ISVNAuthenticationManage
     private class CacheAuthenticationProvider implements ISVNAuthenticationProvider {        
 
         public SVNAuthentication requestClientAuthentication(String kind, SVNURL url, String realm, SVNErrorMessage errorMessage, SVNAuthentication previousAuth, boolean authMayBeStored) {
-            String actualRealm = realm;
-            if (url != null && url.getUserInfo() != null) {
-                actualRealm = url.getUserInfo() + "$" + actualRealm;
-            }
-            return (SVNAuthentication) getRuntimeAuthStorage().getData(kind, actualRealm);
+            return (SVNAuthentication) getRuntimeAuthStorage().getData(kind, realm);
         }
         
         public void saveAuthentication(SVNAuthentication auth, String realm) {
             if (auth == null || realm == null) {
                 return;
             }
-            final String kind = auth.getKind();
-            String actualRealm = realm;
-            if (auth.getURL() != null && auth.getURL().getUserInfo() != null) {
-                actualRealm = auth.getURL().getUserInfo() + "$" + actualRealm;
-            }
-            getRuntimeAuthStorage().putData(kind, actualRealm, auth);
+            String kind = auth.getKind();
+            getRuntimeAuthStorage().putData(kind, realm, auth);
         }
         
         public int acceptServerAuthentication(SVNURL url, String r, Object serverAuth, boolean resultMayBeStored) {
@@ -438,7 +426,6 @@ public class DefaultSVNAuthenticationManager implements ISVNAuthenticationManage
             super(myConfigDirectory);
         }
 
-        @Override
         public ISVNHostOptions getHostOptions(SVNURL url) {
             return new ExtendedHostOptions(getServersFile(), url);
         }
@@ -449,8 +436,6 @@ public class DefaultSVNAuthenticationManager implements ISVNAuthenticationManage
         public ExtendedHostOptions(SVNCompositeConfigFile serversFile, SVNURL url) {
             super(serversFile, url);
         }
-
-        @Override
         public boolean isAuthStorageEnabled() {
             if (!super.hasAuthStorageEnabledOption()) {
                 return myIsStoreAuth;

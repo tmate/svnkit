@@ -25,21 +25,20 @@ public class Version {
 
     private static String PROPERTIES_PATH = "/svnkit.build.properties";
 
-    private static final String SHORT_VERSION_STRING_PROPERTY = "svnkit.version";
     private static final String VERSION_STRING_PROPERTY = "svnkit.version.string";
     private static final String VERSION_MAJOR_PROPERTY = "svnkit.version.major";
     private static final String VERSION_MINOR_PROPERTY = "svnkit.version.minor";
     private static final String VERSION_MICRO_PROPERTY = "svnkit.version.micro";
     private static final String VERSION_REVISION_PROPERTY = "svnkit.version.revision";
+
+    private static final String VERSION_STRING_DEFAULT = "SVN/1.6.18 SVNKit/1.3.10-SNAPSHOT (http://svnkit.com/) rSNAPSHOT";
     private static final String SVN_VERSION_PROPERTY = "svnkit.svn.version";  
     
-    private static final String VERSION_STRING_DEFAULT = "SVN/1.7.6 SVNKit/1.7.6 (http://svnkit.com/) rSNAPSHOT";
-    
     private static final String VERSION_MAJOR_DEFAULT = "1";
-    private static final String VERSION_MINOR_DEFAULT = "7";
-    private static final String VERSION_MICRO_DEFAULT = "6";
+    private static final String VERSION_MINOR_DEFAULT = "3";
+    private static final String VERSION_MICRO_DEFAULT = "10";
     private static final String VERSION_REVISION_DEFAULT = "SNAPSHOT";
-    private static final String SVN_VERSION_DEFAULT = "1.7.6";
+    private static final String SVN_VERSION_DEFAULT = "1.6.18";
     private static String ourUserAgent;
 
     private static Properties ourProperties;
@@ -53,20 +52,13 @@ public class Version {
         return ourProperties.getProperty(VERSION_STRING_PROPERTY, VERSION_STRING_DEFAULT);
     }
     
-    public static String getShortVersionString() {
-        loadProperties();
-        return ourProperties.getProperty(SHORT_VERSION_STRING_PROPERTY, VERSION_STRING_DEFAULT);
-    }
-
     public static String getSVNVersion() {
         loadProperties();
         return ourProperties.getProperty(SVN_VERSION_PROPERTY, SVN_VERSION_DEFAULT);
     }
     
     public static void setUserAgent(String userAgent) {
-        synchronized (Version.class) {
-            ourUserAgent = userAgent;
-        }
+        ourUserAgent = userAgent;
     }
 
     public static String getUserAgent() {
@@ -109,35 +101,28 @@ public class Version {
         return Integer.parseInt(VERSION_MICRO_DEFAULT);
     }
 
-    /**
-     * @deprecated use getRevisionString instead
-     */
-    @Deprecated    
     public static long getRevisionNumber() {
         loadProperties();
-        String revisionProperty = ourProperties.getProperty(VERSION_REVISION_PROPERTY, VERSION_REVISION_DEFAULT);
-        try {
-            return Long.parseLong(revisionProperty);
-        } catch (NumberFormatException nfe) {
-            // try to fetch revision in other way.
-            if (revisionProperty.lastIndexOf('.') > 0) {
-                revisionProperty = revisionProperty.substring(revisionProperty.lastIndexOf('.') + 1);
-            }
-            if (revisionProperty.indexOf('r') >= 0) {
-                int start = revisionProperty.indexOf('r') + 1;
-                final StringBuffer revValue = new StringBuffer();
-                while(start < revisionProperty.length()) {
-                    char ch = revisionProperty.charAt(start);
-                    start++;
-                    if (!Character.isDigit(ch)) {
+        String propertyValue = ourProperties.getProperty(VERSION_REVISION_PROPERTY);
+        if (propertyValue != null) {
+            if (propertyValue.startsWith("r")) {
+                String revValue = ""; 
+                for (int i = 1; i < propertyValue.length(); i++) {
+                    if (Character.isDigit(propertyValue.charAt(i))) {
+                        revValue += propertyValue.charAt(i);
+                    } else {
                         break;
                     }
-                    revValue.append(ch);
                 }
-                if (revValue.length() > 0) {
-                    return Long.parseLong(revValue.toString());
-                }
+                propertyValue = revValue;
             }
+        } else {
+            propertyValue = VERSION_REVISION_DEFAULT;
+        }
+        try {
+            return Long.parseLong(propertyValue);
+        } catch (NumberFormatException nfe) {
+            //
         }
         try {
             return Long.parseLong(VERSION_REVISION_DEFAULT);
@@ -147,28 +132,22 @@ public class Version {
         return -1;
     }
 
-    public static String getRevisionString() {
-        loadProperties();
-        return ourProperties.getProperty(VERSION_REVISION_PROPERTY, VERSION_REVISION_DEFAULT);
-    }
-
     private static void loadProperties() {
-        synchronized (Version.class) {
-            if (ourProperties != null) {
-                return;
-            }
-            ourProperties = new Properties();
-            InputStream is = Version.class.getResourceAsStream(PROPERTIES_PATH);
-            if (is == null) {
-                return;
-            }
-            try {
-                ourProperties.load(is);
-            } catch (IOException e) {
-                //
-            } finally {
-                SVNFileUtil.closeFile(is);
-            }
+        if (ourProperties != null) {
+            return;
         }
+        InputStream is = Version.class.getResourceAsStream(PROPERTIES_PATH);
+        ourProperties = new Properties();
+        if (is == null) {
+            return;
+        }
+        try {
+            ourProperties.load(is);
+        } catch (IOException e) {
+            //
+        } finally {
+            SVNFileUtil.closeFile(is);
+        }
+
     }
 }

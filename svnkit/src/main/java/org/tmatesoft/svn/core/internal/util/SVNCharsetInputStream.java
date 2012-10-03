@@ -11,14 +11,14 @@
  */
 package org.tmatesoft.svn.core.internal.util;
 
+import org.tmatesoft.svn.core.SVNException;
+import org.tmatesoft.svn.core.internal.wc.IOExceptionWrapper;
+
 import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
-
-import org.tmatesoft.svn.core.SVNException;
-import org.tmatesoft.svn.core.internal.wc.IOExceptionWrapper;
 
 
 /**

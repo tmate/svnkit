@@ -29,7 +29,6 @@ import org.tmatesoft.svn.core.SVNURL;
 import org.tmatesoft.svn.core.SVNPropertyValue;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
 import org.tmatesoft.svn.core.internal.util.SVNDate;
-import org.tmatesoft.svn.core.internal.util.SVNURLUtil;
 import org.tmatesoft.svn.core.internal.wc.admin.SVNAdminArea;
 import org.tmatesoft.svn.core.internal.wc.admin.SVNAdminAreaInfo;
 import org.tmatesoft.svn.core.internal.wc.admin.SVNEntry;
@@ -41,7 +40,6 @@ import org.tmatesoft.svn.core.wc.ISVNStatusHandler;
 import org.tmatesoft.svn.core.wc.SVNRevision;
 import org.tmatesoft.svn.core.wc.SVNStatus;
 import org.tmatesoft.svn.core.wc.SVNStatusType;
-import org.tmatesoft.svn.core.wc.SVNWCUtil;
 
 
 
@@ -60,19 +58,6 @@ public class SVNRemoteStatusEditor extends SVNStatusEditor implements ISVNEditor
     public SVNRemoteStatusEditor(ISVNOptions options, SVNWCAccess wcAccess, SVNAdminAreaInfo info, boolean noIgnore, boolean reportAll, SVNDepth depth, ISVNStatusHandler handler) throws SVNException {
         super(options, wcAccess, info, noIgnore, reportAll, depth, handler);
         myAnchorStatus = createStatus(info.getAnchor().getRoot());
-    }
-
-    @Override
-    public void setRepositoryInfo(SVNURL root, Map repositoryLocks) {
-        super.setRepositoryInfo(root, repositoryLocks);
-        if (myAnchorStatus.getRepositoryRootURL() == null) {
-            myAnchorStatus.setRepositoryRootURL(myRepositoryRoot);
-        }
-        if (myAnchorStatus.getURL() != null && myAnchorStatus.getRepositoryRootURL() != null) {
-            myAnchorStatus.setRepositoryRelativePath(SVNURLUtil.getRelativeURL(myAnchorStatus.getRepositoryRootURL(), 
-                    myAnchorStatus.getURL(), false));
-        }
-
     }
 
     public void openRoot(long revision) throws SVNException {
@@ -105,7 +90,7 @@ public class SVNRemoteStatusEditor extends SVNStatusEditor implements ISVNEditor
         }
         
         if (dir.getEntry(name, false) != null) {
-            tweakStatusHash(myDirectoryInfo, myDirectoryInfo, file, SVNStatusType.STATUS_DELETED, SVNStatusType.STATUS_NONE, null, SVNRevision.create(revision));
+            tweakStatusHash(myDirectoryInfo, null, file, SVNStatusType.STATUS_DELETED, SVNStatusType.STATUS_NONE, null, SVNRevision.create(revision));
             // set entry node kind
             SVNStatus status = (SVNStatus) myDirectoryInfo.myChildrenStatuses.get(file);
             if (status != null) {
@@ -322,10 +307,6 @@ public class SVNRemoteStatusEditor extends SVNStatusEditor implements ISVNEditor
             text = SVNStatusType.STATUS_REPLACED;
         }
         status.setRemoteStatus(fileInfo.myURL, text, props, lock, fileInfo.myRemoteKind, fileInfo.myRemoteRevision, fileInfo.myRemoteDate, fileInfo.myRemoteAuthor);
-        status.setRepositoryRootURL(myRepositoryRoot);
-        if (status.getRemoteURL() != null) {
-            status.setRepositoryRelativePath(SVNURLUtil.getRelativeURL(myRepositoryRoot, status.getRemoteURL(), false));
-        }
     }
 
     private void tweakStatusHash(DirectoryInfo dirInfo, DirectoryInfo childDir, File path, SVNStatusType text, SVNStatusType props, SVNLock lock, SVNRevision revision) throws SVNException {
@@ -342,28 +323,14 @@ public class SVNRemoteStatusEditor extends SVNStatusEditor implements ISVNEditor
             text = SVNStatusType.STATUS_REPLACED;
         }
         if (text == SVNStatusType.STATUS_DELETED) {
-            SVNURL remoteURL = dirInfo.myURL;
-            if (childDir != null) {
-                if (childDir.myURL != null) {
-                    remoteURL = childDir.myURL.appendPath(SVNFileUtil.getFileName(path), false);
-                }
-            } else {
-                if (dirInfo.myURL != null) {
-                    remoteURL = dirInfo.myURL.appendPath(SVNFileUtil.getFileName(path), false);
-                }
-            }
             if (revision == SVNRevision.UNDEFINED) {
                 revision = dirInfo.myRemoteRevision;
             }
-            status.setRemoteStatus(remoteURL, text, props, lock, SVNNodeKind.NONE, revision, null, null);
+            status.setRemoteStatus(dirInfo.myURL, text, props, lock, SVNNodeKind.NONE, revision, null, null);
         } else if (childDir == null) {
             status.setRemoteStatus(dirInfo.myURL, text, props, lock, dirInfo.myRemoteKind, dirInfo.myRemoteRevision, dirInfo.myRemoteDate, dirInfo.myRemoteAuthor);
         } else {
             status.setRemoteStatus(childDir.myURL, text, props, lock, childDir.myRemoteKind, childDir.myRemoteRevision, childDir.myRemoteDate, childDir.myRemoteAuthor);
-        }
-        status.setRepositoryRootURL(myRepositoryRoot);
-        if (status.getRemoteURL() != null) {
-            status.setRepositoryRelativePath(SVNURLUtil.getRelativeURL(myRepositoryRoot, status.getRemoteURL(), false));
         }
     }
     

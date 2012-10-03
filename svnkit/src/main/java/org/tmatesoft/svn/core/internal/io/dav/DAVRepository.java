@@ -675,7 +675,8 @@ public class DAVRepository extends SVNRepository {
                 } catch (SVNException e) {
                     error = null;
                     if (e.getErrorMessage() != null) {
-                        if (FSErrors.isLockError(e.getErrorMessage())) {
+                        SVNErrorCode code = e.getErrorMessage().getErrorCode();
+                        if (code == SVNErrorCode.FS_PATH_ALREADY_LOCKED || code == SVNErrorCode.FS_OUT_OF_DATE) {
                             error = e.getErrorMessage();                            
                         }
                     }
@@ -710,23 +711,15 @@ public class DAVRepository extends SVNRepository {
                     error = null;
                 } catch (SVNException e) {
                     if (e.getErrorMessage() != null && 
-                            (e.getErrorMessage().getErrorCode() == SVNErrorCode.RA_NOT_LOCKED  || FSErrors.isUnlockError(e.getErrorMessage()))) {
+                            (e.getErrorMessage().getErrorCode() == SVNErrorCode.RA_NOT_LOCKED || FSErrors.isUnlockError(e.getErrorMessage()))) {
                         error = e.getErrorMessage();
-
-                        if (repositoryPath != null && repositoryPath.startsWith("/")) {
-                            shortPath = repositoryPath.substring("/".length());
-                        } else if (repositoryPath != null) {
-                            shortPath = repositoryPath;
-                        } else {
-                            shortPath = "";
-                        }
                         error = SVNErrorMessage.create(error.getErrorCode(), error.getMessageTemplate(), shortPath);
                     } else {
                         throw e;
                     }
                 }
                 if (handler != null) {
-                    handler.handleUnlock(repositoryPath, new SVNLock(repositoryPath, id, null, null, null, null), error);
+                    handler.handleUnlock(repositoryPath, new SVNLock(path, id, null, null, null, null), error);
                 }
             }
         } finally {
@@ -1299,6 +1292,7 @@ public class DAVRepository extends SVNRepository {
     private SVNDirEntry createDirEntry(String fullPath, DAVProperties child) throws SVNException {
         String href = child.getURL();
         href = SVNEncodingUtil.uriDecode(href);
+        String name = SVNPathUtil.tail(href);
         // build direntry
         SVNNodeKind kind = SVNNodeKind.FILE;
         Object revisionStr = child.getPropertyValue(DAVElement.VERSION_NAME);
@@ -1340,7 +1334,6 @@ public class DAVRepository extends SVNRepository {
         connection.fetchRepositoryRoot(this);            
         SVNURL repositoryRoot = getRepositoryRoot(false);
         SVNURL url = getLocation().setPath(fullPath, true);
-        String name = repositoryRoot.equals(url) ? "" : SVNPathUtil.tail(href);
         return new SVNDirEntry(url, repositoryRoot, name, kind, size, hasProperties, lastRevision, date, author);
     }
 

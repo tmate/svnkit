@@ -6,15 +6,15 @@ task buildAll << {
         into new File(dstDir, "svnkit-${version}")
         into('lib') {
             from configurations.binaries.files
-            exclude '**/*.asc'
-            eachFile fullJarNameExpander
-            
         }
         into ('bin') {
             from configurations.scripts.files
         } 
         into('src') {
             from configurations.sources.files
+        }
+        into('conf') {
+            from configurations.conf.files
         }
         into('licenses') {
             from file('src/main/licenses')

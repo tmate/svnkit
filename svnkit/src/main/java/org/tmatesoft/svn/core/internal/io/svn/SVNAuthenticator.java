@@ -20,7 +20,6 @@ import java.util.List;
 import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
-import org.tmatesoft.svn.core.auth.SVNAuthentication;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.util.SVNLogType;
 
@@ -95,5 +94,5 @@ public abstract class SVNAuthenticator {
         myLastError = err;
     }
 
-    public abstract SVNAuthentication authenticate(List mechs, String realm, SVNRepositoryImpl repository) throws SVNException;
+    public abstract void authenticate(List mechs, String realm, SVNRepositoryImpl repository) throws SVNException;
 }

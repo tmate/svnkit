@@ -1,6 +1,6 @@
 /*
  * ====================================================================
- * Copyright (c) 2004-2012 TMate Software Ltd.  All rights reserved.
+ * Copyright (c) 2004-2009 TMate Software Ltd.  All rights reserved.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution.  The terms
@@ -47,7 +47,7 @@ public class TestResult {
         return null;
     }
     
-    public TestResult(String test, String id, boolean pass) {
+    private TestResult(String test, String id, boolean pass) {
         myName = test;
         myID = Integer.parseInt(id);
         myIsPass = pass;

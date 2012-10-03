@@ -11,6 +11,20 @@
  */
 package org.tmatesoft.svn.cli;
 
+import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.text.MessageFormat;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.Map;
+
 import org.tmatesoft.svn.cli.svn.SVNCommandEnvironment;
 import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
@@ -22,10 +36,6 @@ import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 import org.tmatesoft.svn.util.SVNLogType;
 import org.tmatesoft.svn.util.Version;
-
-import java.io.*;
-import java.text.MessageFormat;
-import java.util.*;
 
 
 /**
@@ -164,7 +174,7 @@ public class SVNCommandUtil {
             SVNFileUtil.closeFile(os);
         }
         SVNFileUtil.setLastModified(tmpFile, System.currentTimeMillis() - 2000);
-        long timestamp = SVNFileUtil.getFileLastModified(tmpFile);
+        long timestamp = tmpFile.lastModified();
         editorCommand = getEditorCommand(env, editorCommand);
         String[] testEnv = SVNFileUtil.getTestEnvironment();
         if (testEnv[0] != null) {
@@ -179,7 +189,7 @@ public class SVNCommandUtil {
                 SVNErrorManager.error(err, SVNLogType.CLIENT);
             }
             // now read from file.
-            if (timestamp == SVNFileUtil.getFileLastModified(tmpFile)) {
+            if (timestamp == tmpFile.lastModified()) {
                 return null;
             }
             InputStream is = null;
@@ -228,7 +238,7 @@ public class SVNCommandUtil {
                 result = SVNFileUtil.execCommand(command, env, false, callback);
             }
         } else if (SVNFileUtil.isLinux || SVNFileUtil.isBSD || SVNFileUtil.isOSX || SVNFileUtil.isSolaris){
-            if (env == null && !SVNFileUtil.isSolaris) {
+            if (env == null) {
                 String shellCommand = SVNFileUtil.getEnvironmentVariable("SHELL");
                 if (shellCommand == null || "".equals(shellCommand.trim())) {
                     shellCommand = "/bin/sh";
@@ -451,9 +461,9 @@ public class SVNCommandUtil {
     }
 
     public static String getVersion(AbstractSVNCommandEnvironment env, boolean quiet) {
-        String version = Version.getShortVersionString();
-        String revNumber = Version.getRevisionString() == null ? "SNAPSHOT" : Version.getRevisionString();
-        String message = MessageFormat.format(env.getProgramName() + ", version {0}\n", new Object[] {version + " (" + revNumber + ")"});
+        String version = Version.getMajorVersion() + "." + Version.getMinorVersion() + "." + Version.getMicroVersion();
+        String revNumber = Version.getRevisionNumber() < 0 ? "SNAPSHOT" : Long.toString(Version.getRevisionNumber());
+        String message = MessageFormat.format(env.getProgramName() + ", version {0}\n", new Object[] {version + " (r" + revNumber + ")"});
         if (quiet) {
             message = version;
         }
@@ -470,7 +480,7 @@ public class SVNCommandUtil {
     public static String getGenericHelp(String programName, String header, String footer, Comparator commandComparator) {
         StringBuffer help = new StringBuffer();
         if (header != null) {
-            String version = Version.getShortVersionString();
+            String version = Version.getMajorVersion() + "." + Version.getMinorVersion() + "." + Version.getMicroVersion();
             header = MessageFormat.format(header, new Object[] {programName, version});
             help.append(header);
         }
