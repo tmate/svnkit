@@ -31,7 +31,6 @@ public class SshHost {
     private List<SshConnection> myConnections;
     private Object myOpenerLock = new Object();
     private int myOpenersCount;
-    private int myReadTimeout;
     
     public SshHost(String host, int port) {
         myConnections = new LinkedList<SshConnection>();
@@ -46,11 +45,7 @@ public class SshHost {
     public void setConnectionTimeout(int timeout) {
         myConnectTimeout = timeout;
     }
-
-    public void setReadTimeout(int readTimeout) {
-        myReadTimeout = readTimeout;
-    }
-
+    
     public void setCredentials(String userName, char[] key, char[] passphrase, char[] password) {
         myUserName = userName;
         myPrivateKey = key;
@@ -226,7 +221,7 @@ public class SshHost {
                 }                    
                 return true;
             }
-        }, myConnectTimeout, myReadTimeout, myConnectTimeout);
+        }, myConnectTimeout, myConnectTimeout);
         
         boolean authenticated = false;        
         

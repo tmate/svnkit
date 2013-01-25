@@ -12,7 +12,6 @@ task buildAll << {
         }
         into ('bin') {
             from configurations.scripts.files
-            exclude '**/logging.properties'
         } 
         into('src') {
             from configurations.sources.files
@@ -20,12 +19,6 @@ task buildAll << {
         into('licenses') {
             from file('src/main/licenses')
         }
-        into ('conf') {
-            from configurations.scripts.files
-            include '**/logging.properties'
-            rename { String filename -> return filename + '.disabled' }            
-        }
-        
         from rootProject.files('LICENSE.txt', 'README.txt', 'CHANGES.txt')
     }
     

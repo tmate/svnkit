@@ -257,8 +257,8 @@ public class DefaultSVNPersistentAuthenticationProvider implements ISVNAuthentic
                 } else if (ISVNAuthenticationManager.USERNAME.equals(kind)) {
                     return new SVNUserNameAuthentication(userName, authMayBeStored, url, false);
                 } else if (ISVNAuthenticationManager.SSL.equals(kind)) {
-                    if (isMSCapi(sslKind)) {                        
-                        final String alias = SVNPropertyValue.getPropertyAsString(values.getSVNPropertyValue("alias"));
+                    if (isMSCapi(sslKind)) {
+                        String alias = SVNPropertyValue.getPropertyAsString(values.getSVNPropertyValue("alias"));
                         return new SVNSSLAuthentication(SVNSSLAuthentication.MSCAPI, alias, authMayBeStored, url, false);
                     }
                     String passphrase = readPassphrase(storedRealm, passwordStorage, values);
@@ -495,9 +495,7 @@ public class DefaultSVNPersistentAuthenticationProvider implements ISVNAuthentic
                 }
             } else if (SVNSSLAuthentication.MSCAPI.equals(sslAuth.getSSLKind())) {
                 values.put("ssl-kind", sslAuth.getSSLKind());
-                if (sslAuth.getAlias() != null) {
-                    values.put("alias", sslAuth.getAlias());
-                }
+                values.put("alias", sslAuth.getAlias());
                 modified = true;
             }
         }

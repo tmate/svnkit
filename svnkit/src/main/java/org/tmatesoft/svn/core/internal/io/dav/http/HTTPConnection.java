@@ -387,10 +387,7 @@ class HTTPConnection implements IHTTPConnection {
         SVNAuthentication httpAuth = myLastValidAuth;
         boolean isAuthForced = authManager != null ? authManager.isAuthenticationForced() : false;
         if (httpAuth == null && isAuthForced) {
-            SVNDebugLog.getDefaultLog().logFine(SVNLogType.WC, "SVNPasswordAuthentication requested."); 
             httpAuth = authManager.getFirstAuthentication(ISVNAuthenticationManager.PASSWORD, sslRealm, null);
-            logAuthFetched(httpAuth);
-
             myChallengeCredentials = new HTTPBasicAuthentication((SVNPasswordAuthentication)httpAuth, myCharset);
         } 
         String realm = null;
@@ -596,8 +593,7 @@ class HTTPConnection implements IHTTPConnection {
                 }
                 
                 try {
-                    myChallengeCredentials = HTTPAuthentication.parseAuthParameters(authHeaderValues, myChallengeCredentials, myCharset, authTypes, authManager, myRequestCount);
-                    SVNDebugLog.getDefaultLog().logFine(SVNLogType.NETWORK, "server auth method is " + myChallengeCredentials);
+                    myChallengeCredentials = HTTPAuthentication.parseAuthParameters(authHeaderValues, myChallengeCredentials, myCharset, authTypes, authManager, myRequestCount); 
                 } catch (SVNException svne) {
                     err = svne.getErrorMessage(); 
                     break;
@@ -658,17 +654,10 @@ class HTTPConnection implements IHTTPConnection {
                 realm = composeRealm(realm); 
                 
                 if (httpAuth == null) {
-                    
-                    SVNDebugLog.getDefaultLog().logFine(SVNLogType.WC, "SVNPasswordAuthentication requested (first)."); 
                     httpAuth = authManager.getFirstAuthentication(ISVNAuthenticationManager.PASSWORD, realm, myRepository.getLocation());
-                    logAuthFetched(httpAuth);
-                    
                 } else if (authAttempts >= requestAttempts) {
                     BasicAuthenticationManager.acknowledgeAuthentication(false, ISVNAuthenticationManager.PASSWORD, realm, request.getErrorMessage(), httpAuth, myRepository.getLocation(), authManager);
-
-                    SVNDebugLog.getDefaultLog().logFine(SVNLogType.WC, "SVNPasswordAuthentication requested (second)."); 
                     httpAuth = authManager.getNextAuthentication(ISVNAuthenticationManager.PASSWORD, realm, myRepository.getLocation());
-                    logAuthFetched(httpAuth);
                 }
                 
                 if (httpAuth == null) {
@@ -749,17 +738,6 @@ class HTTPConnection implements IHTTPConnection {
         SVNErrorMessage err2 = SVNErrorMessage.create(SVNErrorCode.RA_DAV_REQUEST_FAILED, "{0} request failed on ''{1}''", new Object[] {method, path}, err.getType(), err.getCause());
         SVNErrorManager.error(err, err2, SVNLogType.NETWORK);
         return null;
-    }
-
-    private void logAuthFetched(SVNAuthentication httpAuth) {
-        if (httpAuth != null) {
-            SVNDebugLog.getDefaultLog().logFine(SVNLogType.WC, "SVNPasswordAuthentication fetched."); 
-            SVNDebugLog.getDefaultLog().logFine(SVNLogType.WC, "user name: " + httpAuth.getUserName()); 
-            SVNDebugLog.getDefaultLog().logFine(SVNLogType.WC, "password: " + ((SVNPasswordAuthentication) httpAuth).getPassword()); 
-            SVNDebugLog.getDefaultLog().logFine(SVNLogType.WC, new Exception());
-        } else {
-            SVNDebugLog.getDefaultLog().logFine(SVNLogType.WC, "SVNPasswordAuthentication is not available."); 
-        }
     }
 
     private String composeRealm(String realm) {

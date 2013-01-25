@@ -1223,7 +1223,7 @@ public class SVNClientImpl implements ISVNClient {
             SvnCat cat = svnOperationFactory.createCat();
             cat.setSingleTarget(getTarget(path, pegRevision));
             cat.setRevision(getSVNRevision(revision));
-            cat.setExpandKeywords(true);
+            cat.setExpandKeywords(false);
             cat.setOutput(stream);
 
             cat.run();

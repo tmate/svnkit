@@ -28,7 +28,6 @@ import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.auth.ISVNAuthenticationManager;
 import org.tmatesoft.svn.core.auth.SVNPasswordAuthentication;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
-import org.tmatesoft.svn.util.SVNDebugLog;
 import org.tmatesoft.svn.util.SVNLogType;
 
 /**
@@ -94,15 +93,10 @@ abstract class HTTPAuthentication {
     }
 
     public void setUserName(String name) {
-        SVNDebugLog.getDefaultLog().logFine(SVNLogType.NETWORK, "Username set on HTTPAuthentication: " + name);
-        SVNDebugLog.getDefaultLog().logFine(SVNLogType.NETWORK, new Exception());
-        
         myUserName = name;
     }
     
     public void setPassword(String password) {
-        SVNDebugLog.getDefaultLog().logFine(SVNLogType.NETWORK, "Password set on HTTPAuthentication: " + password);
-        SVNDebugLog.getDefaultLog().logFine(SVNLogType.NETWORK, new Exception());
         myPassword = password;
     }
     
