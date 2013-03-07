@@ -682,24 +682,27 @@ public class FSCommitter {
             }
             myTxnRoot.setEntry(target, sourceEntry.getName(), sourceEntry.getId(), sourceEntry.getType());
         }
-        long sourceCount = source.getCount();
-        updateAncestry(sourceId, targetId, targetPath, sourceCount);
+        updateAncestry(sourceId, targetId);
         if (myFSFS.supportsMergeInfo()) {
             myTxnRoot.incrementMergeInfoCount(target, mergeInfoIncrement);
         }
         return mergeInfoIncrement;
     }
 
-    private void updateAncestry(FSID sourceId, FSID targetId, String targetPath, long sourcePredecessorCount) throws SVNException {
+    private void updateAncestry(FSID sourceId, FSID targetId) throws SVNException {
         if (!targetId.isTxn()) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_NOT_MUTABLE, "Unexpected immutable node at ''{0}''", targetPath);
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_NOT_MUTABLE, "Attempt to update ancestry of non-mutable node");
             SVNErrorManager.error(err, SVNLogType.FSFS);
         }
-        FSRevisionNode revNode = myFSFS.getRevisionNode(targetId);
-        revNode.setPredecessorId(sourceId);
-        revNode.setCount(sourcePredecessorCount != -1 ? sourcePredecessorCount + 1 : sourcePredecessorCount);
-        revNode.setIsFreshTxnRoot(false);
-        myFSFS.putTxnRevisionNode(targetId, revNode);
+        final FSRevisionNode targetNode = myFSFS.getRevisionNode(targetId);
+        final FSRevisionNode sourceNode = myFSFS.getRevisionNode(sourceId);
+        targetNode.setPredecessorId(sourceNode.getId());
+        final long sourcePredecessorCount = sourceNode.getCount();
+        targetNode.setPredecessorId(sourceId);
+        targetNode.setCount(sourcePredecessorCount != -1 ? sourcePredecessorCount + 1 : sourcePredecessorCount);
+        
+        targetNode.setIsFreshTxnRoot(false);
+        myFSFS.putTxnRevisionNode(targetId, targetNode);
     }
 
     private void verifyLocks() throws SVNException {
