@@ -53,6 +53,7 @@ import org.tmatesoft.svn.core.internal.wc.SVNWCProperties;
 import org.tmatesoft.svn.core.io.ISVNLockHandler;
 import org.tmatesoft.svn.core.io.SVNLocationEntry;
 import org.tmatesoft.svn.core.io.SVNRepository;
+import org.tmatesoft.svn.core.wc2.SvnChecksum;
 import org.tmatesoft.svn.util.SVNLogType;
 
 /**
@@ -82,6 +83,7 @@ public class FSFS {
     public static final String MANIFEST_FILE = "manifest";
 
     public static final String REP_CACHE_DB = "rep-cache.db";
+    public static final String PATH_REVPROP_GENERATION = "revprop-generation";
     public static final String PACK_EXT = ".pack";
     public static final String PACK_KIND_PACK = "pack";
     public static final String PACK_KIND_MANIFEST = "manifest";
@@ -1018,6 +1020,10 @@ public class FSFS {
         return new File(getTransactionsParentDir(), txnID + TXN_PATH_EXT);
     }
 
+    public File getTransactionSha1File(String txnID, SvnChecksum sha1) {
+        return new File(getTransactionDir(txnID), sha1.getDigest());
+    }
+
     public void setYoungestRevisionCache(long revision) {
         myYoungestRevisionCache = revision;
     }
@@ -1807,7 +1813,7 @@ public class FSFS {
     }
 
     protected File getAbsoluteRevisionPath(long revision) throws SVNException {
-        if (!isPackedRevision(revision)) {
+        if (getDBFormat() < MIN_PACKED_FORMAT || !isPackedRevision(revision)) {
             File revFile = getRevisionFile(revision);
             if (revFile.exists()) {
                 return revFile;
@@ -1825,6 +1831,10 @@ public class FSFS {
     protected FSFile getTransactionRevisionNodePropertiesFile(FSID id) {
         File revNodePropsFile = new File(getTransactionDir(id.getTxnID()), PATH_PREFIX_NODE + id.getNodeID() + "." + id.getCopyID() + TXN_PATH_EXT_PROPS);
         return new FSFile(revNodePropsFile);
+    }
+
+    protected File getRevPropGenerationPath() {
+        return new File(getDBRoot(), PATH_REVPROP_GENERATION);
     }
 
     protected File getPackedRevPath(long revision, String kind) throws SVNException {
