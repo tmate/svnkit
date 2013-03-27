@@ -1,10 +1,10 @@
 group = 'org.tmatesoft.svnkit'
-version = '1.8.0'
+version = '1.7.9'
 
 project.ext {
    release = false
    target = '1.5'
-   compatibleSvnVersion = '1.8.0'
+   compatibleSvnVersion = '1.7.8'
 }
 
 apply from: 'build.pom.gradle'
@@ -89,7 +89,7 @@ configure(javaProjects()) {
 project(':svnkit') {
     dependencies {
         compile 'de.regnis.q.sequence:sequence-library:1.0.2'
-        compile 'org.tmatesoft.sqljet:sqljet:1.1.8-SNAPSHOT'
+        compile 'org.tmatesoft.sqljet:sqljet:1.1.7'
         compile 'net.java.dev.jna:jna:3.4.0'
         compile 'com.trilead:trilead-ssh2:1.0.0-build216'
 
@@ -101,9 +101,9 @@ project(':svnkit') {
 project(':svnkit-javahl16') {
     dependencies {
         compile project(path: ':svnkit')
-        compile 'org.apache.subversion:svn-javahl-api:1.8.0-SNAPSHOT'
+        compile 'org.apache.subversion:svn-javahl-api:1.7.8'
 
-        testCompile 'org.apache.subversion:svn-javahl-tests:1.8.0-SNAPSHOT'
+        testCompile 'org.apache.subversion:svn-javahl-tests:1.7.8'
     }
     artifacts { maven jar, sourcesJar, javadocJar }
 }
@@ -158,7 +158,7 @@ project(':svnkit-distribution') {
 
         osgi project(path: ':svnkit-osgi', configuration: 'archives')
         osgi 'com.trilead:trilead-ssh2-osgi:1.0.0-build216'
-        osgi 'org.tmatesoft.sqljet:sqljet-osgi:1.1.8-SNAPSHOT'
+        osgi 'org.tmatesoft.sqljet:sqljet-osgi:1.1.7'
         osgi 'net.java.dev.jna:jna-osgi:3.4.0'
     }
 }
