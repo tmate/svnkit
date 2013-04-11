@@ -1,0 +1,79 @@
+project.ext.srcRoot = file('src/main/java')
+
+testClasses << {
+    def resolvedArtifact = configurations.testCompile.resolvedConfiguration.resolvedArtifacts.find { it.name == 'svn-javahl-tests' }
+    copy {
+        from zipTree(resolvedArtifact.file)
+        into sourceSets.test.output.classesDir
+    }
+}
+
+classes << {
+    def resolvedArtifact = configurations.testCompile.resolvedConfiguration.resolvedArtifacts.find { it.name == 'svn-javahl-api' }
+    copy {
+        from zipTree(resolvedArtifact.file)
+        into sourceSets.main.output.classesDir
+        exclude 'META-INF/**'
+        eachFile { details ->
+            if (details.isDirectory()) {
+                return
+            } else if (details.name.endsWith('.class')) {
+                String javaFilePath = details.path            
+                javaFilePath = javaFilePath.substring(0, javaFilePath.lastIndexOf('.'))
+                while (javaFilePath.indexOf('$') > 0) {
+                    javaFilePath = javaFilePath.substring(0, javaFilePath.lastIndexOf('$'))
+                }
+                File candidate = new File(srcRoot, javaFilePath + '.java')
+                if (candidate.exists()) {
+                    details.exclude()
+                }
+            }
+        }
+    }
+}
+
+test {
+    includes = ['**/tigris/subversion/javahl/BasicTests*', '**/tigris/subversion/javahl/SVNAdminTests*']    
+    //does not pass on Windows: BasicTests.testBasicChangelist
+    systemProperty 'svnkit.wc.17', 'false'
+    ignoreFailures = true
+    workingDir = file('build/tests-working-dir')
+} 
+
+task testJavaHL2(type: Test) {
+    includes = ['*/apache/subversion/javahl/BasicTests*']
+    //does not pass on Windows: BasicTests.testBasicChangelist
+    ignoreFailures = true
+    workingDir = file('build/tests-working-dir')
+    enableAssertions = true
+}
+
+test.doFirst() {
+    mkdir('build/tests-working-dir')
+}
+
+testJavaHL2.doFirst() {
+    mkdir('build/tests-working-dir')
+}
+
+configurations {
+    javahlSources
+}
+
+dependencies {
+    javahlSources group: 'org.tigris.subversion', name: 'svn-javahl-api', version: '1.6.18-v2', classifier: 'sources'
+}
+
+sourcesJar {
+    into('') {
+        from configurations.javahlSources.files.collect { zipTree(it) }
+        exclude 'META-INF/**' 
+        eachFile { f ->
+            if (new File(srcRoot, f.path).exists()) {
+                f.exclude()
+            }
+        }
+    }
+}
+
+sourcesJar.dependsOn configurations.javahlSources
