@@ -255,25 +255,6 @@ public class SVNFileUtil {
         return file.getParentFile();
     }
 
-    public static byte[] readFully(File file) throws SVNException {
-        final byte[] buffer = new byte[(int) file.length()];
-        final InputStream inputStream = SVNFileUtil.openFileForReading(file);
-        try {
-            final int read = SVNFileUtil.readIntoBuffer(inputStream, buffer, 0, buffer.length);
-            if (read != buffer.length) {
-                SVNErrorMessage errorMessage = SVNErrorMessage.create(SVNErrorCode.STREAM_UNEXPECTED_EOF);
-                SVNErrorManager.error(errorMessage, SVNLogType.DEFAULT);
-            }
-            return buffer;
-        } catch (IOException e) {
-            SVNErrorMessage errorMessage = SVNErrorMessage.create(SVNErrorCode.IO_ERROR);
-            SVNErrorManager.error(errorMessage, e, SVNLogType.DEFAULT);
-        } finally {
-            SVNFileUtil.closeFile(inputStream);
-        }
-        return null;
-    }
-
     public static String readFile(File file) throws SVNException {
         InputStream is = null;
         try {
@@ -451,28 +432,6 @@ public class SVNFileUtil {
             } else {
                 os.write(contents.getBytes());
             }
-        } catch (IOException ioe) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, "Cannot write to file ''{0}'': {1}", new Object[] {
-                    file, ioe.getMessage()
-            });
-            SVNErrorManager.error(err, ioe, Level.FINE, SVNLogType.DEFAULT);
-        } catch (SVNException svne) {
-            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, "Cannot write to file ''{0}''", file);
-            SVNErrorManager.error(err, svne, Level.FINE, SVNLogType.DEFAULT);
-        } finally {
-            SVNFileUtil.closeFile(os);
-        }
-    }
-
-    public static void writeToFile(File file, byte[] contents) throws SVNException {
-        if (contents == null) {
-            return;
-        }
-
-        OutputStream os = null;
-        try {
-            os = SVNFileUtil.openFileForWriting(file);
-            os.write(contents);
         } catch (IOException ioe) {
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, "Cannot write to file ''{0}'': {1}", new Object[] {
                     file, ioe.getMessage()

@@ -3,7 +3,6 @@ package org.tmatesoft.svn.core.internal.wc17.db;
 import java.io.File;
 import java.util.EnumMap;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 import org.tmatesoft.svn.core.SVNDepth;
@@ -16,7 +15,6 @@ import org.tmatesoft.svn.core.internal.wc17.SVNWCUtils;
 import org.tmatesoft.svn.core.internal.wc17.db.ISVNWCDb.SVNWCDbKind;
 import org.tmatesoft.svn.core.internal.wc17.db.ISVNWCDb.SVNWCDbLock;
 import org.tmatesoft.svn.core.internal.wc17.db.ISVNWCDb.SVNWCDbStatus;
-import org.tmatesoft.svn.core.internal.wc17.db.StructureFields.InheritedProperties;
 import org.tmatesoft.svn.core.internal.wc17.db.statement.SVNWCDbSchema;
 import org.tmatesoft.svn.core.wc2.SvnChecksum;
 
@@ -118,10 +116,6 @@ public class SvnWcDbStatementUtil {
 
     public static SVNProperties getColumnProperties(SVNSqlJetStatement stmt, Enum<?> f) throws SVNException {
         return stmt.getColumnProperties(f);
-    }
-
-    public static List<Structure<InheritedProperties>> getColumnInheritedProperties(SVNSqlJetStatement stmt, Enum<?> f) throws SVNException {
-        return stmt.getColumnInheritedProperties(f);
     }
     
     public static boolean hasColumnProperties(SVNSqlJetStatement stmt, Enum<?> f) throws SVNException {

@@ -95,7 +95,6 @@ public interface ISVNWCDb {
 
     // int WC_FORMAT_17 = 23;
     int WC_FORMAT_17 = 29;
-    int WC_FORMAT_18 = 31;
 
     int WC_HAS_WORK_QUEUE = 13;
     long INVALID_FILESIZE = -1;
@@ -105,7 +104,6 @@ public interface ISVNWCDb {
     String PRISTINE_STORAGE_RELPATH = "pristine";
     String PRISTINE_TEMPDIR_RELPATH = "";
     String WCROOT_TEMPDIR_RELPATH = "tmp";
-
 
     /** Enumerated constants for how to open a WC datastore. */
     enum SVNWCDbOpenMode {
@@ -326,9 +324,6 @@ public interface ISVNWCDb {
         public SVNWCDbLock lock;
         public boolean incomplete;
 
-        public File movedToAbsPath;
-        public boolean movedHere;
-
         public void load(WCDbInfo info) {
             if (info == null) {
                 return;
@@ -360,9 +355,6 @@ public interface ISVNWCDb {
             locked = info.lock != null;
             lock = info.lock;
             incomplete = info.status == SVNWCDbStatus.Incomplete;
-            
-            movedHere = info.movedHere;
-            movedToAbsPath = info.movedToAbsPath;
         }
     }
 
@@ -1141,9 +1133,6 @@ public interface ISVNWCDb {
         public boolean opRoot;
         public boolean hadProps;
         public boolean haveMoreWork;
-        
-        public boolean movedHere;
-        public File movedToAbsPath;
 
     }
 

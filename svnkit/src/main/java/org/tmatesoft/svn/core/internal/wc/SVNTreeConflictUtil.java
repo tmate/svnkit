@@ -227,11 +227,10 @@ public class SVNTreeConflictUtil {
     }
 
     public static String getHumanReadableConflictDescription(SVNTreeConflictDescription treeConflict) {
-        final String reasonStr = getReasonString(treeConflict);
-        final String actionStr = getActionString(treeConflict);
-        final String operationStr = treeConflict.getOperation().getName();
-        final String kindStr = treeConflict.getNodeKind().toString();
-        final String description = String.format("local %s %s, incoming %s %s upon %s", kindStr, reasonStr, kindStr, actionStr, operationStr);
+        String reasonStr = getReasonString(treeConflict);
+        String actionStr = getActionString(treeConflict);
+        String operationStr = treeConflict.getOperation().getName();
+        String description = "local " + reasonStr + ", incoming " + actionStr + " upon " + operationStr;
         return description;
     }
 
@@ -253,7 +252,7 @@ public class SVNTreeConflictUtil {
     }
 
     private static String getReasonString(SVNTreeConflictDescription treeConflict) {
-        final SVNConflictReason reason = treeConflict.getConflictReason();        
+        SVNConflictReason reason = treeConflict.getConflictReason();
         if (reason == SVNConflictReason.EDITED) {
             return "edit";
         } else if (reason == SVNConflictReason.OBSTRUCTED) {

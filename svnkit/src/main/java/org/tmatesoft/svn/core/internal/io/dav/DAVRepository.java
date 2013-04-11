@@ -62,7 +62,6 @@ import org.tmatesoft.svn.core.internal.wc.SVNDepthFilterEditor;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.io.ISVNEditor;
 import org.tmatesoft.svn.core.io.ISVNFileRevisionHandler;
-import org.tmatesoft.svn.core.io.ISVNInheritedPropertiesHandler;
 import org.tmatesoft.svn.core.io.ISVNLocationEntryHandler;
 import org.tmatesoft.svn.core.io.ISVNLocationSegmentHandler;
 import org.tmatesoft.svn.core.io.ISVNLockHandler;
@@ -1343,9 +1342,6 @@ public class DAVRepository extends SVNRepository {
         SVNURL url = getLocation().setPath(fullPath, true);
         String name = repositoryRoot.equals(url) ? "" : SVNPathUtil.tail(href);
         return new SVNDirEntry(url, repositoryRoot, name, kind, size, hasProperties, lastRevision, date, author);
-    }
-
-    public void getInheritedProperties(String path, long revision, String propertyName, ISVNInheritedPropertiesHandler handler) throws SVNException {
     }
 
 }
