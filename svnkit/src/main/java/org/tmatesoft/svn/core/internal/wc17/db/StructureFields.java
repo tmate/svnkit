@@ -126,16 +126,14 @@ public class StructureFields {
         updateActualProperties,
         newActualProperties,
         keepRecordedInfo,
-        workItems, 
-        iprops;
+        workItems;
     }
     
     public enum DeletionInfo {
         baseDelRelPath,
         movedToRelPath,
         workDelRelPath, 
-        workDelAbsPath,
-        movedToOpRootRelPath
+        workDelAbsPath;
     }
     
     public enum AdditionInfo {
@@ -150,28 +148,8 @@ public class StructureFields {
         originalReposId,
         originalRootUrl, 
         originalUuid, 
-        originalRevision,
-        movedFromRelPath,
-        movedFromOpRootRelPath,
-        movedFromOpDepth,
+        originalRevision
     }
     
-    public enum MovedFromInfo {
-        movedFromRelPath,
-        movedFromOpRootRelPath,
-        opDepth,        
-    }
-
-    public enum MovedInfo {
-        movedFromAbsPath,
-        movedFromOpRootAbsPath,
-        opRootAbsPath,
-        movedFromDeleteAbsPath,
-    }
-    
-    public enum InheritedProperties {
-        pathOrURL,
-        properties
-    }
     
 }

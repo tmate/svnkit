@@ -3,12 +3,10 @@ package org.tmatesoft.svn.core.internal.wc17.db;
 import java.io.File;
 import java.util.EnumMap;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 import org.tmatesoft.svn.core.SVNDepth;
 import org.tmatesoft.svn.core.SVNException;
-import org.tmatesoft.svn.core.SVNNodeKind;
 import org.tmatesoft.svn.core.SVNProperties;
 import org.tmatesoft.svn.core.internal.db.SVNSqlJetStatement;
 import org.tmatesoft.svn.core.internal.util.SVNDate;
@@ -17,10 +15,7 @@ import org.tmatesoft.svn.core.internal.wc17.SVNWCUtils;
 import org.tmatesoft.svn.core.internal.wc17.db.ISVNWCDb.SVNWCDbKind;
 import org.tmatesoft.svn.core.internal.wc17.db.ISVNWCDb.SVNWCDbLock;
 import org.tmatesoft.svn.core.internal.wc17.db.ISVNWCDb.SVNWCDbStatus;
-import org.tmatesoft.svn.core.internal.wc17.db.StructureFields.InheritedProperties;
 import org.tmatesoft.svn.core.internal.wc17.db.statement.SVNWCDbSchema;
-import org.tmatesoft.svn.core.wc.SVNEventAction;
-import org.tmatesoft.svn.core.wc.SVNStatusType;
 import org.tmatesoft.svn.core.wc2.SvnChecksum;
 
 public class SvnWcDbStatementUtil {
@@ -122,10 +117,6 @@ public class SvnWcDbStatementUtil {
     public static SVNProperties getColumnProperties(SVNSqlJetStatement stmt, Enum<?> f) throws SVNException {
         return stmt.getColumnProperties(f);
     }
-
-    public static List<Structure<InheritedProperties>> getColumnInheritedProperties(SVNSqlJetStatement stmt, Enum<?> f) throws SVNException {
-        return stmt.getColumnInheritedProperties(f);
-    }
     
     public static boolean hasColumnProperties(SVNSqlJetStatement stmt, Enum<?> f) throws SVNException {
         return stmt.hasColumnProperties(f);
@@ -217,17 +208,5 @@ public class SvnWcDbStatementUtil {
         if (stmt != null) {
             stmt.reset();
         }
-    }
-
-    public static SVNEventAction getColumnEventAction(SVNSqlJetStatement stmt, Enum<?> f) throws SVNException {
-        return SVNEventAction.getEventActionById(stmt.getColumnLong(f));
-    }
-
-    public static SVNStatusType getColumnStatusType(SVNSqlJetStatement stmt, Enum<?> f) throws SVNException {
-        return SVNStatusType.getStatusById(stmt.getColumnLong(f));
-    }
-
-    public static SVNNodeKind getColumnNodeKind(SVNSqlJetStatement stmt, Enum<?> f) throws SVNException {
-        return SVNNodeKind.getNodeKindById(stmt.getColumnLong(f));
     }
 }

@@ -69,30 +69,27 @@ public abstract class SVNXMLCommand extends SVNCommand {
         return SVNXMLUtil.closeXMLTag(null, tagName, target);
     }
 
-    protected StringBuffer printXMLPropHash(StringBuffer buffer, SVNProperties propHash, boolean namesOnly, boolean inheritedProperties) {
+    protected StringBuffer printXMLPropHash(StringBuffer buffer, SVNProperties propHash, boolean namesOnly) {
         if (propHash != null && !propHash.isEmpty()) {
             buffer = buffer == null ? new StringBuffer() : buffer;
             for (Iterator propNames = propHash.nameSet().iterator(); propNames.hasNext();) {
                 String propName = (String) propNames.next();
                 SVNPropertyValue propVal = propHash.getSVNPropertyValue(propName);
                 if (namesOnly) {
-                    buffer = openXMLTag(inheritedProperties ? "inherited_property" : "property", SVNXMLUtil.XML_STYLE_SELF_CLOSING, "name", propName, buffer);
+                    buffer = openXMLTag("property", SVNXMLUtil.XML_STYLE_SELF_CLOSING, "name", propName, buffer);
                 } else {
-                    buffer = addXMLProp(new SVNPropertyData(propName, propVal, null), inheritedProperties, buffer);                    
+                    buffer = addXMLProp(new SVNPropertyData(propName, propVal, null), buffer);                    
                 }
             }
         }
         return buffer;
     }
 
-    protected StringBuffer addXMLProp(SVNPropertyData property, boolean inheritedProperty, StringBuffer xmlBuffer) {
-        String value = null;
-        if (property != null && property.getValue() != null) {
-            value = property.getValue().getString();
-        }
+    protected StringBuffer addXMLProp(SVNPropertyData property, StringBuffer xmlBuffer) {
+        String value = property.getValue().getString();
         value = value == null ? "" : value;
         boolean isXMLSafe = true;
-        if (property.getValue() != null && property.getValue().isBinary()) {
+        if (property.getValue().isBinary()) {
             CharsetDecoder decoder = Charset.forName("UTF-8").newDecoder();
             decoder.onMalformedInput(CodingErrorAction.REPORT);
             decoder.onUnmappableCharacter(CodingErrorAction.REPORT);
@@ -121,9 +118,9 @@ public abstract class SVNXMLCommand extends SVNCommand {
             }
         }
         value = SVNEncodingUtil.xmlEncodeCDATA(value);
-        xmlBuffer = openXMLTag(inheritedProperty ? "inherited_property" : "property", SVNXMLUtil.XML_STYLE_PROTECT_CDATA, attrs, xmlBuffer);
+        xmlBuffer = openXMLTag("property", SVNXMLUtil.XML_STYLE_PROTECT_CDATA, attrs, xmlBuffer);
         xmlBuffer.append(value);
-        xmlBuffer = closeXMLTag(inheritedProperty ? "inherited_property" : "property", xmlBuffer);
+        xmlBuffer = closeXMLTag("property", xmlBuffer);
         return xmlBuffer;
     }
 }

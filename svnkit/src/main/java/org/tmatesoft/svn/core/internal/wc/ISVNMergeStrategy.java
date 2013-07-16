@@ -33,7 +33,6 @@ import java.util.Map;
  * <p/>
  * See svnkit-ext package
  *
- * @Deprecated
  * @author TMate Software Ltd.
  * @version 1.3
  */

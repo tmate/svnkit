@@ -11,22 +11,34 @@
  */
 package org.tmatesoft.svn.core.internal.io.fs;
 
-import org.tmatesoft.svn.core.*;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.Charset;
+import java.nio.charset.CharsetDecoder;
+import java.nio.charset.CodingErrorAction;
+import java.nio.charset.MalformedInputException;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.Map;
+import java.util.logging.Level;
+
+import org.tmatesoft.svn.core.SVNDepth;
+import org.tmatesoft.svn.core.SVNErrorCode;
+import org.tmatesoft.svn.core.SVNErrorMessage;
+import org.tmatesoft.svn.core.SVNException;
+import org.tmatesoft.svn.core.SVNProperties;
+import org.tmatesoft.svn.core.SVNPropertyValue;
 import org.tmatesoft.svn.core.internal.util.SVNHashMap;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 import org.tmatesoft.svn.core.io.SVNRepository;
 import org.tmatesoft.svn.util.SVNDebugLog;
 import org.tmatesoft.svn.util.SVNLogType;
-
-import java.io.*;
-import java.nio.ByteBuffer;
-import java.nio.channels.FileChannel;
-import java.nio.charset.*;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.Map;
-import java.util.logging.Level;
 
 
 /**
@@ -36,11 +48,8 @@ import java.util.logging.Level;
 public class FSFile {
     
     private File myFile;
-    private byte[] myData;
-    private int myOffset;
-    private int myLength;
     private FileChannel myChannel;
-    private InputStream myInputStream;
+    private FileInputStream myInputStream;
     private long myPosition;
     
     private long myBufferPosition;
@@ -52,24 +61,6 @@ public class FSFile {
     
     public FSFile(File file) {
         myFile = file;
-        myData = null;
-        myPosition = 0;
-        myBufferPosition = 0;
-        myBuffer = ByteBuffer.allocate(1024);
-        myReadLineBuffer = ByteBuffer.allocate(1024);
-        myDecoder = Charset.forName("UTF-8").newDecoder();
-        myDecoder = myDecoder.onMalformedInput(CodingErrorAction.REPORT).onUnmappableCharacter(CodingErrorAction.REPORT);
-    }
-
-    public FSFile(byte[] data) {
-        this(data, 0, data.length);
-    }
-
-    public FSFile(byte[] data, int offset, int length) {
-        myFile = null;
-        myData = data;
-        myOffset = offset;
-        myLength = length;
         myPosition = 0;
         myBufferPosition = 0;
         myBuffer = ByteBuffer.allocate(1024);
@@ -87,7 +78,7 @@ public class FSFile {
     }
 
     public long size() {
-        return myData == null ? myFile.length() : myLength;
+        return myFile.length();
     }
     
     public void resetDigest() {
@@ -300,7 +291,7 @@ public class FSFile {
     }
     
     public int read() throws IOException {
-        if ((myChannel == null && myInputStream == null) || myPosition < myBufferPosition || myPosition >= myBufferPosition + myBuffer.limit()) {
+        if (myChannel == null || myPosition < myBufferPosition || myPosition >= myBufferPosition + myBuffer.limit()) {
             if (fill() <= 0) {
                 return -1;
             }
@@ -367,29 +358,21 @@ public class FSFile {
             try {
                 myChannel.close();
             } catch (IOException e) {}
+            SVNFileUtil.closeFile(myInputStream);
+            myChannel = null;
+            myInputStream = null;
+            myPosition = 0;
+            myDigest = null;
         }
-        SVNFileUtil.closeFile(myInputStream);
-        myChannel = null;
-        myInputStream = null;
-        myPosition = 0;
-        myDigest = null;
+        
     }
     
     private int fill() throws IOException {
-        if ((myChannel == null && myInputStream == null) || myPosition < myBufferPosition || (myData == null && myPosition >= myBufferPosition + myBuffer.limit())) {
+        if (myChannel == null || myPosition < myBufferPosition || myPosition >= myBufferPosition + myBuffer.limit()) {
             myBufferPosition = myPosition;
-            if (myData == null) {
-                getChannel().position(myBufferPosition);
-            } else {
-                myInputStream = new ByteArrayInputStream(myData, myOffset, myLength);
-            }
+            getChannel().position(myBufferPosition);
             myBuffer.clear();
-            int read;
-            if (myData == null) {
-                read = getChannel().read(myBuffer);
-            } else {
-                read = myInputStream.read(myBuffer.array(), myBuffer.position(), myBuffer.limit());
-            }
+            int read = getChannel().read(myBuffer);
             myBuffer.position(0);
             myBuffer.limit(read >= 0 ? read : 0);
             return read;
@@ -406,13 +389,9 @@ public class FSFile {
     }
     
     private FileChannel getChannel() throws IOException {
-        if (myData != null) {
-            return null;
-        }
         if (myChannel == null) {
-            final FileInputStream fileInputStream = SVNFileUtil.createFileInputStream(myFile);
-            myChannel = fileInputStream.getChannel();
-            myInputStream = fileInputStream;
+            myInputStream = SVNFileUtil.createFileInputStream(myFile);
+            myChannel = myInputStream.getChannel();
         }
         return myChannel;
     }

@@ -99,7 +99,7 @@ public class SVNSqlJetSelectStatement extends SVNSqlJetTableStatement {
             next = super.next();
             loadRowValues(next);
             if (next && !pathScopeMatches()) {
-                continue;
+                return false;
             }
         } while(next && !pathIsDecendant());
         
@@ -130,7 +130,7 @@ public class SVNSqlJetSelectStatement extends SVNSqlJetTableStatement {
     }
 
     private boolean pathIsDecendant() throws SVNException {
-        if (getPathScope() != null) {
+        if (isPathScoped()) {
             final String rowPath = getRowPath();
             if (rowPath != null) {
                 if ("".equals(getPathScope()) && !(isStrictiDescendant() && "".equals(rowPath))) {
@@ -143,7 +143,7 @@ public class SVNSqlJetSelectStatement extends SVNSqlJetTableStatement {
         return true;
     }
 
-    protected String getRowPath() throws SVNException {
+    private String getRowPath() {
         if (SVNWCDbSchema.NODES__Indices.I_NODES_PARENT.toString().equals(getIndexName())) {
             return (String) rowValues.get(SVNWCDbSchema.NODES__Fields.parent_relpath.toString());
         }
@@ -292,9 +292,5 @@ public class SVNSqlJetSelectStatement extends SVNSqlJetTableStatement {
             rowValues.clear();
         }
         super.reset();
-    }
-
-    protected static boolean isStrictDescendantOf(String descendant, String ancestor) {
-        return descendant.startsWith(ancestor + "/");
     }
 }
