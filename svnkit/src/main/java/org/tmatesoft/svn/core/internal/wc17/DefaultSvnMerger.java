@@ -55,10 +55,10 @@ public class DefaultSvnMerger implements ISvnMerger {
     }
     
     public SvnMergeResult mergeText(ISvnMerger baseMerger, File resultFile,
-                                    File targetAbspath,
-                                    File detranslatedTargetAbspath, File leftAbspath,
-                                    File rightAbspath, String targetLabel, String leftLabel,
-                                    String rightLabel, SVNDiffOptions options, SVNDiffConflictChoiceStyle style) throws SVNException {
+            File targetAbspath,
+            File detranslatedTargetAbspath, File leftAbspath,
+            File rightAbspath, String targetLabel, String leftLabel,
+            String rightLabel, SVNDiffOptions options) throws SVNException {
         
         ConflictMarkersInfo markersInfo = context.initConflictMarkers(targetLabel, leftLabel, rightLabel);
         String targetMarker = markersInfo.targetMarker;
@@ -79,7 +79,7 @@ public class DefaultSvnMerger implements ISvnMerger {
             QSequenceLineRAData baseData = new QSequenceLineRAFileData(baseIS);
             QSequenceLineRAData localData = new QSequenceLineRAFileData(localIS);
             QSequenceLineRAData latestData = new QSequenceLineRAFileData(latestIS);
-            mergeResult = merger.merge(baseData, localData, latestData, options, result, style);
+            mergeResult = merger.merge(baseData, localData, latestData, options, result, SVNDiffConflictChoiceStyle.CHOOSE_MODIFIED_LATEST);
         } catch (IOException e) {
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, e.getLocalizedMessage());
             SVNErrorManager.error(err, e, SVNLogType.WC);
@@ -97,16 +97,17 @@ public class DefaultSvnMerger implements ISvnMerger {
     }
 
     public SvnMergeResult mergeProperties(ISvnMerger baseMerger,
-                                          File localAbsPath, SVNNodeKind kind,
-                                          SVNConflictVersion leftVersion, SVNConflictVersion rightVersion,
-                                          SVNProperties serverBaseProperties,
-                                          SVNProperties pristineProperties, SVNProperties actualProperties,
-                                          SVNProperties propChanges, boolean baseMerge, boolean dryRun, ISVNConflictHandler conflictResolver) throws SVNException {
+            File localAbsPath, SVNNodeKind kind,
+            SVNConflictVersion leftVersion, SVNConflictVersion rightVersion,
+            SVNProperties serverBaseProperties,
+            SVNProperties pristineProperties, SVNProperties actualProperties,
+            SVNProperties propChanges, boolean baseMerge, boolean dryRun) throws SVNException {
         
         this.workItems = null;
         SVNSkel conflictSkel = null;
         boolean isDir = (kind == SVNNodeKind.DIR);
-
+        ISVNConflictHandler conflictResolver = context.getOptions().getConflictResolver();
+        
         SVNStatusType mergeOutcome = SVNStatusType.UNCHANGED;
         
         if (propChanges != null) {

@@ -13,12 +13,19 @@ import org.tmatesoft.svn.core.internal.wc2.SvnRepositoryAccess.RepositoryInfo;
 import org.tmatesoft.svn.core.io.SVNCapability;
 import org.tmatesoft.svn.core.io.SVNLocationSegment;
 import org.tmatesoft.svn.core.io.SVNRepository;
-import org.tmatesoft.svn.core.wc.*;
-import org.tmatesoft.svn.core.wc2.*;
+import org.tmatesoft.svn.core.wc.SVNEventAction;
+import org.tmatesoft.svn.core.wc.SVNRevision;
+import org.tmatesoft.svn.core.wc2.AbstractSvnUpdate;
+import org.tmatesoft.svn.core.wc2.SvnOperationFactory;
+import org.tmatesoft.svn.core.wc2.SvnRelocate;
+import org.tmatesoft.svn.core.wc2.SvnTarget;
 import org.tmatesoft.svn.util.SVNLogType;
 
 import java.io.File;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 public abstract class SvnNgAbstractUpdate<V, T extends AbstractSvnUpdate<V>> extends SvnNgOperationRunner<V, T> {
 
@@ -57,7 +64,7 @@ public abstract class SvnNgAbstractUpdate<V, T extends AbstractSvnUpdate<V>> ext
                             allowUnversionedObstructions,
                             addsAsMoodifications, 
                             sleepForTimestamp, 
-                            false, getOperation().getOptions().getConflictResolver());
+                            false);
                     anchor = missingParent;
                     revision = SVNRevision.create(revnum);
                 }
@@ -65,16 +72,8 @@ public abstract class SvnNgAbstractUpdate<V, T extends AbstractSvnUpdate<V>> ext
                 anchor = wcContext.acquireWriteLock(localAbspath, !innerUpdate, true);
                 lockRootPath = anchor;
             }
-
-            RecordConflictsResolver recordConflictsResolver = new RecordConflictsResolver();
-            long updateRevision = updateInternal(wcContext, localAbspath, anchor, revision, depth, depthIsSticky, ignoreExternals, allowUnversionedObstructions, addsAsMoodifications, sleepForTimestamp, true, recordConflictsResolver);
-            ISVNConflictHandler conflictResolver = getWcContext().getOptions().getConflictResolver();
-            if (conflictResolver != null && recordConflictsResolver.hasConflicts()) {
-                for (SVNConflictDescription conflictDescription : recordConflictsResolver.getConflicts()) {
-                    getWcContext().resolvedConflict(conflictDescription.getPath(), SVNDepth.UNKNOWN, true, null, true, null);
-                }
-            }
-            return updateRevision;
+            
+            return updateInternal(wcContext, localAbspath, anchor, revision, depth, depthIsSticky, ignoreExternals, allowUnversionedObstructions, addsAsMoodifications, sleepForTimestamp, true);
             
         } finally {
             if (lockRootPath != null) {
@@ -83,7 +82,8 @@ public abstract class SvnNgAbstractUpdate<V, T extends AbstractSvnUpdate<V>> ext
         }
     }
 
-    protected long updateInternal(SVNWCContext wcContext, File localAbspath, File anchorAbspath, SVNRevision revision, SVNDepth depth, boolean depthIsSticky, boolean ignoreExternals, boolean allowUnversionedObstructions, boolean addsAsMoodifications, boolean sleepForTimestamp, boolean notifySummary, ISVNConflictHandler conflictHandler) throws SVNException {
+    protected long updateInternal(SVNWCContext wcContext, File localAbspath, File anchorAbspath, SVNRevision revision, SVNDepth depth, boolean depthIsSticky, boolean ignoreExternals, boolean allowUnversionedObstructions, boolean addsAsMoodifications, boolean sleepForTimestamp, boolean notifySummary) throws SVNException {
+        
         if (depth == SVNDepth.UNKNOWN) {
             depthIsSticky = false;
         }
@@ -94,45 +94,35 @@ public abstract class SvnNgAbstractUpdate<V, T extends AbstractSvnUpdate<V>> ext
         } else {
             target = "";
         }
-
-        ISVNWCDb.WCDbBaseInfo nodeBaseInfo = wcContext.getNodeBase(anchorAbspath, true, false);
-        File reposRelPath = nodeBaseInfo.reposRelPath;
-        SVNURL reposRootUrl = nodeBaseInfo.reposRootUrl;
-        String reposUuid = nodeBaseInfo.reposUuid;
-
-        boolean targetConflicted = false;
-
-        final SVNURL anchorUrl;
-
-        if (reposRelPath != null) {
-            anchorUrl = reposRootUrl.appendPath(SVNFileUtil.getFilePath(reposRelPath), false);
-
-            try {
-                SVNWCContext.ConflictInfo conflictInfo = wcContext.getConflicted(localAbspath, true, true, false);
-                if (conflictInfo.textConflicted || conflictInfo.propConflicted) {
-                    targetConflicted = true;
-                }
-            } catch (SVNException e) {
-                if (e.getErrorMessage().getErrorCode() != SVNErrorCode.WC_PATH_NOT_FOUND) {
-                    throw e;
-                }
-            }
-
-        } else {
-            anchorUrl = null;
+        final SVNURL anchorUrl = wcContext.getNodeUrl(anchorAbspath);
+    
+        if (anchorUrl == null) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_MISSING_URL, "'{0}' has no URL", anchorAbspath);
+            SVNErrorManager.error(err, SVNLogType.WC);
+            return SVNWCContext.INVALID_REVNUM;
         }
-
-        if (anchorUrl == null || targetConflicted) {
-            SVNEvent event = SVNEventFactory.createSVNEvent(localAbspath, SVNNodeKind.UNKNOWN, null, -1, SVNEventAction.SKIP_CONFLICTED, SVNEventAction.UPDATE_SKIP_WORKING_ONLY, null, null);
-            ISVNEventHandler eventHandler = getOperation().getEventHandler();
-            if (eventHandler != null) {
-                eventHandler.handleEvent(event, ISVNEventHandler.UNKNOWN);
+        
+        long baseRevision = wcContext.getNodeBaseRev(anchorAbspath);
+        SVNWCContext.ConflictInfo conflictInfo;
+        boolean treeConflict = false;
+        try {
+            conflictInfo = wcContext.getConflicted(localAbspath, false, false, true);
+            treeConflict = conflictInfo != null && conflictInfo.treeConflicted;
+        } catch (SVNException e) {
+            if (e.getErrorMessage().getErrorCode() != SVNErrorCode.WC_PATH_NOT_FOUND) {
+                throw e;
             }
-            return -1;
+            treeConflict = false;
         }
-
-        boolean croppingTarget = depthIsSticky && depth.compareTo(SVNDepth.INFINITY) < 0;
-        if (croppingTarget) {
+        if (baseRevision == SVNWCContext.INVALID_REVNUM || treeConflict) {
+            if (wcContext.getEventHandler() != null) {
+                handleEvent(SVNEventFactory.createSVNEvent(localAbspath, SVNNodeKind.NONE, null, -1, 
+                        treeConflict ? SVNEventAction.SKIP_CONFLICTED : SVNEventAction.UPDATE_SKIP_WORKING_ONLY, null, null, null, 0, 0));
+                
+            }
+            return SVNWCContext.INVALID_REVNUM;
+        }
+        if (depthIsSticky && depth.compareTo(SVNDepth.INFINITY) < 0) {
             if (depth == SVNDepth.EXCLUDE) {
                 wcContext.exclude(localAbspath);
                 return SVNWCContext.INVALID_REVNUM;
@@ -153,14 +143,11 @@ public abstract class SvnNgAbstractUpdate<V, T extends AbstractSvnUpdate<V>> ext
         
         SVNRepository repos = getRepositoryAccess().createRepository(anchorUrl, anchorAbspath);
         boolean serverSupportsDepth = repos.hasCapability(SVNCapability.DEPTH);
-        
-        
         final SVNReporter17 reporter = new SVNReporter17(localAbspath, wcContext, true, !serverSupportsDepth, depth, 
                 getOperation().isUpdateLocksOnDemand(), false, !depthIsSticky, useCommitTimes, null);
         final long revNumber = getWcContext().getRevisionNumber(revision, null, repos, localAbspath);
         final SVNURL reposRoot = repos.getRepositoryRoot(true);
         
-        final Map<File, Map<String, SVNProperties>> inheritableProperties = SvnNgInheritableProperties.getInheritalbeProperites(wcContext, repos, localAbspath, revNumber, depth);
     
         final SVNRepository[] repos2 = new SVNRepository[1];
         ISVNDirFetcher dirFetcher = new ISVNDirFetcher() {
@@ -189,8 +176,7 @@ public abstract class SvnNgAbstractUpdate<V, T extends AbstractSvnUpdate<V>> ext
     
         SVNExternalsStore externalsStore = new SVNExternalsStore();
         ISVNUpdateEditor editor = SVNUpdateEditor17.createUpdateEditor(wcContext, revNumber, 
-                anchorAbspath, target, inheritableProperties, 
-                useCommitTimes,
+                anchorAbspath, target, useCommitTimes,
                 null,
                 depth, 
                 depthIsSticky,
@@ -200,8 +186,7 @@ public abstract class SvnNgAbstractUpdate<V, T extends AbstractSvnUpdate<V>> ext
                 cleanCheckout,
                 dirFetcher,
                 externalsStore,
-                preservedExts,
-                conflictHandler);
+                preservedExts);
                 
         try {
             repos.update(revNumber, target, depthIsSticky ? depth : SVNDepth.UNKNOWN, false, reporter, editor);
@@ -217,7 +202,7 @@ public abstract class SvnNgAbstractUpdate<V, T extends AbstractSvnUpdate<V>> ext
         long targetRevision = editor.getTargetRevision();
         
         if (targetRevision >= 0) {
-            if ((depth.isRecursive() || croppingTarget) && !getOperation().isIgnoreExternals()) {
+            if ((depth == SVNDepth.INFINITY || depth == SVNDepth.UNKNOWN) && !getOperation().isIgnoreExternals()) {
                 getWcContext().getDb().gatherExternalDefinitions(localAbspath, externalsStore);
                 handleExternals(externalsStore.getNewExternals(), externalsStore.getDepths(), anchorUrl, localAbspath, reposRoot, depth, false);
             }
@@ -544,26 +529,21 @@ public abstract class SvnNgAbstractUpdate<V, T extends AbstractSvnUpdate<V>> ext
         Structure<RepositoryInfo> repositoryInfo = getRepositoryAccess().createRepositoryFor(target, revision, pegRevision, dirAbspath);
         repository = repositoryInfo.<SVNRepository>get(RepositoryInfo.repository);
         long revnum = repositoryInfo.lng(RepositoryInfo.revision);
-        SVNURL switchUrl = repositoryInfo.<SVNURL>get(RepositoryInfo.url);
+        SVNURL swithUrl = repositoryInfo.<SVNURL>get(RepositoryInfo.url);
         repositoryInfo.release();
         
         String uuid = repository.getRepositoryUUID(true);
         String[] preservedExts = getOperation().getOptions().getPreservedConflictFileExtensions();
         boolean useCommitTimes = getOperation().getOptions().isUseCommitTimes();
-        Map<String, SVNProperties> iprops = repository.getInheritedProperties("", revnum, null);
-        if (iprops != null && !iprops.isEmpty()) {
-            iprops = SvnNgInheritableProperties.translateInheritedPropertiesPaths(iprops);
-        }
-        repository.setLocation(SVNURL.parseURIEncoded(SVNPathUtil.removeTail(url.toString())), true);
+
         File definitionAbsPath = SVNFileUtil.getParentFile(localAbsPath);
         ISVNUpdateEditor updateEditor = SvnExternalUpdateEditor.createEditor(
                 getWcContext(), 
                 localAbsPath, 
                 definitionAbsPath, 
-                switchUrl,
+                swithUrl, 
                 reposRootUrl, 
-                uuid,
-                iprops,
+                uuid, 
                 useCommitTimes, 
                 preservedExts, 
                 definitionAbsPath, 
@@ -571,7 +551,7 @@ public abstract class SvnNgAbstractUpdate<V, T extends AbstractSvnUpdate<V>> ext
                 pegRevision, 
                 revision);
         SvnExternalFileReporter reporter = new SvnExternalFileReporter(getWcContext(), localAbsPath, true, useCommitTimes);
-        repository.update(url, revnum, SVNFileUtil.getFileName(localAbsPath), SVNDepth.UNKNOWN, reporter, updateEditor);
+        repository.update(swithUrl, revnum, SVNFileUtil.getFileName(localAbsPath), SVNDepth.UNKNOWN, reporter, updateEditor);
 
         handleEvent(SVNEventFactory.createSVNEvent(localAbsPath, SVNNodeKind.NONE, null, revnum, SVNEventAction.UPDATE_COMPLETED, null, null, null, 1, 1));
 
@@ -669,21 +649,6 @@ public abstract class SvnNgAbstractUpdate<V, T extends AbstractSvnUpdate<V>> ext
             }
         }
         
-        final Map<File, Map<String, SVNProperties>> wcIprops = new HashMap<File, Map<String,SVNProperties>>();
-        if (!switchRootUrl.equals(switchRevUrl)) {
-            boolean isWcRoot = getWcContext().checkWCRoot(localAbsPath, false).wcRoot;
-            boolean needsCache = true;
-            if (!isWcRoot) {
-                final SVNURL parentURL = getWcContext().getNodeUrl(SVNFileUtil.getParentFile(localAbsPath));
-                needsCache =  !(parentURL.appendPath(localAbsPath.getName(), false).equals(switchRevUrl));
-            }
-            if (needsCache) {
-                Map<String, SVNProperties> iprops = repository.getInheritedProperties("", revnum, null);
-                iprops = SvnNgInheritableProperties.translateInheritedPropertiesPaths(iprops);
-                wcIprops.put(localAbsPath, iprops);
-            }
-        }
-        
         repository.setLocation(anchorUrl, false);
         boolean serverSupportsDepth = repository.hasCapability(SVNCapability.DEPTH);
         SVNExternalsStore externalsStore = new SVNExternalsStore();
@@ -714,14 +679,12 @@ public abstract class SvnNgAbstractUpdate<V, T extends AbstractSvnUpdate<V>> ext
         };
         final SVNReporter17 reporter = new SVNReporter17(localAbsPath, getWcContext(), true, !serverSupportsDepth, depth, 
                 getOperation().isUpdateLocksOnDemand(), false, !depthIsSticky, useCommitTimes, null);
-        
-        final ISVNUpdateEditor editor = SVNUpdateEditor17.createUpdateEditor(getWcContext(), 
-                revnum, anchor, target, wcIprops, useCommitTimes, switchRevUrl, depth, depthIsSticky, allowUnversionedObstructions, 
-                false, serverSupportsDepth, false, dirFetcher, externalsStore, preservedExts, getOperation().getOptions().getConflictResolver());
+        ISVNUpdateEditor editor = SVNUpdateEditor17.createUpdateEditor(getWcContext(), 
+                revnum, anchor, target, useCommitTimes, switchRevUrl, depth, depthIsSticky, allowUnversionedObstructions, 
+                false, serverSupportsDepth, false, dirFetcher, externalsStore, preservedExts);
         
         try {
-            //update() method in SVNKit doesn't allow to use ignoreAncestry=false, so we use diff() method
-            repository.diff(switchRevUrl, revnum, revnum, target, ignoreAncestry, depthIsSticky ? depth : SVNDepth.UNKNOWN, true, reporter, editor);
+            repository.update(switchRevUrl, revnum, target, depthIsSticky ? depth : SVNDepth.UNKNOWN, reporter, editor);
         } catch (SVNException e) {
             sleepForTimestamp();
             throw e;
@@ -770,7 +733,7 @@ public abstract class SvnNgAbstractUpdate<V, T extends AbstractSvnUpdate<V>> ext
             getWcContext().initializeWC(localAbspath, url, rootUrl, uuid, revnum, depth == SVNDepth.UNKNOWN ? SVNDepth.INFINITY : depth);
         } else if (fileKind == SVNFileType.DIRECTORY) {
             int formatVersion = getWcContext().checkWC(localAbspath);
-            if (formatVersion >= SVNWCDb.WC_FORMAT_17 && SvnOperationFactory.isVersionedDirectory(localAbspath)) {
+            if (formatVersion == SVNWCDb.WC_FORMAT_17 && SvnOperationFactory.isVersionedDirectory(localAbspath)) {
                 SVNURL entryUrl = getWcContext().getNodeUrl(localAbspath);
                 if (entryUrl != null && !url.equals(entryUrl)) {                
                     String message = "''{0}'' is already a working copy for a different URL";
@@ -800,26 +763,5 @@ public abstract class SvnNgAbstractUpdate<V, T extends AbstractSvnUpdate<V>> ext
         }
         return true;
     
-    }
-
-    private static class RecordConflictsResolver implements ISVNConflictHandler {
-        private final List<SVNConflictDescription> conflicts;
-
-        private RecordConflictsResolver() {
-            this.conflicts = new ArrayList<SVNConflictDescription>();
-        }
-
-        public SVNConflictResult handleConflict(SVNConflictDescription conflictDescription) throws SVNException {
-            conflicts.add(conflictDescription);
-            return new SVNConflictResult(SVNConflictChoice.POSTPONE, null);
-        }
-
-        private List<SVNConflictDescription> getConflicts() {
-            return conflicts;
-        }
-
-        public boolean hasConflicts() {
-            return conflicts.size() > 0;
-        }
     }
 }

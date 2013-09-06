@@ -1157,7 +1157,6 @@ public class SVNLogClient extends SVNBasicClient {
         list.addTarget(SvnTarget.fromFile(path, pegRevision));
         list.setFetchLocks(fetchLocks);
         list.setEntryFields(entryFields);
-        list.setIgnoreExternals(isIgnoreExternals());
         list.setReceiver(new ISvnObjectReceiver<SVNDirEntry>() {            
             public void receive(SvnTarget target, SVNDirEntry object) throws SVNException {
                 handler.handleDirEntry(object);
@@ -1299,7 +1298,6 @@ public class SVNLogClient extends SVNBasicClient {
         list.addTarget(SvnTarget.fromURL(url, pegRevision));
         list.setFetchLocks(fetchLocks);
         list.setEntryFields(entryFields);
-        list.setIgnoreExternals(isIgnoreExternals());
         list.setReceiver(new ISvnObjectReceiver<SVNDirEntry>() {            
             public void receive(SvnTarget target, SVNDirEntry object) throws SVNException {
                 handler.handleDirEntry(object);

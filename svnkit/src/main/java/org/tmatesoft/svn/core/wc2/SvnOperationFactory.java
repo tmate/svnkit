@@ -1212,10 +1212,6 @@ public class SvnOperationFactory implements ISvnOperationOptionsProvider {
         return new SvnGetStatusSummary(this);
     }
 
-    public SvnSetWCDbVersion createSetWCDbVersion() {
-        return new SvnSetWCDbVersion(this);
-    }
-
     /**
      * Sets whether to dispose repository pool on {@link #dispose()} call.
      * This flag has sense only if <code>repositoryPool</code> field is not <code>null</code>.
@@ -1643,7 +1639,7 @@ public class SvnOperationFactory implements ISvnOperationOptionsProvider {
             }
             SVNWCDb db = new SVNWCDb();
             try {
-                db.open(SVNWCDbOpenMode.ReadOnly, (ISVNOptions) null, false, false);
+                db.open(SVNWCDbOpenMode.ReadOnly, (ISVNOptions) null, true, false);
                 DirParsedInfo info = db.parseDir(path, Mode.ReadOnly, true, isAdditionMode);
                 if (info != null && SVNWCDbDir.isUsable(info.wcDbDir)) {
                     return SvnWcGeneration.V17;

@@ -44,7 +44,6 @@ import org.tmatesoft.svn.core.internal.io.dav.handlers.DAVDateRevisionHandler;
 import org.tmatesoft.svn.core.internal.io.dav.handlers.DAVDeletedRevisionHandler;
 import org.tmatesoft.svn.core.internal.io.dav.handlers.DAVEditorHandler;
 import org.tmatesoft.svn.core.internal.io.dav.handlers.DAVFileRevisionHandler;
-import org.tmatesoft.svn.core.internal.io.dav.handlers.DAVInheritedPropertiesHandler;
 import org.tmatesoft.svn.core.internal.io.dav.handlers.DAVLocationSegmentsHandler;
 import org.tmatesoft.svn.core.internal.io.dav.handlers.DAVLocationsHandler;
 import org.tmatesoft.svn.core.internal.io.dav.handlers.DAVLogHandler;
@@ -63,7 +62,6 @@ import org.tmatesoft.svn.core.internal.wc.SVNDepthFilterEditor;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.io.ISVNEditor;
 import org.tmatesoft.svn.core.io.ISVNFileRevisionHandler;
-import org.tmatesoft.svn.core.io.ISVNInheritedPropertiesHandler;
 import org.tmatesoft.svn.core.io.ISVNLocationEntryHandler;
 import org.tmatesoft.svn.core.io.ISVNLocationSegmentHandler;
 import org.tmatesoft.svn.core.io.ISVNLockHandler;
@@ -1346,40 +1344,6 @@ public class DAVRepository extends SVNRepository {
         SVNURL url = getLocation().setPath(fullPath, true);
         String name = repositoryRoot.equals(url) ? "" : SVNPathUtil.tail(href);
         return new SVNDirEntry(url, repositoryRoot, name, kind, size, hasProperties, lastRevision, date, author);
-    }
-
-    protected void getInheritedPropertiesImpl(String path, long revision, String propertyName, ISVNInheritedPropertiesHandler handler) throws SVNException {
-        try {
-            openConnection();
-            DAVConnection connection = getConnection();
-            String thisSessionPath = doGetFullPath("");
-            thisSessionPath = SVNEncodingUtil.uriEncode(thisSessionPath);
-            
-            final DAVBaselineInfo info = DAVUtil.getBaselineInfo(connection, this, thisSessionPath, revision, false, false, null);
-            final String finalBCPath = SVNPathUtil.append(info.baselineBase, info.baselinePath);
-            final StringBuffer requestBody = DAVInheritedPropertiesHandler.generateReport(null, finalBCPath, revision);
-            final DAVInheritedPropertiesHandler davHandler = new DAVInheritedPropertiesHandler();
-            HTTPStatus status = connection.doReport(finalBCPath, requestBody, davHandler);
-            if (status.getCode() == 501) {
-                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.RA_NOT_IMPLEMENTED, "'inherited-props-report' REPORT not implemented");
-                SVNErrorManager.error(err, status.getError(), SVNLogType.NETWORK);
-            }
-            if (handler != null) {
-                final Map<String, SVNProperties> result = davHandler.getInheritedProperties();            
-                for (String propsPath : result.keySet()) {
-                    final SVNProperties propsFromPath = result.get(propsPath);
-                    if (propertyName != null && propsFromPath.containsName(propertyName)) {
-                        final SVNProperties singleProp = new SVNProperties();
-                        singleProp.put(propertyName, propsFromPath.getSVNPropertyValue(propertyName));
-                        handler.handleInheritedProperites(propsPath, singleProp);
-                    } else if (propertyName == null) {
-                        handler.handleInheritedProperites(propsPath, propsFromPath);
-                    }
-                }
-            }
-        } finally {
-            closeConnection();
-        }
     }
 
 }

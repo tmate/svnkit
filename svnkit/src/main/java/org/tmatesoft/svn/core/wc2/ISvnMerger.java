@@ -6,8 +6,6 @@ import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNNodeKind;
 import org.tmatesoft.svn.core.SVNProperties;
 import org.tmatesoft.svn.core.internal.wc.SVNConflictVersion;
-import org.tmatesoft.svn.core.internal.wc.SVNDiffConflictChoiceStyle;
-import org.tmatesoft.svn.core.wc.ISVNConflictHandler;
 import org.tmatesoft.svn.core.wc.ISVNMerger;
 import org.tmatesoft.svn.core.wc.ISVNMergerFactory;
 import org.tmatesoft.svn.core.wc.SVNDiffOptions;
@@ -38,21 +36,20 @@ public interface ISvnMerger extends ISVNMerger {
 	 * @param leftLabel
 	 * @param rightLabel
 	 * @param options merge options to take into account
-	 * @param style
-     * @return result of merging
+	 * @return result of merging
 	 * @throws SVNException
 	 */
     public SvnMergeResult mergeText(
             ISvnMerger baseMerger,
-            File resultFile,
-            File targetAbspath,
-            File detranslatedTargetAbspath,
-            File leftAbspath,
-            File rightAbspath,
-            String targetLabel,
-            String leftLabel,
-            String rightLabel,
-            SVNDiffOptions options, SVNDiffConflictChoiceStyle style) throws SVNException;
+            File resultFile, 
+            File targetAbspath, 
+            File detranslatedTargetAbspath, 
+            File leftAbspath, 
+            File rightAbspath, 
+            String targetLabel, 
+            String leftLabel, 
+            String rightLabel, 
+            SVNDiffOptions options) throws SVNException;
     
     /**
      * Merges the property changes <code>propChanges</code> based on <code>serverBaseProperties</code> 
@@ -69,20 +66,19 @@ public interface ISvnMerger extends ISVNMerger {
      * @param propChanges property changes that come from the repository
      * @param baseMerge if <code>false</code>, then changes only working properties; otherwise, changes both the base and working properties
      * @param dryRun if <code>true</code>, merge is simulated only, no real changes are done
-     * @param conflictResolver
-     * @return result of merging
+     * @return result of merging 
      * @throws SVNException
      */
     public SvnMergeResult mergeProperties(
             ISvnMerger baseMerger,
-            File localAbsPath,
-            SVNNodeKind kind,
-            SVNConflictVersion leftVersion,
+            File localAbsPath, 
+            SVNNodeKind kind, 
+            SVNConflictVersion leftVersion, 
             SVNConflictVersion rightVersion,
-            SVNProperties serverBaseProperties,
-            SVNProperties pristineProperties,
-            SVNProperties actualProperties,
+            SVNProperties serverBaseProperties, 
+            SVNProperties pristineProperties, 
+            SVNProperties actualProperties, 
             SVNProperties propChanges,
-            boolean baseMerge,
-            boolean dryRun, ISVNConflictHandler conflictResolver) throws SVNException;
+            boolean baseMerge, 
+            boolean dryRun) throws SVNException;
 }
