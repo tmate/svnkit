@@ -54,6 +54,7 @@ import org.tmatesoft.svn.core.internal.wc2.admin.SvnRepositoryGetChangedDirector
 import org.tmatesoft.svn.core.internal.wc2.admin.SvnRepositoryGetChangedImpl;
 import org.tmatesoft.svn.core.internal.wc2.admin.SvnRepositoryGetDateImpl;
 import org.tmatesoft.svn.core.internal.wc2.admin.SvnRepositoryGetDiffImpl;
+import org.tmatesoft.svn.core.internal.wc2.admin.SvnRepositoryGetFileSizeImpl;
 import org.tmatesoft.svn.core.internal.wc2.admin.SvnRepositoryGetHistoryImpl;
 import org.tmatesoft.svn.core.internal.wc2.admin.SvnRepositoryGetInfoImpl;
 import org.tmatesoft.svn.core.internal.wc2.admin.SvnRepositoryGetLockImpl;
