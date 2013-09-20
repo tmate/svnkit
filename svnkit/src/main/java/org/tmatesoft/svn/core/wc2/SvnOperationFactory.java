@@ -169,41 +169,7 @@ import org.tmatesoft.svn.core.wc.ISVNOptions;
 import org.tmatesoft.svn.core.wc.ISVNRepositoryPool;
 import org.tmatesoft.svn.core.wc.SVNEvent;
 import org.tmatesoft.svn.core.wc.SVNWCUtil;
-import org.tmatesoft.svn.core.wc2.admin.SvnRepositoryCat;
-import org.tmatesoft.svn.core.wc2.admin.SvnRepositoryCopyRevisionProperties;
-import org.tmatesoft.svn.core.wc2.admin.SvnRepositoryCreate;
-import org.tmatesoft.svn.core.wc2.admin.SvnRepositoryDump;
-import org.tmatesoft.svn.core.wc2.admin.SvnRepositoryFilter;
-import org.tmatesoft.svn.core.wc2.admin.SvnRepositoryGetAuthor;
-import org.tmatesoft.svn.core.wc2.admin.SvnRepositoryGetChanged;
-import org.tmatesoft.svn.core.wc2.admin.SvnRepositoryGetChangedDirectories;
-import org.tmatesoft.svn.core.wc2.admin.SvnRepositoryGetDate;
-import org.tmatesoft.svn.core.wc2.admin.SvnRepositoryGetDiff;
-import org.tmatesoft.svn.core.wc2.admin.SvnRepositoryGetHistory;
-import org.tmatesoft.svn.core.wc2.admin.SvnRepositoryGetInfo;
-import org.tmatesoft.svn.core.wc2.admin.SvnRepositoryGetLock;
-import org.tmatesoft.svn.core.wc2.admin.SvnRepositoryGetLog;
-import org.tmatesoft.svn.core.wc2.admin.SvnRepositoryGetProperties;
-import org.tmatesoft.svn.core.wc2.admin.SvnRepositoryGetProperty;
-import org.tmatesoft.svn.core.wc2.admin.SvnRepositoryGetRevisionProperties;
-import org.tmatesoft.svn.core.wc2.admin.SvnRepositoryGetRevisionProperty;
-import org.tmatesoft.svn.core.wc2.admin.SvnRepositoryGetTree;
-import org.tmatesoft.svn.core.wc2.admin.SvnRepositoryGetUUID;
-import org.tmatesoft.svn.core.wc2.admin.SvnRepositoryGetYoungest;
-import org.tmatesoft.svn.core.wc2.admin.SvnRepositoryHotCopy;
-import org.tmatesoft.svn.core.wc2.admin.SvnRepositoryInitialize;
-import org.tmatesoft.svn.core.wc2.admin.SvnRepositoryListLocks;
-import org.tmatesoft.svn.core.wc2.admin.SvnRepositoryListTransactions;
-import org.tmatesoft.svn.core.wc2.admin.SvnRepositoryLoad;
-import org.tmatesoft.svn.core.wc2.admin.SvnRepositoryPack;
-import org.tmatesoft.svn.core.wc2.admin.SvnRepositoryRecover;
-import org.tmatesoft.svn.core.wc2.admin.SvnRepositoryRemoveLocks;
-import org.tmatesoft.svn.core.wc2.admin.SvnRepositoryRemoveTransactions;
-import org.tmatesoft.svn.core.wc2.admin.SvnRepositorySetUUID;
-import org.tmatesoft.svn.core.wc2.admin.SvnRepositorySyncInfo;
-import org.tmatesoft.svn.core.wc2.admin.SvnRepositorySynchronize;
-import org.tmatesoft.svn.core.wc2.admin.SvnRepositoryUpgrade;
-import org.tmatesoft.svn.core.wc2.admin.SvnRepositoryVerify;
+import org.tmatesoft.svn.core.wc2.admin.*;
 import org.tmatesoft.svn.util.SVNLogType;
 
 /**
@@ -423,7 +389,8 @@ public class SvnOperationFactory implements ISvnOperationOptionsProvider {
         registerOperationRunner(SvnRepositoryGetDiff.class, new SvnRepositoryGetDiffImpl());
         registerOperationRunner(SvnRepositoryGetHistory.class, new SvnRepositoryGetHistoryImpl());
         registerOperationRunner(SvnRepositoryGetTree.class, new SvnRepositoryGetTreeImpl());
-        
+        registerOperationRunner(SvnRepositoryGetFileSize.class, new SvnRepositoryGetFileSizeImpl());
+
         registerOperationRunner(SvnUpgrade.class, new SvnOldUpgrade());
         registerOperationRunner(SvnUpgrade.class, new SvnNgUpgrade());
 
@@ -1202,6 +1169,14 @@ public class SvnOperationFactory implements ISvnOperationOptionsProvider {
      */
     public SvnRepositoryGetRevisionProperties createRepositoryGetRevisionProperties() {
         return new SvnRepositoryGetRevisionProperties(this);
+    }
+
+    /**
+     * Creates operation for retrieving file size from the repository
+     * @return new <code>SvnRepositoryGetFileSize</code> object
+     */
+    public SvnRepositoryGetFileSize createGetRepositoryFileSize() {
+        return new SvnRepositoryGetFileSize(this);
     }
 
     /**
