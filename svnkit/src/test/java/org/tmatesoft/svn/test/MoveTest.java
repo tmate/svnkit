@@ -3,9 +3,7 @@ package org.tmatesoft.svn.test;
 import org.junit.Assert;
 import org.junit.Ignore;
 import org.junit.Test;
-import org.tmatesoft.svn.core.SVNProperties;
-import org.tmatesoft.svn.core.SVNPropertyValue;
-import org.tmatesoft.svn.core.SVNURL;
+import org.tmatesoft.svn.core.*;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 import org.tmatesoft.svn.core.wc.SVNClientManager;
 import org.tmatesoft.svn.core.wc.SVNMoveClient;
@@ -147,6 +145,54 @@ public class MoveTest {
             Assert.assertNotNull(properties);
             final SVNPropertyValue propertyValue = properties.getSVNPropertyValue("propertyName");
             Assert.assertEquals("propertyValue", SVNPropertyValue.getPropertyAsString(propertyValue));
+
+        } finally {
+            svnOperationFactory.dispose();
+            sandbox.dispose();
+        }
+    }
+
+    @Test
+    public void testMoveToMissingObstructedAddedDirectoryShouldFail() throws Exception {
+        //SVNKIT-405
+        final TestOptions options = TestOptions.getInstance();
+
+        final SvnOperationFactory svnOperationFactory = new SvnOperationFactory();
+        final Sandbox sandbox = Sandbox.createWithCleanup(getTestName() + ".testMoveToMissingObstructedAddedDirectoryShouldFail", options);
+        try {
+            final SVNURL url = sandbox.createSvnRepository();
+
+            final CommitBuilder commitBuilder = new CommitBuilder(url);
+            commitBuilder.addFile("sourceFile");
+            commitBuilder.addFile("targetFile");
+            commitBuilder.commit();
+
+            final WorkingCopy workingCopy = sandbox.checkoutNewWorkingCopy(url);
+            final File sourceFile = workingCopy.getFile("sourceFile");
+            final File targetFile = workingCopy.getFile("targetFile");
+
+            final SvnScheduleForRemoval scheduleForRemoval = svnOperationFactory.createScheduleForRemoval();
+            scheduleForRemoval.setSingleTarget(SvnTarget.fromFile(targetFile));
+            scheduleForRemoval.run();
+
+            SVNFileUtil.ensureDirectoryExists(targetFile);
+
+            final SvnScheduleForAddition scheduleForAddition = svnOperationFactory.createScheduleForAddition();
+            scheduleForAddition.setSingleTarget(SvnTarget.fromFile(targetFile));
+            scheduleForAddition.run();
+
+            SVNFileUtil.deleteAll(targetFile, null);
+
+            final SvnCopy copy = svnOperationFactory.createCopy();
+            copy.setSingleTarget(SvnTarget.fromFile(targetFile));
+            copy.addCopySource(SvnCopySource.create(SvnTarget.fromFile(sourceFile), SVNRevision.WORKING));
+            copy.setMove(true);
+            try {
+                copy.run();
+                Assert.fail("An exception should be thrown");
+            } catch (SVNException e) {
+                //expected
+            }
 
         } finally {
             svnOperationFactory.dispose();
