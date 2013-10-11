@@ -4,6 +4,7 @@ import org.junit.Assert;
 import org.junit.Ignore;
 import org.junit.Test;
 import org.tmatesoft.svn.core.*;
+import org.tmatesoft.svn.core.internal.wc.SVNExternal;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 import org.tmatesoft.svn.core.wc.SVNClientManager;
 import org.tmatesoft.svn.core.wc.SVNMoveClient;
@@ -193,6 +194,47 @@ public class MoveTest {
             } catch (SVNException e) {
                 Assert.assertEquals(e.getErrorMessage().getErrorCode(), SVNErrorCode.WC_NOT_WORKING_COPY);
             }
+
+        } finally {
+            svnOperationFactory.dispose();
+            sandbox.dispose();
+        }
+    }
+
+    @Test
+    public void testMoveFileInsteadOfMissingFileExternal() throws Exception {
+        //SVNKIT-405
+        final TestOptions options = TestOptions.getInstance();
+
+        final SvnOperationFactory svnOperationFactory = new SvnOperationFactory();
+        final Sandbox sandbox = Sandbox.createWithCleanup(getTestName() + ".testMoveFileInsteadOfMissingFileExternal", options);
+        try {
+            final SVNURL url = sandbox.createSvnRepository();
+
+            final SVNExternal external = new SVNExternal("external", url.appendPath("file", false).toString(), SVNRevision.create(1), SVNRevision.HEAD, false, true, true);
+
+            final CommitBuilder commitBuilder = new CommitBuilder(url);
+            commitBuilder.addFile("file");
+            commitBuilder.setDirectoryProperty("", SVNProperty.EXTERNALS, SVNPropertyValue.create(external.toString()));
+            commitBuilder.commit();
+
+            final WorkingCopy workingCopy = sandbox.checkoutNewWorkingCopy(url);
+            final File workingCopyDirectory = workingCopy.getWorkingCopyDirectory();
+            final File file = workingCopy.getFile("file");
+            final File externalFile = workingCopy.getFile("external");
+
+            SVNFileUtil.deleteFile(externalFile);
+
+            final SvnCopy copy = svnOperationFactory.createCopy();
+            copy.addCopySource(SvnCopySource.create(SvnTarget.fromFile(file), SVNRevision.WORKING));
+            copy.setSingleTarget(SvnTarget.fromFile(externalFile));
+            copy.setMove(true);
+            copy.run();
+
+            final Map<File, SvnStatus> statuses = TestUtil.getStatuses(svnOperationFactory, workingCopyDirectory);
+            Assert.assertEquals(SVNStatusType.STATUS_DELETED, statuses.get(file).getNodeStatus());
+            Assert.assertEquals(SVNStatusType.STATUS_ADDED, statuses.get(externalFile).getNodeStatus());
+            Assert.assertTrue(statuses.get(externalFile).isCopied());
 
         } finally {
             svnOperationFactory.dispose();
