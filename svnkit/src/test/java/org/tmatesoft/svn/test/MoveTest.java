@@ -191,7 +191,7 @@ public class MoveTest {
                 copy.run();
                 Assert.fail("An exception should be thrown");
             } catch (SVNException e) {
-                //expected
+                Assert.assertEquals(e.getErrorMessage().getErrorCode(), SVNErrorCode.WC_NOT_WORKING_COPY);
             }
 
         } finally {

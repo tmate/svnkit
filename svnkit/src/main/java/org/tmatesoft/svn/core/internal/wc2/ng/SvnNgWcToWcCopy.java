@@ -146,7 +146,7 @@ public class SvnNgWcToWcCopy extends SvnNgOperationRunner<Void, SvnCopy> {
         File lockRoot = null;
         try {
             lockRoot = context.acquireWriteLock(wcRoot, true, true);
-            copy(context, fakeWorkingCopyDirectory, nestedWC, true);
+            copy(context, fakeWorkingCopyDirectory, nestedWC, true, getOperation().isVirtual());
         } finally {
             if (lockRoot != null) {
                 context.releaseWriteLock(lockRoot);
@@ -382,7 +382,7 @@ public class SvnNgWcToWcCopy extends SvnNgOperationRunner<Void, SvnCopy> {
                 for (SvnCopyPair copyPair : copyPairs) {
                     checkCancelled();
                     File dstPath = SVNFileUtil.createFilePath(copyPair.dstParent, copyPair.baseName);
-                    copy(context, copyPair.source, dstPath, getOperation().isVirtual());
+                    copy(context, copyPair.source, dstPath, getOperation().isVirtual(), getOperation().isVirtual());
                 }
             } finally {
                 context.releaseWriteLock(dstAncestor);
@@ -571,7 +571,7 @@ public class SvnNgWcToWcCopy extends SvnNgOperationRunner<Void, SvnCopy> {
     }
 
     protected void move(SVNWCContext context, File source, File dst, boolean metadataOnly) throws SVNException {
-        copy(context, source, dst, true);
+        copy(context, source, dst, true, getOperation().isVirtual());
         if (!metadataOnly) {
             SVNFileUtil.rename(source, dst);
         }
@@ -585,7 +585,7 @@ public class SvnNgWcToWcCopy extends SvnNgOperationRunner<Void, SvnCopy> {
         SvnNgRemove.delete(getWcContext(), source, true, false, this);
     }
 
-    protected void copy(SVNWCContext context, File source, File dst, boolean metadataOnly) throws SVNException {
+    protected void copy(SVNWCContext context, File source, File dst, boolean metadataOnly, boolean virtualCopy) throws SVNException {
         File dstDirectory = SVNFileUtil.getParentFile(dst);
         
         Structure<NodeInfo> srcInfo = null;
@@ -689,7 +689,7 @@ public class SvnNgWcToWcCopy extends SvnNgOperationRunner<Void, SvnCopy> {
             case NotPresent:
                 break;
             default:
-                if (!metadataOnly) {
+                if (!virtualCopy) {
                     SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ENTRY_EXISTS,
                             "There is already a versioned item ''{0}''", dst);
                     SVNErrorManager.error(err, SVNLogType.WC);
