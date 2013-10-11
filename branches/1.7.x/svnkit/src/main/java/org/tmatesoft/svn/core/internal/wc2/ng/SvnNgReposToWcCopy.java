@@ -390,7 +390,7 @@ public class SvnNgReposToWcCopy extends SvnNgOperationRunner<Void, SvnCopy> {
                 }
     
                 if (sameRepositories) {
-                    new SvnNgWcToWcCopy().copy(getWcContext(), dstPath, pair.dst, true);
+                    new SvnNgWcToWcCopy().copy(getWcContext(), dstPath, pair.dst, true, false);
                     File dstLock = getWcContext().acquireWriteLock(dstPath, false, true);
                     try {
                         getWcContext().removeFromRevisionControl(dstPath, false, false);
