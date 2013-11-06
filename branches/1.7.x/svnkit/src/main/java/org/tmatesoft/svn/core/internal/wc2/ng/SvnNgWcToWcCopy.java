@@ -763,10 +763,8 @@ public class SvnNgWcToWcCopy extends SvnNgOperationRunner<Void, SvnCopy> {
         final SVNURL reposRootUrl = baseInfo.reposRootUrl;
         final String reposUuid = baseInfo.reposUuid;
 
-        final String relativePath = SVNPathUtil.getRelativePath(context.getDb().getWCRoot(source).getAbsolutePath(), source.getAbsolutePath());
-
         context.getDb().opCopyFile(dst, pristineProps, changedRev, changedDate, changedAuthor,
-                new File(relativePath), reposRootUrl, reposUuid, revision, checksum, null, null);
+                context.getNodeReposRelPath(source.getAbsoluteFile()), reposRootUrl, reposUuid, revision, checksum, null, null);
 
         final SVNEvent event = SVNEventFactory.createSVNEvent(dst, SVNNodeKind.FILE, null, SVNRepository.INVALID_REVISION, SVNEventAction.COPY, null, null, null);
         handleEvent(event);
