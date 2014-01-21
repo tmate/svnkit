@@ -26,6 +26,51 @@ public class SvnWcDbConflicts extends SvnWcDbShared {
     private static final String CONFLICT_OP_SWITCH = "switch";
     private static final String CONFLICT_OP_MERGE = "merge";
 
+    public static SVNSkel convertToConflictSkel(File wcRootAbsPath, SVNWCDb db, String localRelpath, String conflictOld, String conflictWorking, String conflictNew, String propReject, byte[] treeConflictData) throws SVNException {
+        SVNSkel conflictData = null;
+        if (conflictOld != null || conflictNew != null || conflictWorking != null) {
+            conflictData = createConflictSkel();
+            File oldAbsPath = null;
+            File newAbsPath = null;
+            File wrkAbsPath = null;
+            if (conflictOld != null) {
+                oldAbsPath = SVNFileUtil.createFilePath(wcRootAbsPath, conflictOld);
+            }
+            if (conflictNew != null) {
+                newAbsPath = SVNFileUtil.createFilePath(wcRootAbsPath, conflictNew);
+            }
+            if (conflictWorking != null) {
+                wrkAbsPath = SVNFileUtil.createFilePath(wcRootAbsPath, conflictWorking);
+            }
+
+            addTextConflict(conflictData, db, wcRootAbsPath, wrkAbsPath, oldAbsPath, newAbsPath);
+        }
+        if (propReject != null) {
+            if (conflictData == null) {
+                conflictData = createConflictSkel();
+            }
+            File prejAbsPath = SVNFileUtil.createFilePath(wcRootAbsPath, propReject);
+            addPropConflict(conflictData, db, wcRootAbsPath, prejAbsPath, null, null, null, Collections.<String>emptySet());
+        }
+
+        if (treeConflictData != null) {
+            if (conflictData == null) {
+                conflictData = createConflictSkel();
+            }
+            final SVNSkel tcSkel = SVNSkel.parse(treeConflictData);
+            final File localAbsPath = SVNFileUtil.createFilePath(wcRootAbsPath, localRelpath);
+            final SVNTreeConflictDescription tcDesc = SVNTreeConflictUtil.readSingleTreeConflict(tcSkel, localAbsPath);
+
+            addTreeConflict(conflictData, db, wcRootAbsPath, tcDesc.getConflictReason(), tcDesc.getConflictAction(), null);
+            if (tcDesc.getOperation() != null && tcDesc.getOperation() != SVNOperation.NONE) {
+                setConflictOperation(conflictData, tcDesc.getOperation(), tcDesc.getSourceLeftVersion(), tcDesc.getSourceRightVersion());
+            }
+        } else if (conflictData != null) {
+            setConflictOperation(conflictData, SVNOperation.UPDATE, null, null);
+        }
+        return conflictData;
+    }
+
     public enum ConflictInfo {
         conflictOperation,
         locations,

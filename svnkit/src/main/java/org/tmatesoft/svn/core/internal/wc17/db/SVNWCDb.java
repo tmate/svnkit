@@ -37,7 +37,6 @@ import org.tmatesoft.svn.core.SVNURL;
 import org.tmatesoft.svn.core.internal.db.*;
 import org.tmatesoft.svn.core.internal.db.SVNSqlJetDb.Mode;
 import org.tmatesoft.svn.core.internal.util.SVNDate;
-import org.tmatesoft.svn.core.internal.util.SVNHashMap;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
 import org.tmatesoft.svn.core.internal.util.SVNSkel;
 import org.tmatesoft.svn.core.internal.wc.SVNConflictVersion;
@@ -3245,6 +3244,9 @@ public class SVNWCDb implements ISVNWCDb {
     }
 
     public SVNSkel readConflictInternal(SVNWCDbRoot wcRoot, File localRelPath) throws SVNException {
+        if (wcRoot.getFormat() == ISVNWCDb.WC_FORMAT_17) {
+            return readConflictInternal17(wcRoot, localRelPath);
+        }
         SVNSqlJetStatement statement = wcRoot.getSDb().getStatement(SVNWCDbStatements.SELECT_ACTUAL_NODE);
         try {
             statement.bindf("is", wcRoot.getWcId(), localRelPath);
@@ -3280,6 +3282,25 @@ public class SVNWCDb implements ISVNWCDb {
 
         } finally {
             statement.reset();
+        }
+    }
+
+    private SVNSkel readConflictInternal17(SVNWCDbRoot wcRoot, File localRelPath) throws SVNException {
+        SVNSqlJetStatement stmt = wcRoot.getSDb().getStatement(SVNWCDbStatements.SELECT_ACTUAL_NODE);
+        try {
+            stmt.bindf("is", wcRoot.getWcId(), localRelPath);
+            if (!stmt.next()) {
+                return null;
+            }
+            String conflictOld = stmt.getColumnString(ACTUAL_NODE__Fields.conflict_old);
+            String conflictWorking = stmt.getColumnString(ACTUAL_NODE__Fields.conflict_working);
+            String conflictNew = stmt.getColumnString(ACTUAL_NODE__Fields.conflict_working);
+            String propReject = stmt.getColumnString(ACTUAL_NODE__Fields.prop_reject);
+            byte[] treeConflictData = stmt.getColumnBlob(ACTUAL_NODE__Fields.tree_conflict_data);
+
+            return SvnWcDbConflicts.convertToConflictSkel(wcRoot.getAbsPath(), wcRoot.getDb(), SVNFileUtil.getFilePath(localRelPath), conflictOld, conflictWorking, conflictNew, propReject, treeConflictData);
+        } finally {
+            stmt.reset();
         }
     }
 
