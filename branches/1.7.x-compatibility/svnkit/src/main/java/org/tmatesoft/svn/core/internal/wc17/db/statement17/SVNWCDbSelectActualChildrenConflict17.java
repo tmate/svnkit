@@ -12,7 +12,7 @@ public class SVNWCDbSelectActualChildrenConflict17 extends SVNSqlJetSelectFields
     }
 
     protected boolean isFilterPassed() throws SVNException {
-        if (isColumnNull(SVNWCDbSchema.ACTUAL_NODE__Fields.conflict_data)) {
+        if (isColumnNull(SVNWCDbSchema.ACTUAL_NODE__Fields.tree_conflict_data)) {
             return false;
         }
         if (isColumnNull(SVNWCDbSchema.ACTUAL_NODE__Fields.wc_id)) {
@@ -26,11 +26,11 @@ public class SVNWCDbSelectActualChildrenConflict17 extends SVNSqlJetSelectFields
 
     protected void defineFields() {
         fields.add(SVNWCDbSchema.ACTUAL_NODE__Fields.local_relpath);
-        fields.add(SVNWCDbSchema.ACTUAL_NODE__Fields.conflict_data);
+        fields.add(SVNWCDbSchema.ACTUAL_NODE__Fields.tree_conflict_data);
     }
 
     @Override
     protected Object[] getWhere() throws SVNException {
-        return new Object[]{getColumnLong(1)};
+        return new Object[]{getBind(1)};
     }
 }
