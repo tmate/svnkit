@@ -3367,7 +3367,7 @@ public class SVNWCDb implements ISVNWCDb {
             }
             String conflictOld = stmt.getColumnString(ACTUAL_NODE__Fields.conflict_old);
             String conflictWorking = stmt.getColumnString(ACTUAL_NODE__Fields.conflict_working);
-            String conflictNew = stmt.getColumnString(ACTUAL_NODE__Fields.conflict_working);
+            String conflictNew = stmt.getColumnString(ACTUAL_NODE__Fields.conflict_new);
             String propReject = stmt.getColumnString(ACTUAL_NODE__Fields.prop_reject);
             byte[] treeConflictData = stmt.getColumnBlob(ACTUAL_NODE__Fields.tree_conflict_data);
 
