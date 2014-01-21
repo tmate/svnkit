@@ -87,15 +87,17 @@ public class SvnNgPropertiesManager {
                 SVNWCDb db = (SVNWCDb) context.getDb();
                 SVNWCDb.DirParsedInfo parsed = db.parseDir(absPath, SVNSqlJetDb.Mode.ReadOnly);
                 List<Structure<StructureFields.InheritedProperties>> inheritedProperties = SvnWcDbProperties.readInheritedProperties(parsed.wcDbDir.getWCRoot(), parsed.localRelPath, SVNProperty.INHERITABLE_IGNORES);
-                for (Structure<StructureFields.InheritedProperties> inheritedProperty : inheritedProperties) {
-                    SVNProperties properties = inheritedProperty.get(StructureFields.InheritedProperties.properties);
-                    String path = inheritedProperty.get(StructureFields.InheritedProperties.pathOrURL);
-                    ignoreProperty = properties.getStringValue(SVNProperty.INHERITABLE_IGNORES);
-                    if (ignoreProperty != null) {
-                        for (StringTokenizer tokens = new StringTokenizer(ignoreProperty, "\r\n"); tokens.hasMoreTokens();) {
-                            String token = tokens.nextToken().trim();
-                            if (token.length() > 0) {
-                                allPatterns.add(token);
+                if (inheritedProperties != null) {
+                    for (Structure<StructureFields.InheritedProperties> inheritedProperty : inheritedProperties) {
+                        SVNProperties properties = inheritedProperty.get(StructureFields.InheritedProperties.properties);
+                        String path = inheritedProperty.get(StructureFields.InheritedProperties.pathOrURL);
+                        ignoreProperty = properties.getStringValue(SVNProperty.INHERITABLE_IGNORES);
+                        if (ignoreProperty != null) {
+                            for (StringTokenizer tokens = new StringTokenizer(ignoreProperty, "\r\n"); tokens.hasMoreTokens();) {
+                                String token = tokens.nextToken().trim();
+                                if (token.length() > 0) {
+                                    allPatterns.add(token);
+                                }
                             }
                         }
                     }

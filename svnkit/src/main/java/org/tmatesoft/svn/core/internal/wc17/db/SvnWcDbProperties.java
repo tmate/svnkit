@@ -484,6 +484,10 @@ public class SvnWcDbProperties extends SvnWcDbShared {
         File relPath = localRelPath;
         File parentRelPath = null;
         File expectedParentReposRelPath = null;
+
+        if (root.getFormat() < ISVNWCDb.MIN_INHERITED_PROPERTIES_FORMAT) {
+            return null;
+        }
         
         final List<Structure<InheritedProperties>> inheritedProperties = new ArrayList<Structure<InheritedProperties>>();
         List<Structure<InheritedProperties>> cachedProperties = null; 

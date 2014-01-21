@@ -546,10 +546,11 @@ public class SVNStatusEditor17 {
                 return patterns;
             }
         }
-        for (Structure<InheritedProperties> element : inheritedProps) {
-            final SVNProperties inherited = element.get(InheritedProperties.properties);
-            SvnNgPropertiesManager.splitAndAppend(patterns, inherited.getStringValue(SVNProperty.INHERITABLE_IGNORES));
-            
+        if (inheritedProps != null) {
+            for (Structure<InheritedProperties> element : inheritedProps) {
+                final SVNProperties inherited = element.get(InheritedProperties.properties);
+                SvnNgPropertiesManager.splitAndAppend(patterns, inherited.getStringValue(SVNProperty.INHERITABLE_IGNORES));
+            }
         }
         return patterns;
     }
@@ -569,18 +570,8 @@ public class SVNStatusEditor17 {
         result.load(readInfo);
         
         result.locked = context.getDb().isWCLocked(localAbsPath);
-        WCDbBaseInfo baseInfo = null;
         if (result.haveBase && (result.status == SVNWCDbStatus.Added || result.status == SVNWCDbStatus.Deleted)) {
-            baseInfo = context.getDb().getBaseInfo(localAbsPath, BaseInfoField.lock, BaseInfoField.updateRoot);
-            result.lock = baseInfo.lock;
-        }
-        if (result.haveBase && result.kind == SVNWCDbKind.File) {
-            if (baseInfo == null) {
-                baseInfo = context.getDb().getBaseInfo(localAbsPath, BaseInfoField.lock, BaseInfoField.updateRoot);
-            }
-            result.fileExternal = baseInfo.updateRoot;
-        } else {
-            result.fileExternal = false;
+            result.lock = context.getDb().getBaseInfo(localAbsPath, BaseInfoField.lock).lock;
         }
         result.hasChecksum = readInfo.checksum != null;
         result.copied = readInfo.originalReposRelpath != null;

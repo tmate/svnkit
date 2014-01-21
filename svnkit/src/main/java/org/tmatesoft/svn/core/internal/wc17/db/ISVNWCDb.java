@@ -104,6 +104,7 @@ public interface ISVNWCDb {
     String PRISTINE_TEMPDIR_RELPATH = "";
     String WCROOT_TEMPDIR_RELPATH = "tmp";
 
+    int MIN_INHERITED_PROPERTIES_FORMAT = ISVNWCDb.WC_FORMAT_18;
 
     /** Enumerated constants for how to open a WC datastore. */
     enum SVNWCDbOpenMode {
