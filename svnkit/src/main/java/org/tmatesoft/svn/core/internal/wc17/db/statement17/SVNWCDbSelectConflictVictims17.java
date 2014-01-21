@@ -20,7 +20,9 @@ public class SVNWCDbSelectConflictVictims17 extends SVNSqlJetSelectFieldsStateme
     @Override
     protected boolean isFilterPassed() throws SVNException {
         return getBind(2).equals(getColumnString(SVNWCDbSchema.ACTUAL_NODE__Fields.parent_relpath)) &&
-                !isColumnNull(SVNWCDbSchema.ACTUAL_NODE__Fields.conflict_data);
+                (!isColumnNull(SVNWCDbSchema.ACTUAL_NODE__Fields.conflict_old) ||
+                        !isColumnNull(SVNWCDbSchema.ACTUAL_NODE__Fields.conflict_new) ||
+                        !isColumnNull(SVNWCDbSchema.ACTUAL_NODE__Fields.conflict_working));
     }
 
     @Override
