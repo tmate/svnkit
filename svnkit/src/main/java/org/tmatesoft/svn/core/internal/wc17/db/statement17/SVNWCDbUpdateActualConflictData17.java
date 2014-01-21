@@ -32,4 +32,9 @@ public class SVNWCDbUpdateActualConflictData17 extends SVNSqlJetUpdateStatement 
         values.put(SVNWCDbSchema.ACTUAL_NODE__Fields.tree_conflict_data.name(), getBind(7));
         return values;
     }
+
+    @Override
+    protected Object[] getWhere() throws SVNException {
+        return new Object[]{getBind(1), getBind(2)};
+    }
 }
