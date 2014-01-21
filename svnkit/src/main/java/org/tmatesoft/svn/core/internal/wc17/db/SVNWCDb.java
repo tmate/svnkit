@@ -2867,7 +2867,13 @@ public class SVNWCDb implements ISVNWCDb {
                         SVNProperties properties = getColumnProperties(stmt, SVNWCDbSchema.ACTUAL_NODE__Fields.properties);
                         childItem.special = properties.getSVNPropertyValue(SVNProperty.SPECIAL) != null;
                     }
-                    childItem.conflicted = !isColumnNull(stmt, SVNWCDbSchema.ACTUAL_NODE__Fields.conflict_data);
+
+                    childItem.conflicted = !isColumnNull(stmt, SVNWCDbSchema.ACTUAL_NODE__Fields.conflict_data) || /* data */
+                            !isColumnNull(stmt, SVNWCDbSchema.ACTUAL_NODE__Fields.conflict_old) || /* old */
+                            !isColumnNull(stmt, SVNWCDbSchema.ACTUAL_NODE__Fields.conflict_new) || /* new */
+                            !isColumnNull(stmt, SVNWCDbSchema.ACTUAL_NODE__Fields.conflict_working) || /* working */
+                            !isColumnNull(stmt, SVNWCDbSchema.ACTUAL_NODE__Fields.prop_reject) || /* prop_reject */
+                            !isColumnNull(stmt, SVNWCDbSchema.ACTUAL_NODE__Fields.tree_conflict_data) /* tree_conflict_data */;
                     if (childItem.conflicted) {
                         conflicts.add(name);
                     }
@@ -3043,6 +3049,10 @@ public class SVNWCDb implements ISVNWCDb {
 //        final File localRelPath = parseDir.localRelPath;
         verifyDirUsable(pdh);
 
+        if (pdh.getWCRoot().getFormat() == ISVNWCDb.WC_FORMAT_17) {
+            return readConflicts17(pdh.getWCRoot(), parseDir.localRelPath, createTempFiles);
+        }
+
         /*
          * ### This will be much easier once we have all conflicts in one field
          * of actual.
@@ -3100,6 +3110,56 @@ public class SVNWCDb implements ISVNWCDb {
             conflicts.add(description);
         }
         return conflicts;
+    }
+
+    private List<SVNWCConflictDescription17> readConflicts17(SVNWCDbRoot wcRoot, File localRelPath, boolean createTempFiles) throws SVNException {
+        final File localAbsPath = SVNFileUtil.createFilePath(wcRoot.getAbsPath(), localRelPath);
+        final List<SVNWCConflictDescription17> conflicts = new ArrayList<SVNWCConflictDescription17>();
+
+        SVNSqlJetStatement stmt = wcRoot.getSDb().getStatement(SVNWCDbStatements.SELECT_CONFLICT_DETAILS);
+        try {
+            stmt.bindf("is", wcRoot.getWcId(), localRelPath);
+            while (stmt.next()) {
+                final String conflictOld = stmt.getColumnString(ACTUAL_NODE__Fields.conflict_old);
+                final String conflictWorking = stmt.getColumnString(ACTUAL_NODE__Fields.conflict_working);
+                final String conflictNew = stmt.getColumnString(ACTUAL_NODE__Fields.conflict_new);
+                final String propReject = stmt.getColumnString(ACTUAL_NODE__Fields.prop_reject);
+                final byte[] treeConflictData = stmt.getColumnBlob(ACTUAL_NODE__Fields.tree_conflict_data);
+
+                if (conflictOld != null && conflictWorking != null && conflictNew != null) {
+                    final File conflictNewAbsPath = SVNFileUtil.createFilePath(wcRoot.getAbsPath(), conflictNew);
+                    final File conflictOldAbsPath = SVNFileUtil.createFilePath(wcRoot.getAbsPath(), conflictOld);
+                    final File conflictWorkingAbsPath = SVNFileUtil.createFilePath(wcRoot.getAbsPath(), conflictWorking);
+
+                    final SVNWCConflictDescription17 conflictDescription = SVNWCConflictDescription17.createText(localAbsPath);
+                    conflictDescription.setTheirFile(conflictNewAbsPath);
+                    conflictDescription.setBaseFile(conflictOldAbsPath);
+                    conflictDescription.setMyFile(conflictWorkingAbsPath);
+                    conflicts.add(conflictDescription);
+                }
+
+                if (propReject != null) {
+                    final File propRejectAbsPath = SVNFileUtil.createFilePath(wcRoot.getAbsPath(), propReject);
+
+                    final SVNWCConflictDescription17 conflictDescription = SVNWCConflictDescription17.createProp(localAbsPath, SVNNodeKind.UNKNOWN, "");
+                    conflictDescription.setTheirFile(propRejectAbsPath);
+                    conflicts.add(conflictDescription);
+                }
+
+
+                if (treeConflictData != null) {
+                    final SVNSkel tcSkel = SVNSkel.parse(treeConflictData);
+                    final SVNTreeConflictDescription tcDesc = SVNTreeConflictUtil.readSingleTreeConflict(tcSkel, localAbsPath);
+
+                    final SVNWCConflictDescription17 conflictDescription = SVNWCConflictDescription17.createTree(localAbsPath, tcDesc.getNodeKind(), tcDesc.getOperation(), tcDesc.getSourceLeftVersion(), tcDesc.getSourceRightVersion());
+                    conflicts.add(conflictDescription);
+                }
+            }
+
+            return conflicts;
+        } finally {
+            stmt.reset();
+        }
     }
 
     public SVNSkel readConflict(File localAbsPath) throws SVNException {
