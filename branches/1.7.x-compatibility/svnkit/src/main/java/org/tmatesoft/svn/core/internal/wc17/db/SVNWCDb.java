@@ -3643,7 +3643,12 @@ public class SVNWCDb implements ISVNWCDb {
                     }
                 }
             } else if (haveActual) {
-                if (isColumnNull(stmtActual, SVNWCDbSchema.ACTUAL_NODE__Fields.conflict_data)) {
+                if (isColumnNull(stmtActual, SVNWCDbSchema.ACTUAL_NODE__Fields.conflict_data) &&
+                        isColumnNull(stmtActual, SVNWCDbSchema.ACTUAL_NODE__Fields.tree_conflict_data) &&
+                        isColumnNull(stmtActual, SVNWCDbSchema.ACTUAL_NODE__Fields.prop_reject) &&
+                        isColumnNull(stmtActual, SVNWCDbSchema.ACTUAL_NODE__Fields.conflict_old) &&
+                        isColumnNull(stmtActual, SVNWCDbSchema.ACTUAL_NODE__Fields.conflict_new) &&
+                        isColumnNull(stmtActual, SVNWCDbSchema.ACTUAL_NODE__Fields.conflict_working)) {
                     SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_CORRUPT, "Corrupt data for ''{0}''", wcRoot.getAbsPath(localRelPath));
                     SVNErrorManager.error(err, SVNLogType.WC);
                 }    
