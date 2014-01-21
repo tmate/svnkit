@@ -5578,7 +5578,7 @@ public class SVNWCContext {
     private boolean resolveTreeConflictOnNode(File localAbsPath, SVNConflictChoice conflictChoice) throws SVNException {
         boolean didResolve = false;
 
-        SVNSkel conflicts = SvnWcDbConflicts.readConflict((SVNWCDb) getDb(), localAbsPath);
+        SVNSkel conflicts = getDb().readConflict(localAbsPath);
 
         if (conflicts == null) {
             return didResolve;
@@ -5722,7 +5722,7 @@ public class SVNWCContext {
     private boolean resolvePropConflictOnNode(File localAbsPath, String conflictedPropName, SVNConflictChoice conflictChoice, File mergedFile) throws SVNException {
         boolean didResolve = false;
 
-        SVNSkel conflicts = SvnWcDbConflicts.readConflict((SVNWCDb) getDb(), localAbsPath);
+        SVNSkel conflicts = getDb().readConflict(localAbsPath);
 
         if (conflicts == null) {
             return didResolve;
