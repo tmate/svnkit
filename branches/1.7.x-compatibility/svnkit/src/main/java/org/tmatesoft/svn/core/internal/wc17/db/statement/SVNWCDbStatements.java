@@ -15,10 +15,7 @@ import org.tmatesoft.svn.core.internal.db.SVNSqlJetStatement;
 import org.tmatesoft.svn.core.internal.io.fs.revprop.SVNFSFSRevPropCreateSchema;
 import org.tmatesoft.svn.core.internal.io.fs.revprop.SVNFSFSRevPropGet;
 import org.tmatesoft.svn.core.internal.io.fs.revprop.SVNFSFSRevPropSet;
-import org.tmatesoft.svn.core.internal.wc17.db.statement17.SVNWCDbSelectActualChildrenConflict17;
-import org.tmatesoft.svn.core.internal.wc17.db.statement17.SVNWCDbSelectActualChildrenInfo17;
-import org.tmatesoft.svn.core.internal.wc17.db.statement17.SVNWCDbSelectActualConflictVictims17;
-import org.tmatesoft.svn.core.internal.wc17.db.statement17.SVNWCDbSelectConflictVictims17;
+import org.tmatesoft.svn.core.internal.wc17.db.statement17.*;
 
 /**
  * @author TMate Software Ltd.
@@ -219,6 +216,8 @@ public enum SVNWCDbStatements {
     SELECT_ACTUAL_CHILDREN_INFO_17(SVNWCDbSelectActualChildrenInfo17.class),
     SELECT_ACTUAL_CONFLICT_VICTIMS_17(SVNWCDbSelectActualConflictVictims17.class),
     SELECT_CONFLICT_VICTIMS17(SVNWCDbSelectConflictVictims17.class),
+    UPDATE_ACTUAL_CONFLICT_DATA_17(SVNWCDbUpdateActualConflictData17.class),
+    INSERT_ACTUAL_CONFLICT_DATA_17(SVNWCDbInsertActualConflictData17.class),
     ;
     
 
