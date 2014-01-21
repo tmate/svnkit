@@ -5643,7 +5643,7 @@ public class SVNWCContext {
         SVNSkel workItems = null;
         boolean didResolve = false;
 
-        SVNSkel conflicts = SvnWcDbConflicts.readConflict((SVNWCDb) getDb(), localAbsPath);
+        SVNSkel conflicts = getDb().readConflict(localAbsPath);
 
         if (conflicts == null) {
             return didResolve;
