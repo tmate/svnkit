@@ -37,6 +37,7 @@ import org.tmatesoft.svn.core.SVNURL;
 import org.tmatesoft.svn.core.internal.db.*;
 import org.tmatesoft.svn.core.internal.db.SVNSqlJetDb.Mode;
 import org.tmatesoft.svn.core.internal.util.SVNDate;
+import org.tmatesoft.svn.core.internal.util.SVNHashMap;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
 import org.tmatesoft.svn.core.internal.util.SVNSkel;
 import org.tmatesoft.svn.core.internal.wc.SVNConflictVersion;
@@ -2351,6 +2352,12 @@ public class SVNWCDb implements ISVNWCDb {
     public void markConflictInternal(SVNWCDbRoot wcRoot, File localRelPath, SVNSkel conflictSkel) throws SVNException {
         final boolean isComplete = SvnWcDbConflicts.isConflictSkelComplete(conflictSkel);
         assert isComplete;
+
+        if (wcRoot.getFormat() == ISVNWCDb.WC_FORMAT_17) {
+            markConflictInternal17(wcRoot, localRelPath, conflictSkel);
+            return;
+        }
+
         SVNSqlJetStatement stmt = wcRoot.getSDb().getStatement(SVNWCDbStatements.SELECT_ACTUAL_NODE);
         boolean gotRow;
         try {
@@ -2379,6 +2386,73 @@ public class SVNWCDb implements ISVNWCDb {
             if (stmt != null) {
                 stmt.reset();
             }
+        }
+    }
+
+    private void markConflictInternal17(SVNWCDbRoot wcRoot, File localRelPath, SVNSkel conflictSkel) throws SVNException {
+        File wcRootAbsPath = wcRoot.getAbsPath();
+        File localAbsPath = SVNFileUtil.createFilePath(wcRootAbsPath, localRelPath);
+
+        Structure<ConflictInfo> conflictInfoStructure = SvnWcDbConflicts.readConflictInfo(conflictSkel);
+        SVNOperation operation = conflictInfoStructure.get(ConflictInfo.conflictOperation);
+        List<SVNConflictVersion> locations = conflictInfoStructure.get(ConflictInfo.locations);
+
+        File conflictOldRelPath = null;
+        File conflictNewRelPath = null;
+        File conflictWorkingRelPath = null;
+        File prejRelPath = null;
+        byte[] treeConflictRawData = null;
+
+        if (conflictInfoStructure.is(ConflictInfo.textConflicted)) {
+            Structure<TextConflictInfo> textConflictInfoStructure = SvnWcDbConflicts.readTextConflict(wcRoot.getDb(), localAbsPath, conflictSkel);
+            File mineAbsPath = textConflictInfoStructure.get(TextConflictInfo.mineAbsPath);
+            File theirOldAbsPath = textConflictInfoStructure.get(TextConflictInfo.theirOldAbsPath);
+            File theirAbsPath = textConflictInfoStructure.get(TextConflictInfo.theirAbsPath);
+
+            conflictOldRelPath = theirOldAbsPath == null ? null : SVNFileUtil.skipAncestor(wcRootAbsPath, theirOldAbsPath);
+            conflictNewRelPath = theirAbsPath == null ? null : SVNFileUtil.skipAncestor(wcRootAbsPath, theirAbsPath);
+            conflictWorkingRelPath = mineAbsPath == null ? null : SVNFileUtil.skipAncestor(wcRootAbsPath, mineAbsPath);
+        }
+        if (conflictInfoStructure.is(ConflictInfo.propConflicted)) {
+            Structure<SvnWcDbConflicts.PropertyConflictInfo> propertyConflictInfoStructure = SvnWcDbConflicts.readPropertyConflict(wcRoot.getDb(), localAbsPath, conflictSkel);
+            File markerAbsPath = propertyConflictInfoStructure.get(SvnWcDbConflicts.PropertyConflictInfo.markerAbspath);
+
+            prejRelPath = markerAbsPath == null ? null : SVNFileUtil.skipAncestor(wcRootAbsPath, markerAbsPath);
+        }
+        if (conflictInfoStructure.is(ConflictInfo.treeConflicted)) {
+            Structure<TreeConflictInfo> treeConflictInfoStructure = SvnWcDbConflicts.readTreeConflict(wcRoot.getDb(), localAbsPath, conflictSkel);
+            SVNConflictReason reason = treeConflictInfoStructure.get(SvnWcDbConflicts.TreeConflictInfo.localChange);
+            SVNConflictAction action = treeConflictInfoStructure.get(SvnWcDbConflicts.TreeConflictInfo.incomingChange);
+
+            SVNTreeConflictDescription treeConflictDescription = new SVNTreeConflictDescription(localAbsPath, SVNNodeKind.UNKNOWN, action, reason, operation, locations.get(0), locations.get(1));
+            treeConflictRawData = SVNTreeConflictUtil.getSingleTreeConflictRawData(treeConflictDescription);
+        }
+
+        SVNSqlJetStatement stmt = wcRoot.getSDb().getStatement(SVNWCDbStatements.SELECT_ACTUAL_NODE);
+        boolean gotRow;
+        try {
+            stmt.bindf("is", wcRoot.getWcId(), localRelPath);
+            gotRow = stmt.next();
+            stmt.reset();
+
+            if (gotRow) {
+                stmt = wcRoot.getSDb().getStatement(SVNWCDbStatements.UPDATE_ACTUAL_CONFLICT_DATA_17);
+                stmt.bindf("is", wcRoot.getWcId(), localRelPath);
+            } else {
+                stmt = wcRoot.getSDb().getStatement(SVNWCDbStatements.INSERT_ACTUAL_CONFLICT_DATA_17);
+                stmt.bindf("is", wcRoot.getWcId(), localRelPath);
+                if (localRelPath.getPath().length() > 0) {
+                    stmt.bindString(8, SVNPathUtil.removeTail(localRelPath.getPath()));
+                }
+            }
+            stmt.bindString(3, SVNFileUtil.getFilePath(conflictOldRelPath));
+            stmt.bindString(4, SVNFileUtil.getFilePath(conflictNewRelPath));
+            stmt.bindString(5, SVNFileUtil.getFilePath(conflictWorkingRelPath));
+            stmt.bindString(6, SVNFileUtil.getFilePath(prejRelPath));
+            stmt.bindBlob(7, treeConflictRawData);
+            stmt.done();
+        } finally {
+            stmt.reset();
         }
     }
 
