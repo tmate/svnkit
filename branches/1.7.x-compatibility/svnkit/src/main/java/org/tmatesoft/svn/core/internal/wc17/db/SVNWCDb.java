@@ -6810,37 +6810,39 @@ public class SVNWCDb implements ISVNWCDb {
         SVNTreeConflictDescription conflictDescription = tcInfo.treeConflictDescription;
         File moveSrcOpRootAbsPath = tcInfo.moveSrcOpRootAbsPath;
 
-        SVNWCContext.writeCheck(this, moveSrcOpRootAbsPath);
+        if (moveSrcOpRootAbsPath != null) {
+            SVNWCContext.writeCheck(this, moveSrcOpRootAbsPath);
 
-        DirParsedInfo parsed = parseDir(victimAbsPath, Mode.ReadOnly);
-        SVNWCDbDir pdh = parsed.wcDbDir;
-        File localRelPath = parsed.localRelPath;
+            DirParsedInfo parsed = parseDir(victimAbsPath, Mode.ReadOnly);
+            SVNWCDbDir pdh = parsed.wcDbDir;
+            File localRelPath = parsed.localRelPath;
 
-        verifyDirUsable(pdh);
+            verifyDirUsable(pdh);
 
-        File moveSrcOpRootRelPath = SVNFileUtil.createFilePath(SVNPathUtil.getRelativePath(SVNFileUtil.getFilePath(pdh.getWCRoot().getAbsPath()), SVNFileUtil.getFilePath(moveSrcOpRootAbsPath)));
+            File moveSrcOpRootRelPath = SVNFileUtil.createFilePath(SVNPathUtil.getRelativePath(SVNFileUtil.getFilePath(pdh.getWCRoot().getAbsPath()), SVNFileUtil.getFilePath(moveSrcOpRootAbsPath)));
 
-        UpdateMovedAwayConflictVictim updateMovedAwayConflictVictim = new UpdateMovedAwayConflictVictim();
-        updateMovedAwayConflictVictim.wcRoot = pdh.getWCRoot();
-        updateMovedAwayConflictVictim.victimRelPath = localRelPath;
-        updateMovedAwayConflictVictim.localChange = conflictDescription.getConflictReason();
-        updateMovedAwayConflictVictim.incomingChange = conflictDescription.getConflictAction();
-        updateMovedAwayConflictVictim.moveSrcOpRootRelPath = moveSrcOpRootRelPath;
-        updateMovedAwayConflictVictim.oldVersion = conflictDescription.getSourceLeftVersion();
-        updateMovedAwayConflictVictim.newVersion = conflictDescription.getSourceRightVersion();
-        updateMovedAwayConflictVictim.operation = conflictDescription.getOperation();
+            UpdateMovedAwayConflictVictim updateMovedAwayConflictVictim = new UpdateMovedAwayConflictVictim();
+            updateMovedAwayConflictVictim.wcRoot = pdh.getWCRoot();
+            updateMovedAwayConflictVictim.victimRelPath = localRelPath;
+            updateMovedAwayConflictVictim.localChange = conflictDescription.getConflictReason();
+            updateMovedAwayConflictVictim.incomingChange = conflictDescription.getConflictAction();
+            updateMovedAwayConflictVictim.moveSrcOpRootRelPath = moveSrcOpRootRelPath;
+            updateMovedAwayConflictVictim.oldVersion = conflictDescription.getSourceLeftVersion();
+            updateMovedAwayConflictVictim.newVersion = conflictDescription.getSourceRightVersion();
+            updateMovedAwayConflictVictim.operation = conflictDescription.getOperation();
 
-        pdh.getWCRoot().getSDb().runTransaction(updateMovedAwayConflictVictim);
+            pdh.getWCRoot().getSDb().runTransaction(updateMovedAwayConflictVictim);
 
-        updateMoveListNotify(pdh.getWCRoot(),
-                conflictDescription.getSourceLeftVersion().getPegRevision(), conflictDescription.getSourceRightVersion().getPegRevision(),
-                eventHandler);
+            updateMoveListNotify(pdh.getWCRoot(),
+                    conflictDescription.getSourceLeftVersion().getPegRevision(), conflictDescription.getSourceRightVersion().getPegRevision(),
+                    eventHandler);
 
-        if (eventHandler != null) {
-            SVNEvent event = SVNEventFactory.createSVNEvent(SVNFileUtil.createFilePath(pdh.getWCRoot().getAbsPath(), localRelPath), SVNNodeKind.NONE, null,
-                    conflictDescription.getSourceRightVersion().getPegRevision(), SVNStatusType.INAPPLICABLE, SVNStatusType.INAPPLICABLE,
-                    SVNStatusType.LOCK_UNKNOWN, SVNEventAction.UPDATE_COMPLETED, SVNEventAction.UPDATE_COMPLETED, null, null);
-            eventHandler.handleEvent(event, ISVNEventHandler.UNKNOWN);
+            if (eventHandler != null) {
+                SVNEvent event = SVNEventFactory.createSVNEvent(SVNFileUtil.createFilePath(pdh.getWCRoot().getAbsPath(), localRelPath), SVNNodeKind.NONE, null,
+                        conflictDescription.getSourceRightVersion().getPegRevision(), SVNStatusType.INAPPLICABLE, SVNStatusType.INAPPLICABLE,
+                        SVNStatusType.LOCK_UNKNOWN, SVNEventAction.UPDATE_COMPLETED, SVNEventAction.UPDATE_COMPLETED, null, null);
+                eventHandler.handleEvent(event, ISVNEventHandler.UNKNOWN);
+            }
         }
     }
 
