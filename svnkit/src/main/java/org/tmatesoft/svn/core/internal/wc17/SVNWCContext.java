@@ -4820,7 +4820,7 @@ public class SVNWCContext {
         return wcFormat;
     }
 
-    public void initializeWC(File localAbspath, SVNURL url, SVNURL repositoryRoot, String uuid, long revision, SVNDepth depth) throws SVNException {
+    public void initializeWC(File localAbspath, SVNURL url, SVNURL repositoryRoot, String uuid, long revision, SVNDepth depth, int targetWorkingCopyFormat) throws SVNException {
         assert (isAbsolute(localAbspath));
         assert (url != null);
         assert (repositoryRoot != null);
@@ -4833,7 +4833,7 @@ public class SVNWCContext {
             reposRelpath = SVNFileUtil.createFilePath("");
         }
         if (format < SVNWCDb.WC_FORMAT_17) {
-            initWC(localAbspath, reposRelpath, repositoryRoot, uuid, revision, depth);
+            initWC(localAbspath, reposRelpath, repositoryRoot, uuid, revision, depth, targetWorkingCopyFormat);
             return;
         }
         WCDbInfo readInfo = db.readInfo(localAbspath, InfoField.status, InfoField.revision, InfoField.reposRelPath, InfoField.reposRootUrl, InfoField.reposUuid);
@@ -4876,7 +4876,7 @@ public class SVNWCContext {
         }
     }
 
-    private void initWC(File localAbspath, File reposRelpath, SVNURL repositoryRoot, String uuid, long revNumber, SVNDepth depth) throws SVNException {
+    private void initWC(File localAbspath, File reposRelpath, SVNURL repositoryRoot, String uuid, long revNumber, SVNDepth depth, int workingCopyFormat) throws SVNException {
         File wcAdmDir = SVNWCUtils.admChild(localAbspath, null);
         SVNFileUtil.ensureDirectoryExists(wcAdmDir);
         SVNFileUtil.setHidden(wcAdmDir, true);
@@ -4884,7 +4884,7 @@ public class SVNWCContext {
         SVNFileUtil.ensureDirectoryExists(SVNWCUtils.admChild(localAbspath, WC_ADM_TMP));
         SVNFileUtil.writeToFile(SVNWCUtils.admChild(localAbspath, WC_ADM_FORMAT), "12", null);
         SVNFileUtil.writeToFile(SVNWCUtils.admChild(localAbspath, WC_ADM_ENTRIES), "12", null);
-        db.init(localAbspath, reposRelpath, repositoryRoot, uuid, revNumber, depth);
+        db.init(localAbspath, reposRelpath, repositoryRoot, uuid, revNumber, depth, workingCopyFormat);
     }
 
     public String getActualTarget(File path) throws SVNException {

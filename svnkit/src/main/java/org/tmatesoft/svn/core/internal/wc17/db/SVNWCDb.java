@@ -163,7 +163,7 @@ public class SVNWCDb implements ISVNWCDb {
         return config;
     }
 
-    public void init(File localAbsPath, File reposRelPath, SVNURL reposRootUrl, String reposUuid, long initialRev, SVNDepth depth) throws SVNException {
+    public void init(File localAbsPath, File reposRelPath, SVNURL reposRootUrl, String reposUuid, long initialRev, SVNDepth depth, int workingCopyFormat) throws SVNException {
 
         assert (SVNFileUtil.isAbsolute(localAbsPath));
         assert (reposRelPath != null);
@@ -172,7 +172,7 @@ public class SVNWCDb implements ISVNWCDb {
         /* ### REPOS_ROOT_URL and REPOS_UUID may be NULL. ... more doc: tbd */
 
         /* Create the SDB and insert the basic rows. */
-        CreateDbInfo createDb = createDb(localAbsPath, reposRootUrl, reposUuid, SDB_FILE);
+        CreateDbInfo createDb = createDb(localAbsPath, reposRootUrl, reposUuid, SDB_FILE, workingCopyFormat);
 
         /* Begin construction of the PDH. */
         SVNWCDbDir pdh = new SVNWCDbDir(localAbsPath);
@@ -215,14 +215,19 @@ public class SVNWCDb implements ISVNWCDb {
         public long wcId;
     }
 
-    private CreateDbInfo createDb(File dirAbsPath, SVNURL reposRootUrl, String reposUuid, String sdbFileName) throws SVNException {
+    private CreateDbInfo createDb(File dirAbsPath, SVNURL reposRootUrl, String reposUuid, String sdbFileName, int workingCopyFormat) throws SVNException {
 
         CreateDbInfo info = new CreateDbInfo();
 
         info.sDb = openDb(dirAbsPath, sdbFileName, SVNSqlJetDb.Mode.RWCreate, journalMode);
 
         /* Create the database's schema. */
-        info.sDb.execStatement(SVNWCDbStatements.CREATE_SCHEMA);
+        SVNWCDbCreateSchema createSchema = new SVNWCDbCreateSchema(info.sDb, SVNWCDbCreateSchema.MAIN_DB_STATEMENTS, workingCopyFormat);
+        try {
+            createSchema.exec();
+        } finally {
+            createSchema.reset();
+        }
 
         /* Insert the repository. */
         info.reposId = createReposId(info.sDb, reposRootUrl, reposUuid);
@@ -5950,7 +5955,7 @@ public class SVNWCDb implements ISVNWCDb {
     }
     
     public void upgradeBegin(File localAbspath, SVNWCDbUpgradeData upgradeData, SVNURL repositoryRootUrl, String repositoryUUID) throws SVNException {
-    	CreateDbInfo dbInfo =  createDb(localAbspath, repositoryRootUrl, repositoryUUID, SDB_FILE);
+    	CreateDbInfo dbInfo =  createDb(localAbspath, repositoryRootUrl, repositoryUUID, SDB_FILE, ISVNWCDb.WC_FORMAT_18);
     	upgradeData.repositoryId = dbInfo.reposId;
     	upgradeData.workingCopyId = dbInfo.wcId;
     	    	
