@@ -2423,7 +2423,15 @@ public class SVNWCDb implements ISVNWCDb {
             SVNConflictReason reason = treeConflictInfoStructure.get(SvnWcDbConflicts.TreeConflictInfo.localChange);
             SVNConflictAction action = treeConflictInfoStructure.get(SvnWcDbConflicts.TreeConflictInfo.incomingChange);
 
-            SVNTreeConflictDescription treeConflictDescription = new SVNTreeConflictDescription(localAbsPath, SVNNodeKind.UNKNOWN, action, reason, operation, locations.get(0), locations.get(1));
+            SVNConflictVersion sourceLeftVersion = locations.get(0);
+            SVNConflictVersion sourceRightVersion = locations.get(1);
+            SVNNodeKind nodeKind = SVNNodeKind.UNKNOWN;
+            if (sourceRightVersion != null) {
+                nodeKind = sourceRightVersion.getKind();
+            } else if (sourceLeftVersion != null) {
+                nodeKind = sourceLeftVersion.getKind();
+            }
+            SVNTreeConflictDescription treeConflictDescription = new SVNTreeConflictDescription(localAbsPath, nodeKind, action, reason, operation, sourceLeftVersion, sourceRightVersion);
             treeConflictRawData = SVNTreeConflictUtil.getSingleTreeConflictRawData(treeConflictDescription);
         }
 
@@ -2488,6 +2496,9 @@ public class SVNWCDb implements ISVNWCDb {
     }
 
     private Map<String, SVNTreeConflictDescription> readAllTreeConflicts(SVNWCDbDir pdh, File localRelpath) throws SVNException {
+        if (pdh.getWCRoot().getFormat() == ISVNWCDb.WC_FORMAT_17) {
+            return readAllTreeConflicts17(pdh, localRelpath);
+        }
         Map<String, SVNTreeConflictDescription> treeConflicts = new HashMap<String, SVNTreeConflictDescription>();
         SVNSqlJetStatement stmt = pdh.getWCRoot().getSDb().getStatement(SVNWCDbStatements.SELECT_ACTUAL_CHILDREN_CONFLICT);
         try {
@@ -2530,6 +2541,29 @@ public class SVNWCDb implements ISVNWCDb {
                             rightVersion);
                     treeConflicts.put(childBaseName, treeConflict);
                 }
+                haveRow = stmt.next();
+            }
+        } finally {
+            stmt.reset();
+        }
+        return treeConflicts;
+    }
+
+    private Map<String, SVNTreeConflictDescription> readAllTreeConflicts17(SVNWCDbDir pdh, File localRelpath) throws SVNException {
+        Map<String, SVNTreeConflictDescription> treeConflicts = new HashMap<String, SVNTreeConflictDescription>();
+        SVNSqlJetStatement stmt = pdh.getWCRoot().getSDb().getStatement(SVNWCDbStatements.SELECT_ACTUAL_CHILDREN_CONFLICT_17);
+        try {
+            stmt.bindf("is", pdh.getWCRoot().getWcId(), localRelpath);
+            boolean haveRow = stmt.next();
+            while (haveRow) {
+                final File childRelpath = SVNFileUtil.createFilePath(stmt.getColumnString(SVNWCDbSchema.ACTUAL_NODE__Fields.local_relpath));
+                final String childBaseName = SVNFileUtil.getFileName(childRelpath);
+                final byte[] conflictData = stmt.getColumnBlob(ACTUAL_NODE__Fields.tree_conflict_data);
+                final SVNSkel skel = SVNSkel.parse(conflictData);
+
+                SVNTreeConflictDescription treeConflictDescription = SVNTreeConflictUtil.readSingleTreeConflict(skel, SVNFileUtil.createFilePath(pdh.getWCRoot().getAbsPath(), localRelpath));
+                treeConflicts.put(childBaseName, treeConflictDescription);
+
                 haveRow = stmt.next();
             }
         } finally {
@@ -3225,6 +3259,11 @@ public class SVNWCDb implements ISVNWCDb {
                     final SVNTreeConflictDescription tcDesc = SVNTreeConflictUtil.readSingleTreeConflict(tcSkel, localAbsPath);
 
                     final SVNWCConflictDescription17 conflictDescription = SVNWCConflictDescription17.createTree(localAbsPath, tcDesc.getNodeKind(), tcDesc.getOperation(), tcDesc.getSourceLeftVersion(), tcDesc.getSourceRightVersion());
+                    conflictDescription.setAction(tcDesc.getConflictAction());
+                    conflictDescription.setReason(tcDesc.getConflictReason());
+                    if (tcDesc.getMergeFiles() != null) {
+                        conflictDescription.setMyFile(tcDesc.getMergeFiles().getLocalFile());
+                    }
                     conflicts.add(conflictDescription);
                 }
             }
