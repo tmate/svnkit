@@ -7242,13 +7242,19 @@ public class SVNWCDb implements ISVNWCDb {
         SVNWCDbDir pdh = parsed.wcDbDir;
         verifyDirUsable(pdh);
 
-        GetConflictMarkerFiles conflictMarkerFiles = new GetConflictMarkerFiles();
-        conflictMarkerFiles.wcRoot = pdh.getWCRoot();
-        conflictMarkerFiles.localRelPath = parsed.localRelPath;
-
-        pdh.getWCRoot().getSDb().runTransaction(conflictMarkerFiles);
-
-        return conflictMarkerFiles.markerFiles;
+        if (pdh.getWCRoot().getFormat() == ISVNWCDb.WC_FORMAT_17) {
+            GetConflictMarkerFiles17 conflictMarkerFiles = new GetConflictMarkerFiles17();
+            conflictMarkerFiles.wcRoot = pdh.getWCRoot();
+            conflictMarkerFiles.localRelPath = parsed.localRelPath;
+            pdh.getWCRoot().getSDb().runTransaction(conflictMarkerFiles);
+            return conflictMarkerFiles.markerFiles;
+        } else {
+            GetConflictMarkerFiles conflictMarkerFiles = new GetConflictMarkerFiles();
+            conflictMarkerFiles.wcRoot = pdh.getWCRoot();
+            conflictMarkerFiles.localRelPath = parsed.localRelPath;
+            pdh.getWCRoot().getSDb().runTransaction(conflictMarkerFiles);
+            return conflictMarkerFiles.markerFiles;
+        }
     }
 
     private static class GetConflictMarkerFiles implements SVNSqlJetTransaction {
@@ -7286,6 +7292,76 @@ public class SVNWCDb implements ISVNWCDb {
                         SVNSkel conflicts = SVNSkel.parse(conflictData);
                         List<File> markers = SvnWcDbConflicts.readConflictMarkers(wcRoot.getDb(), wcRoot.getAbsPath(), conflicts);
                         markerFiles.addAll(markers);
+                    }
+                    haveRow = stmt.next();
+                }
+            } finally {
+                stmt.reset();
+            }
+
+            if (markerFiles.size() == 0) {
+                markerFiles = null;
+            }
+        }
+    }
+
+    private static class GetConflictMarkerFiles17 implements SVNSqlJetTransaction {
+        public SVNWCDbRoot wcRoot;
+        public File localRelPath;
+
+        public List<File> markerFiles;
+
+        public void transaction(SVNSqlJetDb db) throws SqlJetException, SVNException {
+            markerFiles = new ArrayList<File>();
+
+            SVNSqlJetStatement stmt = db.getStatement(SVNWCDbStatements.SELECT_ACTUAL_NODE);
+            try {
+                stmt.bindf("is", wcRoot.getWcId(), localRelPath);
+                boolean haveRow = stmt.next();
+                if (haveRow && (
+                        !stmt.isColumnNull(ACTUAL_NODE__Fields.conflict_old) ||
+                        !stmt.isColumnNull(ACTUAL_NODE__Fields.conflict_new) ||
+                        !stmt.isColumnNull(ACTUAL_NODE__Fields.conflict_working))) {
+                    String conflictOldRelPath = stmt.getColumnString(ACTUAL_NODE__Fields.conflict_old);
+                    String conflictNewRelPath = stmt.getColumnString(ACTUAL_NODE__Fields.conflict_new);
+                    String conflictWorkingRelPath = stmt.getColumnString(ACTUAL_NODE__Fields.conflict_working);
+
+                    File conflictOldAbsPath = conflictOldRelPath == null ? null : SVNFileUtil.createFilePath(wcRoot.getAbsPath(), conflictOldRelPath);
+                    File conflictNewAbsPath = conflictNewRelPath == null ? null : SVNFileUtil.createFilePath(wcRoot.getAbsPath(), conflictNewRelPath);
+                    File conflictWorkingAbsPath = conflictWorkingRelPath == null ? null : SVNFileUtil.createFilePath(wcRoot.getAbsPath(), conflictWorkingRelPath);
+
+                    if (conflictOldAbsPath != null) {
+                        markerFiles.add(conflictOldAbsPath);
+                    }
+                    if (conflictNewAbsPath != null) {
+                        markerFiles.add(conflictNewAbsPath);
+                    }
+                    if (conflictWorkingAbsPath != null) {
+                        markerFiles.add(conflictWorkingAbsPath);
+                    }
+                }
+            } finally {
+                stmt.reset();
+            }
+
+            stmt = db.getStatement(SVNWCDbStatements.SELECT_CONFLICT_VICTIMS_17);
+            try {
+                stmt.bindf("is", wcRoot.getWcId(), localRelPath);
+                boolean haveRow = stmt.next();
+
+                while (haveRow) {
+                    String conflictOldRelPath = stmt.getColumnString(ACTUAL_NODE__Fields.conflict_old);
+                    String conflictNewRelPath = stmt.getColumnString(ACTUAL_NODE__Fields.conflict_new);
+                    String conflictWorkingRelPath = stmt.getColumnString(ACTUAL_NODE__Fields.conflict_working);
+
+                    if (conflictOldRelPath != null) {
+                        markerFiles.add(SVNFileUtil.createFilePath(wcRoot.getAbsPath(), conflictOldRelPath));
+                    }
+                    if (conflictNewRelPath != null) {
+                        markerFiles.add(SVNFileUtil.createFilePath(wcRoot.getAbsPath(), conflictNewRelPath));
+                    }
+                    if (conflictWorkingRelPath != null) {
+                        markerFiles.add(SVNFileUtil.createFilePath(wcRoot.getAbsPath(), conflictWorkingRelPath));
                     }
                     haveRow = stmt.next();
                 }
