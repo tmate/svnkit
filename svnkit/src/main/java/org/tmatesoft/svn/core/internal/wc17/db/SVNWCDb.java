@@ -3267,7 +3267,7 @@ public class SVNWCDb implements ISVNWCDb {
                 final String propReject = stmt.getColumnString(ACTUAL_NODE__Fields.prop_reject);
                 final byte[] treeConflictData = stmt.getColumnBlob(ACTUAL_NODE__Fields.tree_conflict_data);
 
-                if (conflictOld != null && conflictWorking != null && conflictNew != null) {
+                if (conflictOld != null || conflictWorking != null || conflictNew != null) {
                     final File conflictNewAbsPath = SVNFileUtil.createFilePath(wcRoot.getAbsPath(), conflictNew);
                     final File conflictOldAbsPath = SVNFileUtil.createFilePath(wcRoot.getAbsPath(), conflictOld);
                     final File conflictWorkingAbsPath = SVNFileUtil.createFilePath(wcRoot.getAbsPath(), conflictWorking);
