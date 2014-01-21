@@ -15,6 +15,10 @@ import org.tmatesoft.svn.core.internal.db.SVNSqlJetStatement;
 import org.tmatesoft.svn.core.internal.io.fs.revprop.SVNFSFSRevPropCreateSchema;
 import org.tmatesoft.svn.core.internal.io.fs.revprop.SVNFSFSRevPropGet;
 import org.tmatesoft.svn.core.internal.io.fs.revprop.SVNFSFSRevPropSet;
+import org.tmatesoft.svn.core.internal.wc17.db.statement17.SVNWCDbSelectActualChildrenConflict17;
+import org.tmatesoft.svn.core.internal.wc17.db.statement17.SVNWCDbSelectActualChildrenInfo17;
+import org.tmatesoft.svn.core.internal.wc17.db.statement17.SVNWCDbSelectActualConflictVictims17;
+import org.tmatesoft.svn.core.internal.wc17.db.statement17.SVNWCDbSelectConflictVictims17;
 
 /**
  * @author TMate Software Ltd.
@@ -209,7 +213,12 @@ public enum SVNWCDbStatements {
     SELECT_HAS_GRANDCHILDREN(SVNWCDbSelectHasGrandChildren.class),
     SELECT_DEPTH_NODE(SVNWCDbSelectDepthNode.class),
     SELECT_BASE_CHILDREN_INFO(SVNWCDbSelectBaseChildrenInfo.class),
-    DELETE_LOCK_RECURSIVELY(SVNWCDbDeleteLockRecursively.class)
+    DELETE_LOCK_RECURSIVELY(SVNWCDbDeleteLockRecursively.class),
+    //1.7 versions of the requests
+    SELECT_ACTUAL_CHILDREN_CONFLICT_17(SVNWCDbSelectActualChildrenConflict17.class),
+    SELECT_ACTUAL_CHILDREN_INFO_17(SVNWCDbSelectActualChildrenInfo17.class),
+    SELECT_ACTUAL_CONFLICT_VICTIMS_17(SVNWCDbSelectActualConflictVictims17.class),
+    SELECT_CONFLICT_VICTIMS17(SVNWCDbSelectConflictVictims17.class),
     ;
     
 
