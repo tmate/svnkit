@@ -62,7 +62,11 @@ public class SvnWcDbRevert extends SvnWcDbShared {
                     stmt.reset();
                 }
                 if (affectedRows > 0) {
-                    stmt = sdb.getStatement(SVNWCDbStatements.SELECT_ACTUAL_CHILDREN_INFO);
+                    if (root.getFormat() == ISVNWCDb.WC_FORMAT_17) {
+                        stmt = sdb.getStatement(SVNWCDbStatements.SELECT_ACTUAL_CHILDREN_INFO_17);
+                    } else {
+                        stmt = sdb.getStatement(SVNWCDbStatements.SELECT_ACTUAL_CHILDREN_INFO);
+                    }
                     try {
                         stmt.bindf("is", root.getWcId(), localRelPath);
                         if (stmt.next()) {
@@ -122,7 +126,11 @@ public class SvnWcDbRevert extends SvnWcDbShared {
                 SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_INVALID_OPERATION_DEPTH, "Can''t revert ''{0}'' without reverting children", root.getAbsPath(localRelPath));
                 SVNErrorManager.error(err, SVNLogType.WC);
             }
-            stmt = sdb.getStatement(SVNWCDbStatements.SELECT_ACTUAL_CHILDREN_INFO);
+            if (root.getFormat() == ISVNWCDb.WC_FORMAT_17) {
+                stmt = sdb.getStatement(SVNWCDbStatements.SELECT_ACTUAL_CHILDREN_INFO_17);
+            } else {
+                stmt = sdb.getStatement(SVNWCDbStatements.SELECT_ACTUAL_CHILDREN_INFO);
+            }
             try {
                 stmt.bindf("is", root.getWcId(), localRelPath);
                 haveRow = stmt.next();

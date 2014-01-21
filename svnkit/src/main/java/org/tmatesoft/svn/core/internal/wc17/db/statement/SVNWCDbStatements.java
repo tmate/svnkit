@@ -215,7 +215,7 @@ public enum SVNWCDbStatements {
     SELECT_ACTUAL_CHILDREN_CONFLICT_17(SVNWCDbSelectActualChildrenConflict17.class),
     SELECT_ACTUAL_CHILDREN_INFO_17(SVNWCDbSelectActualChildrenInfo17.class),
     SELECT_ACTUAL_CONFLICT_VICTIMS_17(SVNWCDbSelectActualConflictVictims17.class),
-    SELECT_CONFLICT_VICTIMS17(SVNWCDbSelectConflictVictims17.class),
+    SELECT_CONFLICT_VICTIMS_17(SVNWCDbSelectConflictVictims17.class),
     UPDATE_ACTUAL_CONFLICT_DATA_17(SVNWCDbUpdateActualConflictData17.class),
     INSERT_ACTUAL_CONFLICT_DATA_17(SVNWCDbInsertActualConflictData17.class),
     ;

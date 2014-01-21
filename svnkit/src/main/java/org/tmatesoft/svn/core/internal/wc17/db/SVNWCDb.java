@@ -2956,7 +2956,11 @@ public class SVNWCDb implements ISVNWCDb {
             } finally {
                 stmt.reset();
             }
-            stmt = db.getStatement(SVNWCDbStatements.SELECT_ACTUAL_CHILDREN_INFO);
+            if (wcRoot.getFormat() == ISVNWCDb.WC_FORMAT_17) {
+                stmt = db.getStatement(SVNWCDbStatements.SELECT_ACTUAL_CHILDREN_INFO_17);
+            } else {
+                stmt = db.getStatement(SVNWCDbStatements.SELECT_ACTUAL_CHILDREN_INFO);
+            }
             try {
                 stmt.bindf("is", wcRoot.getWcId(), dirRelPath);
                 while(stmt.next()) {
@@ -3106,7 +3110,11 @@ public class SVNWCDb implements ISVNWCDb {
         Set<String> found = new HashSet<String>();
 
         /* First look for text and property conflicts in ACTUAL */
-        stmt = sDb.getStatement(SVNWCDbStatements.SELECT_ACTUAL_CONFLICT_VICTIMS);
+        if (wcInfo.wcDbDir.getWCRoot().getFormat() == ISVNWCDb.WC_FORMAT_17) {
+            stmt = sDb.getStatement(SVNWCDbStatements.SELECT_ACTUAL_CONFLICT_VICTIMS_17);
+        } else {
+            stmt = sDb.getStatement(SVNWCDbStatements.SELECT_ACTUAL_CONFLICT_VICTIMS);
+        }
         try {
             stmt.bindf("is", wcId, SVNFileUtil.getFilePath(localRelPath));
             while (stmt.next()) {
