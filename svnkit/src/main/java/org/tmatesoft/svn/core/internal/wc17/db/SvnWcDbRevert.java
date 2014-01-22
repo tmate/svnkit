@@ -197,7 +197,7 @@ public class SvnWcDbRevert extends SvnWcDbShared {
     }
 
     private static void clearMovedTo(SVNWCDbRoot root, File localRelPath, SvnRevertNodesTrigger nodesTableTrigger) throws SVNException {
-        SVNSqlJetStatement stmt = root.getSDb().getStatement(SVNWCDbStatements.SELECT_MOVED_FROM_RELPATH);
+        SVNSqlJetStatement stmt = root.getSDb().getStatement(root.getFormat() == ISVNWCDb.WC_FORMAT_17 ? SVNWCDbStatements.SELECT_MOVED_FROM_RELPATH_17 : SVNWCDbStatements.SELECT_MOVED_FROM_RELPATH);
         try {
             stmt.bindf("is", root.getWcId(), localRelPath);
             boolean haveRow = stmt.next();

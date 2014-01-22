@@ -312,7 +312,7 @@ public class SvnWcDbShared {
         final Structure<MovedFromInfo> result = Structure.obtain(MovedFromInfo.class);
         SVNSqlJetStatement stmt = null;
         try {
-            stmt = root.getSDb().getStatement(SVNWCDbStatements.SELECT_MOVED_FROM_RELPATH);
+            stmt = root.getSDb().getStatement(root.getFormat() == ISVNWCDb.WC_FORMAT_17 ? SVNWCDbStatements.SELECT_MOVED_FROM_RELPATH_17 : SVNWCDbStatements.SELECT_MOVED_FROM_RELPATH);
             stmt.bindf("is", root.getWcId(), movedToOpRootRelPath);
             if (!stmt.next()) {
                 return result;
