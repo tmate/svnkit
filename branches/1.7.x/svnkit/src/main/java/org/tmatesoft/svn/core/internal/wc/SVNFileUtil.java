@@ -662,9 +662,12 @@ public class SVNFileUtil {
                 renamed = true;
             } 
             if (!renamed) {
+            	boolean caseOnly = dst.getAbsolutePath().equalsIgnoreCase(src.getAbsolutePath());
                 boolean wasRO = dst.exists() && !dst.canWrite();
                 setReadonly(src, false);
-                setReadonly(dst, false);
+                if (!caseOnly) {
+                	setReadonly(dst, false);
+                }
                 // try simple atomic rename first
                 if (src.renameTo(dst)) {
                     return;
@@ -672,7 +675,9 @@ public class SVNFileUtil {
                 // use special loop on windows.
                 long sleep = 1;
                 for (int i = 0; i < FILE_CREATION_ATTEMPTS_COUNT; i++) {
-                    dst.delete();
+                	if (!caseOnly) {
+                		dst.delete();
+                	}
                     if (src.renameTo(dst)) {
                         if (wasRO && !isOpenVMS) {
                             dst.setReadOnly();
