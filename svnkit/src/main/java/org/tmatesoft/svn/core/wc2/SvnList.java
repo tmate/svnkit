@@ -40,12 +40,10 @@ public class SvnList extends SvnReceivingOperation<SVNDirEntry> {
 
     private boolean isFetchLocks;
     private int entryFields;
-    private boolean ignoreExternals;
     
     protected SvnList(SvnOperationFactory factory) {
         super(factory);
         setEntryFields(SVNDirEntry.DIRENT_ALL);
-        ignoreExternals = true;
     }
 
    /**
@@ -97,14 +95,6 @@ public class SvnList extends SvnReceivingOperation<SVNDirEntry> {
     @Override
     public boolean isChangesWorkingCopy() {
         return false;
-    }
-
-    public boolean isIgnoreExternals() {
-        return ignoreExternals;
-    }
-
-    public void setIgnoreExternals(boolean ignoreExternals) {
-        this.ignoreExternals = ignoreExternals;
     }
 
     @Override

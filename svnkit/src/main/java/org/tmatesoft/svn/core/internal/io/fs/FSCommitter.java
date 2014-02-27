@@ -528,11 +528,26 @@ public class FSCommitter {
 
         File txnPropsFile = myFSFS.getTransactionPropertiesFile(myTxn.getTxnId());
 
-        if (myFSFS.getDBFormat() < FSFS.MIN_PACKED_REVPROP_FORMAT || newRevision >= myFSFS.getMinUnpackedRevProp()){
+        if (myFSFS.getDBFormat() < FSFS.MIN_PACKED_REVPROP_FORMAT ||
+                newRevision >= myFSFS.getMinUnpackedRevProp()){
             File dstRevPropsFile = myFSFS.getNewRevisionPropertiesFile(newRevision);
             SVNFileUtil.rename(txnPropsFile, dstRevPropsFile);
-        } else {
-            // TODO pack property?
+        }
+        else
+        {
+          /* Read the revprops, and commit them to the permenant sqlite db. */
+          FSFile fsfProps = new FSFile(txnPropsFile);
+          try {
+              final SVNProperties revProperties = fsfProps.readProperties(false, true);
+              final SVNSqlJetStatement stmt = myFSFS.getRevisionProperitesDb().getStatement(SVNWCDbStatements.FSFS_SET_REVPROP);
+              try{
+                  stmt.insert(new Object[] { newRevision, SVNSkel.createPropList(revProperties.asMap()).getData() } );
+              } finally{
+                  stmt.reset();
+              }
+          } finally {
+              fsfProps.close();
+          }
         }
 
         try {

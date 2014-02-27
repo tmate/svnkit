@@ -148,8 +148,7 @@ public class SvnMerge extends SvnOperation<Void> {
     
     private SvnTarget firstSource;
     private SvnTarget secondSource;
-
-    private boolean ignoreMergeInfo;
+    
     private boolean ignoreAncestry;
     private boolean force;
     private boolean recordOnly;
@@ -267,14 +266,6 @@ public class SvnMerge extends SvnOperation<Void> {
      */
     public boolean isReintegrate() {
         return this.reintegrate;
-    }
-
-    public boolean isIgnoreMergeInfo() {
-        return ignoreMergeInfo;
-    }
-
-    public void setIgnoreMergeInfo(boolean ignoreMergeInfo) {
-        this.ignoreMergeInfo = ignoreMergeInfo;
     }
 
     /**

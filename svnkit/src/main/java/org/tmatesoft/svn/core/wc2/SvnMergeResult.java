@@ -1,7 +1,6 @@
 package org.tmatesoft.svn.core.wc2;
 
 import org.tmatesoft.svn.core.SVNProperties;
-import org.tmatesoft.svn.core.internal.util.SVNSkel;
 import org.tmatesoft.svn.core.wc.SVNStatusType;
 
 /**
@@ -17,7 +16,6 @@ public class SvnMergeResult {
     private final SVNStatusType mergeOutcome;
     private SVNProperties actualProperties;
     private SVNProperties baseProperties;
-    private SVNSkel conflictSkel;
 
     /**
      * Creates merge result object and initializes it with merge outcome (status).
@@ -29,7 +27,7 @@ public class SvnMergeResult {
         return new SvnMergeResult(mergeOutcome);
     }
     
-    public SvnMergeResult(SVNStatusType mergeOutcome) {
+    private SvnMergeResult(SVNStatusType mergeOutcome) {
         this.mergeOutcome = mergeOutcome;
     }
     
@@ -82,21 +80,5 @@ public class SvnMergeResult {
      */
     public void setBaseProperties(SVNProperties baseProperties) {
         this.baseProperties = baseProperties;
-    }
-
-    /**
-     * Gets conflict.
-     * @return conflict
-     */
-    public SVNSkel getConflictSkel() {
-        return conflictSkel;
-    }
-
-    /**
-     * Sets conflict.
-     * @param conflictSkel conflict
-     */
-    public void setConflictSkel(SVNSkel conflictSkel) {
-        this.conflictSkel = conflictSkel;
     }
 }

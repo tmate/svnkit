@@ -23,15 +23,13 @@ public class SvnOldImport extends SvnOldRunner<SVNCommitInfo, SvnImport> {
         SVNCommitClient16 client = new SVNCommitClient16(getOperation().getRepositoryPool(), getOperation().getOptions());
         client.setEventHandler(getOperation().getEventHandler());
         client.setCommitHandler(SvnCodec.commitHandler(getOperation().getCommitHandler()));
-        SVNCommitInfo info = client.doImport(getOperation().getSource(),
+        SVNCommitInfo info = client.doImport(getOperation().getSource(), 
                 getOperation().getFirstTarget().getURL(), 
                 getOperation().getCommitMessage(), 
                 getOperation().getRevisionProperties(), 
                 getOperation().isUseGlobalIgnores(), 
                 getOperation().isForce(), 
-                getOperation().getDepth(),
-                getOperation().isApplyAutoProperties(),
-                getOperation().getFileFilter());
+                getOperation().getDepth());
         
         if (info != null) {
             getOperation().receive(getOperation().getFirstTarget(), info);

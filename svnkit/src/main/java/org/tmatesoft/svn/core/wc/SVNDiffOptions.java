@@ -30,7 +30,6 @@ public class SVNDiffOptions {
     private boolean myIsIgnoreAllWhitespace;
     private boolean myIsIgnoreAmountOfWhitespace;
     private boolean myIsIgnoreEOLStyle;
-    private boolean myIsShowCFunction;
 
     /**
      * Creates a new diff options object. 
@@ -111,20 +110,6 @@ public class SVNDiffOptions {
      */
     public void setIgnoreEOLStyle(boolean isIgnoreEOLStyle) {
         myIsIgnoreEOLStyle = isIgnoreEOLStyle;
-    }
-
-    /**
-     * NOTE: not supported currently
-     */
-    public boolean isShowCFunction() {
-        return myIsShowCFunction;
-    }
-
-    /**
-     * NOTE: not supported currently
-     */
-    public void setShowCFunction(boolean showCFunction) {
-        this.myIsShowCFunction = showCFunction;
     }
 
     /**
