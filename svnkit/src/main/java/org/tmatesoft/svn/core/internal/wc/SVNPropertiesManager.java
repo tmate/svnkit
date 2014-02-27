@@ -15,7 +15,10 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.util.*;
+import java.util.Collection;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.StringTokenizer;
 
 import org.tmatesoft.svn.core.SVNDepth;
 import org.tmatesoft.svn.core.SVNErrorCode;
@@ -56,8 +59,6 @@ public class SVNPropertiesManager {
     static {
         NOT_ALLOWED_FOR_FILE.add(SVNProperty.IGNORE);
         NOT_ALLOWED_FOR_FILE.add(SVNProperty.EXTERNALS);
-        NOT_ALLOWED_FOR_FILE.add(SVNProperty.INHERITABLE_IGNORES);
-        NOT_ALLOWED_FOR_FILE.add(SVNProperty.INHERITABLE_AUTO_PROPS);
 
         NOT_ALLOWED_FOR_DIR.add(SVNProperty.EXECUTABLE);
         NOT_ALLOWED_FOR_DIR.add(SVNProperty.KEYWORDS);
@@ -458,25 +459,12 @@ public class SVNPropertiesManager {
                     SVNErrorManager.error(error, SVNLogType.DEFAULT);
                 }
             }
-        } else if (SVNProperty.IGNORE.equals(name) || SVNProperty.INHERITABLE_IGNORES.equals(name) || SVNProperty.EXTERNALS.equals(name)) {
+        } else if (SVNProperty.IGNORE.equals(name) || SVNProperty.EXTERNALS.equals(name)) {
             if (!value.getString().endsWith("\n")) {
                 value = SVNPropertyValue.create(value.getString().concat("\n"));
             }
             if (SVNProperty.EXTERNALS.equals(name)) {
-                SVNExternal[] externals = SVNExternal.parseExternals(path, value.getString());
-
-                List<String> duplicateTargets = SVNExternal.findTargetDuplications(externals);
-                if (duplicateTargets != null && duplicateTargets.size() > 0) {
-                    StringBuilder moreString = new StringBuilder();
-                    if (duplicateTargets.size() > 1) {
-                        moreString.append(" (").append(duplicateTargets.size()).append(" more duplicate targets found)");
-                    }
-
-                    String absolutePath = path instanceof File ? ((File) path).getAbsolutePath() : new File(path.toString()).getAbsolutePath();
-                    SVNErrorMessage errorMessage = SVNErrorMessage.create(SVNErrorCode.WC_DUPLICATE_EXTERNALS_TARGET, "Invalid {0} property on ''{1}'': " +
-                            "target ''{2}'' appears more than once{3}", SVNProperty.EXTERNALS, absolutePath, duplicateTargets.get(0), moreString.toString());
-                    SVNErrorManager.error(errorMessage, SVNLogType.WC);
-                }
+                SVNExternal.parseExternals(path, value.getString());
             }
         } else if (SVNProperty.KEYWORDS.equals(name)) {
             value = SVNPropertyValue.create(value.getString().trim());

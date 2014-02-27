@@ -11,9 +11,19 @@
  */
 package org.tmatesoft.svn.cli.svn;
 
-import java.util.*;
+import java.util.Collection;
+import java.util.Date;
+import java.util.LinkedList;
+import java.util.List;
 
-import org.tmatesoft.svn.core.*;
+import org.tmatesoft.svn.core.ISVNDirEntryHandler;
+import org.tmatesoft.svn.core.SVNDepth;
+import org.tmatesoft.svn.core.SVNDirEntry;
+import org.tmatesoft.svn.core.SVNErrorCode;
+import org.tmatesoft.svn.core.SVNErrorMessage;
+import org.tmatesoft.svn.core.SVNException;
+import org.tmatesoft.svn.core.SVNLock;
+import org.tmatesoft.svn.core.SVNNodeKind;
 import org.tmatesoft.svn.core.internal.util.SVNDate;
 import org.tmatesoft.svn.core.internal.util.SVNFormatUtil;
 import org.tmatesoft.svn.core.internal.util.SVNXMLUtil;
@@ -29,10 +39,6 @@ import org.tmatesoft.svn.util.SVNLogType;
  */
 public class SVNListCommand extends SVNXMLCommand implements ISVNDirEntryHandler {
 
-    private SVNURL lastExternalParentUrl;
-    private String lastExternalTarget;
-    private boolean inExternal;
-
     public SVNListCommand() {
         super("list", new String[] {"ls"});
     }
@@ -45,7 +51,6 @@ public class SVNListCommand extends SVNXMLCommand implements ISVNDirEntryHandler
         options.add(SVNOption.DEPTH);
         options.add(SVNOption.INCREMENTAL);
         options.add(SVNOption.XML);
-        options.add(SVNOption.INCLUDE_EXTERNALS);
         return options;
     }
 
@@ -73,9 +78,6 @@ public class SVNListCommand extends SVNXMLCommand implements ISVNDirEntryHandler
                 SVNDirEntry.DIRENT_ALL : SVNDirEntry.DIRENT_KIND | SVNDirEntry.DIRENT_TIME;
         boolean fetchLocks = getSVNEnvironment().isXML() || getSVNEnvironment().isVerbose();
         SVNLogClient client = getSVNEnvironment().getClientManager().getLogClient();
-        if (getSVNEnvironment().isIncludeExternals()) {
-            client.setIgnoreExternals(false);
-        }
         boolean seenNonExistentPaths = false;
         for (int i = 0; i < targets.size(); i++) {
             String targetName = (String) targets.get(i);
@@ -98,12 +100,7 @@ public class SVNListCommand extends SVNXMLCommand implements ISVNDirEntryHandler
                 seenNonExistentPaths = true;
             }
             if (getSVNEnvironment().isXML()) {
-                StringBuffer buffer = new StringBuffer();
-                if (inExternal) {
-                    buffer = closeXMLTag("external", buffer);
-                    inExternal = false;
-                }
-                buffer = closeXMLTag("list", buffer);
+                StringBuffer buffer = closeXMLTag("list", new StringBuffer());
                 getSVNEnvironment().getOut().print(buffer.toString());
             }
         }
@@ -135,16 +132,6 @@ public class SVNListCommand extends SVNXMLCommand implements ISVNDirEntryHandler
             }
         }
         StringBuffer buffer = new StringBuffer();
-
-        if (dirEntry.getExternalParentUrl() != null && dirEntry.getExternalTarget() != null) {
-            if ((lastExternalParentUrl == null && lastExternalTarget == null) ||
-                    (!lastExternalParentUrl.equals(dirEntry.getExternalParentUrl()) || !lastExternalTarget.equals(dirEntry.getExternalTarget()))) {
-                buffer.append("Listing external '").append(dirEntry.getExternalTarget()).append("' defined on '").append(dirEntry.getExternalParentUrl()).append("':\n");
-                lastExternalParentUrl = dirEntry.getExternalParentUrl();
-                lastExternalTarget = dirEntry.getExternalTarget();
-            }
-        }
-
         if (getSVNEnvironment().isVerbose()) {
             buffer.append(SVNFormatUtil.formatString(dirEntry.getRevision() + "", 7, false));
             buffer.append(' ');
@@ -189,27 +176,6 @@ public class SVNListCommand extends SVNXMLCommand implements ISVNDirEntryHandler
             }
         }
         StringBuffer buffer = new StringBuffer();
-
-        if (dirEntry.getExternalParentUrl() != null && dirEntry.getExternalTarget() != null) {
-            if ((lastExternalParentUrl == null && lastExternalTarget == null) ||
-                    (!lastExternalParentUrl.equals(dirEntry.getExternalParentUrl()) || lastExternalTarget.equals(dirEntry.getExternalTarget()))) {
-
-                if (inExternal) {
-                    buffer = closeXMLTag("external", buffer);
-                    inExternal = false;
-                }
-
-                Map<String, String> parameters = new HashMap<String, String>();
-                parameters.put("parent_url", dirEntry.getExternalParentUrl().toString());
-                parameters.put("target", dirEntry.getExternalTarget());
-                buffer = openXMLTag("external", SVNXMLUtil.XML_STYLE_NORMAL, parameters, buffer);
-
-                lastExternalParentUrl = dirEntry.getExternalParentUrl();
-                lastExternalTarget = dirEntry.getExternalTarget();
-                inExternal = true;
-            }
-        }
-
         buffer = openXMLTag("entry", SVNXMLUtil.XML_STYLE_NORMAL, "kind", dirEntry.getKind().toString(), buffer);
         buffer = openCDataTag("name", path, buffer);
         if (dirEntry.getKind() == SVNNodeKind.FILE) {

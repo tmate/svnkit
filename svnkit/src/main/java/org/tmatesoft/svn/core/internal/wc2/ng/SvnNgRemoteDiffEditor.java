@@ -197,7 +197,7 @@ public class SvnNgRemoteDiffEditor implements ISVNEditor {
             currentFile.startRevisionFile = getEmptyFile();
         }
         File tmpDir = pureRemoteDiff ? getGlobalTmpDir() : context.getDb().getWCRootTempDir(target);
-        currentFile.endRevisionFile = SVNFileUtil.createUniqueFile(tmpDir, SVNPathUtil.tail(path), ".tmp", false);
+        currentFile.endRevisionFile = SVNFileUtil.createUniqueFile(tmpDir, ".diff", ".tmp", false);
         tmpFiles.add(currentFile.endRevisionFile);
         currentFile.deltaProcessor.applyTextDelta(currentFile.startRevisionFile, currentFile.endRevisionFile, true);
     }

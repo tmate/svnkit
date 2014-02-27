@@ -153,7 +153,7 @@ public class DefaultSVNOptions implements ISVNOptions, ISVNMergerFactory {
      * @return  <span class="javakeyword">true</span> if autoproperties
      *          are enabled, otherwise <span class="javakeyword">false</span>
      */
-    public boolean isUseAutoProperties() {
+    private boolean isUseAutoProperties() {
         String value = getConfigFile().getPropertyValue(MISCELLANY_GROUP, ENABLE_AUTO_PROPS);
         return getBooleanValue(value, false);
     }

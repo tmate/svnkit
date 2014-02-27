@@ -29,7 +29,7 @@ class JNALibraryLoader {
     private static final String GNOME_KEYRING_LIBRARY = "gnome-keyring";
     
     private static ISVNWinCryptLibrary ourWinCryptLibrary;
-    private static ISVNKernel32Library ourKenrelLibrary;
+    private static ISVNKernel32Library ourKernelLibrary;
     private static ISVNSecurityLibrary ourSecurityLibrary;
     private static ISVNCLibrary ourCLibrary;
     private static ISVNWin32Library ourWin32Library;
@@ -47,30 +47,24 @@ class JNALibraryLoader {
         // load win32 libraries.
         if (SVNFileUtil.isWindows && !SVNFileUtil.isOS2) {
             try {
-                ourWinCryptLibrary = (ISVNWinCryptLibrary) Native.loadLibrary("Crypt32", 
-                        ISVNWinCryptLibrary.class);
-                ourWinCryptLibrary = SVNFileUtil.logNativeCalls && ourWinCryptLibrary != null ?
-                        new DebugProxyISVNWinCryptLibrary(ourWinCryptLibrary, SVNDebugLog.getDefaultLog()) : ourWinCryptLibrary;
-                ourKenrelLibrary = (ISVNKernel32Library) Native.loadLibrary("Kernel32", 
-                        ISVNKernel32Library.class);
-                ourKenrelLibrary = SVNFileUtil.logNativeCalls && ourKenrelLibrary != null ?
-                        new DebugProxyISVNKernel32Library(ourKenrelLibrary, SVNDebugLog.getDefaultLog()) : ourKenrelLibrary;
-                String securityLibraryName = getSecurityLibraryName();
-                ourSecurityLibrary = securityLibraryName != null ? 
-                        (ISVNSecurityLibrary) Native.loadLibrary(securityLibraryName, 
-                        ISVNSecurityLibrary.class) : null;
-                ourSecurityLibrary = SVNFileUtil.logNativeCalls && ourSecurityLibrary != null ?
-                        new DebugProxyISVNSecurityLibrary(ourSecurityLibrary, SVNDebugLog.getDefaultLog()) : ourSecurityLibrary;
+                ourWinCryptLibrary = (ISVNWinCryptLibrary) Native.loadLibrary("Crypt32", ISVNWinCryptLibrary.class);
+                ourWinCryptLibrary = SVNFileUtil.logNativeCalls && ourWinCryptLibrary != null ? new DebugProxyISVNWinCryptLibrary(ourWinCryptLibrary, SVNDebugLog.getDefaultLog()) : ourWinCryptLibrary;
+                ourKernelLibrary = (ISVNKernel32Library) Native.loadLibrary("Kernel32", ISVNKernel32Library.class);
+                ourKernelLibrary = SVNFileUtil.logNativeCalls && ourKernelLibrary != null ? new DebugProxyISVNKernel32Library(ourKernelLibrary, SVNDebugLog.getDefaultLog()) : ourKernelLibrary;
+                ourSecurityLibrary = loadSecurityLibrary();
                 ourWin32Library = (ISVNWin32Library) Native.loadLibrary("Shell32", ISVNWin32Library.class);
                 ourWin32Library = SVNFileUtil.logNativeCalls && ourWin32Library != null ?
                         new DebugProxyISVNWin32Library(ourWin32Library, SVNDebugLog.getDefaultLog()) : ourWin32Library;
             } catch (Throwable th) {
                 SVNDebugLog.getDefaultLog().logFine(SVNLogType.DEFAULT, th);
                 ourWinCryptLibrary = null;
-                ourKenrelLibrary = null;
+                ourKernelLibrary = null;
                 ourSecurityLibrary = null;
                 ourWin32Library = null;
             }
+            
+            SVNDebugLog.getDefaultLog().logFine(SVNLogType.NETWORK,  "security library name: " + getSecurityLibraryName());
+            SVNDebugLog.getDefaultLog().logFine(SVNLogType.NETWORK,  "security library: " + ourSecurityLibrary);
         }
         
         if (SVNFileUtil.isOSX || SVNFileUtil.isLinux || SVNFileUtil.isBSD || SVNFileUtil.isSolaris) {
@@ -168,7 +162,7 @@ class JNALibraryLoader {
     }
 
     public static synchronized ISVNKernel32Library getKernelLibrary() {
-        return ourKenrelLibrary;
+        return ourKernelLibrary;
     }
 
     public static synchronized ISVNSecurityLibrary getSecurityLibrary() {
@@ -193,6 +187,26 @@ class JNALibraryLoader {
 
     public static synchronized ISVNGLibrary getGLibrary() {
         return ourGLibrary;
+    }
+    
+    private static ISVNSecurityLibrary loadSecurityLibrary() {
+        ISVNSecurityLibrary lib = null;
+        try {
+            SVNDebugLog.getDefaultLog().logFine(SVNLogType.DEFAULT, "Loading 'Security' library");
+            lib = (ISVNSecurityLibrary) Native.loadLibrary("Security", ISVNSecurityLibrary.class);
+        } catch (Throwable th) {
+            SVNDebugLog.getDefaultLog().logFine(SVNLogType.DEFAULT, th);
+        }
+        if (lib == null) {
+            try {
+                SVNDebugLog.getDefaultLog().logFine(SVNLogType.DEFAULT, "Loading 'Secur32' library");
+                lib = (ISVNSecurityLibrary) Native.loadLibrary("Secur32", ISVNSecurityLibrary.class);
+            } catch (Throwable th) {
+                SVNDebugLog.getDefaultLog().logFine(SVNLogType.DEFAULT, th);
+            }
+        }
+        SVNDebugLog.getDefaultLog().logFine(SVNLogType.DEFAULT, "Library loaded: " + lib);
+        return SVNFileUtil.logNativeCalls && lib != null ? new DebugProxyISVNSecurityLibrary(lib, SVNDebugLog.getDefaultLog()) : lib;
     }
 
     private static String getSecurityLibraryName() {

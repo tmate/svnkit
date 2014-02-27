@@ -1,11 +1,10 @@
 package org.tmatesoft.svn.test;
 
 import org.junit.Assert;
-import org.junit.Assume;
 import org.junit.Ignore;
 import org.junit.Test;
 import org.tmatesoft.svn.core.*;
-import org.tmatesoft.svn.core.auth.BasicAuthenticationManager;
+import org.tmatesoft.svn.core.internal.wc.SVNExternal;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 import org.tmatesoft.svn.core.wc.SVNClientManager;
 import org.tmatesoft.svn.core.wc.SVNMoveClient;
@@ -14,7 +13,6 @@ import org.tmatesoft.svn.core.wc.SVNStatusType;
 import org.tmatesoft.svn.core.wc2.*;
 
 import java.io.File;
-import java.util.HashMap;
 import java.util.Map;
 
 public class MoveTest {
@@ -156,243 +154,89 @@ public class MoveTest {
     }
 
     @Test
-    public void testMovedToAndMovedFrom() throws Exception {
+    public void testMoveToMissingObstructedAddedDirectoryShouldFail() throws Exception {
+        //SVNKIT-405
         final TestOptions options = TestOptions.getInstance();
 
         final SvnOperationFactory svnOperationFactory = new SvnOperationFactory();
-        final Sandbox sandbox = Sandbox.createWithCleanup(getTestName() + ".testMovedToAndMovedFrom", options);
+        final Sandbox sandbox = Sandbox.createWithCleanup(getTestName() + ".testMoveToMissingObstructedAddedDirectoryShouldFail", options);
         try {
             final SVNURL url = sandbox.createSvnRepository();
 
             final CommitBuilder commitBuilder = new CommitBuilder(url);
             commitBuilder.addFile("sourceFile");
+            commitBuilder.addFile("targetFile");
             commitBuilder.commit();
 
             final WorkingCopy workingCopy = sandbox.checkoutNewWorkingCopy(url);
             final File sourceFile = workingCopy.getFile("sourceFile");
             final File targetFile = workingCopy.getFile("targetFile");
 
+            final SvnScheduleForRemoval scheduleForRemoval = svnOperationFactory.createScheduleForRemoval();
+            scheduleForRemoval.setSingleTarget(SvnTarget.fromFile(targetFile));
+            scheduleForRemoval.run();
+
+            SVNFileUtil.ensureDirectoryExists(targetFile);
+
+            final SvnScheduleForAddition scheduleForAddition = svnOperationFactory.createScheduleForAddition();
+            scheduleForAddition.setSingleTarget(SvnTarget.fromFile(targetFile));
+            scheduleForAddition.run();
+
+            SVNFileUtil.deleteAll(targetFile, null);
+
             final SvnCopy copy = svnOperationFactory.createCopy();
-            copy.setMove(true);
-            copy.addCopySource(SvnCopySource.create(SvnTarget.fromFile(sourceFile), SVNRevision.WORKING));
             copy.setSingleTarget(SvnTarget.fromFile(targetFile));
-            copy.run();
-
-            final Map<File, SvnStatus> statuses = TestUtil.getStatuses(svnOperationFactory, workingCopy.getWorkingCopyDirectory());
-            Assert.assertEquals(sourceFile, statuses.get(targetFile).getMovedFromPath());
-            Assert.assertNull(statuses.get(targetFile).getMovedToPath());
-            Assert.assertEquals(targetFile, statuses.get(sourceFile).getMovedToPath());
-            Assert.assertNull(statuses.get(sourceFile).getMovedFromPath());
-
-        } finally {
-            svnOperationFactory.dispose();
-            sandbox.dispose();
-        }
-    }
-
-    @Test
-    public void testDoubleLockingOnMove() throws Exception {
-        final TestOptions options = TestOptions.getInstance();
-
-        final SvnOperationFactory svnOperationFactory = new SvnOperationFactory();
-        final Sandbox sandbox = Sandbox.createWithCleanup(getTestName() + ".testDoubleLockingOnMove", options);
-        try {
-            final SVNURL url = sandbox.createSvnRepository();
-
-            final CommitBuilder commitBuilder = new CommitBuilder(url);
-            commitBuilder.addFile("directory/sourceDirectory/source");
-            commitBuilder.addDirectory("directory/targetDirectory");
-            commitBuilder.commit();
-
-            final WorkingCopy workingCopy = sandbox.checkoutNewWorkingCopy(url);
-            final File source = workingCopy.getFile("directory/sourceDirectory/source");
-            final File target = workingCopy.getFile("directory/targetDirectory/target");
-
-            final SvnCopy copy = svnOperationFactory.createCopy();
-            copy.setMove(true);
-            copy.addCopySource(SvnCopySource.create(SvnTarget.fromFile(source), SVNRevision.WORKING));
-            copy.setSingleTarget(SvnTarget.fromFile(target));
-            copy.run();
-
-            final Map<File, SvnStatus> statuses = TestUtil.getStatuses(svnOperationFactory, workingCopy.getWorkingCopyDirectory());
-            Assert.assertEquals(target, statuses.get(source).getMovedToPath());
-            Assert.assertEquals(source, statuses.get(target).getMovedFromPath());
-
-        } finally {
-            svnOperationFactory.dispose();
-            sandbox.dispose();
-        }
-    }
-
-    @Test
-    public void testMoveBackMovedFile() throws Exception {
-        final TestOptions options = TestOptions.getInstance();
-
-        final SvnOperationFactory svnOperationFactory = new SvnOperationFactory();
-        final Sandbox sandbox = Sandbox.createWithCleanup(getTestName() + ".testMoveBackMovedFile", options);
-        try {
-            final SVNURL url = sandbox.createSvnRepository();
-
-            final CommitBuilder commitBuilder = new CommitBuilder(url);
-            commitBuilder.addFile("source");
-            commitBuilder.commit();
-
-            final WorkingCopy workingCopy = sandbox.checkoutNewWorkingCopy(url);
-            final File source = workingCopy.getFile("source");
-            final File target = workingCopy.getFile("target");
-
-            final SvnCopy move = svnOperationFactory.createCopy();
-            move.setMove(true);
-            move.addCopySource(SvnCopySource.create(SvnTarget.fromFile(source), SVNRevision.WORKING));
-            move.setSingleTarget(SvnTarget.fromFile(target));
-            move.run();
-
-            final SvnCopy moveBack = svnOperationFactory.createCopy();
-            moveBack.setMove(true);
-            moveBack.addCopySource(SvnCopySource.create(SvnTarget.fromFile(target), SVNRevision.WORKING));
-            moveBack.setSingleTarget(SvnTarget.fromFile(source));
-            moveBack.run();
-
-            final Map<File, SvnStatus> statuses = TestUtil.getStatuses(svnOperationFactory, workingCopy.getWorkingCopyDirectory());
-            Assert.assertEquals(SVNStatusType.STATUS_NORMAL, statuses.get(source).getNodeStatus());
-            Assert.assertNull(statuses.get(target));
-
-        } finally {
-            svnOperationFactory.dispose();
-            sandbox.dispose();
-        }
-    }
-
-    @Test
-    public void testMoveAndCommitDirectory() throws Exception {
-        final TestOptions options = TestOptions.getInstance();
-
-        Assume.assumeTrue(TestUtil.areAllSvnserveOptionsSpecified(options));
-
-        final SvnOperationFactory svnOperationFactory = new SvnOperationFactory();
-        final Sandbox sandbox = Sandbox.createWithCleanup(getTestName() + ".testMoveAndCommitDirectory", options);
-        try {
-            final BasicAuthenticationManager authenticationManager = new BasicAuthenticationManager("user", "password");
-            svnOperationFactory.setAuthenticationManager(authenticationManager);
-
-            final Map<String, String> loginToPassword = new HashMap<String, String>();
-            loginToPassword.put("user", "password");
-            final SVNURL url = sandbox.createSvnRepositoryWithSvnAccess(loginToPassword);
-
-            final CommitBuilder commitBuilder = new CommitBuilder(url);
-            commitBuilder.setAuthenticationManager(authenticationManager);
-            commitBuilder.addFile("source/file");
-            commitBuilder.commit();
-
-            final WorkingCopy workingCopy = sandbox.checkoutNewWorkingCopy(url);
-            final File source = workingCopy.getFile("source");
-            final File target = workingCopy.getFile("target");
-
-            final SvnCopy move = svnOperationFactory.createCopy();
-            move.setMove(true);
-            move.addCopySource(SvnCopySource.create(SvnTarget.fromFile(source), SVNRevision.WORKING));
-            move.setSingleTarget(SvnTarget.fromFile(target));
-            move.setFailWhenDstExists(false);
-            move.setMakeParents(false);
-            move.run();
-
-            final SvnCommit commit = svnOperationFactory.createCommit();
-            commit.addTarget(SvnTarget.fromFile(source));
-            commit.addTarget(SvnTarget.fromFile(target));
-            commit.run();
-
-            final Map<File, SvnStatus> statuses = TestUtil.getStatuses(svnOperationFactory, workingCopy.getWorkingCopyDirectory());
-            Assert.assertEquals(SVNStatusType.STATUS_NORMAL, statuses.get(target).getNodeStatus());
-            Assert.assertNull(statuses.get(source));
-
-        }
-        finally {
-            svnOperationFactory.dispose();
-            sandbox.dispose();
-        }
-    }
-
-    @Test
-    public void testMoveMetadataOnly() throws Exception {
-        final TestOptions options = TestOptions.getInstance();
-
-        final SvnOperationFactory svnOperationFactory = new SvnOperationFactory();
-        final Sandbox sandbox = Sandbox.createWithCleanup(getTestName() + ".testMoveMetadataOnly", options);
-        try {
-            final SVNURL url = sandbox.createSvnRepository();
-
-            final CommitBuilder commitBuilder = new CommitBuilder(url);
-            commitBuilder.addFile("sourceFile");
-            commitBuilder.commit();
-
-            final WorkingCopy workingCopy = sandbox.checkoutNewWorkingCopy(url);
-            final File sourceFile = workingCopy.getFile("sourceFile");
-            final File targetFile = workingCopy.getFile("targetFile");
-
-            final SvnCopy copy = svnOperationFactory.createCopy();
             copy.addCopySource(SvnCopySource.create(SvnTarget.fromFile(sourceFile), SVNRevision.WORKING));
-            copy.setSingleTarget(SvnTarget.fromFile(targetFile));
             copy.setMove(true);
-            copy.setMetadataOnly(true);
-            copy.run();
-
-            final Map<File, SvnStatus> statuses = TestUtil.getStatuses(svnOperationFactory, workingCopy.getWorkingCopyDirectory());
-            Assert.assertEquals(SVNStatusType.STATUS_DELETED, statuses.get(sourceFile).getNodeStatus());
-            Assert.assertEquals(targetFile, statuses.get(sourceFile).getMovedToPath());
-            Assert.assertEquals(SVNStatusType.STATUS_MISSING, statuses.get(targetFile).getNodeStatus());
-            Assert.assertNull(statuses.get(targetFile).getMovedToPath());
-        }
-        finally {
-            svnOperationFactory.dispose();
-            sandbox.dispose();
-        }
-    }
-
-    @Test
-    public void testMixedRevisionMoveForbidden() throws Exception {
-        final TestOptions options = TestOptions.getInstance();
-
-        final SvnOperationFactory svnOperationFactory = new SvnOperationFactory();
-        final Sandbox sandbox = Sandbox.createWithCleanup(getTestName() + ".testMixedRevisionMoveForbidden", options);
-        try {
-            final SVNURL url = sandbox.createSvnRepository();
-
-            final CommitBuilder commitBuilder1 = new CommitBuilder(url);
-            commitBuilder1.addFile("directory/file1");
-            commitBuilder1.addFile("directory/file2");
-            commitBuilder1.commit();
-
-            final CommitBuilder commitBuilder2 = new CommitBuilder(url);
-            commitBuilder2.changeFile("directory/file1", "changed".getBytes());
-            commitBuilder2.changeFile("directory/file2", "changed".getBytes());
-            commitBuilder2.commit();
-
-            final WorkingCopy workingCopy = sandbox.checkoutNewWorkingCopy(url);
-            final File directory = workingCopy.getFile("directory");
-            final File movedDirectory = workingCopy.getFile("movedDirectory");
-
-            final File file1 = workingCopy.getFile("directory/file1");
-            final File file2 = workingCopy.getFile("directory/file2");
-
-            final SvnUpdate update = svnOperationFactory.createUpdate();
-            update.setSingleTarget(SvnTarget.fromFile(file2));
-            update.setRevision(SVNRevision.create(1));
-            update.run();
-
-            final SvnCopy copy = svnOperationFactory.createCopy();
-            copy.addCopySource(SvnCopySource.create(SvnTarget.fromFile(directory), SVNRevision.WORKING));
-            copy.setSingleTarget(SvnTarget.fromFile(movedDirectory));
-            copy.setMove(true);
-            copy.setAllowMixedRevisions(false);
             try {
                 copy.run();
                 Assert.fail("An exception should be thrown");
             } catch (SVNException e) {
-                //expected
-                Assert.assertEquals(SVNErrorCode.WC_MIXED_REVISIONS, e.getErrorMessage().getErrorCode());
+                Assert.assertEquals(e.getErrorMessage().getErrorCode(), SVNErrorCode.WC_NOT_WORKING_COPY);
             }
+
+        } finally {
+            svnOperationFactory.dispose();
+            sandbox.dispose();
         }
-        finally {
+    }
+
+    @Test
+    public void testMoveFileInsteadOfMissingFileExternal() throws Exception {
+        //SVNKIT-405
+        final TestOptions options = TestOptions.getInstance();
+
+        final SvnOperationFactory svnOperationFactory = new SvnOperationFactory();
+        final Sandbox sandbox = Sandbox.createWithCleanup(getTestName() + ".testMoveFileInsteadOfMissingFileExternal", options);
+        try {
+            final SVNURL url = sandbox.createSvnRepository();
+
+            final SVNExternal external = new SVNExternal("external", url.appendPath("file", false).toString(), SVNRevision.create(1), SVNRevision.HEAD, false, true, true);
+
+            final CommitBuilder commitBuilder = new CommitBuilder(url);
+            commitBuilder.addFile("file");
+            commitBuilder.setDirectoryProperty("", SVNProperty.EXTERNALS, SVNPropertyValue.create(external.toString()));
+            commitBuilder.commit();
+
+            final WorkingCopy workingCopy = sandbox.checkoutNewWorkingCopy(url);
+            final File workingCopyDirectory = workingCopy.getWorkingCopyDirectory();
+            final File file = workingCopy.getFile("file");
+            final File externalFile = workingCopy.getFile("external");
+
+            SVNFileUtil.deleteFile(externalFile);
+
+            final SvnCopy copy = svnOperationFactory.createCopy();
+            copy.addCopySource(SvnCopySource.create(SvnTarget.fromFile(file), SVNRevision.WORKING));
+            copy.setSingleTarget(SvnTarget.fromFile(externalFile));
+            copy.setMove(true);
+            copy.run();
+
+            final Map<File, SvnStatus> statuses = TestUtil.getStatuses(svnOperationFactory, workingCopyDirectory);
+            Assert.assertEquals(SVNStatusType.STATUS_DELETED, statuses.get(file).getNodeStatus());
+            Assert.assertEquals(SVNStatusType.STATUS_ADDED, statuses.get(externalFile).getNodeStatus());
+            Assert.assertTrue(statuses.get(externalFile).isCopied());
+
+        } finally {
             svnOperationFactory.dispose();
             sandbox.dispose();
         }
@@ -401,4 +245,5 @@ public class MoveTest {
     private String getTestName() {
         return "MoveTest";
     }
+
 }

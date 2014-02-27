@@ -1,7 +1,5 @@
 package org.tmatesoft.svn.test;
 
-import java.io.File;
-
 import org.junit.Assert;
 import org.junit.Assume;
 import org.junit.Ignore;
@@ -11,25 +9,16 @@ import org.tmatesoft.sqljet.core.SqlJetTransactionMode;
 import org.tmatesoft.sqljet.core.table.ISqlJetCursor;
 import org.tmatesoft.sqljet.core.table.ISqlJetTable;
 import org.tmatesoft.sqljet.core.table.SqlJetDb;
-import org.tmatesoft.svn.core.SVNCancelException;
-import org.tmatesoft.svn.core.SVNCommitInfo;
-import org.tmatesoft.svn.core.SVNDepth;
-import org.tmatesoft.svn.core.SVNException;
-import org.tmatesoft.svn.core.SVNNodeKind;
-import org.tmatesoft.svn.core.SVNURL;
-import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
+import org.tmatesoft.svn.core.*;
 import org.tmatesoft.svn.core.internal.wc17.db.statement.SVNWCDbSchema;
 import org.tmatesoft.svn.core.io.SVNRepository;
 import org.tmatesoft.svn.core.io.SVNRepositoryFactory;
 import org.tmatesoft.svn.core.wc.ISVNEventHandler;
 import org.tmatesoft.svn.core.wc.SVNEvent;
 import org.tmatesoft.svn.core.wc.SVNEventAction;
-import org.tmatesoft.svn.core.wc2.SvnOperationFactory;
-import org.tmatesoft.svn.core.wc2.SvnRemoteDelete;
-import org.tmatesoft.svn.core.wc2.SvnScheduleForAddition;
-import org.tmatesoft.svn.core.wc2.SvnScheduleForRemoval;
-import org.tmatesoft.svn.core.wc2.SvnTarget;
-import org.tmatesoft.svn.core.wc2.SvnUpdate;
+import org.tmatesoft.svn.core.wc2.*;
+
+import java.io.File;
 
 public class DeleteTest {
 
@@ -194,61 +183,6 @@ public class DeleteTest {
             svnOperationFactory.dispose();
             sandbox.dispose();
         }
-    }
-
-    @Test
-    public void testEventNotFiredUnchangedStatus() throws Exception {
-        //SVNKIT-458
-        final TestOptions options = TestOptions.getInstance();
-
-        final SvnOperationFactory svnOperationFactory = new SvnOperationFactory();
-        final Sandbox sandbox = Sandbox.createWithCleanup(getTestName() + ".testEventNotFiredUnchangedStatus", options);
-        try {
-            final SVNURL url = sandbox.createSvnRepository();
-
-            final CommitBuilder commitBuilder = new CommitBuilder(url);
-            commitBuilder.addFile("directory/file");
-            commitBuilder.commit();
-
-            final WorkingCopy workingCopy = sandbox.checkoutNewWorkingCopy(url);
-
-            final File directory = workingCopy.getFile("directory");
-            final File file = workingCopy.getFile("directory/file");
-
-            doDelete(svnOperationFactory, directory, false);
-
-            SVNFileUtil.ensureDirectoryExists(directory);
-
-            final SvnScheduleForAddition scheduleForAddition = svnOperationFactory.createScheduleForAddition();
-            scheduleForAddition.setSingleTarget(SvnTarget.fromFile(directory));
-            scheduleForAddition.run();
-
-            final boolean[] eventWasFired = {false};
-
-            svnOperationFactory.setEventHandler(new ISVNEventHandler() {
-                public void handleEvent(SVNEvent event, double progress) throws SVNException {
-                    eventWasFired[0] = true;
-                }
-                public void checkCancelled() throws SVNCancelException {
-                }
-            });
-
-            doDelete(svnOperationFactory, file, true);
-
-            Assert.assertFalse(eventWasFired[0]);
-
-        } finally {
-            svnOperationFactory.dispose();
-            sandbox.dispose();
-        }
-    }
-
-    private void doDelete(final SvnOperationFactory of, final File folderToDelete, final boolean deleteFile) throws SVNException {
-        SvnScheduleForRemoval scheduleForRemoval = of.createScheduleForRemoval();
-        scheduleForRemoval.setSingleTarget(SvnTarget.fromFile(folderToDelete));
-        scheduleForRemoval.setDeleteFiles(deleteFile);
-        scheduleForRemoval.setForce(true);
-        scheduleForRemoval.run();
     }
 
     private void isMarkedAsExcludedOnly(WorkingCopy workingCopy, String path) throws SqlJetException {
