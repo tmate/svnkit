@@ -1,3 +1,8 @@
+== version 1.7.12 ==
+
++ Non-atomic rename issue fixed.
++ Minor stability improvements and bugfixes. 
+
 == version 1.7.11 ==
 
 + Eclipse update site issues fixed.
