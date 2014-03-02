@@ -1,6 +1,10 @@
-== version 1.8.3-1 ==
+== version 1.8.4 ==
 
-+ Pre 1.8.4 version.
++ Full transparent support of 1.7 working copy format.
++ Crash on concurrent access to GNOME Keyring fixed.
++ Non-atomic rename issues when JNA is not present fixed.
++ Missing JavaHL 1.8 methods implemented.
++ Stability and performance improvements.
 
 == version 1.8.3 ==
 
