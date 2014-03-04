@@ -801,7 +801,7 @@ public class SvnNgWcToWcCopy extends SvnNgOperationRunner<Void, SvnCopy> {
         if (srcInfo.get(NodeInfo.kind) == SVNWCDbKind.File || srcInfo.get(NodeInfo.kind) == SVNWCDbKind.Symlink) {
             final boolean shouldCopyBaseData = shouldCopyBaseData(context, source, metadataOnly, srcStatus);
 
-            if (shouldCopyBaseData) {
+            if (shouldCopyBaseData && getOperation().isVirtual()) {//we check for "virtual" to preserve current behaviour in this case
                 copyBaseDataOfFile(context, source, dst);
             } else {
                 copyVersionedFile(context, source, dst, dst, tmpDir, metadataOnly, srcInfo.is(NodeInfo.conflicted), isMove, true);

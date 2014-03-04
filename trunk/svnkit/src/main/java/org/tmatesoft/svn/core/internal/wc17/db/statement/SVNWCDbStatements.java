@@ -211,6 +211,7 @@ public enum SVNWCDbStatements {
     SELECT_DEPTH_NODE(SVNWCDbSelectDepthNode.class),
     SELECT_BASE_CHILDREN_INFO(SVNWCDbSelectBaseChildrenInfo.class),
     DELETE_LOCK_RECURSIVELY(SVNWCDbDeleteLockRecursively.class),
+    INSERT_WORKING_NODE_COPY_FROM(SVNWCDbInsertWorkingNodeCopyFrom.class),
     //1.7 versions of the requests
     SELECT_ACTUAL_CHILDREN_CONFLICT_17(SVNWCDbSelectActualChildrenConflict17.class),
     SELECT_ACTUAL_CHILDREN_INFO_17(SVNWCDbSelectActualChildrenInfo17.class),
