@@ -7,10 +7,7 @@ import org.junit.Test;
 import org.tmatesoft.svn.core.*;
 import org.tmatesoft.svn.core.auth.BasicAuthenticationManager;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
-import org.tmatesoft.svn.core.wc.SVNClientManager;
-import org.tmatesoft.svn.core.wc.SVNMoveClient;
-import org.tmatesoft.svn.core.wc.SVNRevision;
-import org.tmatesoft.svn.core.wc.SVNStatusType;
+import org.tmatesoft.svn.core.wc.*;
 import org.tmatesoft.svn.core.wc2.*;
 
 import java.io.File;
@@ -394,6 +391,56 @@ public class MoveTest {
         }
         finally {
             svnOperationFactory.dispose();
+            sandbox.dispose();
+        }
+    }
+
+    @Test
+    public void testMoveReplaced() throws Exception {
+        final TestOptions options = TestOptions.getInstance();
+        final Sandbox sandbox = Sandbox.createWithCleanup(getTestName() + ".testMoveReplaced", options);
+
+        try {
+            final SVNURL url = sandbox.createSvnRepository();
+            CommitBuilder commitBuilder = new CommitBuilder(url);
+            commitBuilder.addFile("normal.txt");
+            commitBuilder.addFile("replaced.txt");
+            commitBuilder.commit();
+
+            WorkingCopy wc1 = sandbox.checkoutNewWorkingCopy(url);
+            File normalFile = wc1.getFile("normal.txt");
+            File replacedFile = wc1.getFile("replaced.txt");
+            File moveToFile = wc1.getFile("moveTo.txt");
+
+            SVNClientManager scm = SVNClientManager.newInstance();
+
+            // Remove from version control...
+            scm.getWCClient().doDelete(replacedFile, true, true, false);
+            // ... copy another one instead
+            scm.getCopyClient().doCopy(
+                    new SVNCopySource[] { new SVNCopySource(SVNRevision.WORKING, SVNRevision.WORKING, normalFile) },
+                    replacedFile,
+                    false,
+                    false,
+                    true);
+            SVNURL originalURL = scm.getStatusClient().doStatus(normalFile, false).getURL();
+
+            SVNStatus status = scm.getStatusClient().doStatus(replacedFile, false);
+            Assert.assertEquals(SVNStatusType.STATUS_REPLACED, status.getCombinedNodeAndContentsStatus());
+            Assert.assertTrue(status.isCopied());
+            Assert.assertEquals(originalURL.toString(), status.getCopyFromURL().toString());
+
+            // Move the replacing item to a different location
+            scm.getCopyClient().doCopy(
+                    new SVNCopySource[] { new SVNCopySource(SVNRevision.WORKING, SVNRevision.WORKING, replacedFile) },
+                    moveToFile,
+                    true,
+                    false,
+                    true);
+
+            status = scm.getStatusClient().doStatus(moveToFile, false);
+            Assert.assertEquals(originalURL.toString(), status.getCopyFromURL().toString());
+        } finally {
             sandbox.dispose();
         }
     }

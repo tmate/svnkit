@@ -401,7 +401,7 @@ public class SvnWcDbCopy extends SvnWcDbShared {
         
         if (srcPdh.getWCRoot() == dstPdh.getWCRoot()) {
             File dstParentRelpath = SVNFileUtil.getFileDir(localDstRelpath);
-            SVNSqlJetStatement stmt = new InsertWorkingNodeCopy(srcPdh.getWCRoot().getSDb(), false);
+            SVNSqlJetStatement stmt = srcPdh.getWCRoot().getSDb().getStatement(SVNWCDbStatements.INSERT_WORKING_NODE_COPY_FROM);
             try {
                 stmt.bindf("issist", srcPdh.getWCRoot().getWcId(), localSrcRelpath, localDstRelpath, dstOpDepths[0], dstParentRelpath,
                         SvnWcDbStatementUtil.getPresenceText(dstPresence));
