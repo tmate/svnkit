@@ -54,7 +54,7 @@ public class SVNWCDbInsertWorkingNodeCopyFrom extends SVNSqlJetInsertStatement {
         values.put(SVNWCDbSchema.NODES__Fields.local_relpath.name(), getBind(3));
         values.put(SVNWCDbSchema.NODES__Fields.op_depth.name(), getBind(4));
         values.put(SVNWCDbSchema.NODES__Fields.parent_relpath.name(), getBind(5));
-        values.put(SVNWCDbSchema.NODES__Fields.repos_id.name(), internalStatement1.getColumnLong(SVNWCDbSchema.NODES__Fields.repos_id));
+        values.put(SVNWCDbSchema.NODES__Fields.repos_id.name(), internalStatement1.getColumnString(SVNWCDbSchema.NODES__Fields.repos_id));
         values.put(SVNWCDbSchema.NODES__Fields.repos_path.name(), internalStatement1.getColumnString(SVNWCDbSchema.NODES__Fields.repos_path));
         values.put(SVNWCDbSchema.NODES__Fields.revision.name(), internalStatement1.getColumnString(SVNWCDbSchema.NODES__Fields.revision));
         values.put(SVNWCDbSchema.NODES__Fields.presence.name(), getBind(6));
