@@ -4,9 +4,18 @@ import org.junit.Assert;
 import org.junit.Assume;
 import org.junit.Ignore;
 import org.junit.Test;
+import org.tmatesoft.sqljet.core.SqlJetTransactionMode;
+import org.tmatesoft.sqljet.core.table.ISqlJetCursor;
+import org.tmatesoft.sqljet.core.table.ISqlJetTable;
+import org.tmatesoft.sqljet.core.table.SqlJetDb;
 import org.tmatesoft.svn.core.*;
 import org.tmatesoft.svn.core.auth.BasicAuthenticationManager;
+import org.tmatesoft.svn.core.internal.db.SVNSqlJetDb;
+import org.tmatesoft.svn.core.internal.db.SVNSqlJetStatement;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
+import org.tmatesoft.svn.core.internal.wc17.db.ISVNWCDb;
+import org.tmatesoft.svn.core.internal.wc17.db.SVNWCDb;
+import org.tmatesoft.svn.core.internal.wc17.db.statement.SVNWCDbStatements;
 import org.tmatesoft.svn.core.wc.*;
 import org.tmatesoft.svn.core.wc2.*;
 
@@ -442,6 +451,60 @@ public class MoveTest {
             Assert.assertEquals(originalURL.toString(), status.getCopyFromURL().toString());
         } finally {
             sandbox.dispose();
+        }
+    }
+
+    @Test
+    public void testMovingOfAddedDirectories() throws Exception {
+        //SVNKIT-478
+        final TestOptions options = TestOptions.getInstance();
+
+        final SvnOperationFactory svnOperationFactory = new SvnOperationFactory();
+        final Sandbox sandbox = Sandbox.createWithCleanup(getTestName() + ".testMovingOfAddedDirectories", options);
+        try {
+            final SVNURL url = sandbox.createSvnRepository();
+
+            final CommitBuilder commitBuilder = new CommitBuilder(url);
+            commitBuilder.addDirectory("directory/anotherDirectory");
+            commitBuilder.commit();
+
+            final WorkingCopy workingCopy = sandbox.checkoutNewWorkingCopy(url);
+            final File directory = workingCopy.getFile("directory");
+            final File movedDirectory = workingCopy.getFile("movedDirectory");
+            final File subdirectory = new File(directory, "subdirectory");
+            final File subsubdirectory = new File(subdirectory, "subsubdirectory");
+            final File anotherDirectory = workingCopy.getFile("anotherDirectory");
+            final File movedSubdirectory = new File(movedDirectory, "subdirectory");
+            final File file = new File(subdirectory, "file");
+
+            SVNFileUtil.ensureDirectoryExists(subsubdirectory);
+            SVNFileUtil.ensureDirectoryExists(file.getParentFile());
+            TestUtil.writeFileContentsString(file, "");
+
+            final SvnScheduleForAddition scheduleForAddition = svnOperationFactory.createScheduleForAddition();
+            scheduleForAddition.setSingleTarget(SvnTarget.fromFile(subdirectory));
+            scheduleForAddition.run();
+
+            final SvnCopy copy1 = svnOperationFactory.createCopy();
+            copy1.addCopySource(SvnCopySource.create(SvnTarget.fromFile(directory), SVNRevision.WORKING));
+            copy1.setSingleTarget(SvnTarget.fromFile(movedDirectory));
+            copy1.setMove(true);
+            copy1.run();
+
+            final SvnCopy copy2 = svnOperationFactory.createCopy();
+            copy2.addCopySource(SvnCopySource.create(SvnTarget.fromFile(movedSubdirectory), SVNRevision.WORKING));
+            copy2.setSingleTarget(SvnTarget.fromFile(anotherDirectory));
+            copy2.setFailWhenDstExists(false);
+            copy2.setMove(true);
+            copy2.run();
+
+            final Map<File, SvnStatus> statuses = TestUtil.getStatuses(svnOperationFactory, workingCopy.getWorkingCopyDirectory());
+            Assert.assertFalse(statuses.get(anotherDirectory).isCopied());
+            Assert.assertEquals(SVNStatusType.STATUS_ADDED, statuses.get(anotherDirectory).getNodeStatus());
+
+        } finally {
+            sandbox.dispose();
+            svnOperationFactory.dispose();
         }
     }
 
