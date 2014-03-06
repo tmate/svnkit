@@ -648,6 +648,83 @@ public class CopyTest {
         }
     }
 
+    @Test
+    public void testMetadataOnlyCopyNormalFileToUnversioned() throws Exception {
+        //SVNKIT-479
+        final TestOptions options = TestOptions.getInstance();
+        final Sandbox sandbox = Sandbox.createWithCleanup(getTestName() + ".testMetadataOnlyCopyNormalFileToUnversioned", options);
+
+        final SvnOperationFactory svnOperationFactory = new SvnOperationFactory();
+        try {
+            SVNURL url = sandbox.createSvnRepository();
+
+            final CommitBuilder commitBuilder = new CommitBuilder(url);
+            commitBuilder.addFile("sourceFile");
+            commitBuilder.commit();
+
+            final WorkingCopy workingCopy = sandbox.checkoutNewWorkingCopy(url);
+            final File sourceFile = workingCopy.getFile("sourceFile");
+            final File targetFile = workingCopy.getFile("targetFile");
+
+            TestUtil.writeFileContentsString(targetFile, "");
+
+            final SvnCopy copy = svnOperationFactory.createCopy();
+            copy.addCopySource(SvnCopySource.create(SvnTarget.fromFile(sourceFile), SVNRevision.WORKING));
+            copy.setSingleTarget(SvnTarget.fromFile(targetFile));
+            copy.setFailWhenDstExists(true);
+            copy.setMetadataOnly(true);
+            copy.run();
+
+            final Map<File, SvnStatus> statuses = TestUtil.getStatuses(svnOperationFactory, workingCopy.getWorkingCopyDirectory());
+            final SvnStatus status = statuses.get(targetFile);
+            Assert.assertTrue(status.isCopied());
+            Assert.assertEquals(SVNStatusType.STATUS_ADDED, status.getNodeStatus());
+
+        } finally {
+            svnOperationFactory.dispose();
+            sandbox.dispose();
+        }
+    }
+
+
+    @Test
+    public void testMetadataOnlyCopyNormalDirectoryToUnversioned() throws Exception {
+        //SVNKIT-479
+        final TestOptions options = TestOptions.getInstance();
+        final Sandbox sandbox = Sandbox.createWithCleanup(getTestName() + ".testMetadataOnlyCopyNormalDirectoryToUnversioned", options);
+
+        final SvnOperationFactory svnOperationFactory = new SvnOperationFactory();
+        try {
+            SVNURL url = sandbox.createSvnRepository();
+
+            final CommitBuilder commitBuilder = new CommitBuilder(url);
+            commitBuilder.addDirectory("sourceFile");
+            commitBuilder.commit();
+
+            final WorkingCopy workingCopy = sandbox.checkoutNewWorkingCopy(url);
+            final File sourceFile = workingCopy.getFile("sourceFile");
+            final File targetFile = workingCopy.getFile("targetFile");
+
+            SVNFileUtil.ensureDirectoryExists(targetFile);
+
+            final SvnCopy copy = svnOperationFactory.createCopy();
+            copy.addCopySource(SvnCopySource.create(SvnTarget.fromFile(sourceFile), SVNRevision.WORKING));
+            copy.setSingleTarget(SvnTarget.fromFile(targetFile));
+            copy.setFailWhenDstExists(true);
+            copy.setMetadataOnly(true);
+            copy.run();
+
+            final Map<File, SvnStatus> statuses = TestUtil.getStatuses(svnOperationFactory, workingCopy.getWorkingCopyDirectory());
+            final SvnStatus status = statuses.get(targetFile);
+            Assert.assertTrue(status.isCopied());
+            Assert.assertEquals(SVNStatusType.STATUS_ADDED, status.getNodeStatus());
+
+        } finally {
+            svnOperationFactory.dispose();
+            sandbox.dispose();
+        }
+    }
+
     private void assertNoRepositoryPathStartsWithSlash(SvnOperationFactory svnOperationFactory, File workingCopyDirectory) throws SVNException {
         final SVNWCContext context = new SVNWCContext(ISVNWCDb.SVNWCDbOpenMode.ReadOnly, svnOperationFactory.getOptions(), false, false, svnOperationFactory.getEventHandler());
         try {
