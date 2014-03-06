@@ -430,12 +430,14 @@ public class SvnNgWcToWcCopy extends SvnNgOperationRunner<Void, SvnCopy> {
             SVNFileType srcType = SVNFileType.getType(copyPair.source);
             SVNFileType dstType = SVNFileType.getType(copyPair.dst);
 
-            if (getOperation().isVirtual()) {
-                verifyPathsExistenceForVirtualCopy(copyPair.source, copyPair.dst, srcType, dstType, copyPair, move);
-            } else {
-                final boolean caseOnlyRename = verifyPaths(srcType, dstType, copyPair, copyPairs.size(), move);
-                if (caseOnlyRename) {
-                    return;
+            if (!getOperation().isMetadataOnly()) {
+                if (getOperation().isVirtual()) {
+                    verifyPathsExistenceForVirtualCopy(copyPair.source, copyPair.dst, srcType, dstType, copyPair, move);
+                } else {
+                    final boolean caseOnlyRename = verifyPaths(srcType, dstType, copyPair, copyPairs.size(), move);
+                    if (caseOnlyRename) {
+                        return;
+                    }
                 }
             }
             copyPair.dstParent = new File(SVNPathUtil.validateFilePath(SVNFileUtil.getParentFile(copyPair.dst).getAbsolutePath()));
