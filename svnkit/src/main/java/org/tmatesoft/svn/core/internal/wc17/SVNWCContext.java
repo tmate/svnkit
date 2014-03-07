@@ -2339,7 +2339,11 @@ public class SVNWCContext {
 
             boolean didMerge = false;
 
-            theirProps.put(propertyName, toVal);
+            if (toVal == null) {
+                theirProps.remove(propertyName);
+            } else {
+                theirProps.put(propertyName, toVal);
+            }
             mergePropertiesInfo.mergeOutcome = setPropMergeState(mergePropertiesInfo.mergeOutcome, SVNStatusType.CHANGED);
 
             SVNPropertyValue resultVal = workingVal;
@@ -5362,8 +5366,10 @@ public class SVNWCContext {
                                 new QSequenceLineRAByteData(SVNPropertyValue.getPropertyAsBytes(workingVal)),
                                 new QSequenceLineRAByteData(SVNPropertyValue.getPropertyAsBytes(incomingNewVal)),
                                 svnDiffOptions, byteArrayOutputStream, SVNDiffConflictChoiceStyle.CHOOSE_MODIFIED_LATEST);
-                        File mergedFile = SVNFileUtil.createUniqueFile(conflictDescription.getMergedFile(), null, null, false);
+                        File tempDir = getDb().getWCRootTempDir(localAbsPath);
+                        File mergedFile = SVNFileUtil.createUniqueFile(tempDir, SVNFileUtil.getFileName(localAbsPath), ".prej", false);
                         SVNFileUtil.writeToFile(mergedFile, byteArrayOutputStream.toByteArray());
+                        conflictDescription.setMergedFile(mergedFile);
                     } catch (IOException e) {
                         SVNErrorMessage errorMessage = SVNErrorMessage.create(SVNErrorCode.IO_ERROR);
                         SVNErrorManager.error(errorMessage, SVNLogType.WC);
@@ -5435,6 +5441,9 @@ public class SVNWCContext {
                     }
                     if (conflictDescription.getTheirFile() != null) {
                         SVNFileUtil.deleteFile(conflictDescription.getTheirFile());
+                    }
+                    if (conflictDescription.getMergedFile() != null) {
+                        SVNFileUtil.deleteFile(conflictDescription.getMergedFile());
                     }
                 }
             } catch (SVNException e) {
