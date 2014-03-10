@@ -26,6 +26,36 @@ public class SvnWcDbConflicts extends SvnWcDbShared {
     private static final String CONFLICT_OP_SWITCH = "switch";
     private static final String CONFLICT_OP_MERGE = "merge";
 
+    public static SVNSkel convertToConflictSkel(String conflictOld, String conflictWorking, String conflictNew, String propReject, byte[] treeConflictData) throws SVNException {
+        SVNSkel conflictData = null;
+        if (conflictOld != null || conflictNew != null || conflictWorking != null) {
+            conflictData = createConflictSkel();
+
+            addTextConflict(conflictData, conflictWorking, conflictOld, conflictNew);
+        }
+        if (propReject != null) {
+            if (conflictData == null) {
+                conflictData = createConflictSkel();
+            }
+            addPropConflict(conflictData, propReject);
+        }
+        if (treeConflictData != null) {
+            if (conflictData == null) {
+                conflictData = createConflictSkel();
+            }
+            final SVNSkel tcSkel = SVNSkel.parse(treeConflictData);
+            final File fakePath = SVNFileUtil.createFilePath("");
+            final SVNTreeConflictDescription tcDesc = SVNTreeConflictUtil.readSingleTreeConflict(tcSkel, fakePath);
+            addTreeConflict(conflictData, tcDesc.getConflictReason(), tcDesc.getConflictAction());
+            if (tcDesc.getOperation() != null && tcDesc.getOperation() != SVNOperation.NONE) {
+                setConflictOperation(conflictData, tcDesc.getOperation(), tcDesc.getSourceLeftVersion(), tcDesc.getSourceRightVersion());
+            }
+        } else if (conflictData != null) {
+            setConflictOperation(conflictData, SVNOperation.UPDATE, null, null);
+        }
+        return conflictData;
+    }
+
     public static SVNSkel convertToConflictSkel(File wcRootAbsPath, SVNWCDb db, String localRelpath, String conflictOld, String conflictWorking, String conflictNew, String propReject, byte[] treeConflictData) throws SVNException {
         SVNSkel conflictData = null;
         if (conflictOld != null || conflictNew != null || conflictWorking != null) {
@@ -939,5 +969,58 @@ public class SvnWcDbConflicts extends SvnWcDbShared {
         }
 
         return conflictData;
+    }
+
+    private static void addTextConflict(SVNSkel skel, String mineRelPath, String theirOldRelPath, String theirRelPath) throws SVNException {
+        final SVNSkel textConflict = SVNSkel.createEmptyList();
+        final SVNSkel markers = SVNSkel.createEmptyList();
+
+        if (theirRelPath != null) {
+            markers.prepend(SVNSkel.createAtom(theirRelPath));
+        } else {
+            markers.prepend(SVNSkel.createEmptyList());
+        }
+        if (mineRelPath != null) {
+            markers.prepend(SVNSkel.createAtom(mineRelPath));
+        } else {
+            markers.prepend(SVNSkel.createEmptyList());
+        }
+        if (theirOldRelPath != null) {
+            markers.prepend(SVNSkel.createAtom(theirOldRelPath));
+        } else {
+            markers.prepend(SVNSkel.createEmptyList());
+        }
+        textConflict.prepend(markers);
+        textConflict.prepend(SVNSkel.createAtom(ConflictKind.text.toString()));
+
+        skel.first().next().prepend(textConflict);
+    }
+
+    private static void addPropConflict(SVNSkel skel, String propReject) throws SVNException {
+        final SVNSkel propConflict = SVNSkel.createEmptyList();
+
+        final SVNSkel conflictNames = SVNSkel.createEmptyList();
+        propConflict.prepend(conflictNames);
+        final SVNSkel markers = SVNSkel.createEmptyList();
+        if (propReject != null) {
+            markers.prepend(SVNSkel.createAtom(propReject));
+        }
+        propConflict.prepend(markers);
+        propConflict.prepend(SVNSkel.createAtom(ConflictKind.prop.toString()));
+
+        skel.first().next().prepend(propConflict);
+    }
+
+    private static void addTreeConflict(SVNSkel skel, SVNConflictReason localChange, SVNConflictAction incomingChange) throws SVNException {
+        final SVNSkel treeConflict = SVNSkel.createEmptyList();
+
+        treeConflict.prepend(SVNSkel.createAtom(incomingChange.getName()));
+        treeConflict.prepend(SVNSkel.createAtom(localChange.getName()));
+
+        final SVNSkel markers = SVNSkel.createEmptyList();
+        treeConflict.prepend(markers);
+        treeConflict.prepend(SVNSkel.createAtom(ConflictKind.tree.toString()));
+
+        skel.first().next().prepend(treeConflict);
     }
 }

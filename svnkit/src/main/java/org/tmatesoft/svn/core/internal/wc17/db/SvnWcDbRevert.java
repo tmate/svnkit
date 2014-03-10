@@ -22,6 +22,7 @@ import org.tmatesoft.svn.core.internal.wc17.db.statement.SVNWCDbSchema;
 import org.tmatesoft.svn.core.internal.wc17.db.statement.SVNWCDbSchema.NODES__Fields;
 import org.tmatesoft.svn.core.internal.wc17.db.statement.SVNWCDbSchema.REVERT_LIST__Fields;
 import org.tmatesoft.svn.core.internal.wc17.db.statement.SVNWCDbStatements;
+import org.tmatesoft.svn.core.internal.wc17.db.statement17.SvnRevertActualNodesTrigger17;
 import org.tmatesoft.svn.core.wc.*;
 import org.tmatesoft.svn.util.SVNLogType;
 
@@ -42,7 +43,9 @@ public class SvnWcDbRevert extends SvnWcDbShared {
         SVNSqlJetDb sdb = root.getSDb();
 
         SvnRevertNodesTrigger nodesTableTrigger = new SvnRevertNodesTrigger(sdb);
-        SvnRevertActualNodesTrigger actualNodesTableTrigger = new SvnRevertActualNodesTrigger(sdb);
+        ISVNSqlJetTrigger actualNodesTableTrigger = root.getFormat() == ISVNWCDb.WC_FORMAT_17 ?
+                new SvnRevertActualNodesTrigger17(sdb) :
+                new SvnRevertActualNodesTrigger(sdb);
 
         SVNSqlJetStatement stmt = sdb.getStatement(SVNWCDbStatements.SELECT_NODE_INFO);
         long opDepth;
