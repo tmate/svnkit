@@ -391,6 +391,38 @@ public class StatusTest {
         }
     }
 
+    @Test
+    public void testUnversionedFileFormatWC17() throws Exception {
+        //SVNKIT-480
+        final TestOptions options = TestOptions.getInstance();
+        final Sandbox sandbox = Sandbox.createWithCleanup(getTestName() + ".testUnversionedFileFormatWC17", options);
+
+        final SvnOperationFactory svnOperationFactory = new SvnOperationFactory();
+        try {
+            final SVNURL url = sandbox.createSvnRepository();
+
+            final File workingCopyDirectory = sandbox.createDirectory("wc");
+
+            final SvnCheckout checkout = svnOperationFactory.createCheckout();
+            checkout.setSource(SvnTarget.fromURL(url));
+            checkout.setSingleTarget(SvnTarget.fromFile(workingCopyDirectory));
+            checkout.setTargetWorkingCopyFormat(ISVNWCDb.WC_FORMAT_17);
+            checkout.run();
+
+            final File unversionedFile = new File(workingCopyDirectory, "unversionedFile");
+            TestUtil.writeFileContentsString(unversionedFile, "");
+
+            final SvnGetStatus getStatus = svnOperationFactory.createGetStatus();
+            getStatus.setSingleTarget(SvnTarget.fromFile(unversionedFile));
+            final SvnStatus status = getStatus.run();
+
+            Assert.assertEquals(ISVNWCDb.WC_FORMAT_17, status.getWorkingCopyFormat());
+        } finally {
+            sandbox.dispose();
+            svnOperationFactory.dispose();
+        }
+    }
+
     private String getTestName() {
         return "StatusTest";
     }

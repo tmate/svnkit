@@ -206,7 +206,7 @@ public class SVNStatusEditor17 {
         return status;
     }
 
-    private void sendUnversionedItem(File nodeAbsPath, SVNNodeKind pathKind, boolean treeConflicted, Collection<String> patterns, boolean noIgnore, ISvnObjectReceiver<SvnStatus> handler) throws SVNException {
+    private void sendUnversionedItem(File nodeAbsPath, SVNNodeKind pathKind, boolean treeConflicted, Collection<String> patterns, boolean noIgnore, int workingCopyFormat, ISvnObjectReceiver<SvnStatus> handler) throws SVNException {
         boolean isIgnored = SvnNgPropertiesManager.isIgnored(SVNFileUtil.getFileName(nodeAbsPath), patterns);
         boolean isExternal = isExternal(nodeAbsPath);
         SvnStatus status = assembleUnversioned17(nodeAbsPath, pathKind, treeConflicted, isIgnored);
@@ -216,6 +216,9 @@ public class SVNStatusEditor17 {
             }
             if (status.isConflicted()) {
                 isIgnored = false;
+            }
+            if (workingCopyFormat > 0) {
+                status.setWorkingCopyFormat(workingCopyFormat);
             }
             if (handler != null && (noIgnore || !isIgnored || isExternal)) {
                 handler.receive(SvnTarget.fromFile(nodeAbsPath), status);
@@ -722,7 +725,7 @@ public class SVNStatusEditor17 {
                 if (ignorePatterns != null && patterns == null) {
                     patterns = collectIgnorePatterns(wcRoot, wcRoot.computeRelPath(localAbsPath), ignorePatterns);
                 }
-                sendUnversionedItem(nodeAbsPath, SVNFileType.getNodeKind(nodeFileType), true, patterns, noIgnore, handler);                
+                sendUnversionedItem(nodeAbsPath, SVNFileType.getNodeKind(nodeFileType), true, patterns, noIgnore, wcRoot.getFormat(), handler);
                 continue;
             }
             if (nodeFileType == null) {
@@ -737,7 +740,7 @@ public class SVNStatusEditor17 {
             if (ignorePatterns != null && patterns == null) {
                 patterns = collectIgnorePatterns(wcRoot, wcRoot.computeRelPath(localAbsPath), ignorePatterns);
             }
-            sendUnversionedItem(nodeAbsPath, SVNFileType.getNodeKind(nodeFileType), false, patterns, noIgnore || selected != null, handler);                
+            sendUnversionedItem(nodeAbsPath, SVNFileType.getNodeKind(nodeFileType), false, patterns, noIgnore || selected != null, wcRoot.getFormat(), handler);
         }
     }
     
