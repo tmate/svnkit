@@ -3,12 +3,10 @@ package org.tmatesoft.svn.test;
 import org.junit.Assert;
 import org.junit.Assume;
 import org.junit.Test;
-import org.tmatesoft.svn.core.SVNDepth;
-import org.tmatesoft.svn.core.SVNException;
-import org.tmatesoft.svn.core.SVNPropertyValue;
-import org.tmatesoft.svn.core.SVNURL;
+import org.tmatesoft.svn.core.*;
 import org.tmatesoft.svn.core.auth.BasicAuthenticationManager;
 import org.tmatesoft.svn.core.auth.ISVNAuthenticationManager;
+import org.tmatesoft.svn.core.internal.wc.SVNExternal;
 import org.tmatesoft.svn.core.internal.wc.admin.SVNAdminAreaFactory;
 import org.tmatesoft.svn.core.internal.wc17.SVNWCContext;
 import org.tmatesoft.svn.core.internal.wc17.db.ISVNWCDb;
@@ -417,6 +415,50 @@ public class StatusTest {
             final SvnStatus status = getStatus.run();
 
             Assert.assertEquals(ISVNWCDb.WC_FORMAT_17, status.getWorkingCopyFormat());
+        } finally {
+            sandbox.dispose();
+            svnOperationFactory.dispose();
+        }
+    }
+
+    @Test
+    public void testExternalFormatWC17() throws Exception {
+        //SVNKIT-480
+        final TestOptions options = TestOptions.getInstance();
+        final Sandbox sandbox = Sandbox.createWithCleanup(getTestName() + ".testExternalFormatWC17", options);
+
+        final SvnOperationFactory svnOperationFactory = new SvnOperationFactory();
+        try {
+            final SVNURL url = sandbox.createSvnRepository();
+
+            final SVNExternal externalDirectory = new SVNExternal("externalDirectory", url.appendPath("directory", false).toString(), SVNRevision.HEAD, SVNRevision.HEAD, false, false, true);
+            final SVNExternal externalFile = new SVNExternal("externalFile", url.appendPath("directory", false).toString(), SVNRevision.HEAD, SVNRevision.HEAD, false, false, true);
+
+            final CommitBuilder commitBuilder = new CommitBuilder(url);
+            commitBuilder.addFile("file");
+            commitBuilder.addDirectory("directory");
+            commitBuilder.setDirectoryProperty("", SVNProperty.EXTERNALS, SVNPropertyValue.create(externalDirectory.toString() + "\n" + externalFile.toString()));
+            commitBuilder.commit();
+
+            final File workingCopyDirectory = sandbox.createDirectory("wc");
+
+            final SvnCheckout checkout = svnOperationFactory.createCheckout();
+            checkout.setIgnoreExternals(false);
+            checkout.setSource(SvnTarget.fromURL(url));
+            checkout.setSingleTarget(SvnTarget.fromFile(workingCopyDirectory));
+            checkout.setTargetWorkingCopyFormat(ISVNWCDb.WC_FORMAT_17);
+            checkout.run();
+
+            final SvnGetStatus getStatus = svnOperationFactory.createGetStatus();
+            getStatus.setSingleTarget(SvnTarget.fromFile(workingCopyDirectory));
+            getStatus.setDepth(SVNDepth.IMMEDIATES);
+            getStatus.setReceiver(new ISvnObjectReceiver<SvnStatus>() {
+                @Override
+                public void receive(SvnTarget target, SvnStatus status) throws SVNException {
+                    Assert.assertEquals(ISVNWCDb.WC_FORMAT_17, status.getWorkingCopyFormat());                }
+            });
+            getStatus.run();
+
         } finally {
             sandbox.dispose();
             svnOperationFactory.dispose();
