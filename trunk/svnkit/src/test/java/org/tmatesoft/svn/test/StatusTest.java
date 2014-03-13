@@ -465,6 +465,48 @@ public class StatusTest {
         }
     }
 
+    @Test
+    public void testRemotelyAddedNodesFormat() throws Exception {
+        //SVNKIT-480
+        final TestOptions options = TestOptions.getInstance();
+        final Sandbox sandbox = Sandbox.createWithCleanup(getTestName() + ".testRemotelyAddedNodesFormat", options);
+
+        final SvnOperationFactory svnOperationFactory = new SvnOperationFactory();
+        try {
+            final SVNURL url = sandbox.createSvnRepository();
+
+            final CommitBuilder commitBuilder = new CommitBuilder(url);
+            commitBuilder.addFile("file");
+            commitBuilder.commit();
+
+            final File workingCopyDirectory = sandbox.createDirectory("wc");
+
+            final SvnCheckout checkout = svnOperationFactory.createCheckout();
+            checkout.setIgnoreExternals(false);
+            checkout.setSource(SvnTarget.fromURL(url));
+            checkout.setSingleTarget(SvnTarget.fromFile(workingCopyDirectory));
+            checkout.setTargetWorkingCopyFormat(ISVNWCDb.WC_FORMAT_17);
+            checkout.setRevision(SVNRevision.create(0));
+            checkout.run();
+
+            final SvnGetStatus getStatus = svnOperationFactory.createGetStatus();
+            getStatus.setSingleTarget(SvnTarget.fromFile(workingCopyDirectory));
+            getStatus.setDepth(SVNDepth.IMMEDIATES);
+            getStatus.setReportAll(true);
+            getStatus.setRemote(true);
+            getStatus.setReceiver(new ISvnObjectReceiver<SvnStatus>() {
+                @Override
+                public void receive(SvnTarget target, SvnStatus status) throws SVNException {
+                    Assert.assertEquals(ISVNWCDb.WC_FORMAT_17, status.getWorkingCopyFormat());                }
+            });
+            getStatus.run();
+
+        } finally {
+            sandbox.dispose();
+            svnOperationFactory.dispose();
+        }
+    }
+
     private String getTestName() {
         return "StatusTest";
     }

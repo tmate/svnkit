@@ -105,6 +105,9 @@ public class SVNRemoteStatusEditor17 extends SVNStatusEditor17 implements ISVNEd
 
             /* Use the public API to get a statstruct, and put it into the hash. */
             statstruct = internalStatus(myWCContext, localAbsPath);
+            if (statstruct.getNodeStatus() == SVNStatusType.STATUS_UNVERSIONED || statstruct.getNodeStatus() == SVNStatusType.STATUS_NONE) {
+                statstruct.setWorkingCopyFormat(myAnchorStatus.getWorkingCopyFormat());
+            }
             statstruct.setRepositoryLock(reposLock);
             statushash.put(localAbsPath, statstruct);
         }
@@ -448,6 +451,9 @@ public class SVNRemoteStatusEditor17 extends SVNStatusEditor17 implements ISVNEd
                 return;
             statstruct = internalStatus(myWCContext, localAbsPath);
             statstruct.setRepositoryLock(reposLock);
+            if (statstruct.getNodeStatus() == SVNStatusType.STATUS_UNVERSIONED || statstruct.getNodeStatus() == SVNStatusType.STATUS_NONE) {
+                statstruct.setWorkingCopyFormat(myAnchorStatus.getWorkingCopyFormat());
+            }
             statushash.put(localAbsPath, statstruct);
         }
 
