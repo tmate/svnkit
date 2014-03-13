@@ -474,7 +474,7 @@ public class SVNProperty {
     public static boolean isRegularProperty(String name) {
         if (name == null) {
             return false;
-        } else if (name.startsWith(SVN_WC_PREFIX) || name.startsWith(SVN_ENTRY_PREFIX)) {
+        } else if (isWorkingCopyProperty(name) || isEntryProperty(name)) {
             return false;
         } else {
             return true;
