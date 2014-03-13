@@ -453,7 +453,6 @@ public class StatusTest {
             getStatus.setSingleTarget(SvnTarget.fromFile(workingCopyDirectory));
             getStatus.setDepth(SVNDepth.IMMEDIATES);
             getStatus.setReceiver(new ISvnObjectReceiver<SvnStatus>() {
-                @Override
                 public void receive(SvnTarget target, SvnStatus status) throws SVNException {
                     Assert.assertEquals(ISVNWCDb.WC_FORMAT_17, status.getWorkingCopyFormat());                }
             });
@@ -495,7 +494,6 @@ public class StatusTest {
             getStatus.setReportAll(true);
             getStatus.setRemote(true);
             getStatus.setReceiver(new ISvnObjectReceiver<SvnStatus>() {
-                @Override
                 public void receive(SvnTarget target, SvnStatus status) throws SVNException {
                     Assert.assertEquals(ISVNWCDb.WC_FORMAT_17, status.getWorkingCopyFormat());                }
             });
