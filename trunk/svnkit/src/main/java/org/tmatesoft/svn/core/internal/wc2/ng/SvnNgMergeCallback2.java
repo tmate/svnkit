@@ -675,7 +675,7 @@ public class SvnNgMergeCallback2 implements ISvnDiffCallback2 {
             recordTreeConflict(localAbsPath, db.parentBaton, SVNNodeKind.DIR, SVNConflictAction.DELETE, SVNConflictReason.EDITED, null, true);
         } else {
             if (workingProps != null && workingProps.containsName(SVNProperty.MERGE_INFO)) {
-                if (mergeDriver.pathsWithDeletedMergeInfo != null) {
+                if (mergeDriver.pathsWithDeletedMergeInfo == null) {
                     mergeDriver.pathsWithDeletedMergeInfo = new HashSet<File>();
                 }
                 mergeDriver.pathsWithDeletedMergeInfo.add(localAbsPath);
