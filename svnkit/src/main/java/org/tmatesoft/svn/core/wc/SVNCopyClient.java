@@ -25,6 +25,7 @@ import org.tmatesoft.svn.core.auth.ISVNAuthenticationManager;
 import org.tmatesoft.svn.core.internal.wc2.compat.SvnCodec;
 import org.tmatesoft.svn.core.io.SVNRepository;
 import org.tmatesoft.svn.core.wc2.SvnCopy;
+import org.tmatesoft.svn.core.wc2.SvnOperationFactory;
 import org.tmatesoft.svn.core.wc2.SvnRemoteCopy;
 import org.tmatesoft.svn.core.wc2.SvnTarget;
 
@@ -113,9 +114,6 @@ public class SVNCopyClient extends SVNBasicClient {
      */
     public SVNCopyClient(ISVNAuthenticationManager authManager, ISVNOptions options) {
         super(authManager, options);
-        setCommitParameters(null);
-        setCommitHandler(null);
-        setExternalsHandler(null);
     }
 
     /**
@@ -141,6 +139,13 @@ public class SVNCopyClient extends SVNBasicClient {
      */
     public SVNCopyClient(ISVNRepositoryPool repositoryPool, ISVNOptions options) {
         super(repositoryPool, options);
+    }
+
+    public SVNCopyClient(SvnOperationFactory of) {
+        super(of);
+    }
+
+    protected void initDefaults() {
         setCommitParameters(null);
         setCommitHandler(null);
         setExternalsHandler(null);
