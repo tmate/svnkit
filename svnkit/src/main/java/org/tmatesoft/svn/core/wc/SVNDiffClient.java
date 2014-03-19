@@ -30,14 +30,7 @@ import org.tmatesoft.svn.core.auth.ISVNAuthenticationManager;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.internal.wc2.compat.SvnCodec;
 import org.tmatesoft.svn.core.io.SVNRepository;
-import org.tmatesoft.svn.core.wc2.ISvnObjectReceiver;
-import org.tmatesoft.svn.core.wc2.SvnDiff;
-import org.tmatesoft.svn.core.wc2.SvnDiffSummarize;
-import org.tmatesoft.svn.core.wc2.SvnGetMergeInfo;
-import org.tmatesoft.svn.core.wc2.SvnLogMergeInfo;
-import org.tmatesoft.svn.core.wc2.SvnMerge;
-import org.tmatesoft.svn.core.wc2.SvnSuggestMergeSources;
-import org.tmatesoft.svn.core.wc2.SvnTarget;
+import org.tmatesoft.svn.core.wc2.*;
 import org.tmatesoft.svn.util.SVNLogType;
 
 /**
@@ -110,8 +103,6 @@ public class SVNDiffClient extends SVNBasicClient {
      */
     public SVNDiffClient(ISVNAuthenticationManager authManager, ISVNOptions options) {
         super(authManager, options);
-        setDiffGenerator(null);
-        setMergeOptions(null);
     }
 
     /**
@@ -137,6 +128,13 @@ public class SVNDiffClient extends SVNBasicClient {
      */
     public SVNDiffClient(ISVNRepositoryPool repositoryPool, ISVNOptions options) {
         super(repositoryPool, options);
+    }
+
+    public SVNDiffClient(SvnOperationFactory of) {
+        super(of);
+    }
+
+    protected void initDefaults() {
         setDiffGenerator(null);
         setMergeOptions(null);
     }

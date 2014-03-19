@@ -29,13 +29,7 @@ import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.internal.wc2.compat.SvnCodec;
 import org.tmatesoft.svn.core.internal.wc2.compat.SvnCodec.SVNCommitPacketWrapper;
 import org.tmatesoft.svn.core.io.SVNRepository;
-import org.tmatesoft.svn.core.wc2.ISvnObjectReceiver;
-import org.tmatesoft.svn.core.wc2.SvnCommit;
-import org.tmatesoft.svn.core.wc2.SvnCommitPacket;
-import org.tmatesoft.svn.core.wc2.SvnImport;
-import org.tmatesoft.svn.core.wc2.SvnRemoteDelete;
-import org.tmatesoft.svn.core.wc2.SvnRemoteMkDir;
-import org.tmatesoft.svn.core.wc2.SvnTarget;
+import org.tmatesoft.svn.core.wc2.*;
 import org.tmatesoft.svn.util.SVNLogType;
 
 /**
@@ -137,6 +131,13 @@ public class SVNCommitClient extends SVNBasicClient {
      */
     public SVNCommitClient(ISVNRepositoryPool repositoryPool, ISVNOptions options) {
         super(repositoryPool, options);
+    }
+
+    public SVNCommitClient(SvnOperationFactory of) {
+        super(of);
+    }
+
+    protected void initDefaults() {
         setCommitHander(null);
         setCommitParameters(null);
         setCommitHandler(null);

@@ -29,25 +29,7 @@ import org.tmatesoft.svn.core.internal.wc.admin.ISVNEntryHandler;
 import org.tmatesoft.svn.core.internal.wc16.SVNWCClient16;
 import org.tmatesoft.svn.core.internal.wc2.compat.SvnCodec;
 import org.tmatesoft.svn.core.io.SVNRepository;
-import org.tmatesoft.svn.core.wc2.ISvnObjectReceiver;
-import org.tmatesoft.svn.core.wc2.SvnCat;
-import org.tmatesoft.svn.core.wc2.SvnCleanup;
-import org.tmatesoft.svn.core.wc2.SvnGetInfo;
-import org.tmatesoft.svn.core.wc2.SvnGetProperties;
-import org.tmatesoft.svn.core.wc2.SvnGetStatusSummary;
-import org.tmatesoft.svn.core.wc2.SvnInfo;
-import org.tmatesoft.svn.core.wc2.SvnMarkReplaced;
-import org.tmatesoft.svn.core.wc2.SvnRemoteSetProperty;
-import org.tmatesoft.svn.core.wc2.SvnResolve;
-import org.tmatesoft.svn.core.wc2.SvnRevert;
-import org.tmatesoft.svn.core.wc2.SvnScheduleForAddition;
-import org.tmatesoft.svn.core.wc2.SvnScheduleForRemoval;
-import org.tmatesoft.svn.core.wc2.SvnSetLock;
-import org.tmatesoft.svn.core.wc2.SvnSetProperty;
-import org.tmatesoft.svn.core.wc2.SvnStatusSummary;
-import org.tmatesoft.svn.core.wc2.SvnTarget;
-import org.tmatesoft.svn.core.wc2.SvnUnlock;
-import org.tmatesoft.svn.core.wc2.SvnUpgrade;
+import org.tmatesoft.svn.core.wc2.*;
 
 /**
  * The <b>SVNWCClient</b> class combines a number of version control operations
@@ -183,8 +165,6 @@ public class SVNWCClient extends SVNBasicClient {
      */
     public SVNWCClient(ISVNAuthenticationManager authManager, ISVNOptions options) {
         super(authManager, options);
-        setCommitHandler(null);
-        setAddParameters(null);
     }
 
     /**
@@ -210,6 +190,13 @@ public class SVNWCClient extends SVNBasicClient {
      */
     public SVNWCClient(ISVNRepositoryPool repositoryPool, ISVNOptions options) {
         super(repositoryPool, options);
+    }
+
+    public SVNWCClient(SvnOperationFactory of) {
+        super(of);
+    }
+
+    protected void initDefaults() {
         setCommitHandler(null);
         setAddParameters(null);
     }
@@ -2505,7 +2492,7 @@ public class SVNWCClient extends SVNBasicClient {
      * @since 1.2
      */
     public void doSetWCFormat(File directory, int format) throws SVNException {
-        if (format == 12) {
+        if (format >= 12) {
             SvnUpgrade upgrade = getOperationsFactory().createUpgrade();
             upgrade.setSingleTarget(SvnTarget.fromFile(directory));
             upgrade.setDepth(SVNDepth.INFINITY);
