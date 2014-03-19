@@ -94,6 +94,8 @@ public class SVNSaslAuthenticator extends SVNAuthenticator {
                 if (myClient == null) {
                     return new SVNPlainAuthenticator(getConnection()).authenticate(mechs, realm, repository);
                 }
+                // reiterate from the first available credentials next time:
+                boolean startOver = false;
                 try {
                     if (tryAuthentication(repository, getMechanismName(myClient, isAnonymous))) {
                         if (myAuthenticationManager != null && myAuthentication != null) {
@@ -110,6 +112,7 @@ public class SVNSaslAuthenticator extends SVNAuthenticator {
                     // it may be plain replaced with anonymous.
                     String mechName = getMechanismName(myClient, isAnonymous);
                     mechs.remove(mechName);
+                    startOver = true;
                 } 
                 if (myAuthenticationManager != null) {
                     SVNErrorMessage error = getLastError();
@@ -130,6 +133,9 @@ public class SVNSaslAuthenticator extends SVNAuthenticator {
                 if (mechs.isEmpty()) {
                     failed = true;
                     break;
+                }
+                if (startOver) {
+                    myAuthentication = null;
                 }
                 myClient = createSaslClient(mechs, realm, repository, repository.getLocation());
             }
