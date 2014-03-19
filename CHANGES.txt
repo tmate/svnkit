@@ -1,3 +1,8 @@
+== version 1.8.5 ==
+
++ Properties merge didn't work correctly in 1.8.4, fixed.
++ Stability improvements.
+
 == version 1.8.4 ==
 
 + Full transparent support of 1.7 working copy format.
