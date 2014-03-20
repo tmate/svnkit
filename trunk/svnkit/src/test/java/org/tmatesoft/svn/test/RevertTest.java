@@ -475,6 +475,64 @@ public class RevertTest {
         }
     }
 
+    @Test
+    public void testRevertInfinityDepthRemovesMarkedFilesWC17() throws Exception {
+        //SVNKIT-483
+        final TestOptions options = TestOptions.getInstance();
+
+        final SvnOperationFactory svnOperationFactory = new SvnOperationFactory();
+        final Sandbox sandbox = Sandbox.createWithCleanup(getTestName() + ".testRevertInfinityDepthRemovesMarkedFilesWC17", options);
+        try {
+            final SVNURL url = sandbox.createSvnRepository();
+
+            final CommitBuilder commitBuilder1 = new CommitBuilder(url);
+            commitBuilder1.addFile("file", "base".getBytes());
+            commitBuilder1.setFileProperty("file", "propertyName", SVNPropertyValue.create("base"));
+            commitBuilder1.commit();
+
+            final CommitBuilder commitBuilder2 = new CommitBuilder(url);
+            commitBuilder2.changeFile("file", "theirs".getBytes());
+            commitBuilder2.setFileProperty("file", "propertyName", SVNPropertyValue.create("theirs"));
+            commitBuilder2.commit();
+
+            final File workingCopyDirectory = sandbox.createDirectory("wc");
+            final File file = new File(workingCopyDirectory, "file");
+
+            final SvnCheckout checkout = svnOperationFactory.createCheckout();
+            checkout.setTargetWorkingCopyFormat(ISVNWCDb.WC_FORMAT_17);
+            checkout.setSource(SvnTarget.fromURL(url));
+            checkout.setSingleTarget(SvnTarget.fromFile(workingCopyDirectory));
+            checkout.setRevision(SVNRevision.create(1));
+            checkout.run();
+
+            final SvnSetProperty setProperty = svnOperationFactory.createSetProperty();
+            setProperty.setSingleTarget(SvnTarget.fromFile(file));
+            setProperty.setPropertyName("propertyName");
+            setProperty.setPropertyValue(SVNPropertyValue.create("ours"));
+            setProperty.run();
+
+            TestUtil.writeFileContentsString(file, "ours");
+
+            final SvnUpdate update = svnOperationFactory.createUpdate();
+            update.setSingleTarget(SvnTarget.fromFile(file));
+            update.run();
+
+            final SvnRevert revert = svnOperationFactory.createRevert();
+            revert.setDepth(SVNDepth.INFINITY);
+            revert.setSingleTarget(SvnTarget.fromFile(file));
+            revert.run();
+
+            Assert.assertFalse(new File(file.getPath() + ".mine").exists());
+            Assert.assertFalse(new File(file.getPath() + ".r1").exists());
+            Assert.assertFalse(new File(file.getPath() + ".r2").exists());
+            Assert.assertFalse(new File(file.getPath() + ".prej").exists());
+
+        } finally {
+            svnOperationFactory.dispose();
+            sandbox.dispose();
+        }
+    }
+
     private void testRevertCopy(String testName, boolean recursiveRevert, boolean preserveModifiedCopies, boolean modifyFileContents, boolean modifyProperties, boolean expectedFileExistence16, SVNStatusType expectedNodeStatus16, boolean expectedFileExistence17, SVNStatusType expectedNodeStatus17) throws SVNException {
         final TestOptions options = TestOptions.getInstance();
 
