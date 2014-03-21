@@ -9,6 +9,7 @@ import org.tmatesoft.svn.core.internal.db.SVNSqlJetDb;
 import org.tmatesoft.svn.core.internal.db.SVNSqlJetSelectFieldsStatement;
 import org.tmatesoft.svn.core.internal.db.SVNSqlJetStatement;
 import org.tmatesoft.svn.core.internal.wc.SVNExternal;
+import org.tmatesoft.svn.core.internal.wc.SVNFileListUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNFileType;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 import org.tmatesoft.svn.core.internal.wc17.SVNWCContext;
@@ -719,6 +720,58 @@ public class CopyTest {
             Assert.assertTrue(status.isCopied());
             Assert.assertEquals(SVNStatusType.STATUS_ADDED, status.getNodeStatus());
 
+        } finally {
+            svnOperationFactory.dispose();
+            sandbox.dispose();
+        }
+    }
+
+    @Test
+    public void testPrejFileNotCopiedWC17() throws Exception {
+        //SVNKIT-488
+        final TestOptions options = TestOptions.getInstance();
+        final Sandbox sandbox = Sandbox.createWithCleanup(getTestName() + ".testPrejFileNotCopiedWC17", options);
+
+        final SvnOperationFactory svnOperationFactory = new SvnOperationFactory();
+        try {
+            SVNURL url = sandbox.createSvnRepository();
+
+            final CommitBuilder commitBuilder1 = new CommitBuilder(url);
+            commitBuilder1.addDirectory("directory/subdirectory");
+            commitBuilder1.setDirectoryProperty("sourceDirectory/subdirectory", "propertyName", SVNPropertyValue.create("base"));
+            commitBuilder1.commit();
+
+            final CommitBuilder commitBuilder2 = new CommitBuilder(url);
+            commitBuilder2.setDirectoryProperty("sourceDirectory/subdirectory", "propertyName", SVNPropertyValue.create("theirs"));
+            commitBuilder2.commit();
+
+            final File workingCopyDirectory = sandbox.createDirectory("wc");
+
+            final SvnCheckout checkout = svnOperationFactory.createCheckout();
+            checkout.setSource(SvnTarget.fromURL(url));
+            checkout.setSingleTarget(SvnTarget.fromFile(workingCopyDirectory));
+            checkout.run();
+
+            final File sourceDirectory = new File(workingCopyDirectory, "sourceDirectory");
+            final File targetDirectory = new File(workingCopyDirectory, "targetDirectory");
+            final File subdirectory = new File(sourceDirectory, "subdirectory");
+
+            final SvnSetProperty setProperty = svnOperationFactory.createSetProperty();
+            setProperty.setPropertyName("propertyName");
+            setProperty.setPropertyValue(SVNPropertyValue.create("ours"));
+            setProperty.setSingleTarget(SvnTarget.fromFile(subdirectory));
+            setProperty.run();
+
+            final SvnUpdate update = svnOperationFactory.createUpdate();
+            update.setSingleTarget(SvnTarget.fromFile(workingCopyDirectory));
+            update.run();
+
+            final SvnCopy copy = svnOperationFactory.createCopy();
+            copy.addCopySource(SvnCopySource.create(SvnTarget.fromFile(sourceDirectory), SVNRevision.WORKING));
+            copy.setSingleTarget(SvnTarget.fromFile(targetDirectory));
+            copy.run();
+
+            Assert.assertEquals(0, SVNFileListUtil.listFiles(new File(targetDirectory, "subdirectory")).length);
         } finally {
             svnOperationFactory.dispose();
             sandbox.dispose();

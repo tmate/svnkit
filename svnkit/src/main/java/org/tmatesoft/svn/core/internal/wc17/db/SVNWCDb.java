@@ -7479,14 +7479,17 @@ public class SVNWCDb implements ISVNWCDb {
                 if (haveRow && (
                         !stmt.isColumnNull(ACTUAL_NODE__Fields.conflict_old) ||
                         !stmt.isColumnNull(ACTUAL_NODE__Fields.conflict_new) ||
-                        !stmt.isColumnNull(ACTUAL_NODE__Fields.conflict_working))) {
+                        !stmt.isColumnNull(ACTUAL_NODE__Fields.conflict_working)) ||
+                        !stmt.isColumnNull(ACTUAL_NODE__Fields.prop_reject)) {
                     String conflictOldRelPath = stmt.getColumnString(ACTUAL_NODE__Fields.conflict_old);
                     String conflictNewRelPath = stmt.getColumnString(ACTUAL_NODE__Fields.conflict_new);
                     String conflictWorkingRelPath = stmt.getColumnString(ACTUAL_NODE__Fields.conflict_working);
+                    String prejRelPath = stmt.getColumnString(ACTUAL_NODE__Fields.prop_reject);
 
                     File conflictOldAbsPath = conflictOldRelPath == null ? null : SVNFileUtil.createFilePath(wcRoot.getAbsPath(), conflictOldRelPath);
                     File conflictNewAbsPath = conflictNewRelPath == null ? null : SVNFileUtil.createFilePath(wcRoot.getAbsPath(), conflictNewRelPath);
                     File conflictWorkingAbsPath = conflictWorkingRelPath == null ? null : SVNFileUtil.createFilePath(wcRoot.getAbsPath(), conflictWorkingRelPath);
+                    File prejAbsPath = prejRelPath == null ? null : SVNFileUtil.createFilePath(wcRoot.getAbsPath(), prejRelPath);
 
                     if (conflictOldAbsPath != null) {
                         markerFiles.add(conflictOldAbsPath);
@@ -7496,6 +7499,9 @@ public class SVNWCDb implements ISVNWCDb {
                     }
                     if (conflictWorkingAbsPath != null) {
                         markerFiles.add(conflictWorkingAbsPath);
+                    }
+                    if (prejAbsPath != null) {
+                        markerFiles.add(prejAbsPath);
                     }
                 }
             } finally {
@@ -7511,15 +7517,24 @@ public class SVNWCDb implements ISVNWCDb {
                     String conflictOldRelPath = stmt.getColumnString(ACTUAL_NODE__Fields.conflict_old);
                     String conflictNewRelPath = stmt.getColumnString(ACTUAL_NODE__Fields.conflict_new);
                     String conflictWorkingRelPath = stmt.getColumnString(ACTUAL_NODE__Fields.conflict_working);
+                    String prejRelPath = stmt.getColumnString(ACTUAL_NODE__Fields.prop_reject);
 
-                    if (conflictOldRelPath != null) {
-                        markerFiles.add(SVNFileUtil.createFilePath(wcRoot.getAbsPath(), conflictOldRelPath));
+                    File conflictOldAbsPath = conflictOldRelPath == null ? null : SVNFileUtil.createFilePath(wcRoot.getAbsPath(), conflictOldRelPath);
+                    File conflictNewAbsPath = conflictNewRelPath == null ? null : SVNFileUtil.createFilePath(wcRoot.getAbsPath(), conflictNewRelPath);
+                    File conflictWorkingAbsPath = conflictWorkingRelPath == null ? null : SVNFileUtil.createFilePath(wcRoot.getAbsPath(), conflictWorkingRelPath);
+                    File prejAbsPath = prejRelPath == null ? null : SVNFileUtil.createFilePath(wcRoot.getAbsPath(), prejRelPath);
+
+                    if (conflictOldAbsPath != null) {
+                        markerFiles.add(conflictOldAbsPath);
                     }
-                    if (conflictNewRelPath != null) {
-                        markerFiles.add(SVNFileUtil.createFilePath(wcRoot.getAbsPath(), conflictNewRelPath));
+                    if (conflictNewAbsPath != null) {
+                        markerFiles.add(conflictNewAbsPath);
                     }
-                    if (conflictWorkingRelPath != null) {
-                        markerFiles.add(SVNFileUtil.createFilePath(wcRoot.getAbsPath(), conflictWorkingRelPath));
+                    if (conflictWorkingAbsPath != null) {
+                        markerFiles.add(conflictWorkingAbsPath);
+                    }
+                    if (prejAbsPath != null) {
+                        markerFiles.add(prejAbsPath);
                     }
                     haveRow = stmt.next();
                 }
