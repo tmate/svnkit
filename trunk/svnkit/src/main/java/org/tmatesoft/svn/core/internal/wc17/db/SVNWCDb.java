@@ -100,20 +100,13 @@ import org.tmatesoft.svn.core.internal.wc17.db.StructureFields.RepositoryInfo;
 import org.tmatesoft.svn.core.internal.wc17.db.SvnWcDbConflicts.ConflictInfo;
 import org.tmatesoft.svn.core.internal.wc17.db.SvnWcDbConflicts.TextConflictInfo;
 import org.tmatesoft.svn.core.internal.wc17.db.SvnWcDbConflicts.TreeConflictInfo;
-import org.tmatesoft.svn.core.internal.wc17.db.statement.SVNWCDbCreateSchema;
-import org.tmatesoft.svn.core.internal.wc17.db.statement.SVNWCDbInsertDeleteList;
-import org.tmatesoft.svn.core.internal.wc17.db.statement.SVNWCDbSchema;
+import org.tmatesoft.svn.core.internal.wc17.db.statement.*;
 import org.tmatesoft.svn.core.internal.wc17.db.statement.SVNWCDbSchema.ACTUAL_NODE__Fields;
 import org.tmatesoft.svn.core.internal.wc17.db.statement.SVNWCDbSchema.DELETE_LIST__Fields;
 import org.tmatesoft.svn.core.internal.wc17.db.statement.SVNWCDbSchema.NODES__Fields;
 import org.tmatesoft.svn.core.internal.wc17.db.statement.SVNWCDbSchema.PRISTINE__Fields;
 import org.tmatesoft.svn.core.internal.wc17.db.statement.SVNWCDbSchema.REPOSITORY__Fields;
 import org.tmatesoft.svn.core.internal.wc17.db.statement.SVNWCDbSchema.WC_LOCK__Fields;
-import org.tmatesoft.svn.core.internal.wc17.db.statement.SVNWCDbSelectCommittableExternalsImmediatelyBelow;
-import org.tmatesoft.svn.core.internal.wc17.db.statement.SVNWCDbSelectDeletionInfo;
-import org.tmatesoft.svn.core.internal.wc17.db.statement.SVNWCDbSelectMinMaxRevisions;
-import org.tmatesoft.svn.core.internal.wc17.db.statement.SVNWCDbSelectOpDepthMovedPair;
-import org.tmatesoft.svn.core.internal.wc17.db.statement.SVNWCDbStatements;
 import org.tmatesoft.svn.core.io.SVNRepository;
 import org.tmatesoft.svn.core.wc.ISVNEventHandler;
 import org.tmatesoft.svn.core.wc.ISVNOptions;
@@ -486,9 +479,9 @@ public class SVNWCDb implements ISVNWCDb {
         pdh.getWCRoot().getSDb().runTransaction(ibb);
         pdh.flushEntries(localAbsPath);
     }
-    
+
     private class Delete implements SVNSqlJetTransaction {
-        
+
         public SVNWCDbRoot root;
         public File localRelPath;
         public long deleteDepth;
@@ -499,243 +492,260 @@ public class SVNWCDb implements ISVNWCDb {
         public SVNSkel conflict;
 
         public void transaction(SVNSqlJetDb db) throws SqlJetException, SVNException {
-            WCDbInfo info = readInfo(root, localRelPath, InfoField.status, InfoField.opRoot, InfoField.kind);
-            SVNWCDbStatus status = info.status;
-            if (status == SVNWCDbStatus.Deleted || status == SVNWCDbStatus.NotPresent) {
-                return;
-            }
-            SVNWCDbKind kind = info.kind;
-            SVNSqlJetStatement stmt;
-            if (status == SVNWCDbStatus.Normal && kind == SVNWCDbKind.Dir) {
-                stmt = root.getSDb().getStatement(SVNWCDbStatements.HAS_SERVER_EXCLUDED_NODES);
-                try {
-                    stmt.bindf("is", root.getWcId(), localRelPath);
-                    if (stmt.next()) {
-                        File absentPath = getColumnPath(stmt, SVNWCDbSchema.NODES__Fields.local_relpath);
-                        SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_PATH_UNEXPECTED_STATUS,
-                                "Cannot delete ''{0}'' as ''{1}'' is excluded by server", localRelPath, absentPath);
-                        SVNErrorManager.error(err, SVNLogType.WC);
-                    }
-                } finally {
-                    stmt.reset();
-                }
-            } else if (status == SVNWCDbStatus.ServerExcluded) {
-                SVNErrorMessage errorMessage = SVNErrorMessage.create(SVNErrorCode.WC_PATH_UNEXPECTED_STATUS, "Cannot delete '{0}' as it is excluded by server", SVNFileUtil.createFilePath(root.getAbsPath(), localRelPath));
-                SVNErrorManager.error(errorMessage, SVNLogType.WC);
-            } else if (status == SVNWCDbStatus.Excluded) {
-                SVNErrorMessage errorMessage = SVNErrorMessage.create(SVNErrorCode.WC_PATH_UNEXPECTED_STATUS, "Cannot delete '{0}' as it is excluded", SVNFileUtil.createFilePath(root.getAbsPath(), localRelPath));
-                SVNErrorManager.error(errorMessage, SVNLogType.WC);
-            }
+            int deleteOpDepth = SVNWCUtils.relpathDepth(localRelPath);
 
-            List<MovedNode> movedNodes = null;
-            if (movedToRelPath != null) {
-                movedNodes = new ArrayList<MovedNode>();
-
-                int movedOpDepth = 0;
-                File movedFromRelPath = null;
-                if (status == SVNWCDbStatus.Added) {
-                    Structure<StructureFields.AdditionInfo> additionInfoStructure = SvnWcDbShared.scanAddition(root, localRelPath, StructureFields.AdditionInfo.status, StructureFields.AdditionInfo.movedFromRelPath, StructureFields.AdditionInfo.movedFromOpDepth);
-                    status = additionInfoStructure.get(StructureFields.AdditionInfo.status);
-                    movedFromRelPath = additionInfoStructure.get(StructureFields.AdditionInfo.movedFromRelPath);
-                    movedOpDepth = (int) additionInfoStructure.lng(StructureFields.AdditionInfo.movedFromOpDepth);
-                }
-
-                if (info.opRoot && movedFromRelPath != null) {
-                    File part = SVNFileUtil.skipAncestor(localRelPath, movedFromRelPath);
-                    MovedNode movedNode = new MovedNode();
-                    if (part == null) {
-                        movedNode.localRelPath = movedFromRelPath;
-                    } else {
-                        movedNode.localRelPath = SVNFileUtil.createFilePath(movedToRelPath, part);
-                    }
-                    movedNode.opDepth = movedOpDepth;
-                    movedNode.movedToRelPath = movedToRelPath;
-                    movedNodes.add(movedNode);
-
-                } else if (!info.opRoot && (status == SVNWCDbStatus.Normal || status == SVNWCDbStatus.Copied || status == SVNWCDbStatus.MovedHere)) {
-                    MovedNode movedNode = new MovedNode();
-                    movedNode.localRelPath = localRelPath;
-                    movedNode.opDepth = (int) deleteDepth;
-                    movedNode.movedToRelPath = movedToRelPath;
-                    movedNodes.add(movedNode);
-                }
-
-                stmt = root.getSDb().getStatement(SVNWCDbStatements.UPDATE_MOVED_TO_DESCENDANTS);
-                try {
-                    stmt.bindf("iss", root.getWcId(), localRelPath, movedToRelPath);
-                    stmt.done();
-                } finally {
-                    stmt.reset();
-                }
-            } else {
-                stmt = root.getSDb().getStatement(SVNWCDbStatements.CLEAR_MOVED_TO_DESCENDANTS);
-                try {
-                    stmt.bindf("is", root.getWcId(), localRelPath);
-                    stmt.done();
-                } finally {
-                    stmt.reset();
-                }
-            }
-
-            stmt = root.getSDb().getStatement(SVNWCDbStatements.SELECT_MOVED_FOR_DELETE);
+            SVNSqlJetStatement stmt = root.getSDb().getStatement(SVNWCDbStatements.SELECT_NODE_INFO);
             try {
                 stmt.bindf("is", root.getWcId(), localRelPath);
                 boolean haveRow = stmt.next();
+                if (!haveRow) {
+                    SVNErrorMessage errorMessage = SVNErrorMessage.create(SVNErrorCode.WC_PATH_NOT_FOUND, "The node ''{0}'' was not found.", SVNFileUtil.createFilePath(root.getAbsPath(), localRelPath));
+                    SVNErrorManager.error(errorMessage, SVNLogType.WC);
+                }
+                int workingOpDepth = (int) stmt.getColumnLong(NODES__Fields.op_depth);
+                SVNWCDbStatus status = SvnWcDbStatementUtil.getColumnPresence(stmt, NODES__Fields.presence);
+                SVNWCDbKind kind = SvnWcDbStatementUtil.getColumnKind(stmt, NODES__Fields.kind);
+
+                boolean opRoot;
+                boolean addWork = false;
+                int keepOpDepth = 0;
+                if (workingOpDepth < deleteOpDepth) {
+                    opRoot = false;
+                    addWork = true;
+                    keepOpDepth = workingOpDepth;
+                } else {
+                    opRoot = true;
+
+                    haveRow = stmt.next();
+                    if (haveRow) {
+                        int belowOpDepth = (int) stmt.getColumnLong(NODES__Fields.op_depth);
+                        SVNWCDbStatus belowStatus = SvnWcDbStatementUtil.getColumnPresence(stmt, NODES__Fields.presence);
+
+                        if (belowStatus != SVNWCDbStatus.NotPresent && belowStatus != SVNWCDbStatus.BaseDeleted) {
+                            addWork = true;
+                            keepOpDepth = belowOpDepth;
+                        } else {
+                            keepOpDepth = 0;
+                        }
+                    } else {
+                        keepOpDepth = -1;
+                    }
+                }
+
+                stmt.reset();
+
+                if (workingOpDepth != 0) {
+                    status = convertToWorkingStatus(status);
+                }
+
+                if (status == SVNWCDbStatus.Deleted || status == SVNWCDbStatus.NotPresent) {
+                    return;
+                }
+
+                if (status == SVNWCDbStatus.Normal && kind == SVNWCDbKind.Dir) {
+                    stmt.reset();
+                    stmt = root.getSDb().getStatement(SVNWCDbStatements.HAS_SERVER_EXCLUDED_DESCENDANTS);
+                    stmt.bindf("is", root.getWcId(), localRelPath);
+                    haveRow = stmt.next();
+                    if (haveRow) {
+                        String absentPath = stmt.getColumnString(NODES__Fields.local_relpath);
+
+                        SVNErrorMessage errorMessage = SVNErrorMessage.create(SVNErrorCode.WC_PATH_UNEXPECTED_STATUS, "Cannot delete ''{0}'' as ''{1}'' is excluded by server", SVNFileUtil.createFilePath(root.getAbsPath(), localRelPath), SVNFileUtil.createFilePath(root.getAbsPath(), absentPath));
+                        SVNErrorManager.error(errorMessage, SVNLogType.WC);
+                    }
+                } else if (status == SVNWCDbStatus.ServerExcluded) {
+                    SVNErrorMessage errorMessage = SVNErrorMessage.create(SVNErrorCode.WC_PATH_UNEXPECTED_STATUS, "Cannot delete ''{0}'' as it is excluded by server", SVNFileUtil.createFilePath(root.getAbsPath(), localRelPath));
+                    SVNErrorManager.error(errorMessage, SVNLogType.WC);
+                } else if (status == SVNWCDbStatus.Excluded) {
+                    SVNErrorMessage errorMessage = SVNErrorMessage.create(SVNErrorCode.WC_PATH_UNEXPECTED_STATUS, "Cannot delete ''{0}'' as it is excluded", SVNFileUtil.createFilePath(root.getAbsPath(), localRelPath));
+                    SVNErrorManager.error(errorMessage, SVNLogType.WC);
+                }
+
+                List<MovedNode> movedNodes = null;
+                if (movedToRelPath != null) {
+                    movedNodes = new ArrayList<MovedNode>();
+
+                    int movedOpDepth = 0;
+                    File movedFromRelPath = null;
+                    if (status == SVNWCDbStatus.Added) {
+                        Structure<StructureFields.AdditionInfo> additionInfoStructure = SvnWcDbShared.scanAddition(root, localRelPath, StructureFields.AdditionInfo.status, StructureFields.AdditionInfo.movedFromRelPath, StructureFields.AdditionInfo.movedFromOpDepth);
+                        status = additionInfoStructure.get(StructureFields.AdditionInfo.status);
+                        movedFromRelPath = additionInfoStructure.get(StructureFields.AdditionInfo.movedFromRelPath);
+                        movedOpDepth = (int) additionInfoStructure.lng(StructureFields.AdditionInfo.movedFromOpDepth);
+                    }
+
+                    if (opRoot && movedFromRelPath != null) {
+                        File part = SVNFileUtil.skipAncestor(localRelPath, movedFromRelPath);
+                        MovedNode movedNode = new MovedNode();
+                        if (part == null) {
+                            movedNode.localRelPath = movedFromRelPath;
+                        } else {
+                            movedNode.localRelPath = SVNFileUtil.createFilePath(movedToRelPath, part);
+                        }
+                        movedNode.opDepth = movedOpDepth;
+                        movedNode.movedToRelPath = movedToRelPath;
+                        movedNode.movedFromDepth = -1;
+                        movedNodes.add(movedNode);
+                    } else if (!opRoot && (status == SVNWCDbStatus.Normal || status == SVNWCDbStatus.Copied || status == SVNWCDbStatus.MovedHere)) {
+                        MovedNode movedNode = new MovedNode();
+                        movedNode.localRelPath = localRelPath;
+                        movedNode.opDepth = deleteOpDepth;
+                        movedNode.movedToRelPath = movedToRelPath;
+                        movedNode.movedFromDepth = -1;
+                        movedNodes.add(movedNode);
+                    }
+
+                    stmt.reset();
+                    stmt = root.getSDb().getStatement(SVNWCDbStatements.UPDATE_MOVED_TO_DESCENDANTS);
+                    stmt.bindf("iss", root.getWcId(), localRelPath, movedToRelPath);
+                    stmt.done();
+                }
+                stmt.reset();
+                stmt = root.getSDb().getStatement(SVNWCDbStatements.SELECT_MOVED_FOR_DELETE);
+                stmt.bindf("isi", root.getWcId(), localRelPath, deleteOpDepth);
+                haveRow = stmt.next();
                 while (haveRow) {
                     File childRelPath = SVNFileUtil.createFilePath(stmt.getColumnString(NODES__Fields.local_relpath));
                     File mvToRelPath = SVNFileUtil.createFilePath(stmt.getColumnString(NODES__Fields.moved_to));
-                    long childOpDepth = stmt.getColumnLong(NODES__Fields.op_depth);
+                    int childOpDepth = (int) stmt.getColumnLong(NODES__Fields.op_depth);
+                    int movedFromDepth = -1;
                     boolean fixUp = false;
 
                     if (movedToRelPath == null && SVNFileUtil.skipAncestor(localRelPath, mvToRelPath) == null) {
-                        fixUp = true;
-                        childOpDepth = deleteDepth;
-                    } else if (movedToRelPath != null && deleteDepth == childOpDepth) {
-                        fixUp = true;
-                        childOpDepth = deleteDepth;
-                    } else if (movedToRelPath != null && childOpDepth >= deleteDepth && SVNFileUtil.skipAncestor(localRelPath, mvToRelPath) == null) {
-                        childRelPath = SVNFileUtil.skipAncestor(localRelPath, childRelPath);
-                        if (childRelPath != null) {
-                            childRelPath = SVNFileUtil.createFilePath(movedToRelPath, childRelPath);
-
-                            if (childOpDepth > deleteDepth && SVNFileUtil.skipAncestor(localRelPath, childRelPath) != null) {
-                                childOpDepth = deleteDepth;
-                            } else {
-                                childOpDepth = SVNWCUtils.relpathDepth(childRelPath);
-                            }
-
+                        int movedHereDepth = ((SVNWCDbSelectMovedForDelete) stmt).getMovedHereDepth();
+                        if (movedHereDepth >= deleteOpDepth) {
                             fixUp = true;
+                            movedFromDepth = movedHereDepth;
+                        } else {
+                            fixUp = true;
+                            childOpDepth = deleteOpDepth;
+                        }
+                    } else if (movedToRelPath != null) {
+                        if (deleteOpDepth == childOpDepth) {
+                            fixUp = true;
+                        } else if (childOpDepth >= deleteOpDepth && SVNFileUtil.skipAncestor(localRelPath, mvToRelPath) == null) {
+                            childRelPath = SVNFileUtil.skipAncestor(localRelPath, childRelPath);
+                            if (childRelPath != null) {
+                                childRelPath = SVNFileUtil.createFilePath(movedToRelPath, childRelPath);
+                                if (childOpDepth > deleteOpDepth && SVNFileUtil.skipAncestor(localRelPath, childRelPath) != null) {
+                                    childOpDepth = deleteOpDepth;
+                                } else {
+                                    childOpDepth = SVNWCUtils.relpathDepth(childRelPath);
+                                }
+                                fixUp = true;
+                            }
                         }
                     }
 
                     if (fixUp) {
-                        MovedNode movedNode = new MovedNode();
-                        movedNode.localRelPath = childRelPath;
-                        movedNode.movedToRelPath = mvToRelPath;
-                        movedNode.opDepth = (int) childOpDepth;
+                        MovedNode mn = new MovedNode();
+                        mn.localRelPath = childRelPath;
+                        mn.movedToRelPath = mvToRelPath;
+                        mn.opDepth = childOpDepth;
+                        mn.movedFromDepth = movedFromDepth;
 
                         if (movedNodes == null) {
                             movedNodes = new ArrayList<MovedNode>();
                         }
-                        movedNodes.add(movedNode);
+                        movedNodes.add(mn);
                     }
 
                     haveRow = stmt.next();
                 }
-            } finally {
                 stmt.reset();
-            }
 
-            boolean addWork = false;
-            boolean refetchDepth = false;
-            long selectDepth;
-
-
-            if (info.opRoot) {
-                WCDbInfo infoBelow = readInfoBelowWorking(root, localRelPath, -1);
-                if ((infoBelow.haveBase || infoBelow.haveWork)
-                        && infoBelow.status != SVNWCDbStatus.NotPresent
-                        && infoBelow.status != SVNWCDbStatus.Deleted) {
-                    addWork = true;
-                    refetchDepth = true;
+                if (movedNodes != null) {
+                    for (Iterator<MovedNode> iterator = movedNodes.iterator(); iterator.hasNext(); ) {
+                        final MovedNode movedNode = iterator.next();
+                        if (movedNode.movedFromDepth > 0) {
+                            ResolveMovedFrom resolveMovedFrom = resolveMovedFrom(root, localRelPath, movedNode.localRelPath, movedNode.movedFromDepth);
+                            movedNode.localRelPath = resolveMovedFrom.movedFromRelPath;
+                            movedNode.opDepth = resolveMovedFrom.movedFromOpDepth;
+                            if (movedNode.localRelPath == null) {
+                                iterator.remove();
+                            }
+                        }
+                    }
                 }
-                selectDepth = SVNWCUtils.relpathDepth(localRelPath);
-            } else {
-                addWork = true;
-                if (status != SVNWCDbStatus.Normal) {
-                    selectDepth = readOpDepth(root, localRelPath);
-                } else {
-                    selectDepth = 0;
-                }
-            }
-            // collect files to delete.
-            stmt = new SVNWCDbCreateSchema(root.getSDb().getTemporaryDb(), SVNWCDbCreateSchema.DELETE_LIST, -1);
-            try {
-                stmt.done();
-            } finally {
-                stmt.reset();
-            }
 
-            if (eventHandler != null) {
-                stmt = new SVNWCDbInsertDeleteList(root.getSDb());
+                if (movedToRelPath == null) {
+                    stmt.reset();
+                    stmt = root.getSDb().getStatement(SVNWCDbStatements.CLEAR_MOVED_TO_DESCENDANTS);
+                    stmt.bindf("is", root.getWcId(), localRelPath);
+                    stmt.done();
+
+                    if (opRoot) {
+                        stmt.reset();
+                        stmt = root.getSDb().getStatement(SVNWCDbStatements.CLEAR_MOVED_TO_FROM_DEST);
+                        stmt.bindf("is", root.getWcId(), localRelPath);
+                        stmt.done();
+                    }
+                }
+
+                stmt = new SVNWCDbCreateSchema(root.getSDb().getTemporaryDb(), SVNWCDbCreateSchema.DELETE_LIST, -1);
                 try {
-                    stmt.bindf("isi", root.getWcId(), localRelPath, selectDepth);
                     stmt.done();
                 } finally {
                     stmt.reset();
                 }
-            }
 
-            SVNSqlJetStatement deleteStmt = root.getSDb().getStatement(SVNWCDbStatements.DELETE_NODES_ABOVE_DEPTH_RECURSIVE);
-            try {
-                deleteStmt.bindf("isi", root.getWcId(), localRelPath, deleteDepth);
-                deleteStmt.done();
-            } finally {
-                deleteStmt.reset();
-            }
 
-            if (refetchDepth) {
-                selectDepth = readOpDepth(root, localRelPath);
-            }
-            deleteStmt = root.getSDb().getStatement(SVNWCDbStatements.DELETE_ACTUAL_NODE_LEAVING_CHANGELIST_RECURSIVE);
-            try {
-                deleteStmt.bindf("is", root.getWcId(), localRelPath);
-                deleteStmt.done();
-            } finally {
-                deleteStmt.reset();
-            }
-
-            deleteStmt = root.getSDb().getStatement(SVNWCDbStatements.CLEAR_ACTUAL_NODE_LEAVING_CHANGELIST_RECURSIVE);
-            try {
-                deleteStmt.bindf("is", root.getWcId(), localRelPath);
-                deleteStmt.done();
-            } finally {
-                deleteStmt.reset();
-            }
-
-            deleteStmt = root.getSDb().getStatement(SVNWCDbStatements.DELETE_WC_LOCK_ORPHAN_RECURSIVE);
-            try {
-                deleteStmt.bindf("is", root.getWcId(), localRelPath);
-                deleteStmt.done();
-            } finally {
-                deleteStmt.reset();
-            }
-
-            if (addWork) {
-                SVNSqlJetStatement insertStmt = root.getSDb().getStatement(SVNWCDbStatements.INSERT_DELETE_FROM_NODE_RECURSIVE);
-                try {
-                    insertStmt.bindf("isii", root.getWcId(), localRelPath, selectDepth, deleteDepth);
-                    insertStmt.done();
-                } finally {
-                    insertStmt.reset();
+                if (eventHandler != null) {
+                    stmt.reset();
+                    stmt = root.getSDb().getStatement(SVNWCDbStatements.INSERT_DELETE_LIST);
+                    stmt.bindf("isi", root.getWcId(), localRelPath, workingOpDepth);
+                    stmt.done();
                 }
-            }
 
-            if (movedNodes != null) {
-                for (MovedNode movedNode : movedNodes) {
-                    deleteUpdateMovedTo(root, movedNode.localRelPath, movedNode.opDepth, movedNode.movedToRelPath);
-                }
-            }
+                stmt.reset();
+                stmt = root.getSDb().getStatement(SVNWCDbStatements.DELETE_NODES_ABOVE_DEPTH_RECURSIVE);
+                stmt.bindf("isi", root.getWcId(), localRelPath, deleteOpDepth);
+                stmt.done();
 
-            stmt = root.getSDb().getStatement(SVNWCDbStatements.DELETE_FILE_EXTERNALS);
-            try {
+                stmt.reset();
+                stmt = root.getSDb().getStatement(SVNWCDbStatements.DELETE_ACTUAL_NODE_LEAVING_CHANGELIST_RECURSIVE);
                 stmt.bindf("is", root.getWcId(), localRelPath);
                 stmt.done();
-            } finally {
-                stmt.reset();
-            }
 
-            stmt = root.getSDb().getStatement(deleteDirExternals ? SVNWCDbStatements.DELETE_EXTERNAL_REGISTRATIONS : SVNWCDbStatements.DELETE_FILE_EXTERNAL_REGISTRATIONS);
-            try {
+                stmt.reset();
+                stmt = root.getSDb().getStatement(SVNWCDbStatements.CLEAR_ACTUAL_NODE_LEAVING_CHANGELIST_RECURSIVE);
                 stmt.bindf("is", root.getWcId(), localRelPath);
                 stmt.done();
+
+                stmt.reset();
+                stmt = root.getSDb().getStatement(SVNWCDbStatements.DELETE_WC_LOCK_ORPHAN_RECURSIVE);
+                stmt.bindf("is", root.getWcId(), localRelPath);
+                stmt.done();
+
+                if (addWork) {
+                    stmt.reset();
+                    stmt = root.getSDb().getStatement(SVNWCDbStatements.INSERT_DELETE_FROM_NODE_RECURSIVE);
+                    stmt.bindf("isii", root.getWcId(), localRelPath, keepOpDepth, deleteOpDepth);
+                    stmt.done();
+                }
+
+                if (movedNodes != null) {
+                    for (MovedNode movedNode : movedNodes) {
+                        deleteUpdateMovedTo(root, movedNode.localRelPath, movedNode.opDepth, movedNode.movedToRelPath);
+                    }
+                }
+
+                stmt.reset();
+                stmt = root.getSDb().getStatement(SVNWCDbStatements.DELETE_FILE_EXTERNALS);
+                stmt.bindf("is", root.getWcId(), localRelPath);
+                stmt.done();
+
+                stmt.reset();
+                stmt = root.getSDb().getStatement(deleteDirExternals ? SVNWCDbStatements.DELETE_EXTERNAL_REGISTRATIONS : SVNWCDbStatements.DELETE_FILE_EXTERNAL_REGISTRATIONS);
+                stmt.bindf("is", root.getWcId(), localRelPath);
+                stmt.done();
+
+                addWorkItems(root.getSDb(), workItems);
+                if (conflict != null) {
+                    markConflictInternal(root, localRelPath, conflict);
+                }
             } finally {
                 stmt.reset();
-            }
-
-            addWorkItems(root.getSDb(), workItems);
-            if (conflict != null) {
-                markConflictInternal(root, localRelPath, conflict);
             }
         }
     }
@@ -751,10 +761,52 @@ public class SVNWCDb implements ISVNWCDb {
         }
     }
 
+    private ResolveMovedFrom resolveMovedFrom(SVNWCDbRoot root, File rootRelPath, File localRelPath, int opDepth) throws SVNException {
+        ResolveMovedFrom resolveMovedFrom = new ResolveMovedFrom();
+        String suffix = "";
+        while (SVNWCUtils.relpathDepth(localRelPath) > opDepth) {
+            suffix = SVNPathUtil.append(suffix, SVNFileUtil.getFileName(localRelPath));
+        }
+        File fromRelPath;
+        int moveFromDepth;
+        SVNSqlJetStatement stmt = root.getSDb().getStatement(SVNWCDbStatements.SELECT_MOVED_FROM_FOR_DELETE);
+        try {
+            stmt.bindf("is", root.getWcId(), localRelPath);
+            boolean haveRow = stmt.next();
+            if (!haveRow) {
+                return resolveMovedFrom;
+            }
+            fromRelPath = SVNFileUtil.createFilePath(stmt.getColumnString(NODES__Fields.local_relpath));
+            int fromOpDepth = (int) stmt.getColumnLong(NODES__Fields.op_depth);
+            moveFromDepth = (int) ((SVNWCDbSelectMovedFromForDelete)stmt).getMovedHereOpDepth();
+
+            if (SVNFileUtil.skipAncestor(rootRelPath, fromRelPath) == null) {
+                resolveMovedFrom.movedFromRelPath = SVNFileUtil.createFilePath(fromRelPath, suffix);
+                resolveMovedFrom.movedFromOpDepth = fromOpDepth;
+                return resolveMovedFrom;
+            } else if (moveFromDepth == 0) {
+                return resolveMovedFrom;
+            }
+        } finally {
+            stmt.reset();
+        }
+        return resolveMovedFrom(root, rootRelPath, SVNFileUtil.createFilePath(fromRelPath, suffix), moveFromDepth);
+    }
+
+    private static class ResolveMovedFrom {
+        File movedFromRelPath;
+        int movedFromOpDepth;
+
+        private ResolveMovedFrom() {
+            movedFromOpDepth = -1;
+        }
+    }
+
     private static class MovedNode {
         public File localRelPath;
         public File movedToRelPath;
-        int opDepth;
+        public int opDepth;
+        public int movedFromDepth;
     }
     
     private class InsertLock implements SVNSqlJetTransaction {
