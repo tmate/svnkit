@@ -508,6 +508,65 @@ public class MoveTest {
         }
     }
 
+    @Test
+    public void testMoveError() throws Exception {
+        final TestOptions options = TestOptions.getInstance();
+        final Sandbox sandbox = Sandbox.createWithCleanup(getTestName() + ".test", options);
+
+        try {
+            final SVNURL url = sandbox.createSvnRepository();
+            CommitBuilder commitBuilder = new CommitBuilder(url);
+            // A file that will be conflicted
+            commitBuilder.addFile("conflict.txt");
+            // Another file
+            commitBuilder.addFile("file.txt");
+            commitBuilder.commit();
+
+            WorkingCopy wc1 = sandbox.checkoutNewWorkingCopy(url);
+            File file = wc1.getFile("file.txt");
+            File conflictFile = wc1.getFile("conflict.txt");
+            TestUtil.writeFileContentsString(conflictFile, "wc1");
+            File moveToFile = wc1.getFile("moveTo.txt");
+
+            WorkingCopy wc2 = sandbox.checkoutNewWorkingCopy(url);
+            File conflictFile2 = wc2.getFile("conflict.txt");
+            TestUtil.writeFileContentsString(conflictFile2, "wc2");
+            wc2.commit("test");
+
+            try {
+                wc1.updateToRevision(-1);
+            } catch (Throwable t) {
+                // Throws a runtime exception, didn't study it, but the conflict is generated
+            }
+
+            SVNClientManager scm = SVNClientManager.newInstance();
+            // Move conflict
+            scm.getCopyClient().doCopy(
+                    new SVNCopySource[] { new SVNCopySource(SVNRevision.WORKING, SVNRevision.WORKING, conflictFile) },
+                    moveToFile,
+                    true,
+                    false,
+                    true);
+
+            scm.getWCClient().doDelete(moveToFile, true, true, false);
+            Assert.assertFalse(moveToFile.exists());
+
+            // Move the other file
+            try {
+                scm.getCopyClient().doCopy(
+                        new SVNCopySource[] { new SVNCopySource(SVNRevision.WORKING, SVNRevision.WORKING, file) },
+                        moveToFile,
+                        true,
+                        false,
+                        true);
+            } catch (SVNException e) {
+                Assert.fail(e.getMessage());
+            }
+        } finally {
+            sandbox.dispose();
+        }
+    }
+
     private String getTestName() {
         return "MoveTest";
     }

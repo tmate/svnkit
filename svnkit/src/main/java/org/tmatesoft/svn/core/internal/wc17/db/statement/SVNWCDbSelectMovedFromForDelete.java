@@ -11,52 +11,30 @@ import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.util.SVNLogType;
 
 /**
- * SELECT local_relpath, moved_to, op_depth,
+ * SELECT local_relpath, op_depth,
  *   (SELECT CASE WHEN r.moved_here THEN r.op_depth END FROM nodes r
  *    WHERE r.wc_id = ?1
  *      AND r.local_relpath = n.local_relpath
  *      AND r.op_depth < n.op_depth
- *     BY r.op_depth DESC LIMIT 1) AS moved_here_op_depth
+ *    ORDER BY r.op_depth DESC LIMIT 1) AS moved_here_op_depth
  * FROM nodes n
- * WHERE wc_id = ?1
- *   AND (local_relpath = ?2 OR IS_STRICT_DESCENDANT_OF(local_relpath, ?2))
- *   AND moved_to IS NOT NULL
- *   AND op_depth >= ?3
+ * WHERE wc_id = ?1 AND moved_to = ?2 AND op_depth > 0
  *
  * @version 1.8
  */
-public class SVNWCDbSelectMovedForDelete extends SVNSqlJetSelectFieldsStatement<SVNWCDbSchema.NODES__Fields> {
+public class SVNWCDbSelectMovedFromForDelete extends SVNSqlJetSelectFieldsStatement<SVNWCDbSchema.NODES__Fields> {
 
-    private InternalStatement internalStatement;
+    InternalStatement internalStatement;
 
-    public SVNWCDbSelectMovedForDelete(SVNSqlJetDb sDb) throws SVNException {
+    public SVNWCDbSelectMovedFromForDelete(SVNSqlJetDb sDb) throws SVNException {
         super(sDb, SVNWCDbSchema.NODES);
     }
 
     @Override
     protected void defineFields() {
         fields.add(SVNWCDbSchema.NODES__Fields.local_relpath);
-        fields.add(SVNWCDbSchema.NODES__Fields.moved_to);
         fields.add(SVNWCDbSchema.NODES__Fields.op_depth);
-    }
-
-    @Override
-    public void reset() throws SVNException {
-        if (internalStatement != null) {
-            internalStatement.reset();
-            internalStatement = null;
-        }
-        super.reset();
-    }
-
-    @Override
-    protected String getPathScope() {
-        return (String) getBind(2);
-    }
-
-    @Override
-    protected boolean isStrictiDescendant() {
-        return false;
+        fields.add(SVNWCDbSchema.NODES__Fields.moved_here);
     }
 
     @Override
@@ -67,20 +45,29 @@ public class SVNWCDbSelectMovedForDelete extends SVNSqlJetSelectFieldsStatement<
             internalStatement.bindf("isi", getBind(1), getBind(2), opDepth);
             internalStatement.next();
         }
-        return !isColumnNull(SVNWCDbSchema.NODES__Fields.moved_to) && opDepth >= (Long)getBind(3);
+        return opDepth > 0;
+    }
+
+    public int getMovedHereOpDepth() throws SVNException {
+        if (internalStatement == null) {
+            return -1;
+        } else {
+            return (int)internalStatement.getColumnLong(SVNWCDbSchema.NODES__Fields.op_depth);
+        }
     }
 
     @Override
     protected Object[] getWhere() throws SVNException {
-        return new Object[]{getBind(1)};
+        return new Object[] {getBind(1), getBind(2)};
     }
 
-    public int getMovedHereDepth() throws SVNException {
-        if (internalStatement == null) {
-            return -1;
-        } else {
-            return (int) internalStatement.getColumnLong(SVNWCDbSchema.NODES__Fields.op_depth);
+    @Override
+    public void reset() throws SVNException {
+        if (internalStatement != null) {
+            internalStatement.reset();
+            internalStatement = null;
         }
+        super.reset();
     }
 
     private static class InternalStatement extends SVNSqlJetSelectFieldsStatement<SVNWCDbSchema.NODES__Fields> {
