@@ -32,8 +32,9 @@ class SVNMacOsKeychain {
 
     private static final int ERR_SEC_ITEM_NOT_FOUND = -25300;
 
-    static boolean isEnabled() {
-        return SVNFileUtil.isOSX && JNALibraryLoader.getMacOsSecurityLibrary() != null;
+    public static boolean isEnabled() {
+        final boolean enabled = Boolean.valueOf(System.getProperty("svnkit.library.osxkeychain.enabled", "true"));
+        return enabled && SVNFileUtil.isOSX && JNALibraryLoader.getMacOsSecurityLibrary() != null;
     }
 
     public static synchronized boolean setPassword(String realm, String userName, String password, boolean nonInteractive) throws SVNException {
