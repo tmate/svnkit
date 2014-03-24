@@ -289,6 +289,51 @@ public class UpgradeTest {
         }
     }
 
+    @Test
+    public void testUpgradeToWC17() throws Exception {
+        final TestOptions options = TestOptions.getInstance();
+
+        final SvnOperationFactory svnOperationFactory = new SvnOperationFactory();
+        final Sandbox sandbox = Sandbox.createWithCleanup(getTestName() + ".test", options);
+        try {
+            final SVNURL url = sandbox.createSvnRepository();
+
+            final CommitBuilder commitBuilder1 = new CommitBuilder(url);
+            commitBuilder1.addFile("file", "base".getBytes());
+            commitBuilder1.commit();
+
+            final CommitBuilder commitBuilder2 = new CommitBuilder(url);
+            commitBuilder2.changeFile("file", "theirs".getBytes());
+            commitBuilder2.commit();
+
+            final WorkingCopy workingCopy = sandbox.checkoutNewWorkingCopy(url, 1, false, SvnWcGeneration.V16);
+            final File workingCopyDirectory = workingCopy.getWorkingCopyDirectory();
+            final File file = workingCopy.getFile("file");
+            TestUtil.writeFileContentsString(file, "ours");
+
+            final SvnUpdate update = svnOperationFactory.createUpdate();
+            update.setSingleTarget(SvnTarget.fromFile(workingCopyDirectory));
+            update.run();
+
+            final SvnUpgrade upgrade = svnOperationFactory.createUpgrade();
+            upgrade.setTargetWorkingCopyFormat(ISVNWCDb.WC_FORMAT_17);
+            upgrade.setSingleTarget(SvnTarget.fromFile(workingCopyDirectory));
+            upgrade.run();
+
+            final SvnGetStatus getStatus = svnOperationFactory.createGetStatus();
+            getStatus.setSingleTarget(SvnTarget.fromFile(workingCopyDirectory));
+            final SvnStatus status = getStatus.run();
+
+            Map<File, SvnStatus> statuses = TestUtil.getStatuses(svnOperationFactory, workingCopyDirectory);
+            Assert.assertEquals(ISVNWCDb.WC_FORMAT_17, status.getWorkingCopyFormat());
+            Assert.assertTrue(statuses.get(file).isConflicted());
+
+        } finally {
+            svnOperationFactory.dispose();
+            sandbox.dispose();
+        }
+    }
+
     private void checkout(SvnOperationFactory svnOperationFactory, SVNURL url, File wcngDirectory, SvnWcGeneration primaryWcGeneration) throws SVNException {
         svnOperationFactory.setPrimaryWcGeneration(primaryWcGeneration);
 

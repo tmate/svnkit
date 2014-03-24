@@ -34,7 +34,7 @@ import java.util.Map;
 public class SvnOldUpgradeEntries {
 	
 	public static WriteBaton writeUpgradedEntries(WriteBaton parentNode, SVNWCDb db,  SVNWCDbUpgradeData upgradeData, File dirAbsPath, 
-			Map<String, SVNEntry> entries, SVNHashMap textBases) throws SVNException {
+			Map<String, SVNEntry> entries, SVNHashMap textBases, int targetWorkingCopyFormat) throws SVNException {
 		WriteBaton dirNode = new WriteBaton();
 		
 		SVNEntry thisDir = entries.get("");
@@ -51,7 +51,7 @@ public class SvnOldUpgradeEntries {
 		
 		/* Write out "this dir" */
 		dirNode = writeEntry(true, parentNode, db, upgradeData, thisDir, null, dirRelPath, 
-				SVNFileUtil.createFilePath(upgradeData.rootAbsPath, dirRelPath), oldRootAbsPath, thisDir, false);
+				SVNFileUtil.createFilePath(upgradeData.rootAbsPath, dirRelPath), oldRootAbsPath, thisDir, false, targetWorkingCopyFormat);
 				
 		for (Iterator<String> names = entries.keySet().iterator(); names.hasNext();) {
             String name = (String) names.next();
@@ -65,11 +65,11 @@ public class SvnOldUpgradeEntries {
             File childAbsPath =  SVNFileUtil.createFilePath(dirAbsPath, name);
             File childRelPath = SVNWCUtils.skipAncestor(oldRootAbsPath, childAbsPath);
             writeEntry(false, dirNode, db, upgradeData, entry, info, childRelPath, 
-            		SVNFileUtil.createFilePath(upgradeData.rootAbsPath, childRelPath), oldRootAbsPath, thisDir, true);
+            		SVNFileUtil.createFilePath(upgradeData.rootAbsPath, childRelPath), oldRootAbsPath, thisDir, true, targetWorkingCopyFormat);
 		}
 		
 		if (dirNode.treeConflicts != null) {
-			writeActualOnlyEntries(dirNode.treeConflicts, upgradeData.root.getSDb(), upgradeData.root.getDb(), upgradeData.rootAbsPath, upgradeData.workingCopyId, SVNFileUtil.getFilePath(dirRelPath));
+			writeActualOnlyEntries(dirNode.treeConflicts, upgradeData.root.getSDb(), upgradeData.root.getDb(), upgradeData.rootAbsPath, upgradeData.workingCopyId, SVNFileUtil.getFilePath(dirRelPath), targetWorkingCopyFormat);
 		}
 	
 		return dirNode;
@@ -121,7 +121,7 @@ public class SvnOldUpgradeEntries {
 	/* Write the information for ENTRY to WC_DB.  The WC_ID, REPOS_ID and REPOS_ROOT will all be used for writing ENTRY.
 	  Transitioning from straight sql to using the wc_db APIs.  For the time being, we'll need both parameters. */
 	private static WriteBaton writeEntry(boolean isCalculateEntryNode, WriteBaton parentNode, SVNWCDb db, SVNWCDbUpgradeData upgradeData, SVNEntry entry, TextBaseInfo textBaseInfo,
-			File localRelPath, File tmpEntryAbsPath, File rootAbsPath, SVNEntry thisDir, boolean isCreateLocks) throws SVNException {
+			File localRelPath, File tmpEntryAbsPath, File rootAbsPath, SVNEntry thisDir, boolean isCreateLocks, int targetWorkingCopyFormat) throws SVNException {
 		DbNode baseNode = null;
 		DbNode workingNode = null;
 		DbNode belowWorkingNode = null;
@@ -629,7 +629,7 @@ public class SvnOldUpgradeEntries {
 			actualNode.wcId = upgradeData.workingCopyId;
 			actualNode.localRelPath = SVNFileUtil.getFilePath(localRelPath);
 			actualNode.parentRelPath = parentRelPath;
-			insertActualNode(upgradeData.root.getSDb(), upgradeData.root.getDb(), upgradeData.rootAbsPath, actualNode);
+			insertActualNode(upgradeData.root.getSDb(), upgradeData.root.getDb(), upgradeData.rootAbsPath, actualNode, targetWorkingCopyFormat);
 		}
 		
 		WriteBaton entryNode = null;
@@ -718,8 +718,8 @@ public class SvnOldUpgradeEntries {
         }
 	}
 	
-	private static void insertActualNode(SVNSqlJetDb sDb, ISVNWCDb db, File wriAbsPath, DbActualNode actualNode) throws SVNException {
-		SVNSqlJetStatement stmt = sDb.getStatement(SVNWCDbStatements.INSERT_ACTUAL_NODE);
+	private static void insertActualNode(SVNSqlJetDb sDb, ISVNWCDb db, File wriAbsPath, DbActualNode actualNode, int targetWorkingCopyFormat) throws SVNException {
+		SVNSqlJetStatement stmt = sDb.getStatement(targetWorkingCopyFormat <= ISVNWCDb.WC_FORMAT_17 ? SVNWCDbStatements.INSERT_ACTUAL_NODE_17: SVNWCDbStatements.INSERT_ACTUAL_NODE);
         try {
             stmt.bindLong(1, actualNode.wcId);
             stmt.bindString(2, actualNode.localRelPath);
@@ -728,30 +728,48 @@ public class SvnOldUpgradeEntries {
                 stmt.bindProperties(4, actualNode.properties);
             }
             if (actualNode.changelist != null) {
-                stmt.bindString(5, actualNode.changelist);
-            }
-
-            byte[] treeConflictDataBytes = null;
-            if (actualNode.treeConflictData != null) {
-                try {
-                    treeConflictDataBytes = actualNode.treeConflictData.getBytes("UTF-8");
-                } catch (UnsupportedEncodingException e) {
-                    treeConflictDataBytes = actualNode.treeConflictData.getBytes();
+                if (targetWorkingCopyFormat <= ISVNWCDb.WC_FORMAT_17) {
+                    stmt.bindString(9, actualNode.changelist);
+                } else {
+                    stmt.bindString(5, actualNode.changelist);
                 }
             }
 
+            if (targetWorkingCopyFormat <= ISVNWCDb.WC_FORMAT_17) {
+                if (actualNode.conflictOld != null) {
+                    stmt.bindString(5, actualNode.conflictOld);
+                    stmt.bindString(6, actualNode.conflictNew);
+                    stmt.bindString(7, actualNode.conflictWorking);
+                }
+                if (actualNode.propReject != null) {
+                    stmt.bindString(8, actualNode.propReject);
+                }
+                if (actualNode.treeConflictData != null) {
+                    stmt.bindString(10, actualNode.treeConflictData);
+                }
+            } else {
+                byte[] treeConflictDataBytes = null;
+                if (actualNode.treeConflictData != null) {
+                    try {
+                        treeConflictDataBytes = actualNode.treeConflictData.getBytes("UTF-8");
+                    } catch (UnsupportedEncodingException e) {
+                        treeConflictDataBytes = actualNode.treeConflictData.getBytes();
+                    }
+                }
 
-            SVNSkel conflictData = SvnWcDbConflicts.upgradeConflictSkelFromRaw(db, wriAbsPath,
-                    SVNFileUtil.createFilePath(actualNode.localRelPath),
-                    actualNode.conflictOld,
-                    actualNode.conflictWorking,
-                    actualNode.conflictNew,
-                    SVNFileUtil.createFilePath(actualNode.propReject),
-                    SVNSkel.parse(treeConflictDataBytes));
 
-            if (conflictData != null) {
-                byte[] conflictDataBytes = conflictData.unparse();
-                stmt.bindBlob(6, conflictDataBytes);
+                SVNSkel conflictData = SvnWcDbConflicts.upgradeConflictSkelFromRaw(db, wriAbsPath,
+                        SVNFileUtil.createFilePath(actualNode.localRelPath),
+                        actualNode.conflictOld,
+                        actualNode.conflictWorking,
+                        actualNode.conflictNew,
+                        SVNFileUtil.createFilePath(actualNode.propReject),
+                        SVNSkel.parse(treeConflictDataBytes));
+
+                if (conflictData != null) {
+                    byte[] conflictDataBytes = conflictData.unparse();
+                    stmt.bindBlob(6, conflictDataBytes);
+                }
             }
             stmt.done();
         } finally {
@@ -759,7 +777,7 @@ public class SvnOldUpgradeEntries {
         }
 	}
 	
-	private static void writeActualOnlyEntries(Map<String, String> treeConflicts, SVNSqlJetDb sDb, ISVNWCDb db, File wriAbsPath, long wcId, String dirRelPath) throws SVNException {
+	private static void writeActualOnlyEntries(Map<String, String> treeConflicts, SVNSqlJetDb sDb, ISVNWCDb db, File wriAbsPath, long wcId, String dirRelPath, int targetWorkingCopyFormat) throws SVNException {
 		for (Iterator<String> items = treeConflicts.keySet().iterator(); items.hasNext();) {
 			String path = items.next();
 			DbActualNode actualNode = new DbActualNode();
@@ -767,7 +785,7 @@ public class SvnOldUpgradeEntries {
 			actualNode.localRelPath = path;
 			actualNode.parentRelPath = dirRelPath;
 			actualNode.treeConflictData = treeConflicts.get(path);
-			insertActualNode(sDb, db, wriAbsPath, actualNode);
+			insertActualNode(sDb, db, wriAbsPath, actualNode, targetWorkingCopyFormat);
 		}
 	}
 	

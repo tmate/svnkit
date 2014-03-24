@@ -43,7 +43,7 @@ public class SvnNgUpgrade extends SvnNgOperationRunner<SvnWcGeneration, SvnUpgra
             SVNWCDb.DirParsedInfo dirParsedInfo = ((SVNWCDb) db).parseDir(localAbsPath, SVNSqlJetDb.Mode.ReadOnly, true, false);
             int format = dirParsedInfo.wcDbDir.getWCRoot().getFormat();
 
-            if (format < ISVNWCDb.WC_FORMAT_18) {
+            if (format < getOperation().getTargetWorkingCopyFormat()) {
                 SvnNgUpgradeSDb.upgrade(localAbsPath, (SVNWCDb) db, db.getSDb(dirParsedInfo.wcDbDir.getWCRoot().getAbsPath()), format, context.getEventHandler());
             }
 
@@ -83,7 +83,7 @@ public class SvnNgUpgrade extends SvnNgOperationRunner<SvnWcGeneration, SvnUpgra
 
                                             if (status != null) {
                                                 int workingCopyFormat = status.getWorkingCopyFormat();
-                                                if (workingCopyFormat < ISVNWCDb.WC_FORMAT_18) {
+                                                if (workingCopyFormat < getOperation().getTargetWorkingCopyFormat()) {
                                                     upgradeRequired = true;
                                                 }
                                             }
