@@ -1633,7 +1633,7 @@ public interface ISVNWCDb {
 		public SVNWCDbRoot root; 
 	}
     
-    void upgradeBegin(File localAbspath, SVNWCDbUpgradeData upgradeData, SVNURL repositoryRootUrl, String repositoryUUID) throws SVNException;
+    void upgradeBegin(File localAbspath, SVNWCDbUpgradeData upgradeData, SVNURL repositoryRootUrl, String repositoryUUID, int targetWorkingCopyFormat) throws SVNException;
 
     class SVNWCDbNodeCheckReplaceData {
         public static SVNWCDbNodeCheckReplaceData NO_REPLACE = new SVNWCDbNodeCheckReplaceData(false, false, false);

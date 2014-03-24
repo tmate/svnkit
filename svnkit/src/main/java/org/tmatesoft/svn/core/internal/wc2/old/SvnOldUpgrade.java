@@ -13,12 +13,9 @@ import org.tmatesoft.svn.core.internal.wc.admin.*;
 import org.tmatesoft.svn.core.internal.wc16.SVNUpdateClient16;
 import org.tmatesoft.svn.core.internal.wc17.SVNWCContext;
 import org.tmatesoft.svn.core.internal.wc17.SVNWCUtils;
+import org.tmatesoft.svn.core.internal.wc17.db.*;
 import org.tmatesoft.svn.core.internal.wc17.db.ISVNWCDb.SVNWCDbOpenMode;
 import org.tmatesoft.svn.core.internal.wc17.db.ISVNWCDb.SVNWCDbUpgradeData;
-import org.tmatesoft.svn.core.internal.wc17.db.SVNWCDb;
-import org.tmatesoft.svn.core.internal.wc17.db.SVNWCDbRoot;
-import org.tmatesoft.svn.core.internal.wc17.db.SvnWcDbPristines;
-import org.tmatesoft.svn.core.internal.wc17.db.SvnWcDbProperties;
 import org.tmatesoft.svn.core.internal.wc17.db.statement.SVNWCDbSchema;
 import org.tmatesoft.svn.core.internal.wc17.db.statement.SVNWCDbStatements;
 import org.tmatesoft.svn.core.internal.wc2.SvnRepositoryAccess;
@@ -307,7 +304,7 @@ public class SvnOldUpgrade extends SvnOldRunner<SvnWcGeneration, SvnUpgrade> {
 			/*
 			 * Create an empty sqlite database for this directory and store it in DB.
 			 */
-			db.upgradeBegin(upgradeData.rootAbsPath, upgradeData, getEntryRepositoryRootURL(thisDir), thisDir.getUUID());
+			db.upgradeBegin(upgradeData.rootAbsPath, upgradeData, getEntryRepositoryRootURL(thisDir), thisDir.getUUID(), getOperation().getTargetWorkingCopyFormat());
 
 			/*
 			 * Migrate the entries over to the new database. ### We need to think about atomicity here.
@@ -472,7 +469,7 @@ public class SvnOldUpgrade extends SvnOldRunner<SvnWcGeneration, SvnUpgrade> {
 
 			/***** ENTRIES - WRITE *****/
 			try {
-				dirBaton = SvnOldUpgradeEntries.writeUpgradedEntries(parentDirBaton, db, data, dirAbsPath, entries, textBases);
+				dirBaton = SvnOldUpgradeEntries.writeUpgradedEntries(parentDirBaton, db, data, dirAbsPath, entries, textBases, getOperation().getTargetWorkingCopyFormat());
 			} catch (SVNException ex) {
 				if (ex.getErrorMessage().getErrorCode() == SVNErrorCode.WC_CORRUPT) {
 					SVNErrorMessage err = ex.getErrorMessage().wrap("This working copy is corrupt and cannot be upgraded. Please check out a new working copy.");
