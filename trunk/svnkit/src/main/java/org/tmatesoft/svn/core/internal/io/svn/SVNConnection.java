@@ -117,7 +117,11 @@ public class SVNConnection {
         if (r >= 0 && attempt == 0) {
             return skipLeadingGrabage(attempt + 1);
         }
-        SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.RA_SVN_MALFORMED_DATA, "Handshake failed, received: ''{0}''", new String(bytes));
+        if (r <= 0) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.RA_SVN_MALFORMED_DATA, "Handshake failed, data stream ended unexpectedly");
+            SVNErrorManager.error(err, SVNLogType.NETWORK);
+        }
+        SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.RA_SVN_MALFORMED_DATA, "Handshake failed, received: ''{0}''", new String(bytes, 0, r));
         SVNErrorManager.error(err, SVNLogType.NETWORK);
         return null;
     }
