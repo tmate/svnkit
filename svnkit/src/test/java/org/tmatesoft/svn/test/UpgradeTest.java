@@ -11,6 +11,7 @@ import org.tmatesoft.sqljet.core.table.ISqlJetTable;
 import org.tmatesoft.sqljet.core.table.SqlJetDb;
 import org.tmatesoft.svn.core.*;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
+import org.tmatesoft.svn.core.internal.wc.admin.SVNAdminArea15;
 import org.tmatesoft.svn.core.internal.wc17.SVNWCContext;
 import org.tmatesoft.svn.core.internal.wc17.SVNWCUtils;
 import org.tmatesoft.svn.core.internal.wc17.db.ISVNWCDb;
@@ -310,6 +311,63 @@ public class UpgradeTest {
             final File workingCopyDirectory = workingCopy.getWorkingCopyDirectory();
             final File file = workingCopy.getFile("file");
             TestUtil.writeFileContentsString(file, "ours");
+
+            final SvnUpdate update = svnOperationFactory.createUpdate();
+            update.setSingleTarget(SvnTarget.fromFile(workingCopyDirectory));
+            update.run();
+
+            final SvnUpgrade upgrade = svnOperationFactory.createUpgrade();
+            upgrade.setTargetWorkingCopyFormat(ISVNWCDb.WC_FORMAT_17);
+            upgrade.setSingleTarget(SvnTarget.fromFile(workingCopyDirectory));
+            upgrade.run();
+
+            final SvnGetStatus getStatus = svnOperationFactory.createGetStatus();
+            getStatus.setSingleTarget(SvnTarget.fromFile(workingCopyDirectory));
+            final SvnStatus status = getStatus.run();
+
+            Map<File, SvnStatus> statuses = TestUtil.getStatuses(svnOperationFactory, workingCopyDirectory);
+            Assert.assertEquals(ISVNWCDb.WC_FORMAT_17, status.getWorkingCopyFormat());
+            Assert.assertTrue(statuses.get(file).isConflicted());
+
+        } finally {
+            svnOperationFactory.dispose();
+            sandbox.dispose();
+        }
+    }
+
+    @Test
+    public void testUpgradeWC15toWC17() throws Exception {
+        final TestOptions options = TestOptions.getInstance();
+
+        final SvnOperationFactory svnOperationFactory = new SvnOperationFactory();
+        final Sandbox sandbox = Sandbox.createWithCleanup(getTestName() + ".testUpgradeWC15toWC17", options);
+        try {
+            final SVNURL url = sandbox.createSvnRepository();
+
+            final CommitBuilder commitBuilder1 = new CommitBuilder(url);
+            commitBuilder1.addFile("file", "base".getBytes());
+            commitBuilder1.commit();
+
+            final CommitBuilder commitBuilder2 = new CommitBuilder(url);
+            commitBuilder2.changeFile("file", "theirs".getBytes());
+            commitBuilder2.commit();
+
+            final File workingCopyDirectory = sandbox.createDirectory("wc");
+            final File file = new File(workingCopyDirectory, "file");
+
+            final SvnCheckout checkout = svnOperationFactory.createCheckout();
+            checkout.setSource(SvnTarget.fromURL(url));
+            checkout.setSingleTarget(SvnTarget.fromFile(workingCopyDirectory));
+            checkout.setRevision(SVNRevision.create(1));
+            checkout.setTargetWorkingCopyFormat(SVNAdminArea15.WC_FORMAT);
+            checkout.run();
+
+            TestUtil.writeFileContentsString(file, "ours");
+
+            final SvnGetStatus getStatus15 = svnOperationFactory.createGetStatus();
+            getStatus15.setSingleTarget(SvnTarget.fromFile(workingCopyDirectory));
+            final SvnStatus status15 = getStatus15.run();
+            Assert.assertEquals(SVNAdminArea15.WC_FORMAT, status15.getWorkingCopyFormat());
 
             final SvnUpdate update = svnOperationFactory.createUpdate();
             update.setSingleTarget(SvnTarget.fromFile(workingCopyDirectory));
