@@ -10,7 +10,9 @@ import org.tmatesoft.svn.core.internal.util.SVNSkel;
 import org.tmatesoft.svn.core.internal.util.SVNURLUtil;
 import org.tmatesoft.svn.core.internal.wc.*;
 import org.tmatesoft.svn.core.internal.wc.admin.*;
+import org.tmatesoft.svn.core.internal.wc16.SVNStatusClient16;
 import org.tmatesoft.svn.core.internal.wc16.SVNUpdateClient16;
+import org.tmatesoft.svn.core.internal.wc16.SVNWCClient16;
 import org.tmatesoft.svn.core.internal.wc17.SVNWCContext;
 import org.tmatesoft.svn.core.internal.wc17.SVNWCUtils;
 import org.tmatesoft.svn.core.internal.wc17.db.*;
@@ -27,6 +29,7 @@ import org.tmatesoft.svn.core.wc.SVNEvent;
 import org.tmatesoft.svn.core.wc.SVNEventAction;
 import org.tmatesoft.svn.core.wc2.*;
 import org.tmatesoft.svn.core.wc2.SvnChecksum.Kind;
+import org.tmatesoft.svn.util.SVNDebugLog;
 import org.tmatesoft.svn.util.SVNLogType;
 
 import java.io.File;
@@ -103,8 +106,34 @@ public class SvnOldUpgrade extends SvnOldRunner<SvnWcGeneration, SvnUpgrade> {
 
 	@Override
 	protected SvnWcGeneration run() throws SVNException {
+        final int targetWorkingCopyFormat = getOperation().getTargetWorkingCopyFormat();
+        final int currentWorkingCopyFormat = readWorkingCopyFormat(getFirstTarget());
 
-		if (getOperation().getFirstTarget().isURL()) {
+        if (targetWorkingCopyFormat == currentWorkingCopyFormat) {
+            //do nothing
+            return SvnWcGeneration.V16;
+        } else if (targetWorkingCopyFormat < currentWorkingCopyFormat) {
+            //1.6->1.5, 1.6.->1.4, 1.5->1.4
+            SVNWCClient16 client =  new SVNWCClient16(getOperation().getRepositoryPool(), getOperation().getOptions());
+            client.setEventHandler(getOperation().getEventHandler());
+            client.setDebugLog(SVNDebugLog.getDefaultLog());
+            client.doSetWCFormat(getFirstTarget(), targetWorkingCopyFormat);
+            return SvnWcGeneration.V16;
+        } else if (targetWorkingCopyFormat >= SVNAdminArea16.WC_FORMAT) {
+            //1.5->1.7, 1.4->1.8, 1.6->1.7, 1.4->1.6 and so on
+            //then upgrade to 1.6
+            SVNWCClient16 client =  new SVNWCClient16(getOperation().getRepositoryPool(), getOperation().getOptions());
+            client.setEventHandler(getOperation().getEventHandler());
+            client.setDebugLog(SVNDebugLog.getDefaultLog());
+            client.doSetWCFormat(getFirstTarget(), SVNAdminArea16.WC_FORMAT);
+            //and continue upgrading only if targetWorkingCopyFormat > 1.6
+            if (targetWorkingCopyFormat == SVNAdminArea16.WC_FORMAT) {
+                return SvnWcGeneration.V16;
+            }
+        }
+
+
+        if (getOperation().getFirstTarget().isURL()) {
 			SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.ILLEGAL_TARGET, "'{0}' is not a local path", getOperation().getFirstTarget().getURL());
 			SVNErrorManager.error(err, SVNLogType.WC);
 		}
@@ -155,7 +184,15 @@ public class SvnOldUpgrade extends SvnOldRunner<SvnWcGeneration, SvnUpgrade> {
 		return SvnWcGeneration.V17;
 	}
 
-	private void checkIsOldWCRoot(File localAbsPath) throws SVNException {
+    private int readWorkingCopyFormat(File firstTarget) throws SVNException {
+        SVNWCAccess wcAccess = getWCAccess();
+        SVNAdminArea adminArea = wcAccess.probeOpen(firstTarget, false, 0);
+        final int currentWorkingCopyFormat = adminArea.getFormatVersion();
+        wcAccess.close();
+        return currentWorkingCopyFormat;
+    }
+
+    private void checkIsOldWCRoot(File localAbsPath) throws SVNException {
 		SVNWCAccess wcAccess = getWCAccess();
 		
 		try {
