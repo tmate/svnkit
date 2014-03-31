@@ -394,7 +394,6 @@ public class UpgradeTest {
         }
     }
 
-    @Ignore
     @Test
     public void testUpgradeWC15toWC16() throws Exception {
         final TestOptions options = TestOptions.getInstance();
