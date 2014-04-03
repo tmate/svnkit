@@ -122,10 +122,12 @@ public class SvnOldUpgrade extends SvnOldRunner<SvnWcGeneration, SvnUpgrade> {
         } else if (targetWorkingCopyFormat >= SVNAdminArea16.WC_FORMAT) {
             //1.5->1.7, 1.4->1.8, 1.6->1.7, 1.4->1.6 and so on
             //then upgrade to 1.6
-            SVNWCClient16 client =  new SVNWCClient16(getOperation().getRepositoryPool(), getOperation().getOptions());
-            client.setEventHandler(getOperation().getEventHandler());
-            client.setDebugLog(SVNDebugLog.getDefaultLog());
-            client.doSetWCFormat(getFirstTarget(), SVNAdminArea16.WC_FORMAT);
+            if (currentWorkingCopyFormat < SVNAdminArea16.WC_FORMAT) {
+                SVNWCClient16 client =  new SVNWCClient16(getOperation().getRepositoryPool(), getOperation().getOptions());
+                client.setEventHandler(getOperation().getEventHandler());
+                client.setDebugLog(SVNDebugLog.getDefaultLog());
+                client.doSetWCFormat(getFirstTarget(), SVNAdminArea16.WC_FORMAT);
+            }
             //and continue upgrading only if targetWorkingCopyFormat > 1.6
             if (targetWorkingCopyFormat == SVNAdminArea16.WC_FORMAT) {
                 return SvnWcGeneration.V16;
