@@ -24,6 +24,9 @@ import org.tmatesoft.svn.util.SVNLogType;
 public class SvnRemoteList extends SvnRemoteOperationRunner<SVNDirEntry, SvnList> implements ISVNDirEntryHandler {
 
     public boolean isApplicable(SvnList operation, SvnWcGeneration wcGeneration) throws SVNException {
+        if (wcGeneration == SvnWcGeneration.V16 && operation.getFirstTarget().isFile()) {
+            return false;
+        }
         return true;
     }
 
