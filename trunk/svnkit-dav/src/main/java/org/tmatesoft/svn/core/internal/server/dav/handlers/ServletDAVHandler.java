@@ -1770,7 +1770,7 @@ public abstract class ServletDAVHandler extends BasicDAVHandler {
             CountingInputStream stream = null;
             try {
                 mySAXParser = getSAXParserFactory().newSAXParser();
-                if (myRequest.getContentLength() > 0) {
+                if (myRequest.getContentLength() > 0 || (myRequest.getContentLength() < 0 && "chunked".equalsIgnoreCase(myRequest.getHeader("Transfer-Encoding")))) {
                     org.xml.sax.XMLReader reader = mySAXParser.getXMLReader();
                     reader.setContentHandler(this);
                     reader.setDTDHandler(this);
