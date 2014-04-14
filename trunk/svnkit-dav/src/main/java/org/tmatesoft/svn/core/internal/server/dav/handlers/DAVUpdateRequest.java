@@ -21,7 +21,10 @@ import org.tmatesoft.svn.core.SVNURL;
 import org.tmatesoft.svn.core.internal.io.dav.DAVElement;
 import org.tmatesoft.svn.core.internal.server.dav.DAVPathUtil;
 import org.tmatesoft.svn.core.internal.server.dav.DAVResource;
+import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
+import org.tmatesoft.svn.core.internal.util.SVNURLUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
+import org.tmatesoft.svn.core.wc2.SvnTarget;
 import org.tmatesoft.svn.util.SVNLogType;
 
 /**
@@ -43,6 +46,7 @@ public class DAVUpdateRequest extends DAVRequest {
 
     private boolean mySendAll = false;
     private long myRevision = DAVResource.INVALID_REVISION;
+    private String mySrcPath = null;
     private SVNURL mySrcURL = null;
     private SVNURL myDstURL = null;
     private String myTarget = "";
@@ -71,6 +75,14 @@ public class DAVUpdateRequest extends DAVRequest {
 
     private void setRevision(long revision) {
         myRevision = revision;
+    }
+
+    public String getSrcPath() {
+        return mySrcPath;
+    }
+
+    public void setSrcPath(String srcPath) {
+        this.mySrcPath = srcPath;
     }
 
     public SVNURL getSrcURL() {
@@ -181,7 +193,11 @@ public class DAVUpdateRequest extends DAVRequest {
                     assertNullCData(element, property);
                     String value = property.getFirstValue(false);
                     DAVPathUtil.testCanonical(value);
-                    setSrcURL(SVNURL.parseURIEncoded(value));
+                    if (SVNPathUtil.isURL(value)) {
+                        setSrcURL(SVNURL.parseURIEncoded(value));
+                    } else {
+                        setSrcPath(value);
+                    }
                 } else if (element == DST_PATH) {
                     assertNullCData(element, property);
                     String value = property.getFirstValue(false);
@@ -221,7 +237,7 @@ public class DAVUpdateRequest extends DAVRequest {
             if (!isDepthRequested() && !isRecursiveRequested() && (getDepth() == SVNDepth.UNKNOWN)) {
                 setDepth(SVNDepth.INFINITY);
             }
-            if (getSrcURL() == null) {
+            if (getSrcURL() == null && getSrcPath() == null) {
                 SVNErrorManager.error(SVNErrorMessage.create(SVNErrorCode.RA_DAV_REQUEST_FAILED, 
                         "The request did not contain the '<src-path>' element.\nThis may indicate that your client is too old."), SVNLogType.NETWORK);
             }

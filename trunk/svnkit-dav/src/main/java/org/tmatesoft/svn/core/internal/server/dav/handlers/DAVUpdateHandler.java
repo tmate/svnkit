@@ -292,7 +292,8 @@ public class DAVUpdateHandler extends DAVReportHandler implements ISVNEditor {
                 myRequestedDepth = SVNDepth.INFINITY;
             }
 
-            String srcPath = getRepositoryManager().getRepositoryRelativePath(getUpdateRequest().getSrcURL());
+            SVNURL srcURL = getUpdateRequest().getSrcURL();
+            String srcPath = (srcURL != null) ? getRepositoryManager().getRepositoryRelativePath(srcURL) : getUpdateRequest().getSrcPath();
             setAnchor(srcPath);
 
             SVNURL dstURL = getUpdateRequest().getDstURL();
@@ -307,7 +308,7 @@ public class DAVUpdateHandler extends DAVReportHandler implements ISVNEditor {
             FSFS fsfs = getDAVResource().getFSFS();
             myRevisionRoot = fsfs.createRevisionRoot(targetRevision);
             
-            SVNURL repositoryURL = getRepositoryManager().convertHttpToFile(getUpdateRequest().getSrcURL());
+            SVNURL repositoryURL = (srcURL != null) ? getRepositoryManager().convertHttpToFile(srcURL) : SVNURL.parseURIEncoded(getRepositoryManager().getResourceRepositoryRoot() + getUpdateRequest().getSrcPath());
             FSRepository repository = (FSRepository) SVNRepositoryFactory.create(repositoryURL);
 
             FSTranslateReporter reporter = repository.beginReport(getRevision(),
