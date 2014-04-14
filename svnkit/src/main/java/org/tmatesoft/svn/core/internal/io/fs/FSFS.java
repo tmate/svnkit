@@ -51,6 +51,7 @@ import org.tmatesoft.svn.core.internal.wc.SVNWCProperties;
 import org.tmatesoft.svn.core.io.ISVNLockHandler;
 import org.tmatesoft.svn.core.io.SVNLocationEntry;
 import org.tmatesoft.svn.core.io.SVNRepository;
+import org.tmatesoft.svn.core.wc.SVNRevision;
 import org.tmatesoft.svn.util.SVNLogType;
 
 /**
@@ -625,6 +626,9 @@ public class FSFS {
 
     public SVNProperties getRevisionProperties(long revision) throws SVNException {
         try{
+            if (!SVNRevision.isValidRevisionNumber(revision)) {
+                revision = getYoungestRevision();
+            }
             return readRevisionProperties(revision);
         } catch(SVNException e ) {
             if(e.getErrorMessage().getErrorCode()==SVNErrorCode.FS_NO_SUCH_REVISION && myDBFormat >= MIN_PACKED_REVPROP_FORMAT ) {
