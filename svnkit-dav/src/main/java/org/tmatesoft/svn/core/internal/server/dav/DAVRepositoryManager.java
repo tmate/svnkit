@@ -172,6 +172,14 @@ public class DAVRepositoryManager {
         return SVNURL.parseURIEncoded(getResourceRepositoryRoot() + getRepositoryRelativePath(url));
     }
 
+    public SVNURL convertHttpToFile(String path) throws SVNException {
+        String uri = DAVPathUtil.addLeadingSlash(path);
+        if (!uri.startsWith(getResourceContext())) {
+            SVNErrorManager.error(SVNErrorMessage.create(SVNErrorCode.RA_DAV_REQUEST_FAILED, "Invalid path ''{0}'' requested", path), SVNLogType.NETWORK);
+        }
+        return SVNURL.parseURIEncoded(getResourceRepositoryRoot() + uri.substring(getResourceContext().length()));
+    }
+
     public String getRepositoryRelativePath(SVNURL url) throws SVNException {
         String uri = getURI(url);
         DAVResourceURI resourceURI = new DAVResourceURI(null, uri, null, false);
