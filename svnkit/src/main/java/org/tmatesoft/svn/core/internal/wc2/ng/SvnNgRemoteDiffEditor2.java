@@ -312,7 +312,7 @@ public class SvnNgRemoteDiffEditor2 implements ISVNEditor {
         }
         if (fb.pathEndRevision == null) {
             File tmpDir = new File(System.getProperty("java.io.tmpdir"));
-            fb.pathEndRevision = SVNFileUtil.createUniqueFile(tmpDir, "svn", "tmp", false);
+            fb.pathEndRevision = SVNFileUtil.createUniqueFile(tmpDir, "svn", "tmp", true);
             tempFiles.add(fb.pathEndRevision);
         }
 
@@ -435,7 +435,7 @@ public class SvnNgRemoteDiffEditor2 implements ISVNEditor {
         }
         if (!propsOnly) {
             File tmpDir = new File(System.getProperty("java.io.tmpdir"));
-            fb.pathStartRevision = SVNFileUtil.createUniqueFile(tmpDir, "svn", "tmp", false);
+            fb.pathStartRevision = SVNFileUtil.createUniqueFile(tmpDir, "svn", "tmp", true);
             tempFiles.add(fb.pathStartRevision);
             OutputStream outputStream = null;
             SVNChecksumOutputStream checksumOutputStream = null;
