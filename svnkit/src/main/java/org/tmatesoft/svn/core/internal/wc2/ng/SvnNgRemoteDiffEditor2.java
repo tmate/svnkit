@@ -58,15 +58,19 @@ public class SvnNgRemoteDiffEditor2 implements ISVNEditor {
     }
 
     public void deleteEntry(String path, long revision) throws SVNException {
-        DirBaton pb = dirBaton;
-        if (pb.skipChildren) {
-            return;
-        }
-        SVNNodeKind kind = repository.checkPath(path, this.revision);
-        if (kind == SVNNodeKind.FILE) {
-            diffDeletedFile(path);
-        } else if (kind == SVNNodeKind.DIR) {
-            diffDeletedDirectory(path);
+        try {
+            DirBaton pb = dirBaton;
+            if (pb.skipChildren) {
+                return;
+            }
+            SVNNodeKind kind = repository.checkPath(path, this.revision);
+            if (kind == SVNNodeKind.FILE) {
+                diffDeletedFile(path);
+            } else if (kind == SVNNodeKind.DIR) {
+                diffDeletedDirectory(path);
+            }
+        } finally {
+            cleanupTempFiles();
         }
     }
 
@@ -228,51 +232,55 @@ public class SvnNgRemoteDiffEditor2 implements ISVNEditor {
     }
 
     public void closeFile(String path, String textChecksum) throws SVNException {
-        FileBaton fb = fileBaton;
-        if (fb.skip) {
-            return;
-        }
-
-        if (textChecksum != null && this.textDeltas) {
-            if (fb.resultMd5Checksum != null && !textChecksum.equals(fb.resultMd5Checksum)) {
-                SVNErrorMessage errorMessage = SVNErrorMessage.create(SVNErrorCode.CHECKSUM_MISMATCH, "Checksum mismatch for ''{0}''", fb.path);
-                SVNErrorManager.error(errorMessage, SVNLogType.WC);
-            }
-        }
-
-        if (fb.added || (fb.pathEndRevision != null || !this.textDeltas) || fb.hasPropChanges) {
-            SVNProperties rightProps;
-
-            if (!fb.added && fb.pristineProps == null) {
-                getFileFromRa(fb, true);
+        try {
+            FileBaton fb = fileBaton;
+            if (fb.skip) {
+                return;
             }
 
-            String oldChecksum = fb.pristineProps.getStringValue(SVNProperty.CHECKSUM);
-
-            if (fb.pristineProps != null) {
-                fb.propChanges = removeNonPropChanges(fb.pristineProps, fb.propChanges);
-            }
-
-            rightProps = new SVNProperties(fb.pristineProps);
-            rightProps.putAll(fb.propChanges);
-            rightProps.removeNullValues();
-
-            if (fb.added) {
-                result.reset();
-                callback.fileAdded(result, SVNFileUtil.createFilePath(fb.path), null, fb.rightSource, null, fb.pathEndRevision, null, rightProps);
-            } else {
-                result.reset();
-                boolean fileModified = fb.pathEndRevision != null;
-                if (textChecksum != null && oldChecksum != null) {
-                    //SVNKit is different from SVN: it always sends applyTextDelta, but Subversion --- only for changed files
-                    fileModified = !textChecksum.equals(oldChecksum);
+            if (textChecksum != null && this.textDeltas) {
+                if (fb.resultMd5Checksum != null && !textChecksum.equals(fb.resultMd5Checksum)) {
+                    SVNErrorMessage errorMessage = SVNErrorMessage.create(SVNErrorCode.CHECKSUM_MISMATCH, "Checksum mismatch for ''{0}''", fb.path);
+                    SVNErrorManager.error(errorMessage, SVNLogType.WC);
                 }
-                if (fileModified && !textDeltas) {
-                    fb.pathStartRevision = getEmptyFile();
-                    fb.pathEndRevision = getEmptyFile();
-                }
-                callback.fileChanged(result, SVNFileUtil.createFilePath(fb.path), fb.leftSource, fb.rightSource, fb.pathEndRevision != null ? fb.pathStartRevision : null, fb.pathEndRevision, fb.pristineProps, rightProps, fileModified, fb.propChanges);
             }
+
+            if (fb.added || (fb.pathEndRevision != null || !this.textDeltas) || fb.hasPropChanges) {
+                SVNProperties rightProps;
+
+                if (!fb.added && fb.pristineProps == null) {
+                    getFileFromRa(fb, true);
+                }
+
+                String oldChecksum = fb.pristineProps.getStringValue(SVNProperty.CHECKSUM);
+
+                if (fb.pristineProps != null) {
+                    fb.propChanges = removeNonPropChanges(fb.pristineProps, fb.propChanges);
+                }
+
+                rightProps = new SVNProperties(fb.pristineProps);
+                rightProps.putAll(fb.propChanges);
+                rightProps.removeNullValues();
+
+                if (fb.added) {
+                    result.reset();
+                    callback.fileAdded(result, SVNFileUtil.createFilePath(fb.path), null, fb.rightSource, null, fb.pathEndRevision, null, rightProps);
+                } else {
+                    result.reset();
+                    boolean fileModified = fb.pathEndRevision != null;
+                    if (textChecksum != null && oldChecksum != null) {
+                        //SVNKit is different from SVN: it always sends applyTextDelta, but Subversion --- only for changed files
+                        fileModified = !textChecksum.equals(oldChecksum);
+                    }
+                    if (fileModified && !textDeltas) {
+                        fb.pathStartRevision = getEmptyFile();
+                        fb.pathEndRevision = getEmptyFile();
+                    }
+                    callback.fileChanged(result, SVNFileUtil.createFilePath(fb.path), fb.leftSource, fb.rightSource, fb.pathEndRevision != null ? fb.pathStartRevision : null, fb.pathEndRevision, fb.pristineProps, rightProps, fileModified, fb.propChanges);
+                }
+            }
+        } finally {
+            cleanupTempFiles();
         }
     }
 
@@ -339,6 +347,10 @@ public class SvnNgRemoteDiffEditor2 implements ISVNEditor {
     }
 
     public void cleanup() {
+        cleanupTempFiles();
+    }
+
+    public void cleanupTempFiles() {
         for (File tempFile : tempFiles) {
             try {
                 SVNFileUtil.deleteFile(tempFile);
@@ -346,6 +358,7 @@ public class SvnNgRemoteDiffEditor2 implements ISVNEditor {
                 //ignore
             }
         }
+        tempFiles.clear();
     }
 
     private void diffDeletedFile(String path) throws SVNException {
