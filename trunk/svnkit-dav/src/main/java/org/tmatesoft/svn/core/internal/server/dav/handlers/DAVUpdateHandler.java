@@ -660,7 +660,9 @@ public class DAVUpdateHandler extends DAVReportHandler implements ISVNEditor {
                 } else if (SVNProperty.COMMITTED_DATE.equals(name)) {
                     entry.setCommitedDate(value.getString());
                 } else if (SVNProperty.LAST_AUTHOR.equals(name)) {
-                    entry.setLastAuthor(value.getString());
+                    if (value != null) {
+                        entry.setLastAuthor(value.getString());
+                    }
                 } else if (SVNProperty.LOCK_TOKEN.equals(name) && value == null) {
                     entry.addRemovedProperty(name);
                 }
