@@ -170,7 +170,42 @@ import org.tmatesoft.svn.core.wc.ISVNOptions;
 import org.tmatesoft.svn.core.wc.ISVNRepositoryPool;
 import org.tmatesoft.svn.core.wc.SVNEvent;
 import org.tmatesoft.svn.core.wc.SVNWCUtil;
-import org.tmatesoft.svn.core.wc2.admin.*;
+import org.tmatesoft.svn.core.wc2.admin.SvnRepositoryCat;
+import org.tmatesoft.svn.core.wc2.admin.SvnRepositoryCopyRevisionProperties;
+import org.tmatesoft.svn.core.wc2.admin.SvnRepositoryCreate;
+import org.tmatesoft.svn.core.wc2.admin.SvnRepositoryDump;
+import org.tmatesoft.svn.core.wc2.admin.SvnRepositoryFilter;
+import org.tmatesoft.svn.core.wc2.admin.SvnRepositoryGetAuthor;
+import org.tmatesoft.svn.core.wc2.admin.SvnRepositoryGetChanged;
+import org.tmatesoft.svn.core.wc2.admin.SvnRepositoryGetChangedDirectories;
+import org.tmatesoft.svn.core.wc2.admin.SvnRepositoryGetDate;
+import org.tmatesoft.svn.core.wc2.admin.SvnRepositoryGetDiff;
+import org.tmatesoft.svn.core.wc2.admin.SvnRepositoryGetFileSize;
+import org.tmatesoft.svn.core.wc2.admin.SvnRepositoryGetHistory;
+import org.tmatesoft.svn.core.wc2.admin.SvnRepositoryGetInfo;
+import org.tmatesoft.svn.core.wc2.admin.SvnRepositoryGetLock;
+import org.tmatesoft.svn.core.wc2.admin.SvnRepositoryGetLog;
+import org.tmatesoft.svn.core.wc2.admin.SvnRepositoryGetProperties;
+import org.tmatesoft.svn.core.wc2.admin.SvnRepositoryGetProperty;
+import org.tmatesoft.svn.core.wc2.admin.SvnRepositoryGetRevisionProperties;
+import org.tmatesoft.svn.core.wc2.admin.SvnRepositoryGetRevisionProperty;
+import org.tmatesoft.svn.core.wc2.admin.SvnRepositoryGetTree;
+import org.tmatesoft.svn.core.wc2.admin.SvnRepositoryGetUUID;
+import org.tmatesoft.svn.core.wc2.admin.SvnRepositoryGetYoungest;
+import org.tmatesoft.svn.core.wc2.admin.SvnRepositoryHotCopy;
+import org.tmatesoft.svn.core.wc2.admin.SvnRepositoryInitialize;
+import org.tmatesoft.svn.core.wc2.admin.SvnRepositoryListLocks;
+import org.tmatesoft.svn.core.wc2.admin.SvnRepositoryListTransactions;
+import org.tmatesoft.svn.core.wc2.admin.SvnRepositoryLoad;
+import org.tmatesoft.svn.core.wc2.admin.SvnRepositoryPack;
+import org.tmatesoft.svn.core.wc2.admin.SvnRepositoryRecover;
+import org.tmatesoft.svn.core.wc2.admin.SvnRepositoryRemoveLocks;
+import org.tmatesoft.svn.core.wc2.admin.SvnRepositoryRemoveTransactions;
+import org.tmatesoft.svn.core.wc2.admin.SvnRepositorySetUUID;
+import org.tmatesoft.svn.core.wc2.admin.SvnRepositorySyncInfo;
+import org.tmatesoft.svn.core.wc2.admin.SvnRepositorySynchronize;
+import org.tmatesoft.svn.core.wc2.admin.SvnRepositoryUpgrade;
+import org.tmatesoft.svn.core.wc2.admin.SvnRepositoryVerify;
 import org.tmatesoft.svn.util.SVNLogType;
 
 /**
@@ -1613,10 +1648,27 @@ public class SvnOperationFactory implements ISvnOperationOptionsProvider {
             if (path == null) {
                 return SvnWcGeneration.NOT_DETECTED;
             }
-            SVNWCDb db = new SVNWCDb();
+            SVNWCDb db = null;
             try {
-                db.open(SVNWCDbOpenMode.ReadOnly, (ISVNOptions) null, true, false);
-                DirParsedInfo info = db.parseDir(path, Mode.ReadOnly, true, isAdditionMode);
+            	final File folder = SVNFileType.getType(path) == SVNFileType.DIRECTORY ? path : SVNFileUtil.getParentFile(path);
+            	if (folder != null) {
+            		final File adminDir = new File(folder, SVNFileUtil.getAdminDirectoryName());
+            		final File wcdb = new File(adminDir, "wc.db");
+	            	if (!wcdb.exists()) {
+	            		final File entries = new File(adminDir, "entries");
+	            		if (entries.exists()) {
+		            		return SvnWcGeneration.V16;
+	            		} else {
+		            		final File format = new File(adminDir, "format");
+		            		if (format.exists()) {
+		            			return SvnWcGeneration.V16;
+		            		}	            			
+	            		}
+	            	}
+            	}
+                db = new SVNWCDb();
+				db.open(SVNWCDbOpenMode.ReadOnly, (ISVNOptions) null, true, false);
+                final DirParsedInfo info = db.parseDir(path, Mode.ReadOnly, true, isAdditionMode);
                 if (info != null && SVNWCDbDir.isUsable(info.wcDbDir)) {
                     return SvnWcGeneration.V17;
                 } else if (info != null
@@ -1675,7 +1727,9 @@ public class SvnOperationFactory implements ISvnOperationOptionsProvider {
                     throw e;
                 }
             } finally {
-                db.close();
+            	if (db != null) {
+            		db.close();
+            	}
             }
         }
     }
