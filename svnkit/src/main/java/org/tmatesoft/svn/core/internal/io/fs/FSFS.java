@@ -35,6 +35,7 @@ import org.tmatesoft.svn.core.SVNProperties;
 import org.tmatesoft.svn.core.SVNProperty;
 import org.tmatesoft.svn.core.SVNPropertyValue;
 import org.tmatesoft.svn.core.SVNRevisionProperty;
+import org.tmatesoft.svn.core.internal.delta.SVNDeltaReader;
 import org.tmatesoft.svn.core.internal.io.fs.revprop.SVNFSFSPackedRevProps;
 import org.tmatesoft.svn.core.internal.io.fs.revprop.SVNFSFSPackedRevPropsManifest;
 import org.tmatesoft.svn.core.internal.util.SVNDate;
@@ -48,9 +49,12 @@ import org.tmatesoft.svn.core.internal.wc.SVNFileListUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNFileType;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNWCProperties;
+import org.tmatesoft.svn.core.io.ISVNDeltaConsumer;
 import org.tmatesoft.svn.core.io.ISVNLockHandler;
 import org.tmatesoft.svn.core.io.SVNLocationEntry;
 import org.tmatesoft.svn.core.io.SVNRepository;
+import org.tmatesoft.svn.core.io.diff.SVNDeltaProcessor;
+import org.tmatesoft.svn.core.io.diff.SVNDiffWindow;
 import org.tmatesoft.svn.core.wc.SVNRevision;
 import org.tmatesoft.svn.util.SVNLogType;
 
@@ -846,14 +850,55 @@ public class FSFS {
                 revisionFile = openAndSeekRepresentation(txtRep);
                 String repHeader = revisionFile.readLine(160);
 
-                if(!"PLAIN".equals(repHeader)){
-                    SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_CORRUPT, "Malformed representation header");
+                SVNProperties rawEntries = null;
+                String checksum = null;
+
+                if ("PLAIN".equals(repHeader)) {
+                    revisionFile.resetDigest();
+                    rawEntries = revisionFile.readProperties(false, false);
+                    checksum = revisionFile.digest();
+                } else if ("DELTA".equals(repHeader)) {
+                    SVNDeltaReader deltaReader = new SVNDeltaReader();
+                    byte[] buffer = new byte[2048];
+                    int readCount = -1;
+                    int length = (int) txtRep.getSize();
+
+                    final SVNDeltaProcessor deltaProcessor = new SVNDeltaProcessor();
+                    final ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+
+                    //TODO if repHeader is "DELTA source length", deltaProcessor should be applied to that source
+                    deltaProcessor.applyTextDelta(SVNFileUtil.DUMMY_IN, byteArrayOutputStream, true);
+
+                    while ((readCount = revisionFile.read(buffer, 0, length)) != -1) {
+                        if (readCount == 0) {
+                            continue;
+                        }
+                        deltaReader.nextWindow(buffer, 0, readCount, "", new ISVNDeltaConsumer() {
+                            public void applyTextDelta(String path, String baseChecksum) throws SVNException {
+                            }
+
+                            public OutputStream textDeltaChunk(String path, SVNDiffWindow diffWindow) throws SVNException {
+                                return deltaProcessor.textDeltaChunk(diffWindow);
+                            }
+
+                            public void textDeltaEnd(String path) throws SVNException {
+                            }
+                        });
+                        length -= readCount;
+                        if (length == 0) {
+                            break;
+                        }
+                    }
+
+                    checksum = deltaProcessor.textDeltaEnd();
+                    rawEntries = readProperties(byteArrayOutputStream.toByteArray());
+                } else {
+                    //if this happens, see "TODO" above
+                    SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_CORRUPT, "Malformed representation header ''{0}''", repHeader);
                     SVNErrorManager.error(err, SVNLogType.FSFS);
                 }
 
-                revisionFile.resetDigest();
-                SVNProperties rawEntries = revisionFile.readProperties(false, false);
-                String checksum = revisionFile.digest();
+                SVNErrorManager.assertionFailure(checksum != null, "Checksum should be computed", SVNLogType.FSFS);
 
                 if (!checksum.equals(txtRep.getMD5HexDigest())) {
                     SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_CORRUPT,
@@ -863,6 +908,9 @@ public class FSFS {
                 }
 
                 return parsePlainRepresentation(rawEntries, false);
+            } catch (IOException e) {
+                SVNErrorMessage errorMessage = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, e);
+                SVNErrorManager.error(errorMessage, SVNLogType.FSFS);
             } finally {
                 if(revisionFile != null){
                     revisionFile.close();
