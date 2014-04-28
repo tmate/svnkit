@@ -285,7 +285,9 @@ public class SvnNgRemoteDiffEditor2 implements ISVNEditor {
     }
 
     private File getEmptyFile() throws SVNException {
-        return SVNFileUtil.createTempFile("", "");
+        final File tempFile = SVNFileUtil.createTempFile("", "");
+        this.tempFiles.add(tempFile);
+        return tempFile;
     }
 
     public SVNCommitInfo closeEdit() throws SVNException {
