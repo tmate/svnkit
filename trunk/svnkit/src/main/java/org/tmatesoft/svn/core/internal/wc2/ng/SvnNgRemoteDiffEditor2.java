@@ -31,6 +31,7 @@ public class SvnNgRemoteDiffEditor2 implements ISVNEditor {
     private FileBaton fileBaton;
 
     private Set<File> tempFiles;
+    private File emptyFile;
 
     public SvnNgRemoteDiffEditor2(long revision, boolean textDeltas, SVNRepository repository, ISvnDiffCallback2 callback) {
         this.revision = revision;
@@ -285,9 +286,10 @@ public class SvnNgRemoteDiffEditor2 implements ISVNEditor {
     }
 
     private File getEmptyFile() throws SVNException {
-        final File tempFile = SVNFileUtil.createTempFile("", "");
-        this.tempFiles.add(tempFile);
-        return tempFile;
+        if (this.emptyFile == null) {
+            this.emptyFile = SVNFileUtil.createTempFile("", "");
+        }
+        return this.emptyFile;
     }
 
     public SVNCommitInfo closeEdit() throws SVNException {
@@ -361,6 +363,13 @@ public class SvnNgRemoteDiffEditor2 implements ISVNEditor {
             }
         }
         tempFiles.clear();
+        if (emptyFile != null) {
+            try {
+                SVNFileUtil.deleteFile(emptyFile);
+            } catch (SVNException e) {
+                //ignore
+            }
+        }
     }
 
     private void diffDeletedFile(String path) throws SVNException {
