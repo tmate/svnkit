@@ -240,6 +240,9 @@ public class SvnOperationFactory implements ISvnOperationOptionsProvider {
     
     private SvnWcGeneration primaryWcGeneration;
     private int runLevel;
+    
+    private SvnWcGeneration detectedWcGeneration = SvnWcGeneration.NOT_DETECTED;
+	private boolean isWcGenerationSticky;
 
     /**
      * Creates operation factory and initializes it with empty <code>context</code>.
@@ -1308,14 +1311,21 @@ public class SvnOperationFactory implements ISvnOperationOptionsProvider {
 
         SvnWcGeneration wcGeneration = SvnWcGeneration.NOT_DETECTED;
         if (operation.getOperationalWorkingCopy() != null) {
-            if (operation.getClass() == SvnCheckout.class) {
-                if (SVNWCUtil.isVersionedDirectory(operation.getOperationalWorkingCopy())) {
-                    wcGeneration = detectWcGeneration(operation.getOperationalWorkingCopy(), false, isAdditionMode);
-                } else {
-                    wcGeneration = getPrimaryWcGeneration();
-                }
-            } else {
-                wcGeneration = detectWcGeneration(operation.getOperationalWorkingCopy(), false, isAdditionMode);
+        	if (isWcGenerationSticky && detectedWcGeneration != SvnWcGeneration.NOT_DETECTED) {
+        		wcGeneration = detectedWcGeneration;
+        	} else {
+	            if (operation.getClass() == SvnCheckout.class) {
+	                if (SVNWCUtil.isVersionedDirectory(operation.getOperationalWorkingCopy())) {
+	                    wcGeneration = detectWcGeneration(operation.getOperationalWorkingCopy(), false, isAdditionMode);
+	                } else {
+	                    wcGeneration = getPrimaryWcGeneration();
+	                }
+	            } else {
+	                wcGeneration = detectWcGeneration(operation.getOperationalWorkingCopy(), false, isAdditionMode);
+	            }
+        	}
+            if (isWcGenerationSticky && wcGeneration != SvnWcGeneration.NOT_DETECTED) {
+            	detectedWcGeneration = wcGeneration;
             }
         }
         
@@ -1650,22 +1660,6 @@ public class SvnOperationFactory implements ISvnOperationOptionsProvider {
             }
             SVNWCDb db = null;
             try {
-            	final File folder = SVNFileType.getType(path) == SVNFileType.DIRECTORY ? path : SVNFileUtil.getParentFile(path);
-            	if (folder != null) {
-            		final File adminDir = new File(folder, SVNFileUtil.getAdminDirectoryName());
-            		final File wcdb = new File(adminDir, "wc.db");
-	            	if (!wcdb.exists()) {
-	            		final File entries = new File(adminDir, "entries");
-	            		if (entries.exists()) {
-		            		return SvnWcGeneration.V16;
-	            		} else {
-		            		final File format = new File(adminDir, "format");
-		            		if (format.exists()) {
-		            			return SvnWcGeneration.V16;
-		            		}	            			
-	            		}
-	            	}
-            	}
                 db = new SVNWCDb();
 				db.open(SVNWCDbOpenMode.ReadOnly, (ISVNOptions) null, true, false);
                 final DirParsedInfo info = db.parseDir(path, Mode.ReadOnly, true, isAdditionMode);
@@ -1790,6 +1784,26 @@ public class SvnOperationFactory implements ISvnOperationOptionsProvider {
         }
         this.primaryWcGeneration = primaryWcGeneration;
         registerRunners();
+    }
+    
+    /**
+     * When set to true, first encountered working copy generation becomes 'sticky'
+     * for this instance of {@link SvnOperationFactory} and no working copy format detection 
+     * will be performed for subsequent operation. 
+     * 
+     * @param isWcGenerationSticky
+     */
+    public void setWcGenerationSticky(boolean isWcGenerationSticky) {
+		detectedWcGeneration = SvnWcGeneration.NOT_DETECTED; 
+    	this.isWcGenerationSticky = isWcGenerationSticky;
+    }
+    
+    /**
+     * @see #setWcGenerationSticky(boolean)
+     * @return true when this instance of {@link SvnOperationFactory}
+     */
+    public boolean isWcGenerationSticky() {
+    	return this.isWcGenerationSticky;
     }
     
     private SvnWcGeneration[] getRunnerScope(ISvnOperationRunner<?, ? extends SvnOperation<?>> runner) {
