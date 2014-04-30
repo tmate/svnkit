@@ -21,7 +21,6 @@ import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNProperty;
 import org.tmatesoft.svn.core.auth.ISVNAuthenticationManager;
 import org.tmatesoft.svn.core.internal.db.SVNSqlJetDb.Mode;
-import org.tmatesoft.svn.core.internal.wc.SVNAdminUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.internal.wc.SVNExternal;
 import org.tmatesoft.svn.core.internal.wc.SVNFileType;
@@ -242,6 +241,9 @@ public class SvnOperationFactory implements ISvnOperationOptionsProvider {
     
     private SvnWcGeneration primaryWcGeneration;
     private int runLevel;
+    
+    private SvnWcGeneration detectedWcGeneration = SvnWcGeneration.NOT_DETECTED;
+	private boolean isWcGenerationSticky;
 
     /**
      * Creates operation factory and initializes it with empty <code>context</code>.
@@ -1316,18 +1318,21 @@ public class SvnOperationFactory implements ISvnOperationOptionsProvider {
 
         SvnWcGeneration wcGeneration = SvnWcGeneration.NOT_DETECTED;
         if (operation.getOperationalWorkingCopy() != null) {
-            if (operation.getClass() == SvnCheckout.class) {
-                if (SVNWCUtil.isVersionedDirectory(operation.getOperationalWorkingCopy())) {
-                    wcGeneration = detectWcGeneration(operation.getOperationalWorkingCopy(), false, isAdditionMode);
-                } else {
-                    if (operation instanceof SvnCheckout && ((SvnCheckout) operation).getTargetWorkingCopyFormat() > 0) {
-                        wcGeneration = ((SvnCheckout) operation).getTargetWorkingCopyFormat() < SVNWCContext.WC_NG_VERSION ? SvnWcGeneration.V16 : SvnWcGeneration.V17;
-                    } else {
-                        wcGeneration = getPrimaryWcGeneration();
-                    }
-                }
-            } else {
-                wcGeneration = detectWcGeneration(operation.getOperationalWorkingCopy(), false, isAdditionMode);
+        	if (isWcGenerationSticky && detectedWcGeneration != SvnWcGeneration.NOT_DETECTED) {
+        		wcGeneration = detectedWcGeneration;
+        	} else {
+	            if (operation.getClass() == SvnCheckout.class) {
+	                if (SVNWCUtil.isVersionedDirectory(operation.getOperationalWorkingCopy())) {
+	                    wcGeneration = detectWcGeneration(operation.getOperationalWorkingCopy(), false, isAdditionMode);
+	                } else {
+	                    wcGeneration = getPrimaryWcGeneration();
+	                }
+	            } else {
+	                wcGeneration = detectWcGeneration(operation.getOperationalWorkingCopy(), false, isAdditionMode);
+	            }
+        	}
+            if (isWcGenerationSticky && wcGeneration != SvnWcGeneration.NOT_DETECTED) {
+            	detectedWcGeneration = wcGeneration;
             }
         }
         
@@ -1662,11 +1667,6 @@ public class SvnOperationFactory implements ISvnOperationOptionsProvider {
             }
             SVNWCDb db = new SVNWCDb();
             try {
-            	final File folder = SVNFileType.getType(path) == SVNFileType.DIRECTORY ? path : SVNFileUtil.getParentFile(path); 
-            	final int wcVersion = SVNAdminUtil.getVersion(folder);
-            	if (wcVersion >= SVNAdminAreaFactory.WC_FORMAT_13 && wcVersion <= SVNAdminAreaFactory.WC_FORMAT_16) {
-            		SVNErrorManager.error(SVNErrorMessage.create(SVNErrorCode.WC_UNSUPPORTED_FORMAT), SVNLogType.WC);
-            	}
             	db.open(SVNWCDbOpenMode.ReadOnly, (ISVNOptions) null, false, false);
                 DirParsedInfo info = db.parseDir(path, Mode.ReadOnly, true, isAdditionMode);
                 if (info != null && SVNWCDbDir.isUsable(info.wcDbDir)) {
@@ -1788,6 +1788,26 @@ public class SvnOperationFactory implements ISvnOperationOptionsProvider {
         }
         this.primaryWcGeneration = primaryWcGeneration;
         registerRunners();
+    }
+    
+    /**
+     * When set to true, first encountered working copy generation becomes 'sticky'
+     * for this instance of {@link SvnOperationFactory} and no working copy format detection 
+     * will be performed for subsequent operation. 
+     * 
+     * @param isWcGenerationSticky
+     */
+    public void setWcGenerationSticky(boolean isWcGenerationSticky) {
+		detectedWcGeneration = SvnWcGeneration.NOT_DETECTED; 
+    	this.isWcGenerationSticky = isWcGenerationSticky;
+    }
+    
+    /**
+     * @see #setWcGenerationSticky(boolean)
+     * @return true when this instance of {@link SvnOperationFactory}
+     */
+    public boolean isWcGenerationSticky() {
+    	return this.isWcGenerationSticky;
     }
     
     private SvnWcGeneration[] getRunnerScope(ISvnOperationRunner<?, ? extends SvnOperation<?>> runner) {
