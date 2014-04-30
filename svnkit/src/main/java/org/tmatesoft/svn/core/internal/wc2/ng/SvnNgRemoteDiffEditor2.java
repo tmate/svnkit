@@ -352,6 +352,15 @@ public class SvnNgRemoteDiffEditor2 implements ISVNEditor {
 
     public void cleanup() {
         cleanupTempFiles();
+
+        if (emptyFile != null) {
+            try {
+                SVNFileUtil.deleteFile(emptyFile);
+            } catch (SVNException e) {
+                //ignore
+            }
+            emptyFile = null;
+        }
     }
 
     public void cleanupTempFiles() {
@@ -363,13 +372,6 @@ public class SvnNgRemoteDiffEditor2 implements ISVNEditor {
             }
         }
         tempFiles.clear();
-        if (emptyFile != null) {
-            try {
-                SVNFileUtil.deleteFile(emptyFile);
-            } catch (SVNException e) {
-                //ignore
-            }
-        }
     }
 
     private void diffDeletedFile(String path) throws SVNException {
