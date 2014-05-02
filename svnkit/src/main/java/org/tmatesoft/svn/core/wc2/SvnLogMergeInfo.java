@@ -9,9 +9,6 @@ import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.wc.SVNRevisionRange;
 import org.tmatesoft.svn.util.SVNLogType;
 
-import java.util.Collection;
-import java.util.HashSet;
-
 /**
  * Creates a <code>SVNLogEntry</code> object with the revisions merged from
  * <code>mergeSource</code> (as of <code>mergeSource</code>'s <code>pegRevision</code>) into
@@ -48,12 +45,9 @@ public class SvnLogMergeInfo extends SvnReceivingOperation<SVNLogEntry> {
 
     private boolean discoverChangedPaths;
     private String[] revisionProperties;
-
-    private Collection<SvnRevisionRange> ranges;
     
     protected SvnLogMergeInfo(SvnOperationFactory factory) {
         super(factory);
-        this.ranges = new HashSet<SvnRevisionRange>();
     }
 
     /**
@@ -130,14 +124,6 @@ public class SvnLogMergeInfo extends SvnReceivingOperation<SVNLogEntry> {
      */
     public void setRevisionProperties(String[] revisionProperties) {
         this.revisionProperties = revisionProperties;
-    }
-
-    public void addRevisionRange(SvnRevisionRange range) {
-        this.ranges.add(range);
-    }
-
-    public Collection<SvnRevisionRange> getRanges() {
-        return ranges;
     }
 
     @Override

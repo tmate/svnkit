@@ -8,8 +8,6 @@ import org.tmatesoft.svn.core.internal.wc17.SVNWCContext;
 import org.tmatesoft.svn.core.wc2.SvnResolve;
 import org.tmatesoft.svn.util.SVNLogType;
 
-import java.io.File;
-
 public class SvnNgResolve extends SvnNgOperationRunner<Void, SvnResolve>  {
 
     @Override
@@ -19,21 +17,10 @@ public class SvnNgResolve extends SvnNgOperationRunner<Void, SvnResolve>  {
         			"'{0}' is not a local path", getOperation().getFirstTarget().getURL());
             SVNErrorManager.error(err, SVNLogType.WC);
         }
-        File localAbsPath = getFirstTarget();
-        File lockAbsPath  = null;
-        try {
-            lockAbsPath = context.acquireWriteLockForResolve(localAbsPath);
-            context.resolvedConflict(getFirstTarget(), getOperation().getDepth(), true, "", true, getOperation().getConflictChoice());
-        } finally {
-            try {
-                if (lockAbsPath != null) {
-                    context.releaseWriteLock(lockAbsPath);
-                }
-            } finally {
-                sleepForTimestamp();
-            }
-        }
+        context.resolvedConflict(getFirstTarget(), getOperation().getDepth(), true, null, true, getOperation().getConflictChoice());
     	return null;
     }
-
+    
+   
+ 
 }

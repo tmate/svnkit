@@ -11,6 +11,21 @@
  */
 package org.tmatesoft.svn.cli;
 
+import com.jcraft.jsch.agentproxy.AgentProxyException;
+import com.jcraft.jsch.agentproxy.Connector;
+import com.jcraft.jsch.agentproxy.ConnectorFactory;
+import com.jcraft.jsch.agentproxy.TrileadAgentProxy;
+import com.trilead.ssh2.auth.AgentProxy;
+import org.tmatesoft.svn.core.SVNErrorMessage;
+import org.tmatesoft.svn.core.SVNException;
+import org.tmatesoft.svn.core.SVNURL;
+import org.tmatesoft.svn.core.auth.*;
+import org.tmatesoft.svn.core.internal.util.SVNSSLUtil;
+import org.tmatesoft.svn.core.internal.wc.ISVNAuthStoreHandler;
+import org.tmatesoft.svn.core.internal.wc.ISVNGnomeKeyringPasswordProvider;
+import org.tmatesoft.svn.core.internal.wc.ISVNSSLPasspharsePromptSupport;
+import org.tmatesoft.svn.core.wc.SVNWCUtil;
+
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
@@ -21,25 +36,6 @@ import java.security.cert.X509Certificate;
 import java.text.MessageFormat;
 import java.util.HashMap;
 import java.util.Map;
-
-import org.tmatesoft.svn.core.SVNErrorMessage;
-import org.tmatesoft.svn.core.SVNException;
-import org.tmatesoft.svn.core.SVNURL;
-import org.tmatesoft.svn.core.auth.ISVNAuthenticationManager;
-import org.tmatesoft.svn.core.auth.ISVNAuthenticationProvider;
-import org.tmatesoft.svn.core.auth.SVNAuthentication;
-import org.tmatesoft.svn.core.auth.SVNPasswordAuthentication;
-import org.tmatesoft.svn.core.auth.SVNSSHAuthentication;
-import org.tmatesoft.svn.core.auth.SVNSSLAuthentication;
-import org.tmatesoft.svn.core.auth.SVNUserNameAuthentication;
-import org.tmatesoft.svn.core.internal.io.svn.SVNSSHPrivateKeyUtil;
-import org.tmatesoft.svn.core.internal.util.SVNSSLUtil;
-import org.tmatesoft.svn.core.internal.wc.ISVNAuthStoreHandler;
-import org.tmatesoft.svn.core.internal.wc.ISVNGnomeKeyringPasswordProvider;
-import org.tmatesoft.svn.core.internal.wc.ISVNSSLPasspharsePromptSupport;
-import org.tmatesoft.svn.core.wc.SVNWCUtil;
-
-import com.trilead.ssh2.auth.AgentProxy;
 
 
 /**
@@ -80,7 +76,7 @@ public class SVNConsoleAuthenticationProvider implements ISVNAuthenticationProvi
     private static final String OUR_PASSWORD_PROMPT_STRING = "Store password unencrypted (yes/no)? ";
     private static final String OUR_PASSPHRASE_PROMPT_STRING = "Store passphrase unencrypted (yes/no)? ";
     private static final int MAX_PROMPT_COUNT = 3;
-    private Map<String,Integer> myRequestsCount = new HashMap<String,Integer>();
+    private Map myRequestsCount = new HashMap();
     private boolean myIsTrustServerCertificate;
     
     public SVNConsoleAuthenticationProvider(boolean trustServerCertificate) {
@@ -331,11 +327,13 @@ public class SVNConsoleAuthenticationProvider implements ISVNAuthenticationProvi
             } else if (keyFile != null) {
                 return new SVNSSHAuthentication(name, keyFile, passphrase, port, authMayBeStored, url, false);
             } else {
-                final AgentProxy agentProxy = SVNSSHPrivateKeyUtil.createOptionalSSHAgentProxy();
-                if (agentProxy != null) {
-                    return new SVNSSHAuthentication(name, agentProxy, port, url, false);
+                try {
+                    Connector connector = ConnectorFactory.getDefault().createConnector();
+                    AgentProxy agentConnection = new TrileadAgentProxy(connector);
+                    return new SVNSSHAuthentication(name, agentConnection, port, url, false);
+                } catch (AgentProxyException e) {
+                    return null;
                 }
-                return null;
             }
         } else if (ISVNAuthenticationManager.USERNAME.equals(kind)) {
             String name = System.getProperty("user.name");
@@ -444,14 +442,14 @@ public class SVNConsoleAuthenticationProvider implements ISVNAuthenticationProvi
     private static String promptPassword(String label) {
         System.err.print(label + ": ");
         System.err.flush();
-        Class<?> systemClass = System.class;
+        Class systemClass = System.class;
         try {
             // try to use System.console().readPassword - since JDK 1.6
             Method consoleMethod = systemClass.getMethod("console", new Class[0]);
             if (consoleMethod != null) {
                 Object consoleObject = consoleMethod.invoke(null, new Object[0]);
                 if (consoleObject != null) {
-                    Class<?> consoleClass = consoleObject.getClass();
+                    Class consoleClass = consoleObject.getClass();
                     Method readPasswordMethod = consoleClass.getMethod("readPassword", new Class[0]);
                     if (readPasswordMethod != null) {
                         Object password = readPasswordMethod.invoke(consoleObject, new Object[0]);

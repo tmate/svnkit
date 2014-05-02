@@ -39,7 +39,6 @@ import org.tmatesoft.svn.core.io.ISVNEditor;
 import org.tmatesoft.svn.core.io.SVNLocationEntry;
 import org.tmatesoft.svn.core.io.SVNRepository;
 import org.tmatesoft.svn.core.io.diff.SVNDeltaGenerator;
-import org.tmatesoft.svn.core.wc.SVNRevision;
 import org.tmatesoft.svn.util.SVNLogType;
 
 
@@ -509,12 +508,6 @@ public class FSUpdateContext {
 
         if (sourceEntry != null && !related) {
             long deletedRev = getDeletedRevision(targetPath, sourceRevision, getTargetRevision());
-            if (!SVNRevision.isValidRevisionNumber(deletedRev)) {
-                SVNNodeKind kind = getTargetRoot().checkNodeKind(targetPath);
-                if (kind != SVNNodeKind.NONE) {
-                    deletedRev = getTargetRevision() - 1;
-                }
-            }
             getEditor().deleteEntry(editPath, deletedRev);
             sourcePath = null;
         }

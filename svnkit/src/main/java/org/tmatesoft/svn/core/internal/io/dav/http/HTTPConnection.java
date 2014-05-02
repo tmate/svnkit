@@ -378,7 +378,6 @@ public class HTTPConnection implements IHTTPConnection {
     public HTTPStatus request(String method, String path, HTTPHeader header, InputStream body, int ok1, int ok2, OutputStream dst, DefaultHandler handler, SVNErrorMessage context) throws SVNException {
         myLastStatus = null;
         myRequestCount++;
-        
         if ("".equals(path) || path == null) {
             path = "/";
         }
@@ -463,7 +462,6 @@ public class HTTPConnection implements IHTTPConnection {
                         request.dispatch(method, path, header, ok1, ok2, context);
                         break;
                     } catch (EOFException pe) {
-                        myRepository.getDebugLog().logFine(SVNLogType.NETWORK, pe);
                         // retry, EOF always means closed connection.
                         if (retryCount > 0) {
                             close();
@@ -483,18 +481,13 @@ public class HTTPConnection implements IHTTPConnection {
             } catch (SSLHandshakeException ssl) {
                 myRepository.getDebugLog().logFine(SVNLogType.NETWORK, ssl);
                 close();
-	            if (ssl.getCause() instanceof SVNSSLUtil.CertificateNotTrustedException 
-	                    || ssl.getCause() instanceof SVNSSLUtil.CertificateDoesNotConformConstraints) {
+	            if (ssl.getCause() instanceof SVNSSLUtil.CertificateNotTrustedException) {
 		            SVNErrorManager.cancel(ssl.getCause().getMessage(), SVNLogType.NETWORK);
 	            }
                 SVNErrorMessage sslErr = SVNErrorMessage.create(SVNErrorCode.RA_NOT_AUTHORIZED, "SSL handshake failed: ''{0}''", new Object[] { ssl.getMessage() }, SVNErrorMessage.TYPE_ERROR, ssl);
-	            if (keyManager != null && keyManager.isInitialized()) {
-            		keyManager.acknowledgeAndClearAuthentication(sslErr);
-	            } else {
-            		sslErr = SVNErrorMessage.create(SVNErrorCode.RA_DAV_REQUEST_FAILED, "SSL handshake failed: ''{0}''", new Object[] { ssl.getMessage() }, SVNErrorMessage.TYPE_ERROR, ssl);
-		            SVNErrorManager.error(sslErr, SVNLogType.NETWORK);
-	            	
-	            }
+		            if (keyManager != null) {
+			            keyManager.acknowledgeAndClearAuthentication(sslErr);
+		            }
                 err = SVNErrorMessage.create(SVNErrorCode.RA_DAV_REQUEST_FAILED, ssl);
 	            continue;
             } catch (IOException e) {
@@ -660,6 +653,7 @@ public class HTTPConnection implements IHTTPConnection {
                      * and JNA is available, we should try a native auth mechanism first without calling 
                      * auth providers. 
                      */                
+                    SVNDebugLog.getDefaultLog().logFine(SVNLogType.NETWORK,  "would skip credentials prompt: " + !ntlmAuth.allowPropmtForCredentials());
                     if (!ntlmAuth.allowPropmtForCredentials()) {
                         continue;
                     }

@@ -292,8 +292,7 @@ public class DAVUpdateHandler extends DAVReportHandler implements ISVNEditor {
                 myRequestedDepth = SVNDepth.INFINITY;
             }
 
-            SVNURL srcURL = getUpdateRequest().getSrcURL();
-            String srcPath = (srcURL != null) ? getRepositoryManager().getRepositoryRelativePath(srcURL) : getUpdateRequest().getSrcPath();
+            String srcPath = getRepositoryManager().getRepositoryRelativePath(getUpdateRequest().getSrcURL());
             setAnchor(srcPath);
 
             SVNURL dstURL = getUpdateRequest().getDstURL();
@@ -307,8 +306,8 @@ public class DAVUpdateHandler extends DAVReportHandler implements ISVNEditor {
 
             FSFS fsfs = getDAVResource().getFSFS();
             myRevisionRoot = fsfs.createRevisionRoot(targetRevision);
-
-            SVNURL repositoryURL = (srcURL != null) ? getRepositoryManager().convertHttpToFile(srcURL) : getRepositoryManager().convertHttpToFile(getUpdateRequest().getSrcPath());
+            
+            SVNURL repositoryURL = getRepositoryManager().convertHttpToFile(getUpdateRequest().getSrcURL());
             FSRepository repository = (FSRepository) SVNRepositoryFactory.create(repositoryURL);
 
             FSTranslateReporter reporter = repository.beginReport(getRevision(),
@@ -660,9 +659,7 @@ public class DAVUpdateHandler extends DAVReportHandler implements ISVNEditor {
                 } else if (SVNProperty.COMMITTED_DATE.equals(name)) {
                     entry.setCommitedDate(value.getString());
                 } else if (SVNProperty.LAST_AUTHOR.equals(name)) {
-                    if (value != null) {
-                        entry.setLastAuthor(value.getString());
-                    }
+                    entry.setLastAuthor(value.getString());
                 } else if (SVNProperty.LOCK_TOKEN.equals(name) && value == null) {
                     entry.addRemovedProperty(name);
                 }

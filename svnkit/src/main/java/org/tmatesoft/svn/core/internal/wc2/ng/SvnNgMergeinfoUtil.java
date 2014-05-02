@@ -160,7 +160,7 @@ public class SvnNgMergeinfoUtil {
                     break;
                 }
                 CheckWCRootInfo rootInfo = context.checkWCRoot(localAbsPath, true);
-                if (rootInfo.wcRoot || rootInfo.switched) {
+                if (rootInfo.wcRoot || (rootInfo.switched && rootInfo.kind == SVNWCDbKind.Dir)) {
                     break;
                 }
                 walkRelPath = SVNPathUtil.append(SVNFileUtil.getFileName(localAbsPath), walkRelPath);
@@ -183,9 +183,6 @@ public class SvnNgMergeinfoUtil {
                 result.inherited = true;
                 result.mergeinfo = new HashMap<String, SVNMergeRangeList>();                
                 result.mergeinfo = SVNMergeInfoUtil.adjustMergeInfoSourcePaths(result.mergeinfo, walkRelPath, wcMergeInfo);
-            } else {
-                result.inherited = false;
-                result.mergeinfo = null;
             }
         }
         result.walkRelPath = walkRelPath;

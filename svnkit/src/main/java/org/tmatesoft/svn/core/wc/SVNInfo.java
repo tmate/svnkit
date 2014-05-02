@@ -104,8 +104,6 @@ public class SVNInfo {
     private SVNTreeConflictDescription myTreeConflict;
     
     private File myWorkingCopyRoot;
-    private File myMovedFromPath;
-    private File myMovedToPath;
     
     public static SVNInfo createInfo(File file, SVNEntry entry) throws SVNException {
         if (entry == null) {
@@ -540,24 +538,8 @@ public class SVNInfo {
         return myWorkingCopyRoot;
     }
     
-    public File getMovedFromPath() {
-        return myMovedFromPath;
-    }
-    
-    public File getMovedToPath() {
-        return myMovedToPath;
-    }
-    
     public void setWorkingCopyRoot(File root) {
         myWorkingCopyRoot = root;
-    }
-    
-    public void setMovedFromPath(File movedFrom) {
-        myMovedFromPath = movedFrom;
-    }
-
-    public void setMovedToPath(File movedTo) {
-        myMovedToPath = movedTo;
     }
 
 }

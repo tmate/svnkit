@@ -6,14 +6,12 @@ import org.junit.Test;
 import org.tmatesoft.svn.core.SVNDirEntry;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNURL;
-import org.tmatesoft.svn.core.internal.wc2.SvnWcGeneration;
 import org.tmatesoft.svn.core.wc.SVNRevision;
 import org.tmatesoft.svn.core.wc2.ISvnObjectReceiver;
 import org.tmatesoft.svn.core.wc2.SvnList;
 import org.tmatesoft.svn.core.wc2.SvnOperationFactory;
 import org.tmatesoft.svn.core.wc2.SvnTarget;
 
-import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -177,34 +175,6 @@ public class ListTest {
             Assert.assertEquals("", entries.get(0).getRelativePath());
             Assert.assertEquals("subdirectory", entries.get(1).getName());
             Assert.assertEquals("subdirectory", entries.get(1).getRelativePath());
-
-        } finally {
-            svnOperationFactory.dispose();
-            sandbox.dispose();
-        }
-    }
-
-    @Test
-    public void testListWC16() throws Exception {
-        final TestOptions options = TestOptions.getInstance();
-        Assume.assumeTrue(TestUtil.areAllApacheOptionsSpecified(options));
-
-        final SvnOperationFactory svnOperationFactory = new SvnOperationFactory();
-        final Sandbox sandbox = Sandbox.createWithCleanup(getTestName() + ".testListWC16", options);
-        try {
-            final SVNURL url = sandbox.createSvnRepositoryWithDavAccess();
-
-            final CommitBuilder commitBuilder = new CommitBuilder(url);
-            commitBuilder.commit();
-
-            final WorkingCopy workingCopy = sandbox.checkoutNewWorkingCopy(url, -1, true, SvnWcGeneration.V16);
-            final File workingCopyDirectory = workingCopy.getWorkingCopyDirectory();
-
-            final SvnList list = svnOperationFactory.createList();
-            list.setSingleTarget(SvnTarget.fromFile(workingCopyDirectory));
-            final SVNDirEntry dirEntry = list.run();
-
-            Assert.assertEquals(url, dirEntry.getURL());
 
         } finally {
             svnOperationFactory.dispose();

@@ -11,8 +11,6 @@
  */
 package org.tmatesoft.svn.cli.svn;
 
-import java.io.File;
-
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.internal.util.SVNFormatUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNTreeConflictUtil;
@@ -48,21 +46,6 @@ public class SVNStatusPrinter {
             treeDescriptionLine = "\n      >   " + description;
         }
 
-        String movedFromLine = "";
-        String movedToLine = "";
-        
-        if (status.getMovedFromPath() != null && status.getMovedToPath() != null &&
-                status.getMovedFromPath().equals(status.getMovedToPath())) {
-            movedFromLine = String.format("\n        > swapped places with %s", getRelativePath(status.getMovedFromPath()));
-        } else if (status.getMovedFromPath() != null || status.getMovedToPath() != null) {
-            if (status.getMovedFromPath() != null) {
-                movedFromLine = String.format("\n        > moved from %s", getRelativePath(status.getMovedFromPath()));
-            }
-            if (status.getMovedToPath() != null) {
-                movedToLine = String.format("\n        > moved to %s", getRelativePath(status.getMovedToPath()));
-            }
-        }
-        
         StringBuffer result = new StringBuffer();
         if (detailed) {
             String wcRevision;
@@ -72,7 +55,7 @@ public class SVNStatusPrinter {
             } else if (status.isCopied()) {
                 wcRevision = "-";
             } else if (!status.getRevision().isValid()) {
-                if(status.getWorkingCopyFormat() >= ISVNWCDb.WC_FORMAT_17) {
+                if(status.getWorkingCopyFormat() == ISVNWCDb.WC_FORMAT_17) {
                     if(status.getNodeStatus()==SVNStatusType.STATUS_DELETED) {
                         wcRevision = status.getCommittedRevision().toString();
                     } else {
@@ -136,8 +119,6 @@ public class SVNStatusPrinter {
                 result.append(SVNFormatUtil.formatString(commitAuthor, 12, true)); // 12 chars
                 result.append(" ");
                 result.append(path);
-                result.append(movedToLine);
-                result.append(movedFromLine);
                 result.append(treeDescriptionLine);
             }  else {
                 result.append(combineStatus(status).getCode());
@@ -153,8 +134,6 @@ public class SVNStatusPrinter {
                 result.append(SVNFormatUtil.formatString(wcRevision, 6, false, false)); // 6 chars
                 result.append("   ");
                 result.append(path);
-                result.append(movedToLine);
-                result.append(movedFromLine);
                 result.append(treeDescriptionLine);
             }
         } else {
@@ -167,15 +146,9 @@ public class SVNStatusPrinter {
             result.append(treeStatusCode); // tree status
             result.append(" ");
             result.append(path);
-            result.append(movedToLine);
-            result.append(movedFromLine);
             result.append(treeDescriptionLine);
         }
         myEnvironment.getOut().println(result);
-    }
-    
-    private String getRelativePath(File path) {
-        return myEnvironment.getRelativePath(path);
     }
     
     public static SVNStatusType combineStatus(SVNStatus status) {

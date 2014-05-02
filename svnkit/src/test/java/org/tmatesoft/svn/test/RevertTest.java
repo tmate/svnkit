@@ -4,9 +4,14 @@ import org.junit.Assert;
 import org.junit.Test;
 import org.tmatesoft.svn.core.*;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
-import org.tmatesoft.svn.core.internal.wc17.db.ISVNWCDb;
-import org.tmatesoft.svn.core.wc.*;
-import org.tmatesoft.svn.core.wc2.*;
+import org.tmatesoft.svn.core.wc.ISVNEventHandler;
+import org.tmatesoft.svn.core.wc.SVNEvent;
+import org.tmatesoft.svn.core.wc.SVNEventAction;
+import org.tmatesoft.svn.core.wc.SVNStatusType;
+import org.tmatesoft.svn.core.wc2.SvnOperationFactory;
+import org.tmatesoft.svn.core.wc2.SvnRevert;
+import org.tmatesoft.svn.core.wc2.SvnStatus;
+import org.tmatesoft.svn.core.wc2.SvnTarget;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -372,160 +377,6 @@ public class RevertTest {
             final Map<File, SvnStatus> statuses = TestUtil.getStatuses(svnOperationFactory, workingCopy.getWorkingCopyDirectory());
             Assert.assertEquals(SVNStatusType.STATUS_NORMAL, statuses.get(sourceFile).getNodeStatus());
             Assert.assertNull(statuses.get(targetFile));
-
-        } finally {
-            svnOperationFactory.dispose();
-            sandbox.dispose();
-        }
-    }
-
-    @Test
-    public void testRevertMovedFile() throws Exception {
-        final TestOptions options = TestOptions.getInstance();
-
-        final SvnOperationFactory svnOperationFactory = new SvnOperationFactory();
-        final Sandbox sandbox = Sandbox.createWithCleanup(getTestName() + ".testRevertMovedFile", options);
-        try {
-            final SVNURL url = sandbox.createSvnRepository();
-
-            final CommitBuilder commitBuilder = new CommitBuilder(url);
-            commitBuilder.addFile("source");
-            commitBuilder.commit();
-
-            final WorkingCopy workingCopy = sandbox.checkoutNewWorkingCopy(url);
-            final File source = workingCopy.getFile("source");
-            final File target = workingCopy.getFile("target");
-
-            final SvnCopy copy = svnOperationFactory.createCopy();
-            copy.setMove(true);
-            copy.addCopySource(SvnCopySource.create(SvnTarget.fromFile(source), SVNRevision.WORKING));
-            copy.setSingleTarget(SvnTarget.fromFile(target));
-            copy.run();
-
-            final SvnRevert revert = svnOperationFactory.createRevert();
-            revert.setSingleTarget(SvnTarget.fromFile(target));
-            revert.run();
-
-            final Map<File, SvnStatus> statuses = TestUtil.getStatuses(svnOperationFactory, workingCopy.getWorkingCopyDirectory());
-            Assert.assertEquals(SVNStatusType.STATUS_DELETED, statuses.get(source).getNodeStatus());
-            Assert.assertFalse(statuses.get(source).isCopied());
-            Assert.assertNull(statuses.get(source).getMovedFromPath());
-            Assert.assertNull(statuses.get(source).getMovedToPath());
-            Assert.assertNull(statuses.get(target));
-
-        } finally {
-            svnOperationFactory.dispose();
-            sandbox.dispose();
-        }
-    }
-
-    @Test
-    public void testRevertRemovesMarkedFilesWC17() throws Exception {
-        final TestOptions options = TestOptions.getInstance();
-
-        final SvnOperationFactory svnOperationFactory = new SvnOperationFactory();
-        final Sandbox sandbox = Sandbox.createWithCleanup(getTestName() + ".testRevertRemovesMarkedFilesWC17", options);
-        try {
-            final SVNURL url = sandbox.createSvnRepository();
-
-            final CommitBuilder commitBuilder1 = new CommitBuilder(url);
-            commitBuilder1.addFile("file", "base".getBytes());
-            commitBuilder1.setFileProperty("file", "propertyName", SVNPropertyValue.create("base"));
-            commitBuilder1.commit();
-
-            final CommitBuilder commitBuilder2 = new CommitBuilder(url);
-            commitBuilder2.changeFile("file", "theirs".getBytes());
-            commitBuilder2.setFileProperty("file", "propertyName", SVNPropertyValue.create("theirs"));
-            commitBuilder2.commit();
-
-            final File workingCopyDirectory = sandbox.createDirectory("wc");
-            final File file = new File(workingCopyDirectory, "file");
-
-            final SvnCheckout checkout = svnOperationFactory.createCheckout();
-            checkout.setTargetWorkingCopyFormat(ISVNWCDb.WC_FORMAT_17);
-            checkout.setSource(SvnTarget.fromURL(url));
-            checkout.setSingleTarget(SvnTarget.fromFile(workingCopyDirectory));
-            checkout.setRevision(SVNRevision.create(1));
-            checkout.run();
-
-            final SvnSetProperty setProperty = svnOperationFactory.createSetProperty();
-            setProperty.setSingleTarget(SvnTarget.fromFile(file));
-            setProperty.setPropertyName("propertyName");
-            setProperty.setPropertyValue(SVNPropertyValue.create("ours"));
-            setProperty.run();
-
-            TestUtil.writeFileContentsString(file, "ours");
-
-            final SvnUpdate update = svnOperationFactory.createUpdate();
-            update.setSingleTarget(SvnTarget.fromFile(file));
-            update.run();
-
-            final SvnRevert revert = svnOperationFactory.createRevert();
-            revert.setSingleTarget(SvnTarget.fromFile(file));
-            revert.run();
-
-            Assert.assertFalse(new File(file.getPath() + ".mine").exists());
-            Assert.assertFalse(new File(file.getPath() + ".r1").exists());
-            Assert.assertFalse(new File(file.getPath() + ".r2").exists());
-            Assert.assertFalse(new File(file.getPath() + ".prej").exists());
-
-        } finally {
-            svnOperationFactory.dispose();
-            sandbox.dispose();
-        }
-    }
-
-    @Test
-    public void testRevertInfinityDepthRemovesMarkedFilesWC17() throws Exception {
-        //SVNKIT-483
-        final TestOptions options = TestOptions.getInstance();
-
-        final SvnOperationFactory svnOperationFactory = new SvnOperationFactory();
-        final Sandbox sandbox = Sandbox.createWithCleanup(getTestName() + ".testRevertInfinityDepthRemovesMarkedFilesWC17", options);
-        try {
-            final SVNURL url = sandbox.createSvnRepository();
-
-            final CommitBuilder commitBuilder1 = new CommitBuilder(url);
-            commitBuilder1.addFile("file", "base".getBytes());
-            commitBuilder1.setFileProperty("file", "propertyName", SVNPropertyValue.create("base"));
-            commitBuilder1.commit();
-
-            final CommitBuilder commitBuilder2 = new CommitBuilder(url);
-            commitBuilder2.changeFile("file", "theirs".getBytes());
-            commitBuilder2.setFileProperty("file", "propertyName", SVNPropertyValue.create("theirs"));
-            commitBuilder2.commit();
-
-            final File workingCopyDirectory = sandbox.createDirectory("wc");
-            final File file = new File(workingCopyDirectory, "file");
-
-            final SvnCheckout checkout = svnOperationFactory.createCheckout();
-            checkout.setTargetWorkingCopyFormat(ISVNWCDb.WC_FORMAT_17);
-            checkout.setSource(SvnTarget.fromURL(url));
-            checkout.setSingleTarget(SvnTarget.fromFile(workingCopyDirectory));
-            checkout.setRevision(SVNRevision.create(1));
-            checkout.run();
-
-            final SvnSetProperty setProperty = svnOperationFactory.createSetProperty();
-            setProperty.setSingleTarget(SvnTarget.fromFile(file));
-            setProperty.setPropertyName("propertyName");
-            setProperty.setPropertyValue(SVNPropertyValue.create("ours"));
-            setProperty.run();
-
-            TestUtil.writeFileContentsString(file, "ours");
-
-            final SvnUpdate update = svnOperationFactory.createUpdate();
-            update.setSingleTarget(SvnTarget.fromFile(file));
-            update.run();
-
-            final SvnRevert revert = svnOperationFactory.createRevert();
-            revert.setDepth(SVNDepth.INFINITY);
-            revert.setSingleTarget(SvnTarget.fromFile(file));
-            revert.run();
-
-            Assert.assertFalse(new File(file.getPath() + ".mine").exists());
-            Assert.assertFalse(new File(file.getPath() + ".r1").exists());
-            Assert.assertFalse(new File(file.getPath() + ".r2").exists());
-            Assert.assertFalse(new File(file.getPath() + ".prej").exists());
 
         } finally {
             svnOperationFactory.dispose();

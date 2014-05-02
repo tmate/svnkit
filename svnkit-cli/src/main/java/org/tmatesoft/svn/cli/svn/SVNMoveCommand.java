@@ -95,7 +95,7 @@ public class SVNMoveCommand extends SVNCommand {
                     getSVNEnvironment().printCommitInfo(info);
                 }
             } else {
-                client.doCopy(copySources, dst.getFile(), true, getSVNEnvironment().isParents(), false, getSVNEnvironment().isAllowMixedRevisions(), false);
+                client.doCopy(copySources, dst.getFile(), true, getSVNEnvironment().isParents(), false);
             }
         } catch (SVNException e) {
             SVNErrorMessage err = e.getErrorMessage();

@@ -3,14 +3,14 @@ package org.tmatesoft.svn.test;
 import org.junit.Assert;
 import org.junit.Assume;
 import org.junit.Test;
-import org.tmatesoft.svn.core.*;
+import org.tmatesoft.svn.core.SVNDepth;
+import org.tmatesoft.svn.core.SVNException;
+import org.tmatesoft.svn.core.SVNURL;
 import org.tmatesoft.svn.core.auth.BasicAuthenticationManager;
 import org.tmatesoft.svn.core.auth.ISVNAuthenticationManager;
-import org.tmatesoft.svn.core.internal.wc.SVNExternal;
 import org.tmatesoft.svn.core.internal.wc.admin.SVNAdminAreaFactory;
 import org.tmatesoft.svn.core.internal.wc17.SVNWCContext;
 import org.tmatesoft.svn.core.internal.wc17.db.ISVNWCDb;
-import org.tmatesoft.svn.core.internal.wc2.SvnWcGeneration;
 import org.tmatesoft.svn.core.internal.wc2.compat.SvnCodec;
 import org.tmatesoft.svn.core.wc.*;
 import org.tmatesoft.svn.core.wc2.*;
@@ -151,7 +151,7 @@ public class StatusTest {
             TestUtil.writeFileContentsString(addedFile, "contents");
             workingCopy.add(addedFile);
 
-            final int expectedWcFormat = TestUtil.isNewWorkingCopyTest() ? ISVNWCDb.WC_FORMAT_18 : SVNAdminAreaFactory.WC_FORMAT_16;
+            final int expectedWcFormat = TestUtil.isNewWorkingCopyTest() ? ISVNWCDb.WC_FORMAT_17 : SVNAdminAreaFactory.WC_FORMAT_16;
 
             final SVNClientManager clientManager = SVNClientManager.newInstance();
             try {
@@ -290,218 +290,6 @@ public class StatusTest {
         } finally {
             svnOperationFactory.dispose();
             sandbox.dispose();
-        }
-    }
-
-    @Test
-    public void testRemoteStatusTextNotModifiedWhenPropertiesModified() throws Exception {
-        //SVNKIT-437
-        final TestOptions options = TestOptions.getInstance();
-
-        final SvnOperationFactory svnOperationFactory = new SvnOperationFactory();
-        final Sandbox sandbox = Sandbox.createWithCleanup(getTestName() + ".testRemoteStatusTextNotModifiedWhenPropertiesModified", options);
-
-        try {
-            final SVNURL url = sandbox.createSvnRepository();
-
-            // Add file
-            final CommitBuilder commitBuilder1 = new CommitBuilder(url);
-            commitBuilder1.addFile("file");
-            commitBuilder1.commit();
-
-            // Check out a working copy (wc1)
-            final WorkingCopy workingCopy1 = sandbox.checkoutNewWorkingCopy(url);
-            final File file1 = workingCopy1.getFile("file");
-
-            // Check out another working copy (wc2)
-            final WorkingCopy workingCopy2 = sandbox.checkoutNewWorkingCopy(url, 1, true, SvnWcGeneration.V17, sandbox.createDirectory("wc2"));
-            final File file2 = workingCopy2.getFile("file");
-
-            // Set property and commit (from wc2) using the old API (what we use in our app & tests)
-            // Somehow, this seems to commit something different?!
-            SVNClientManager scm = SVNClientManager.newInstance();
-            scm.getWCClient().doSetProperty(file2, "p", SVNPropertyValue.create("v"), true, SVNDepth.EMPTY, null, null);
-            scm.getCommitClient().doCommit(new File[] { file2 }, false, "", null, null, false, true, SVNDepth.EMPTY);
-
-            final SvnGetStatus getStatus = svnOperationFactory.createGetStatus();
-            getStatus.setSingleTarget(SvnTarget.fromFile(file1));
-            getStatus.setRemote(true);
-            final SvnStatus status = getStatus.run();
-
-            Assert.assertEquals(SVNStatusType.STATUS_NORMAL, status.getNodeStatus());
-            Assert.assertEquals(SVNStatusType.STATUS_NORMAL, status.getTextStatus());
-            Assert.assertEquals(SVNStatusType.STATUS_NONE, status.getPropertiesStatus());
-
-            Assert.assertEquals(SVNStatusType.STATUS_MODIFIED, status.getRepositoryNodeStatus());
-            Assert.assertEquals(SVNStatusType.STATUS_NONE, status.getRepositoryTextStatus());
-            Assert.assertEquals(SVNStatusType.STATUS_MODIFIED, status.getRepositoryPropertiesStatus());
-        } finally {
-            svnOperationFactory.dispose();
-            sandbox.dispose();
-        }
-    }
-
-    @Test
-    public void testConflictGeneratedFilesAreReported() throws Exception {
-        final TestOptions options = TestOptions.getInstance();
-        final Sandbox sandbox = Sandbox.createWithCleanup(getTestName() + ".testConflictGeneratedFilesAreReported", options);
-
-        final SvnOperationFactory svnOperationFactory = new SvnOperationFactory();
-        try {
-            final SVNURL url = sandbox.createSvnRepository();
-
-            // Create file
-            CommitBuilder commitBuilder = new CommitBuilder(url);
-            commitBuilder.addFile("conflict.txt");
-            commitBuilder.commit();
-
-            // WC 1 - will have the conflict
-            WorkingCopy wc1 = sandbox.checkoutNewWorkingCopy(url);
-            File file1 = wc1.getFile("conflict.txt");
-            TestUtil.writeFileContentsString(file1, "wc1");
-
-            // WC 2 - used to generate the conflict
-            WorkingCopy wc2 = sandbox.checkoutNewWorkingCopy(url);
-            File file2 = wc2.getFile("conflict.txt");
-            TestUtil.writeFileContentsString(file2, "wc2");
-            wc2.commit("test");
-
-            // Get conflict
-            try {
-                wc1.updateToRevision(-1);
-            } catch (Throwable t) {
-                // Throws a runtime exception, didn't study it, but the conflict is generated
-            }
-
-            // We use old API
-            SVNClientManager scm = SVNClientManager.newInstance();
-            SVNStatus status = scm.getStatusClient().doStatus(file1, false);
-            Assert.assertEquals(SVNStatusType.STATUS_CONFLICTED, status.getNodeStatus());
-            Assert.assertEquals(SVNStatusType.STATUS_CONFLICTED, status.getContentsStatus());
-
-            Assert.assertEquals(wc1.getFile("conflict.txt.r2"), status.getConflictNewFile());
-            Assert.assertEquals(wc1.getFile("conflict.txt.r1"), status.getConflictOldFile());
-            Assert.assertEquals(wc1.getFile("conflict.txt.mine"), status.getConflictWrkFile());
-
-        } finally {
-            sandbox.dispose();
-            svnOperationFactory.dispose();
-        }
-    }
-
-    @Test
-    public void testUnversionedFileFormatWC17() throws Exception {
-        //SVNKIT-480
-        final TestOptions options = TestOptions.getInstance();
-        final Sandbox sandbox = Sandbox.createWithCleanup(getTestName() + ".testUnversionedFileFormatWC17", options);
-
-        final SvnOperationFactory svnOperationFactory = new SvnOperationFactory();
-        try {
-            final SVNURL url = sandbox.createSvnRepository();
-
-            final File workingCopyDirectory = sandbox.createDirectory("wc");
-
-            final SvnCheckout checkout = svnOperationFactory.createCheckout();
-            checkout.setSource(SvnTarget.fromURL(url));
-            checkout.setSingleTarget(SvnTarget.fromFile(workingCopyDirectory));
-            checkout.setTargetWorkingCopyFormat(ISVNWCDb.WC_FORMAT_17);
-            checkout.run();
-
-            final File unversionedFile = new File(workingCopyDirectory, "unversionedFile");
-            TestUtil.writeFileContentsString(unversionedFile, "");
-
-            final SvnGetStatus getStatus = svnOperationFactory.createGetStatus();
-            getStatus.setSingleTarget(SvnTarget.fromFile(unversionedFile));
-            final SvnStatus status = getStatus.run();
-
-            Assert.assertEquals(ISVNWCDb.WC_FORMAT_17, status.getWorkingCopyFormat());
-        } finally {
-            sandbox.dispose();
-            svnOperationFactory.dispose();
-        }
-    }
-
-    @Test
-    public void testExternalFormatWC17() throws Exception {
-        //SVNKIT-480
-        final TestOptions options = TestOptions.getInstance();
-        final Sandbox sandbox = Sandbox.createWithCleanup(getTestName() + ".testExternalFormatWC17", options);
-
-        final SvnOperationFactory svnOperationFactory = new SvnOperationFactory();
-        try {
-            final SVNURL url = sandbox.createSvnRepository();
-
-            final SVNExternal externalDirectory = new SVNExternal("externalDirectory", url.appendPath("directory", false).toString(), SVNRevision.HEAD, SVNRevision.HEAD, false, false, true);
-            final SVNExternal externalFile = new SVNExternal("externalFile", url.appendPath("directory", false).toString(), SVNRevision.HEAD, SVNRevision.HEAD, false, false, true);
-
-            final CommitBuilder commitBuilder = new CommitBuilder(url);
-            commitBuilder.addFile("file");
-            commitBuilder.addDirectory("directory");
-            commitBuilder.setDirectoryProperty("", SVNProperty.EXTERNALS, SVNPropertyValue.create(externalDirectory.toString() + "\n" + externalFile.toString()));
-            commitBuilder.commit();
-
-            final File workingCopyDirectory = sandbox.createDirectory("wc");
-
-            final SvnCheckout checkout = svnOperationFactory.createCheckout();
-            checkout.setIgnoreExternals(false);
-            checkout.setSource(SvnTarget.fromURL(url));
-            checkout.setSingleTarget(SvnTarget.fromFile(workingCopyDirectory));
-            checkout.setTargetWorkingCopyFormat(ISVNWCDb.WC_FORMAT_17);
-            checkout.run();
-
-            final SvnGetStatus getStatus = svnOperationFactory.createGetStatus();
-            getStatus.setSingleTarget(SvnTarget.fromFile(workingCopyDirectory));
-            getStatus.setDepth(SVNDepth.IMMEDIATES);
-            getStatus.setReceiver(new ISvnObjectReceiver<SvnStatus>() {
-                public void receive(SvnTarget target, SvnStatus status) throws SVNException {
-                    Assert.assertEquals(ISVNWCDb.WC_FORMAT_17, status.getWorkingCopyFormat());                }
-            });
-            getStatus.run();
-
-        } finally {
-            sandbox.dispose();
-            svnOperationFactory.dispose();
-        }
-    }
-
-    @Test
-    public void testRemotelyAddedNodesFormat() throws Exception {
-        //SVNKIT-480
-        final TestOptions options = TestOptions.getInstance();
-        final Sandbox sandbox = Sandbox.createWithCleanup(getTestName() + ".testRemotelyAddedNodesFormat", options);
-
-        final SvnOperationFactory svnOperationFactory = new SvnOperationFactory();
-        try {
-            final SVNURL url = sandbox.createSvnRepository();
-
-            final CommitBuilder commitBuilder = new CommitBuilder(url);
-            commitBuilder.addFile("file");
-            commitBuilder.commit();
-
-            final File workingCopyDirectory = sandbox.createDirectory("wc");
-
-            final SvnCheckout checkout = svnOperationFactory.createCheckout();
-            checkout.setIgnoreExternals(false);
-            checkout.setSource(SvnTarget.fromURL(url));
-            checkout.setSingleTarget(SvnTarget.fromFile(workingCopyDirectory));
-            checkout.setTargetWorkingCopyFormat(ISVNWCDb.WC_FORMAT_17);
-            checkout.setRevision(SVNRevision.create(0));
-            checkout.run();
-
-            final SvnGetStatus getStatus = svnOperationFactory.createGetStatus();
-            getStatus.setSingleTarget(SvnTarget.fromFile(workingCopyDirectory));
-            getStatus.setDepth(SVNDepth.IMMEDIATES);
-            getStatus.setReportAll(true);
-            getStatus.setRemote(true);
-            getStatus.setReceiver(new ISvnObjectReceiver<SvnStatus>() {
-                public void receive(SvnTarget target, SvnStatus status) throws SVNException {
-                    Assert.assertEquals(ISVNWCDb.WC_FORMAT_17, status.getWorkingCopyFormat());                }
-            });
-            getStatus.run();
-
-        } finally {
-            sandbox.dispose();
-            svnOperationFactory.dispose();
         }
     }
 

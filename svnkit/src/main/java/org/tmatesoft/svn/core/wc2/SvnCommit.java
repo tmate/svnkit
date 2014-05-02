@@ -100,9 +100,6 @@ public class SvnCommit extends AbstractSvnCommit {
     private boolean combinePackets;
     private SvnCommitPacket[] splitPackets;
 
-    private boolean includeFileExternals;
-    private boolean includeDirectoryExternals;
-
     protected SvnCommit(SvnOperationFactory factory) {
         super(factory);
     }
@@ -254,22 +251,6 @@ public class SvnCommit extends AbstractSvnCommit {
     
     public void setFailOnMultipleRepositories(boolean fail) {
         this.isFailOnMultipleRepositories = fail;
-    }
-
-    public boolean isIncludeFileExternals() {
-        return includeFileExternals;
-    }
-
-    public void setIncludeFileExternals(boolean includeFileExternals) {
-        this.includeFileExternals = includeFileExternals;
-    }
-
-    public boolean isIncludeDirectoryExternals() {
-        return includeDirectoryExternals;
-    }
-
-    public void setIncludeDirectoryExternals(boolean includeDirectoryExternals) {
-        this.includeDirectoryExternals = includeDirectoryExternals;
     }
 
     @Override
