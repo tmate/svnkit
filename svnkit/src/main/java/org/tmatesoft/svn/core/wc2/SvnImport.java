@@ -7,7 +7,6 @@ import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNPropertyValue;
 import org.tmatesoft.svn.core.wc.ISVNEventHandler;
-import org.tmatesoft.svn.core.wc.ISVNFileFilter;
 import org.tmatesoft.svn.core.wc.SVNEventAction;
 
 /**
@@ -65,7 +64,6 @@ public class SvnImport extends AbstractSvnCommit {
     private boolean force;
     
     private File source;
-    private ISVNFileFilter fileFilter;
     
     /**
      * Gets whether to enable automatic properties
@@ -170,13 +168,5 @@ public class SvnImport extends AbstractSvnCommit {
     @Override
     public boolean isChangesWorkingCopy() {
         return false;
-    }
-
-    public ISVNFileFilter getFileFilter() {
-        return fileFilter;
-    }
-
-    public void setFileFilter(ISVNFileFilter fileFilter) {
-        this.fileFilter = fileFilter;
     }
 }

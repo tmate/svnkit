@@ -4,7 +4,6 @@ import java.util.Collection;
 import java.util.Collections;
 
 import org.tmatesoft.svn.core.SVNDepth;
-import org.tmatesoft.svn.core.SVNProperties;
 import org.tmatesoft.svn.core.SVNURL;
 import org.tmatesoft.svn.core.internal.util.SVNDate;
 import org.tmatesoft.svn.core.internal.wc17.db.ISVNWCDb.SVNWCDbKind;
@@ -24,8 +23,7 @@ public class StructureFields {
         depth(SVNDepth.class), 
         checksum(SvnChecksum.class), 
         target(String.class),
-        hadProps(Boolean.TYPE),
-        props(SVNProperties.class);
+        hadProps(Boolean.TYPE);
 
         public static final Collection<PristineInfo> all = Collections.emptyList(); 
         public static final Collection<PristineInfo> defaults = all;
@@ -128,17 +126,14 @@ public class StructureFields {
         updateActualProperties,
         newActualProperties,
         keepRecordedInfo,
-        workItems, 
-        iprops,
-        definingAbsPath;
+        workItems;
     }
     
     public enum DeletionInfo {
         baseDelRelPath,
         movedToRelPath,
         workDelRelPath, 
-        workDelAbsPath,
-        movedToOpRootRelPath
+        workDelAbsPath;
     }
     
     public enum AdditionInfo {
@@ -153,28 +148,8 @@ public class StructureFields {
         originalReposId,
         originalRootUrl, 
         originalUuid, 
-        originalRevision,
-        movedFromRelPath,
-        movedFromOpRootRelPath,
-        movedFromOpDepth,
+        originalRevision
     }
     
-    public enum MovedFromInfo {
-        movedFromRelPath,
-        movedFromOpRootRelPath,
-        opDepth,        
-    }
-
-    public enum MovedInfo {
-        movedFromAbsPath,
-        movedFromOpRootAbsPath,
-        opRootAbsPath,
-        movedFromDeleteAbsPath,
-    }
-    
-    public enum InheritedProperties {
-        pathOrURL,
-        properties
-    }
     
 }

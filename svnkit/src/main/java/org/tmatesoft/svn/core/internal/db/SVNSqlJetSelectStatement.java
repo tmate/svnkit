@@ -99,7 +99,7 @@ public class SVNSqlJetSelectStatement extends SVNSqlJetTableStatement {
             next = super.next();
             loadRowValues(next);
             if (next && !pathScopeMatches()) {
-                continue;
+                return false;
             }
         } while(next && !pathIsDecendant());
         
@@ -130,7 +130,7 @@ public class SVNSqlJetSelectStatement extends SVNSqlJetTableStatement {
     }
 
     private boolean pathIsDecendant() throws SVNException {
-        if (getPathScope() != null) {
+        if (isPathScoped()) {
             final String rowPath = getRowPath();
             if (rowPath != null) {
                 if ("".equals(getPathScope()) && !(isStrictiDescendant() && "".equals(rowPath))) {
@@ -143,7 +143,7 @@ public class SVNSqlJetSelectStatement extends SVNSqlJetTableStatement {
         return true;
     }
 
-    protected String getRowPath() throws SVNException {
+    private String getRowPath() {
         if (SVNWCDbSchema.NODES__Indices.I_NODES_PARENT.toString().equals(getIndexName())) {
             return (String) rowValues.get(SVNWCDbSchema.NODES__Fields.parent_relpath.toString());
         }
@@ -188,17 +188,11 @@ public class SVNSqlJetSelectStatement extends SVNSqlJetTableStatement {
     public Map<String, Object> getRowValues2(Map<String, Object> v) throws SVNException {
         v = v == null ? new HashMap<String, Object>() : v;
         try {
-            final List<ISqlJetColumnDef> columns = getTable().getDefinition().getColumns();
-            final Object[] rValues = getCursor().getRowValues();
-            final Object[] values;
-            if (rValues.length < columns.size()) {
-                values = new Object[columns.size()];
-                System.arraycopy(rValues, 0, values, 0, rValues.length);
-            } else {
-                values = rValues;
-            }
+            Object[] values = getCursor().getRowValues();
+            List<ISqlJetColumnDef> columns = getTable().getDefinition().getColumns();
             for (int i = 0; i < values.length; i++) {
-                v.put(columns.get(i).getName(), values[i]);
+                String colName = columns.get(i).getName();
+                v.put(colName, values[i]);
             }
             return v;
         } catch (SqlJetException e) {
@@ -208,12 +202,12 @@ public class SVNSqlJetSelectStatement extends SVNSqlJetTableStatement {
     }
 
     public Map<String, Object> getRowValues() throws SVNException {
-        final HashMap<String, Object> v = new HashMap<String, Object>();
+        HashMap<String, Object> v = new HashMap<String, Object>();
         try {
-            final List<ISqlJetColumnDef> columns = getTable().getDefinition().getColumns();
+            List<ISqlJetColumnDef> columns = getTable().getDefinition().getColumns();
             for (ISqlJetColumnDef column : columns) {
-                final String colName = column.getName();
-                final SqlJetValueType fieldType = getCursor().getFieldType(colName);
+                String colName = column.getName();
+                SqlJetValueType fieldType = getCursor().getFieldType(colName);
                 if (fieldType == SqlJetValueType.NULL) {
                     v.put(colName, null);
                 } else if (fieldType == SqlJetValueType.BLOB) {
@@ -298,9 +292,5 @@ public class SVNSqlJetSelectStatement extends SVNSqlJetTableStatement {
             rowValues.clear();
         }
         super.reset();
-    }
-
-    protected static boolean isStrictDescendantOf(String descendant, String ancestor) {
-        return descendant.startsWith(ancestor + "/");
     }
 }

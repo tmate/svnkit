@@ -35,41 +35,41 @@ public class SvnWcDbRelocate extends SvnWcDbShared {
     public static void relocate(SVNWCContext context, File localAbspath, SVNURL from, SVNURL to, ISvnRelocateValidator validator) throws SVNException {
         if (!context.getDb().isWCRoot(localAbspath)) {
             try {
-                File wcRootAbsPath = context.getDb().getWCRoot(localAbspath);
-                SVNErrorMessage errorMessage = SVNErrorMessage.create(SVNErrorCode.WC_INVALID_OP_ON_CWD, "Cannot relocate ''{0}'' as it is not the root of a working copy; try relocating ''{1}'' instead", localAbspath, wcRootAbsPath);
-                SVNErrorManager.error(errorMessage, SVNLogType.WC);
+                File wcRoot = context.getDb().getWCRoot(localAbspath);
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_INVALID_OP_ON_CWD, "Cannot relocate ''{0}'' as it is not the root of the working copy; " +
+                		"try relocating ''{1}'' instead", localAbspath, wcRoot);
+                SVNErrorManager.error(err, SVNLogType.WC);
             } catch (SVNException e) {
-                SVNErrorMessage errorMessage = SVNErrorMessage.create(SVNErrorCode.WC_INVALID_OP_ON_CWD, "Cannot relocate ''{0}'' as it is not the root of a working copy", localAbspath);
-                SVNErrorManager.error(errorMessage, SVNLogType.WC);
+                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_INVALID_OP_ON_CWD, "Cannot relocate ''{0}'' as it is not the root of the working copy", localAbspath);
+                SVNErrorManager.error(err, SVNLogType.WC);
             }
+            return;
         }
-
-        Structure<NodeInfo> nodeInfoStructure = context.getDb().readInfo(localAbspath, NodeInfo.kind, NodeInfo.reposRelPath, NodeInfo.reposRootUrl, NodeInfo.reposUuid);
-        SVNWCDbKind kind = nodeInfoStructure.get(NodeInfo.kind);
-        File reposRelPath = nodeInfoStructure.get(NodeInfo.reposRelPath);
-        SVNURL oldReposRoot = nodeInfoStructure.get(NodeInfo.reposRootUrl);
-        String uuid = nodeInfoStructure.get(NodeInfo.reposUuid);
-
-        if (kind != SVNWCDbKind.Dir) {
-            SVNErrorMessage errorMessage = SVNErrorMessage.create(SVNErrorCode.CLIENT_INVALID_RELOCATION, "Cannot relocate a single file");
-            SVNErrorManager.error(errorMessage, SVNLogType.WC);
+        Structure<NodeInfo> info = context.getDb().readInfo(localAbspath, NodeInfo.kind, NodeInfo.reposRelPath, NodeInfo.reposRootUrl, NodeInfo.reposUuid);
+        if (info.<SVNWCDbKind>get(NodeInfo.kind) != SVNWCDbKind.Dir) {
+            info.release();
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.CLIENT_INVALID_RELOCATION, "Cannot relocate a single file");
+            SVNErrorManager.error(err, SVNLogType.WC);
         }
+        File relPath = info.<File>get(NodeInfo.reposRelPath);
+        SVNURL oldUrl = info.<SVNURL>get(NodeInfo.reposRootUrl);
+        String uuid = info.text(NodeInfo.reposUuid);
+        info.release();
 
-        SVNURL oldUrl = oldReposRoot.appendPath(SVNFileUtil.getFilePath(reposRelPath), false);
+        oldUrl = SVNWCUtils.join(oldUrl, relPath);
 
-        if (!oldUrl.toString().startsWith(from.toString())) {
-            SVNErrorMessage errorMessage = SVNErrorMessage.create(SVNErrorCode.WC_INVALID_RELOCATION, "Invalid source URL prefix: ''{0}'' (does not overlap target's URL ''{1}'')", from, oldUrl);
-            SVNErrorManager.error(errorMessage, SVNLogType.WC);
+        if (from != null && !oldUrl.toString().startsWith(from.toString())) {
+            SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_INVALID_RELOCATION, "Invalid source URL prefix: ''{0}'' (does not " +
+            		"overlap target''s URL ''{1}''", from, oldUrl);
+            SVNErrorManager.error(err, SVNLogType.WC);
         }
-
         SVNURL newUrl;
-        if (oldUrl.equals(from)) {
+        if (from == null || oldUrl.equals(from)) {
             newUrl = to;
         } else {
-            newUrl = SVNURL.parseURIEncoded(to.toString() + oldUrl.toString().substring(from.toString().length()));;
+            newUrl = SVNURL.parseURIEncoded(to.toString() + oldUrl.toString().substring(from.toString().length()));
         }
-
-        String relPathStr = SVNFileUtil.getFilePath(reposRelPath);
+        String relPathStr = SVNFileUtil.getFilePath(relPath);
         String newReposRootPath = newUrl.getPath();
         if (!newReposRootPath.endsWith(relPathStr)) {
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_INVALID_RELOCATION, 

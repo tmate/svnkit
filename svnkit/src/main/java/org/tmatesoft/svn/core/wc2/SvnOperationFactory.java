@@ -87,7 +87,6 @@ import org.tmatesoft.svn.core.internal.wc2.ng.SvnNgCheckout;
 import org.tmatesoft.svn.core.internal.wc2.ng.SvnNgCleanup;
 import org.tmatesoft.svn.core.internal.wc2.ng.SvnNgCommit;
 import org.tmatesoft.svn.core.internal.wc2.ng.SvnNgDiff;
-import org.tmatesoft.svn.core.internal.wc2.ng.SvnNgDiffSummarize;
 import org.tmatesoft.svn.core.internal.wc2.ng.SvnNgExport;
 import org.tmatesoft.svn.core.internal.wc2.ng.SvnNgGetChangelistPaths;
 import org.tmatesoft.svn.core.internal.wc2.ng.SvnNgGetInfo;
@@ -132,7 +131,6 @@ import org.tmatesoft.svn.core.internal.wc2.old.SvnOldGetProperties;
 import org.tmatesoft.svn.core.internal.wc2.old.SvnOldGetStatus;
 import org.tmatesoft.svn.core.internal.wc2.old.SvnOldGetStatusSummary;
 import org.tmatesoft.svn.core.internal.wc2.old.SvnOldImport;
-import org.tmatesoft.svn.core.internal.wc2.old.SvnOldList;
 import org.tmatesoft.svn.core.internal.wc2.old.SvnOldLogMergeInfo;
 import org.tmatesoft.svn.core.internal.wc2.old.SvnOldMarkReplaced;
 import org.tmatesoft.svn.core.internal.wc2.old.SvnOldMerge;
@@ -153,6 +151,7 @@ import org.tmatesoft.svn.core.internal.wc2.remote.SvnNgReposToReposCopy;
 import org.tmatesoft.svn.core.internal.wc2.remote.SvnRemoteAnnotate;
 import org.tmatesoft.svn.core.internal.wc2.remote.SvnRemoteCat;
 import org.tmatesoft.svn.core.internal.wc2.remote.SvnRemoteDiff;
+import org.tmatesoft.svn.core.internal.wc2.remote.SvnRemoteDiffSummarize;
 import org.tmatesoft.svn.core.internal.wc2.remote.SvnRemoteExport;
 import org.tmatesoft.svn.core.internal.wc2.remote.SvnRemoteGetInfo;
 import org.tmatesoft.svn.core.internal.wc2.remote.SvnRemoteGetProperties;
@@ -338,7 +337,7 @@ public class SvnOperationFactory implements ISvnOperationOptionsProvider {
         registerOperationRunner(SvnCat.class, new SvnNgCat());
         registerOperationRunner(SvnCat.class, new SvnOldCat());
 
-        registerOperationRunner(SvnDiffSummarize.class, new SvnNgDiffSummarize());
+        registerOperationRunner(SvnDiffSummarize.class, new SvnRemoteDiffSummarize());
         
         registerOperationRunner(SvnCopy.class, new SvnNgWcToWcCopy());
         registerOperationRunner(SvnCopy.class, new SvnNgReposToWcCopy());
@@ -381,9 +380,8 @@ public class SvnOperationFactory implements ISvnOperationOptionsProvider {
         registerOperationRunner(SvnResolve.class, new SvnOldResolve());
         registerOperationRunner(SvnResolve.class, new SvnNgResolve());
         
-        registerOperationRunner(SvnList.class, new SvnOldList());
         registerOperationRunner(SvnList.class, new SvnRemoteList());
-
+        
         registerOperationRunner(SvnLogMergeInfo.class, new SvnOldLogMergeInfo());
         registerOperationRunner(SvnLogMergeInfo.class, new SvnNgLogMergeInfo());
         registerOperationRunner(SvnGetMergeInfo.class, new SvnOldGetMergeInfo());
@@ -1228,10 +1226,6 @@ public class SvnOperationFactory implements ISvnOperationOptionsProvider {
         return new SvnGetStatusSummary(this);
     }
 
-    public SvnSetWCDbVersion createSetWCDbVersion() {
-        return new SvnSetWCDbVersion(this);
-    }
-
     /**
      * Sets whether to dispose repository pool on {@link #dispose()} call.
      * This flag has sense only if <code>repositoryPool</code> field is not <code>null</code>.
@@ -1292,9 +1286,8 @@ public class SvnOperationFactory implements ISvnOperationOptionsProvider {
 
     private SVNWCContext obtainWcContext(SvnOperation<?> operation) {
         if (wcContext == null) {
-            wcContext = new SVNWCContext(SVNWCDbOpenMode.ReadWrite, getOptions(), false, true, getEventHandler());
+            wcContext = new SVNWCContext(getOptions(), getEventHandler());
         }
-        wcContext.setOperation(operation);
         return wcContext;
     }
 
@@ -1665,10 +1658,11 @@ public class SvnOperationFactory implements ISvnOperationOptionsProvider {
             if (path == null) {
                 return SvnWcGeneration.NOT_DETECTED;
             }
-            SVNWCDb db = new SVNWCDb();
+            SVNWCDb db = null;
             try {
-            	db.open(SVNWCDbOpenMode.ReadOnly, (ISVNOptions) null, false, false);
-                DirParsedInfo info = db.parseDir(path, Mode.ReadOnly, true, isAdditionMode);
+                db = new SVNWCDb();
+				db.open(SVNWCDbOpenMode.ReadOnly, (ISVNOptions) null, true, false);
+                final DirParsedInfo info = db.parseDir(path, Mode.ReadOnly, true, isAdditionMode);
                 if (info != null && SVNWCDbDir.isUsable(info.wcDbDir)) {
                     return SvnWcGeneration.V17;
                 } else if (info != null
@@ -1727,7 +1721,9 @@ public class SvnOperationFactory implements ISvnOperationOptionsProvider {
                     throw e;
                 }
             } finally {
-                db.close();
+            	if (db != null) {
+            		db.close();
+            	}
             }
         }
     }

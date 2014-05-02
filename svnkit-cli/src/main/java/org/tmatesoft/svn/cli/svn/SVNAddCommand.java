@@ -11,7 +11,6 @@
  */
 package org.tmatesoft.svn.cli.svn;
 
-import java.io.File;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -73,9 +72,9 @@ public class SVNAddCommand extends SVNCommand {
                 continue;
             }
             try {
-                client.doAdd(new File[]{target.getFile()}, getSVNEnvironment().isForce(), false,
-                        getSVNEnvironment().isParents(), depth, false, getSVNEnvironment().isNoIgnore(),
-                        getSVNEnvironment().isParents(), !getSVNEnvironment().isNoAutoProps());
+                client.doAdd(target.getFile(), getSVNEnvironment().isForce(), false, 
+                        getSVNEnvironment().isParents(), depth, getSVNEnvironment().isNoIgnore(), 
+                        getSVNEnvironment().isParents());
             } catch (SVNException e) {
                 hasMissingPaths |= e.getErrorMessage().getErrorCode() == SVNErrorCode.WC_PATH_NOT_FOUND; 
                 hasPresentPaths |= e.getErrorMessage().getErrorCode() == SVNErrorCode.ENTRY_EXISTS; 

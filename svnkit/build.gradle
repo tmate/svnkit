@@ -8,7 +8,6 @@ processResources {
 }
 
 test {
-    ignoreFailures = true
     enableAssertions = true
     systemProperty 'svnkit.wc.17', (project.svnVersion == '17')
 }
