@@ -1,3 +1,9 @@
+== version 1.7.13 ==
+
++ Introduced 'sticky' working copy format detection mode to get rid of format detection overhead.
++ Option to control OS X KeyChain support added.
++ SVNClientManager.dispose now disposes underlying singleton SvnOperationFactory instance.
+
 == version 1.7.12 ==
 
 + Non-atomic rename issue fixed.
