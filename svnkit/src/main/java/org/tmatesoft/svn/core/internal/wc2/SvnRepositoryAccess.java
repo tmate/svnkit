@@ -22,6 +22,8 @@ import org.tmatesoft.svn.core.internal.wc.SVNMergeDriver;
 import org.tmatesoft.svn.core.internal.wc17.SVNWCContext;
 import org.tmatesoft.svn.core.internal.wc17.db.Structure;
 import org.tmatesoft.svn.core.internal.wc17.db.StructureFields;
+import org.tmatesoft.svn.core.internal.wc2.ng.SvnNgRepositoryAccess;
+import org.tmatesoft.svn.core.internal.wc2.old.SvnOldRepositoryAccess;
 import org.tmatesoft.svn.core.io.ISVNLocationSegmentHandler;
 import org.tmatesoft.svn.core.io.SVNLocationEntry;
 import org.tmatesoft.svn.core.io.SVNLocationSegment;
@@ -128,7 +130,7 @@ public abstract class SvnRepositoryAccess {
         SVNURL url = null;
         
         if (path.isFile()) {
-            if (revision == SVNRevision.WORKING) {
+            if (revision == SVNRevision.WORKING && getWCContext() != null) {
                 Structure<StructureFields.NodeOriginInfo> nodeOrigin = getWCContext().getNodeOrigin(path.getFile(), false, StructureFields.NodeOriginInfo.isCopy, StructureFields.NodeOriginInfo.revision, StructureFields.NodeOriginInfo.reposRelpath, StructureFields.NodeOriginInfo.reposRootUrl);
                 boolean isCopy = nodeOrigin.is(StructureFields.NodeOriginInfo.isCopy);
                 long pegRevNum = nodeOrigin.lng(StructureFields.NodeOriginInfo.revision);
