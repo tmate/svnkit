@@ -1325,7 +1325,17 @@ public class SvnOperationFactory implements ISvnOperationOptionsProvider {
 	                if (SVNWCUtil.isVersionedDirectory(operation.getOperationalWorkingCopy())) {
 	                    wcGeneration = detectWcGeneration(operation.getOperationalWorkingCopy(), false, isAdditionMode);
 	                } else {
-	                    wcGeneration = getPrimaryWcGeneration();
+                        SvnCheckout checkout = (SvnCheckout) operation;
+                        final int targetWorkingCopyFormat = checkout.getTargetWorkingCopyFormat();
+                        if (targetWorkingCopyFormat > 0) {
+                            if (targetWorkingCopyFormat >= SVNWCContext.WC_NG_VERSION) {
+                                wcGeneration = SvnWcGeneration.V17;
+                            } else {
+                                wcGeneration = SvnWcGeneration.V16;
+                            }
+                        } else {
+	                        wcGeneration = getPrimaryWcGeneration();
+                        }
 	                }
 	            } else {
 	                wcGeneration = detectWcGeneration(operation.getOperationalWorkingCopy(), false, isAdditionMode);
