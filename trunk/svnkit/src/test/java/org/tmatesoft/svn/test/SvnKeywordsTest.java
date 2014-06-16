@@ -6,6 +6,7 @@ import org.tmatesoft.svn.core.SVNCommitInfo;
 import org.tmatesoft.svn.core.SVNProperty;
 import org.tmatesoft.svn.core.SVNPropertyValue;
 import org.tmatesoft.svn.core.SVNURL;
+import org.tmatesoft.svn.core.auth.BasicAuthenticationManager;
 import org.tmatesoft.svn.core.wc.SVNRevision;
 import org.tmatesoft.svn.core.wc2.SvnCat;
 import org.tmatesoft.svn.core.wc2.SvnCheckout;
@@ -96,6 +97,39 @@ public class SvnKeywordsTest {
             sandbox.dispose();
         }
 
+    }
+
+    @Test
+    public void testCustomKeywords() throws Exception {
+        //SVNKIT-514
+        final TestOptions options = TestOptions.getInstance();
+
+        final SvnOperationFactory svnOperationFactory = new SvnOperationFactory();
+        final Sandbox sandbox = Sandbox.createWithCleanup(getTestName() + ".testCustomKeywords", options);
+        try {
+            final SVNURL url = sandbox.createSvnRepository();
+
+            final CommitBuilder commitBuilder = new CommitBuilder(url);
+            commitBuilder.setAuthenticationManager(new BasicAuthenticationManager("username", null));
+            commitBuilder.addFile("file", ("$Author$\n" + "$Revision$\n" + "$Custom$\n").getBytes());
+            commitBuilder.setFileProperty("file", SVNProperty.KEYWORDS, SVNPropertyValue.create("Author Revision Custom=%a-%r"));
+            commitBuilder.commit();
+
+            final File workingCopyDirectory = sandbox.createDirectory("wc");
+
+            final SvnCheckout checkout = svnOperationFactory.createCheckout();
+            checkout.setSource(SvnTarget.fromURL(url));
+            checkout.setSingleTarget(SvnTarget.fromFile(workingCopyDirectory));
+            checkout.run();
+
+            final File file = new File(workingCopyDirectory, "file");
+            final String fileContent = TestUtil.readFileContentsString(file);
+
+            Assert.assertEquals("$Author: username $\n" + "$Revision: 1 $\n" + "$Custom: username-1 $\n", fileContent);
+        } finally {
+            svnOperationFactory.dispose();
+            sandbox.dispose();
+        }
     }
 
     private String getTestName() {
