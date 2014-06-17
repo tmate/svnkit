@@ -25,6 +25,7 @@ public class SvnDiffGenerator implements ISvnDiffGenerator {
     protected static final String WC_REVISION_LABEL = "(working copy)";
     protected static final String PROPERTIES_SEPARATOR = "___________________________________________________________________";
     protected static final String HEADER_SEPARATOR = "===================================================================";
+    protected static final String HEADER_ENCODING = "UTF-8";
 
     private SvnTarget originalTarget1;
     private SvnTarget originalTarget2;
@@ -552,7 +553,7 @@ public class SvnDiffGenerator implements ISvnDiffGenerator {
 
         try {
             byteArrayOutputStream.close();
-            return byteArrayOutputStream.toString(getEncoding());
+            return byteArrayOutputStream.toString(HEADER_ENCODING);
         } catch (IOException e) {
             return "";
         }
@@ -581,7 +582,7 @@ public class SvnDiffGenerator implements ISvnDiffGenerator {
 
         try {
             byteArrayOutputStream.close();
-            return byteArrayOutputStream.toString(getEncoding());
+            return byteArrayOutputStream.toString(HEADER_ENCODING);
         } catch (IOException e) {
             return "";
         }
@@ -1109,7 +1110,7 @@ public class SvnDiffGenerator implements ISvnDiffGenerator {
     }
 
     private void displayString(OutputStream outputStream, String s) throws IOException {
-        outputStream.write(s.getBytes(getEncoding()));
+        outputStream.write(s.getBytes(HEADER_ENCODING));
     }
 
     private void displayEOL(OutputStream os) throws IOException {
