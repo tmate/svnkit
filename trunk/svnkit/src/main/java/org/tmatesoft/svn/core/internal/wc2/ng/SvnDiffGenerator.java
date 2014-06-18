@@ -517,7 +517,7 @@ public class SvnDiffGenerator implements ISvnDiffGenerator {
                 diffHeader = header + headerFields;
             }
             QDiffGenerator generator = new QDiffUniGenerator(properties, diffHeader);
-            EmptyDetectionWriter writer = new EmptyDetectionWriter(new OutputStreamWriter(outputStream, getEncoding()));
+            EmptyDetectionWriter writer = new EmptyDetectionWriter(new OutputStreamWriter(outputStream, HEADER_ENCODING));
             QDiffManager.generateTextDiff(is1, is2, getEncoding(), writer, generator);
             if (writer.isSomethingWritten()) {
                 visitedPaths.add(displayPath);
