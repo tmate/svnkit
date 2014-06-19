@@ -43,7 +43,7 @@ public abstract class SvnOperationRunner<V, T extends SvnOperation<V>> implement
         this.operation = operation;
     }
 
-    protected T getOperation() {
+    public T getOperation() {
         return this.operation;
     }
     

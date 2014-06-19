@@ -43,6 +43,7 @@ import org.tmatesoft.svn.core.internal.wc17.db.SVNWCDbDir;
 import org.tmatesoft.svn.core.internal.wc17.db.SVNWCDbRoot;
 import org.tmatesoft.svn.core.internal.wc17.db.SvnWcDbPristines;
 import org.tmatesoft.svn.core.internal.wc2.ISvnCommitRunner;
+import org.tmatesoft.svn.core.internal.wc2.SvnOperationRunner;
 import org.tmatesoft.svn.core.internal.wc2.SvnWcGeneration;
 import org.tmatesoft.svn.core.internal.wc2.admin.SvnRepositoryCatImpl;
 import org.tmatesoft.svn.core.internal.wc2.admin.SvnRepositoryCopyRevisionPropertiesImpl;
@@ -1377,6 +1378,20 @@ public class SvnOperationFactory implements ISvnOperationOptionsProvider {
             break;
         }
         if (runner != null) {
+            //we should NOT reuse already running runners (i.e. runners with operation != null)
+            //instead we should create new runner of the same class
+            if ((runner instanceof SvnOperationRunner) && (((SvnOperationRunner) runner).getOperation() != null)) {
+                final Class<? extends ISvnOperationRunner> runnerClass = runner.getClass();
+                try {
+                    runner = (ISvnOperationRunner<?, SvnOperation<?>>)runnerClass.newInstance();
+                } catch (InstantiationException e) {
+                    SVNErrorMessage errorMessage = SVNErrorMessage.create(SVNErrorCode.ASSERTION_FAIL, e);
+                    SVNErrorManager.error(errorMessage, SVNLogType.WC);
+                } catch (IllegalAccessException e) {
+                    SVNErrorMessage errorMessage = SVNErrorMessage.create(SVNErrorCode.ASSERTION_FAIL, e);
+                    SVNErrorManager.error(errorMessage, SVNLogType.WC);
+                }
+            }
             runner.reset(wcGeneration);
         } else {
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.UNSUPPORTED_FEATURE, "Runner for ''{0}'' command have not been found; probably not yet implement in this API.",
