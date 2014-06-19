@@ -17,7 +17,11 @@ public abstract class SvnOperationRunner<V, T extends SvnOperation<V>> implement
     
     public V run(T operation) throws SVNException {
         setOperation(operation);
-        return run();
+        try {
+            return run();
+        } finally {
+            reset(getWcGeneration());
+        }
     }
     
     public void reset(SvnWcGeneration wcGeneration) {
