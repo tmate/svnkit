@@ -676,12 +676,12 @@ public class SvnNgWcToWcCopy extends SvnNgOperationRunner<Void, SvnCopy> {
         }
 
         if (isMove && source.equals(srcWcRootAbsPath)) {
-            SVNErrorMessage errorMessage = SVNErrorMessage.create(SVNErrorCode.WC_PATH_UNEXPECTED_STATUS, "'{0}' is the root of a working copy and cannot be moved", source);
+            SVNErrorMessage errorMessage = SVNErrorMessage.create(SVNErrorCode.WC_PATH_UNEXPECTED_STATUS, "''{0}'' is the root of a working copy and cannot be moved", source);
             SVNErrorManager.error(errorMessage, SVNLogType.WC);
         }
         File srcReposRelPath = srcInfo.get(NodeInfo.reposRelPath);
         if (isMove && srcReposRelPath != null && "".equals(SVNFileUtil.getFilePath(srcReposRelPath))) {
-            SVNErrorMessage errorMessage = SVNErrorMessage.create(SVNErrorCode.WC_PATH_UNEXPECTED_STATUS, "'{0}' represents the repository root and cannot be moved", source);
+            SVNErrorMessage errorMessage = SVNErrorMessage.create(SVNErrorCode.WC_PATH_UNEXPECTED_STATUS, "''{0}'' represents the repository root and cannot be moved", source);
             SVNErrorManager.error(errorMessage, SVNLogType.WC);
         }
 
@@ -691,7 +691,7 @@ public class SvnNgWcToWcCopy extends SvnNgOperationRunner<Void, SvnCopy> {
                 readInfo(dstDirectory, NodeInfo.status, NodeInfo.reposRootUrl, NodeInfo.reposUuid);
         } catch (SVNException e) {
             if (e.getErrorMessage().getErrorCode() == SVNErrorCode.WC_PATH_NOT_FOUND) {
-                SVNErrorMessage errorMessage = SVNErrorMessage.create(SVNErrorCode.ENTRY_NOT_FOUND, "'{0}' is not under version control", dstDirectory);
+                SVNErrorMessage errorMessage = SVNErrorMessage.create(SVNErrorCode.ENTRY_NOT_FOUND, "''{0}'' is not under version control", dstDirectory);
                 SVNErrorManager.error(errorMessage, SVNLogType.WC);
             }
         }
@@ -816,7 +816,7 @@ public class SvnNgWcToWcCopy extends SvnNgOperationRunner<Void, SvnCopy> {
                 if (SVNRevision.isValidRevisionNumber(minRevision) && SVNRevision.isValidRevisionNumber(maxRevision) && minRevision != maxRevision) {
                     if (!allowMixedRevisions) {
                         SVNErrorMessage errorMessage = SVNErrorMessage.create(SVNErrorCode.WC_MIXED_REVISIONS,
-                                "Cannot move mixed-revision subtree '{0}' [{1}:{2}]; try updating it first", source, minRevision, maxRevision);
+                                "Cannot move mixed-revision subtree ''{0}'' [{1}:{2}]; try updating it first", source, minRevision, maxRevision);
                         SVNErrorManager.error(errorMessage, SVNLogType.WC);
                     }
                     isMove = false;
@@ -938,17 +938,17 @@ public class SvnNgWcToWcCopy extends SvnNgOperationRunner<Void, SvnCopy> {
                 } else if (info.kind == SVNWCDbKind.Dir) {
                     copyVersionedDirectory(wcContext, childSrcAbsPath, childDstAbsPath, dstOpRootAbsPath, tmpDirAbsPath, metadataOnly, isMove, false);
                 } else {
-                    SVNErrorMessage errorMessage = SVNErrorMessage.create(SVNErrorCode.NODE_UNEXPECTED_KIND, "cannot handle node kind for '{0}'", childSrcAbsPath);
+                    SVNErrorMessage errorMessage = SVNErrorMessage.create(SVNErrorCode.NODE_UNEXPECTED_KIND, "cannot handle node kind for ''{0}''", childSrcAbsPath);
                     SVNErrorManager.error(errorMessage, SVNLogType.WC);
                 }
             } else if (info.status == SVNWCDbStatus.Deleted || info.status == SVNWCDbStatus.NotPresent || info.status == SVNWCDbStatus.Excluded) {
                 wcContext.getDb().opCopy(childSrcAbsPath, childDstAbsPath, dstOpRootAbsPath, isMove, null);
             } else if (info.status == SVNWCDbStatus.Incomplete) {
-                SVNErrorMessage errorMessage = SVNErrorMessage.create(SVNErrorCode.WC_PATH_UNEXPECTED_STATUS, "Cannot handle status of '{0}'", childSrcAbsPath);
+                SVNErrorMessage errorMessage = SVNErrorMessage.create(SVNErrorCode.WC_PATH_UNEXPECTED_STATUS, "Cannot handle status of ''{0}''", childSrcAbsPath);
                 SVNErrorManager.error(errorMessage, SVNLogType.WC);
             } else {
                 assert (info.status == SVNWCDbStatus.ServerExcluded);
-                SVNErrorMessage errorMessage = SVNErrorMessage.create(SVNErrorCode.WC_PATH_UNEXPECTED_STATUS, "Cannot copy '{0}' excluded by server", childSrcAbsPath);
+                SVNErrorMessage errorMessage = SVNErrorMessage.create(SVNErrorCode.WC_PATH_UNEXPECTED_STATUS, "Cannot copy ''{0}'' excluded by server", childSrcAbsPath);
                 SVNErrorManager.error(errorMessage, SVNLogType.WC);
             }
             if (diskChildren != null && (info.status == SVNWCDbStatus.Normal || info.status == SVNWCDbStatus.Added)) {
@@ -1045,7 +1045,7 @@ public class SvnNgWcToWcCopy extends SvnNgOperationRunner<Void, SvnCopy> {
         if (copyToTmpDir.kind == SVNNodeKind.NONE) {
             return copyToTmpDir;
         } else if (copyToTmpDir.kind == SVNNodeKind.UNKNOWN) {
-            SVNErrorMessage errorMessage = SVNErrorMessage.create(SVNErrorCode.NODE_UNEXPECTED_KIND, "Source '{0}' is unexpected kind", srcAbsPath);
+            SVNErrorMessage errorMessage = SVNErrorMessage.create(SVNErrorCode.NODE_UNEXPECTED_KIND, "Source ''{0}'' is unexpected kind", srcAbsPath);
             SVNErrorManager.error(errorMessage, SVNLogType.WC);
         } else if (copyToTmpDir.kind == SVNNodeKind.DIR) {
             deleteOnClose = true;
