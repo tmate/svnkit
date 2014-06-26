@@ -3,7 +3,7 @@ version = '1.8.6'
 
 project.ext {
    release = false
-   target = '1.5'
+   target = '1.6'
    compatibleSvnVersion = '1.8.1'
 }
 
