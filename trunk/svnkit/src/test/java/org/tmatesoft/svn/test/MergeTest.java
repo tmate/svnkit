@@ -1156,6 +1156,60 @@ public class MergeTest {
         }
     }
 
+    @Test
+    public void testReverseMerge() throws Exception {
+        final TestOptions options = TestOptions.getInstance();
+        final Sandbox sandbox = Sandbox.createWithCleanup(getTestName() + ".testReverseMerge", options);
+        final SvnOperationFactory svnOperationFactory = new SvnOperationFactory();
+        try {
+            // Create local repository
+            final SVNURL url = sandbox.createSvnRepository();
+
+            // Check out a working copy
+            final WorkingCopy wc = sandbox.checkoutNewWorkingCopy(url);
+            final File config = wc.getFile("config");
+            config.createNewFile();
+            wc.add(config);
+            wc.commit("file created");
+
+            wc.delete(config);
+            config.mkdir();
+            wc.add(config);
+            Assert.assertTrue(config.isDirectory());
+
+            long rev = wc.commit("file replaced with dir");
+            // Update to HEAD
+            wc.updateToRevision(-1);
+
+            final File workingCopyDirectory = wc.getWorkingCopyDirectory();
+            final SVNURL configUrl = url.appendPath("config", false);
+
+            // Roll back last revision changes
+            SvnMerge merge = svnOperationFactory.createMerge();
+            merge.addRevisionRange(SvnCodec.revisionRange(new SVNRevisionRange(SVNRevision.create(rev), SVNRevision.create(rev - 1))));
+            merge.setDepth(SVNDepth.UNKNOWN);
+            merge.setDryRun(false);
+            merge.setForce(true);
+            merge.setIgnoreAncestry(false);
+            merge.setIgnoreMergeInfo(false);
+            merge.setMergeOptions(null);
+            merge.setRecordOnly(false);
+            merge.setSingleTarget(SvnTarget.fromFile(workingCopyDirectory));
+            merge.setSource(SvnTarget.fromFile(workingCopyDirectory), false);
+            merge.run();
+
+            final Map<File, SvnStatus> statuses = TestUtil.getStatuses(svnOperationFactory, workingCopyDirectory);
+            final SvnStatus status = statuses.get(config);
+            Assert.assertEquals(SVNStatusType.STATUS_REPLACED, status.getNodeStatus());
+            Assert.assertTrue(status.isCopied());
+            Assert.assertFalse(status.isConflicted());
+            Assert.assertEquals(configUrl, status.getCopyFromUrl());
+
+        } finally {
+            sandbox.dispose();
+        }
+    }
+
     private void update(SvnOperationFactory svnOperationFactory, WorkingCopy workingCopy) throws SVNException {
         final SvnUpdate update = svnOperationFactory.createUpdate();
         update.setSingleTarget(SvnTarget.fromFile(workingCopy.getWorkingCopyDirectory()));

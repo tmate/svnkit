@@ -631,35 +631,35 @@ public class SvnNgMergeCallback2 implements ISvnDiffCallback2 {
             same = true;
         } else {
             same = arePropertiesSame(leftProps, workingProps);
-        }
-        DirectoryDeleteBaton delBaton = db.deleteState;
-        assert delBaton != null;
 
-        if (!same) {
-            delBaton.foundEdit = true;
-        } else {
-            delBaton.comparedAbsPaths.add(localAbsPath);
-        }
-        if (delBaton.delRoot != db) {
-            return;
-        }
-        if (delBaton.foundEdit) {
-            same = false;
-        } else if (mergeDriver.forceDelete) {
-            same = true;
-        } else {
-            try {
-                SVNStatusEditor17 statusEditor17 = new SVNStatusEditor17(localAbsPath, context, context.getOptions(), false, true, SVNDepth.INFINITY, new VerifyTouchedByDelCheck(delBaton));
-                statusEditor17.walkStatus(localAbsPath, SVNDepth.INFINITY, true, false, true, null);
-            } catch (SVNException e) {
-                if (e.getErrorMessage().getErrorCode() != SVNErrorCode.CEASE_INVOCATION) {
-                    throw e;
-                }
+            DirectoryDeleteBaton delBaton = db.deleteState;
+            assert delBaton != null;
+
+            if (!same) {
+                delBaton.foundEdit = true;
+            } else {
+                delBaton.comparedAbsPaths.add(localAbsPath);
             }
+            if (delBaton.delRoot != db) {
+                return;
+            }
+            if (delBaton.foundEdit) {
+                same = false;
+            } else if (mergeDriver.forceDelete) {
+                same = true;
+            } else {
+                try {
+                    SVNStatusEditor17 statusEditor17 = new SVNStatusEditor17(localAbsPath, context, context.getOptions(), false, true, SVNDepth.INFINITY, new VerifyTouchedByDelCheck(delBaton));
+                    statusEditor17.walkStatus(localAbsPath, SVNDepth.INFINITY, true, false, true, null);
+                } catch (SVNException e) {
+                    if (e.getErrorMessage().getErrorCode() != SVNErrorCode.CEASE_INVOCATION) {
+                        throw e;
+                    }
+                }
 
-            same = !delBaton.foundEdit;
+                same = !delBaton.foundEdit;
+            }
         }
-
         if (same && !mergeDriver.dryRun) {
             try {
                 SvnNgRemove.delete(context, localAbsPath, null, false, false, null);
