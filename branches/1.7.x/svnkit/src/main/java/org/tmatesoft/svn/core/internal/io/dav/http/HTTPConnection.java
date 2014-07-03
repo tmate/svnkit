@@ -609,7 +609,7 @@ public class HTTPConnection implements IHTTPConnection {
                 }
                 
                 try {
-                    myChallengeCredentials = HTTPAuthentication.parseAuthParameters(authHeaderValues, myChallengeCredentials, myCharset, authTypes, authManager, myRequestCount); 
+                    myChallengeCredentials = HTTPAuthentication.parseAuthParameters(authHeaderValues, myChallengeCredentials, myCharset, authTypes, authManager, myRequestCount);
                 } catch (SVNException svne) {
                     err = svne.getErrorMessage(); 
                     break;

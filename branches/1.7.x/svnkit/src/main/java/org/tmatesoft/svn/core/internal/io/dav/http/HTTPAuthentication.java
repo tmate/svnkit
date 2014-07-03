@@ -194,18 +194,24 @@ abstract class HTTPAuthentication {
             } else if ("NTLM".equalsIgnoreCase(method)) {
                 HTTPNTLMAuthentication ntlmAuth = null;
                 if (source.length() == 0) {
-                    SVNDebugLog.getDefaultLog().logFine(SVNLogType.NETWORK, 
-                            "svnkit.http.ntlm=" + System.getProperty("svnkit.http.ntlm", "java"));
-                    if ("jna".equalsIgnoreCase(System.getProperty("svnkit.http.ntlm", "java"))) {
+                    String ntlmImpl = System.getProperty("svnkit.http.ntlm", "jna");
+                    if ("jna".equalsIgnoreCase(ntlmImpl)) {
                         ntlmAuth = HTTPNativeNTLMAuthentication.newInstance(charset);
-                        SVNDebugLog.getDefaultLog().logFine(SVNLogType.NETWORK, 
-                                "native NTLM implementation = " + ntlmAuth);
-                    }
-                    if (ntlmAuth != null) {
-                        ntlmAuth.parseChallenge(null);
+                        if (ntlmAuth != null) {
+                            ntlmAuth.parseChallenge(null);
+                        }
                     }
                     if (ntlmAuth == null) {
-                        ntlmAuth = new HTTPNTLMAuthentication(charset);
+                        if ("jna".equalsIgnoreCase(ntlmImpl)) {
+                            ntlmImpl = "java";
+                        }
+                        if ("java:apache".equalsIgnoreCase(ntlmImpl)) {
+                            ntlmAuth = HTTPApacheNTLMAuthentication.newInstance(charset, HTTPApacheNTLMAuthentication.APACHE_ENGINE);
+                        } else if ("java:jcifs".equalsIgnoreCase(ntlmImpl)) {
+                            ntlmAuth = HTTPApacheNTLMAuthentication.newInstance(charset, HTTPApacheNTLMAuthentication.JCIFS_ENGINE);
+                        } else {
+                            ntlmAuth = new HTTPNTLMAuthentication(charset);
+                        }
                         SVNDebugLog.getDefaultLog().logFine(SVNLogType.NETWORK, 
                                 "non-native NTLM implementation = " + ntlmAuth);
                     }
