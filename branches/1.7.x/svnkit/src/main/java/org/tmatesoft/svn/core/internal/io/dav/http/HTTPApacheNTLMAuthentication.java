@@ -4,6 +4,8 @@ import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
+import org.tmatesoft.svn.core.internal.wc.SVNFileListUtil;
+import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 import org.tmatesoft.svn.util.SVNDebugLog;
 import org.tmatesoft.svn.util.SVNLogType;
 
@@ -61,9 +63,30 @@ public class HTTPApacheNTLMAuthentication extends HTTPNTLMAuthentication {
         }
         String userName = userOverride != null ? userOverride : getUserName();
         if (userName == null) {
-            userName = System.getProperty("user.name", "user");
+            userName = System.getProperty("user.name", System.getenv("USERNAME"));
         }
         final String password = passwordOverride != null ? passwordOverride : getPassword();
+
+        if (SVNFileUtil.isWindows) {
+            final boolean useDomainEnvironment = Boolean.parseBoolean(System.getProperty("svnkit.http.ntlm.domain.useEnv", "false"));
+            SVNDebugLog.getDefaultLog().logFine(SVNLogType.NETWORK, "Will try to use domain from environment: " + useDomainEnvironment);
+            final boolean useWsEnvironment = Boolean.parseBoolean(System.getProperty("svnkit.http.ntlm.workstation.useEnv", "true"));
+            SVNDebugLog.getDefaultLog().logFine(SVNLogType.NETWORK, "Will try to use workstation from environment: " + useWsEnvironment);
+            if ("".equals(ws) && wsOverride == null && useWsEnvironment) {
+                ws = System.getenv("COMPUTERNAME");
+                if (ws == null) {
+                    ws = "";
+                }
+                SVNDebugLog.getDefaultLog().logFine(SVNLogType.NETWORK, "Workstation from environment: " + ws);
+            }
+            if ("".equals(domain) && domainOverride == null && useDomainEnvironment) {
+                domain = System.getenv("USERDOMAIN");
+                if (domain == null) {
+                    domain = "";
+                }
+                SVNDebugLog.getDefaultLog().logFine(SVNLogType.NETWORK, "Domain from environment: " + domain);
+            }
+        }
 
         SVNDebugLog.getDefaultLog().logFine(SVNLogType.NETWORK, "Domain: " + domain);
         SVNDebugLog.getDefaultLog().logFine(SVNLogType.NETWORK, "Workstation: " + ws);
