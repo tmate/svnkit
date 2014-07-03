@@ -331,7 +331,8 @@ class HTTPNTLMAuthentication extends HTTPAuthentication {
         } else {
             myIsNegotiateLocalCall = false;
         }
-        
+        System.out.println("negotiate local calls: " + myIsNegotiateLocalCall);
+
         if ((flags & NEGOTIATE_TARGET_INFO) != 0) {
             int tgtInfoSecurityBufferOffset = containsContext ? 40: 32;
             
