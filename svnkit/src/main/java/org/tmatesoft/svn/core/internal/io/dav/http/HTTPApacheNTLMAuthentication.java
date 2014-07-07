@@ -59,10 +59,8 @@ public class HTTPApacheNTLMAuthentication extends HTTPNTLMAuthentication {
         try {
             if (myState == TYPE1) {
                 response = myEngine.generateType1Msg(domain, ws);
-                System.out.println("generated type1: " + response);
             } else if (myState == TYPE3) {
                 response = myEngine.generateType3Msg(userName, password, domain, ws, myLastToken);
-                System.out.println("generated type3: " + response);
             }
         } catch (IOException e) {
             throw new SVNException(SVNErrorMessage.create(SVNErrorCode.RA_DAV_REQUEST_FAILED), e);
