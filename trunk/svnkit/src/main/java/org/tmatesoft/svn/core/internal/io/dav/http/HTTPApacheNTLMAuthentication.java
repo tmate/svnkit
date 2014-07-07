@@ -4,6 +4,8 @@ import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
+import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
+import org.tmatesoft.svn.util.SVNDebugLog;
 import org.tmatesoft.svn.util.SVNLogType;
 
 import java.io.IOException;
@@ -52,9 +54,39 @@ public class HTTPApacheNTLMAuthentication extends HTTPNTLMAuthentication {
             ws = wsOverride.toUpperCase(Locale.ENGLISH);
         }
         final String userOverride = System.getProperty("svnkit.http.ntlm.user");
+        String userName = userOverride != null ? userOverride : getUserName();
+        if (userName == null) {
+            userName = System.getProperty("user.name", System.getenv("USERNAME"));
+        }
         final String passwordOverride = System.getProperty("svnkit.http.ntlm.password");
-        final String userName = userOverride != null ? userOverride : getUserName();
         final String password = passwordOverride != null ? passwordOverride : getPassword();
+
+        if (SVNFileUtil.isWindows) {
+            final boolean useDomainEnvironment = Boolean.parseBoolean(System.getProperty("svnkit.http.ntlm.domain.useEnv", "false"));
+            SVNDebugLog.getDefaultLog().logFine(SVNLogType.NETWORK, "Will try to use domain from environment: " + useDomainEnvironment);
+            final boolean useWsEnvironment = Boolean.parseBoolean(System.getProperty("svnkit.http.ntlm.workstation.useEnv", "true"));
+            SVNDebugLog.getDefaultLog().logFine(SVNLogType.NETWORK, "Will try to use workstation from environment: " + useWsEnvironment);
+            if ("".equals(ws) && wsOverride == null && useWsEnvironment) {
+                ws = System.getenv("COMPUTERNAME");
+                if (ws == null) {
+                    ws = "";
+                }
+                SVNDebugLog.getDefaultLog().logFine(SVNLogType.NETWORK, "Workstation from environment: " + ws);
+            }
+            if ("".equals(domain) && domainOverride == null && useDomainEnvironment) {
+                domain = System.getenv("USERDOMAIN");
+                if (domain == null) {
+                    domain = "";
+                }
+                SVNDebugLog.getDefaultLog().logFine(SVNLogType.NETWORK, "Domain from environment: " + domain);
+            }
+        }
+
+        SVNDebugLog.getDefaultLog().logFine(SVNLogType.NETWORK, "Domain: " + domain);
+        SVNDebugLog.getDefaultLog().logFine(SVNLogType.NETWORK, "Workstation: " + ws);
+        SVNDebugLog.getDefaultLog().logFine(SVNLogType.NETWORK, "User: " + userName);
+        SVNDebugLog.getDefaultLog().logFine(SVNLogType.NETWORK, "Password: "
+                + (password != null && password.length() > 0 ? "<not empty>" : "<empty or null>"));
 
         try {
             if (myState == TYPE1) {
