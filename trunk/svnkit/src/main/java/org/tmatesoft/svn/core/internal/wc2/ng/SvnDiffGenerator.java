@@ -518,7 +518,7 @@ public class SvnDiffGenerator implements ISvnDiffGenerator {
             }
             QDiffGenerator generator = new QDiffUniGenerator(properties, diffHeader);
             EmptyDetectionWriter writer = new EmptyDetectionWriter(new OutputStreamWriter(outputStream, HEADER_ENCODING));
-            QDiffManager.generateTextDiff(is1, is2, getEncoding(), writer, generator);
+            QDiffManager.generateTextDiff(is1, is2, null, writer, generator);
             if (writer.isSomethingWritten()) {
                 visitedPaths.add(displayPath);
             }
@@ -780,7 +780,7 @@ public class SvnDiffGenerator implements ISvnDiffGenerator {
                 QDiffGenerator generator = new QDiffUniGenerator(properties, "");
                 Writer writer = new OutputStreamWriter(outputStream, getEncoding());
                 QDiffManager.generateTextDiff(new ByteArrayInputStream(originalValueBytes), new ByteArrayInputStream(newValueBytes),
-                        getEncoding(), writer, generator);
+                        null, writer, generator);
                 writer.flush();
                 if (!newValueHadEol) {
                     displayString(outputStream, "\\ No newline at end of property");
