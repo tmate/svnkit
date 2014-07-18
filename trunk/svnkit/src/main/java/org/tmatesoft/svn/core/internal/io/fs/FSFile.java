@@ -36,7 +36,7 @@ import java.util.logging.Level;
 public class FSFile {
     
     private File myFile;
-    private byte[] myData;
+    private final byte[] myData;
     private int myOffset;
     private int myLength;
     private FileChannel myChannel;
@@ -310,6 +310,16 @@ public class FSFile {
     }
     
     public int read() throws IOException {
+        if (myData != null) {
+            if (myPosition >= myLength) {
+                return -1;
+            }
+            myPosition++;
+            if (myDigest != null) {
+                myDigest.update((byte) (myData[((int) (myOffset + myPosition - 1))] & 0xff));
+            }
+            return myData[((int) (myOffset + myPosition - 1))] & 0xff;
+        }
         if ((myChannel == null && myInputStream == null) || myPosition < myBufferPosition || myPosition >= myBufferPosition + myBuffer.limit()) {
             if (fill() <= 0) {
                 return -1;
@@ -326,6 +336,15 @@ public class FSFile {
     }
 
     public int read(ByteBuffer target) throws IOException {
+        if (myData != null) {
+            int couldRead = (int) Math.min(myLength - myPosition, target.remaining());
+            target.put(myData, (int) myPosition + myOffset, couldRead);
+            if (myDigest != null) {
+                myDigest.update(myData, (int) myPosition + myOffset, couldRead);
+            }
+            myPosition += couldRead;
+            return couldRead > 0 ? couldRead : -1;
+        }
         int read = 0;
         while(target.hasRemaining()) {
             if (fill() < 0) {
@@ -347,6 +366,15 @@ public class FSFile {
     }
 
     public int read(byte[] buffer, int offset, int length) throws IOException {
+        if (myData != null) {
+            int couldRead = (int) Math.min(myLength - myPosition, length);
+            System.arraycopy(myData, (int) myPosition + myOffset, buffer, offset, couldRead);
+            if (myDigest != null) {
+                myDigest.update(myData, (int) myPosition + myOffset, couldRead);
+            }
+            myPosition += couldRead;
+            return couldRead > 0 ? couldRead : -1;
+        }
         int read = 0;
         int toRead = length;
         while(toRead > 0) {
@@ -386,20 +414,11 @@ public class FSFile {
     }
     
     private int fill() throws IOException {
-        if ((myChannel == null && myInputStream == null) || myPosition < myBufferPosition || (myData == null && myPosition >= myBufferPosition + myBuffer.limit())) {
+        if ((myChannel == null && myInputStream == null) || myPosition < myBufferPosition || (myPosition >= myBufferPosition + myBuffer.limit())) {
             myBufferPosition = myPosition;
-            if (myData == null) {
-                getChannel().position(myBufferPosition);
-            } else {
-                myInputStream = new ByteArrayInputStream(myData, myOffset, myLength);
-            }
+            getChannel().position(myBufferPosition);
             myBuffer.clear();
-            int read;
-            if (myData == null) {
-                read = getChannel().read(myBuffer);
-            } else {
-                read = myInputStream.read(myBuffer.array(), myBuffer.position(), myBuffer.limit());
-            }
+            int read = getChannel().read(myBuffer);
             myBuffer.position(0);
             myBuffer.limit(read >= 0 ? read : 0);
             return read;
@@ -416,9 +435,6 @@ public class FSFile {
     }
     
     private FileChannel getChannel() throws IOException {
-        if (myData != null) {
-            return null;
-        }
         if (myChannel == null) {
             final FileInputStream fileInputStream = SVNFileUtil.createFileInputStream(myFile);
             myChannel = fileInputStream.getChannel();

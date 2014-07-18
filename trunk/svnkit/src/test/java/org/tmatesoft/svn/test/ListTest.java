@@ -218,9 +218,9 @@ public class ListTest {
         }
     }
 
-    @Ignore("SVNKIT-529")
     @Test
     public void testGetDirHangsLongCommitMessage() throws Exception {
+        //SVNKIT-529
         final TestOptions options = TestOptions.getInstance();
 
         final long oldMaxFilesPerDirectory = FSFS.getDefaultMaxFilesPerDirectory();
