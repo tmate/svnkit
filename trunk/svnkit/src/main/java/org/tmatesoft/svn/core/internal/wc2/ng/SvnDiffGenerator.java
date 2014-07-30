@@ -517,12 +517,12 @@ public class SvnDiffGenerator implements ISvnDiffGenerator {
                 diffHeader = header + headerFields;
             }
             QDiffGenerator generator = new QDiffUniGenerator(properties, diffHeader);
-            EmptyDetectionWriter writer = new EmptyDetectionWriter(new OutputStreamWriter(outputStream, HEADER_ENCODING));
-            QDiffManager.generateTextDiff(is1, is2, null, writer, generator);
-            if (writer.isSomethingWritten()) {
+            EmptyDetectionOutputStream emptyDetectionOutputStream = new EmptyDetectionOutputStream(outputStream);
+            QDiffManager.generateTextDiff(is1, is2, emptyDetectionOutputStream, generator);
+            if (emptyDetectionOutputStream.isSomethingWritten()) {
                 visitedPaths.add(displayPath);
             }
-            writer.flush();
+            emptyDetectionOutputStream.flush();
         } catch (IOException e) {
             SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, e.getMessage());
             SVNErrorManager.error(err, e, SVNLogType.DEFAULT);
@@ -1160,13 +1160,13 @@ public class SvnDiffGenerator implements ISvnDiffGenerator {
         return options;
     }
 
-    private class EmptyDetectionWriter extends Writer {
+    private class EmptyDetectionOutputStream extends OutputStream {
 
-        private final Writer writer;
+        private final OutputStream outputStream;
         private boolean somethingWritten;
 
-        public EmptyDetectionWriter(Writer writer) {
-            this.writer = writer;
+        public EmptyDetectionOutputStream(OutputStream outputStream) {
+            this.outputStream = outputStream;
             this.somethingWritten = false;
         }
 
@@ -1177,59 +1177,29 @@ public class SvnDiffGenerator implements ISvnDiffGenerator {
         @Override
         public void write(int c) throws IOException {
             somethingWritten = true;
-            writer.write(c);
+            outputStream.write(c);
         }
 
         @Override
-        public void write(char[] cbuf) throws IOException {
-            somethingWritten = cbuf.length > 0;
-            writer.write(cbuf);
+        public void write(byte[] bytes) throws IOException {
+            somethingWritten = bytes.length > 0;
+            outputStream.write(bytes);
         }
 
         @Override
-        public void write(char[] cbuf, int off, int len) throws IOException {
-            somethingWritten = len > 0 && cbuf.length > 0;
-            writer.write(cbuf, off, len);
-        }
-
-        @Override
-        public void write(String str) throws IOException {
-            somethingWritten = str.length() > 0;
-            writer.write(str);
-        }
-
-        @Override
-        public void write(String str, int off, int len) throws IOException {
-            somethingWritten = len > 0 && str.length() > 0;
-            writer.write(str, off, len);
-        }
-
-        @Override
-        public Writer append(CharSequence csq) throws IOException {
-            somethingWritten = csq.length() > 0;
-            return writer.append(csq);
-        }
-
-        @Override
-        public Writer append(CharSequence csq, int start, int end) throws IOException {
-            somethingWritten = csq.length() > 0 && (start >= end);
-            return writer.append(csq, start, end);
-        }
-
-        @Override
-        public Writer append(char c) throws IOException {
-            somethingWritten = true;
-            return writer.append(c);
+        public void write(byte[] bytes, int offset, int length) throws IOException {
+            somethingWritten = length > 0;
+            outputStream.write(bytes, offset, length);
         }
 
         @Override
         public void flush() throws IOException {
-            writer.flush();
+            outputStream.flush();
         }
 
         @Override
         public void close() throws IOException {
-            writer.close();
+            outputStream.close();
         }
     }
 }
