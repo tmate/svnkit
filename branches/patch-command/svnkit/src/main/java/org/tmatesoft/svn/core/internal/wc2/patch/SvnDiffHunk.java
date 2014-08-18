@@ -184,6 +184,14 @@ public class SvnDiffHunk implements Comparable<SvnDiffHunk> {
                 maxLen = range.end - range.current;
                 str = readLine(patchFileStream, eolStr, eof);
 
+                //here we apply "maxLen" restriction; suppose str="abcd\n", maxLen=3: we should cut str to "abc" and forget about finding EOL
+                if (maxLen >= 0 && str.length() >= maxLen) {
+                    str = str.substring(0, (int) maxLen);
+                    if (eolStr != null && eolStr[0] != null && !str.endsWith("\r") && !str.endsWith("\n")) {
+                        eolStr[0] = null;
+                    }
+                }
+
                 range.current = patchFileStream.getSeekPosition();
                 filtered = (str.length() > 0) && (str.charAt(0) == forbidden || str.charAt(0) == '\\');
 
