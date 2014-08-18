@@ -88,7 +88,7 @@ configure(javaProjects()) {
 
 project(':svnkit') {
     dependencies {
-        compile 'de.regnis.q.sequence:sequence-library:1.0.3'
+        compile 'de.regnis.q.sequence:sequence-library:1.0.2'
         compile 'org.tmatesoft.sqljet:sqljet:1.1.10'
         compile 'net.java.dev.jna:jna:4.1.0'
         compile 'net.java.dev.jna:jna-platform:4.1.0'

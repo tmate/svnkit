@@ -15,7 +15,7 @@ import org.tmatesoft.svn.core.internal.wc17.db.SvnWcDbStatementUtil;
 public class SVNWCDbSelectMovedHereChildren extends SVNSqlJetSelectFieldsStatement<SVNWCDbSchema.NODES__Fields> {
 
     public SVNWCDbSelectMovedHereChildren(SVNSqlJetDb sDb) throws SVNException {
-        super(sDb, SVNWCDbSchema.NODES, SVNWCDbSchema.NODES__Indices.I_NODES_MOVED);
+        super(sDb, SVNWCDbSchema.NODES);
     }
 
     @Override

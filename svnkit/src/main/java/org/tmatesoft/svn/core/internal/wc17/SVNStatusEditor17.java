@@ -151,7 +151,7 @@ public class SVNStatusEditor17 {
         return myIsNoIgnore;
     }
 
-    private static Collection<String> getGlobalIgnores(ISVNOptions options) {
+    public static Collection<String> getGlobalIgnores(ISVNOptions options) {
         if (options != null) {
             String[] ignores = options.getIgnorePatterns();
             if (ignores != null) {

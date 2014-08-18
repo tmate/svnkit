@@ -125,6 +125,12 @@ public class SVNEvent {
     private SVNProperties myRevisionProperties;
     private String myPropertyName;
     private Object info;
+    private int hunkOriginalStart;
+    private int hunkOriginalLength;
+    private int hunkModifiedStart;
+    private int hunkModifiedLength;
+    private int hunkMatchedLine;
+    private int hunkFuzz;
 
     /**
      * Constructs an <b>SVNEvent</b> object given
@@ -465,5 +471,29 @@ public class SVNEvent {
 
     public void setPropertyName(String propertyName) {
         this.myPropertyName = propertyName;
+    }
+
+    public void setHunkOriginalStart(int hunkOriginalStart) {
+        this.hunkOriginalStart = hunkOriginalStart;
+    }
+
+    public void setHunkOriginalLength(int hunkOriginalLength) {
+        this.hunkOriginalLength = hunkOriginalLength;
+    }
+
+    public void setHunkModifiedStart(int hunkModifiedStart) {
+        this.hunkModifiedStart = hunkModifiedStart;
+    }
+
+    public void setHunkModifiedLength(int hunkModifiedLength) {
+        this.hunkModifiedLength = hunkModifiedLength;
+    }
+
+    public void setHunkMatchedLine(int hunkMatchedLine) {
+        this.hunkMatchedLine = hunkMatchedLine;
+    }
+
+    public void setHunkFuzz(int hunkFuzz) {
+        this.hunkFuzz = hunkFuzz;
     }
 }
