@@ -193,6 +193,67 @@ public class PatchTest {
         }
     }
 
+    @Test
+    public void testMovement() throws Exception {
+        final TestOptions options = TestOptions.getInstance();
+
+        final SvnOperationFactory svnOperationFactory = new SvnOperationFactory();
+        final Sandbox sandbox = Sandbox.createWithCleanup(getTestName() + ".testMovement", options);
+        try {
+            final SVNURL url = sandbox.createSvnRepository();
+
+            final CommitBuilder commitBuilder1 = new CommitBuilder(url);
+            commitBuilder1.addFile("file", "new".getBytes());
+            commitBuilder1.commit();
+
+            final CommitBuilder commitBuilder2 = new CommitBuilder(url);
+            commitBuilder2.delete("file");
+            commitBuilder2.addFileByCopying("movedFile", "file");
+            commitBuilder2.commit();
+
+            final SvnDiffGenerator diffGenerator = new SvnDiffGenerator();
+            diffGenerator.setBasePath(new File("").getAbsoluteFile());
+            final ByteArrayOutputStream output = new ByteArrayOutputStream();
+
+            final SvnDiff diff = svnOperationFactory.createDiff();
+            diff.setSource(SvnTarget.fromURL(url), SVNRevision.create(1), SVNRevision.create(2));
+            diff.setDiffGenerator(diffGenerator);
+            diff.setOutput(output);
+            diff.run();
+
+            final String patchString = output.toString();
+
+            final WorkingCopy workingCopy = sandbox.checkoutNewWorkingCopy(url, 1);
+            final File workingCopyDirectory = workingCopy.getWorkingCopyDirectory();
+            final File file = workingCopy.getFile("file");
+            final File movedFile = workingCopy.getFile("movedFile");
+            final File patchFile = new File(sandbox.createDirectory("directory"), "patchFile");
+
+            TestUtil.writeFileContentsString(patchFile, patchString);
+
+            final UpdateTest.EventsHandler eventHandler = new UpdateTest.EventsHandler();
+            svnOperationFactory.setEventHandler(eventHandler);
+
+            final SvnPatch patch = svnOperationFactory.createPatch();
+            patch.setSingleTarget(SvnTarget.fromFile(workingCopyDirectory));
+            patch.setPatchFile(patchFile);
+            patch.run();
+
+            Assert.assertFalse(file.exists());
+            Assert.assertEquals("new", TestUtil.readFileContentsString(movedFile));
+
+            final List<SVNEvent> events = eventHandler.getEvents();
+            Assert.assertEquals(2, events.size());
+            Assert.assertEquals(SVNEventAction.DELETE, events.get(0).getAction());
+            Assert.assertEquals(file, events.get(0).getFile());
+            Assert.assertEquals(SVNEventAction.ADD, events.get(1).getAction());
+            Assert.assertEquals(movedFile, events.get(1).getFile());
+        } finally {
+            svnOperationFactory.dispose();
+            sandbox.dispose();
+        }
+    }
+
     private String getTestName() {
         return getClass().getSimpleName();
     }

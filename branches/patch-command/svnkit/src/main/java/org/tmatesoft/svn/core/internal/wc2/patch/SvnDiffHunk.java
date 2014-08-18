@@ -190,6 +190,9 @@ public class SvnDiffHunk implements Comparable<SvnDiffHunk> {
                     if (eolStr != null && eolStr[0] != null && !str.endsWith("\r") && !str.endsWith("\n")) {
                         eolStr[0] = null;
                     }
+                    if (eof != null) {
+                        eof[0] = maxLen == 0;
+                    }
                 }
 
                 range.current = patchFileStream.getSeekPosition();
