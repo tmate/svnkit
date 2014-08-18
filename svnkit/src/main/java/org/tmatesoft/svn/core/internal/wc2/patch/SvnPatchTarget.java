@@ -913,7 +913,7 @@ public class SvnPatchTarget extends SvnTargetContent {
                     SVNFileUtil.createSymlink(getAbsPath(), SVNFileUtil.readFile(getPatchedAbsPath()));
                 } else {
                     boolean repairEol = getEolStyle() == SVNWCContext.SVNEolStyle.Fixed || getEolStyle() == SVNWCContext.SVNEolStyle.Native;
-                    SVNTranslator.translate(getPatchedAbsPath(), getMoveTargetAbsPath() != null ? getMoveTargetAbsPath() : getAbsPath(), null, getEolStr().getBytes(), getKeywords(), false, true);
+                    SVNTranslator.translate(getPatchedAbsPath(), getMoveTargetAbsPath() != null ? getMoveTargetAbsPath() : getAbsPath(), null, getEolStr() == null ? null : getEolStr().getBytes(), getKeywords(), false, true);
                 }
 
                 if (isAdded() || isReplaced()) {

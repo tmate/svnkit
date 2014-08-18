@@ -499,7 +499,7 @@ public class SvnPatch {
         int commaPos = range.indexOf(",");
         if (commaPos >= 0) {
             if (range.length() > 1) {
-                if (!parseOffset(length, range.substring(commaPos))) {
+                if (!parseOffset(length, range.substring(commaPos + ",".length()))) {
                     return false;
                 }
                 range.setLength(commaPos);
