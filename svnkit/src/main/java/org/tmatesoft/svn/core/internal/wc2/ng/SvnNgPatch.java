@@ -123,7 +123,7 @@ public class SvnNgPatch extends SvnNgOperationRunner<Void, SvnPatch> {
         File dirAbsPath = SVNFileUtil.getFileDir(deletedTarget);
         Collection<String> globalIgnores = SVNStatusEditor17.getGlobalIgnores(context.getOptions());
 
-        while (SVNPathUtil.isAncestor(SVNFileUtil.getFilePath(applyRoot), SVNFileUtil.getFilePath(dirAbsPath))) {
+        while (SVNPathUtil.isAncestor(SVNFileUtil.getFilePath(applyRoot), SVNFileUtil.getFilePath(dirAbsPath)) && !applyRoot.equals(dirAbsPath)) {
             final CanDeleteBaton statusWalker = new CanDeleteBaton();
             statusWalker.localAbsPath = dirAbsPath;
             statusWalker.mustKeep = false;
