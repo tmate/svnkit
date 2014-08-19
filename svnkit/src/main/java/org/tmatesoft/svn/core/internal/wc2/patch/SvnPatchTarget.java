@@ -451,7 +451,7 @@ public class SvnPatchTarget extends SvnTargetContent {
                 if (!taken) {
                     matchedLine = getCurrentLine();
                     if (matchFirst) {
-                        return matchedLine;
+                        break;
                     }
                 }
             }
@@ -459,7 +459,7 @@ public class SvnPatchTarget extends SvnTargetContent {
                 seekToLine(getCurrentLine() + 1);
             }
         }
-        return 0;
+        return matchedLine;
     }
 
     private static void copyLinesToTarget(SvnTargetContent target, int line) throws SVNException {
@@ -1160,12 +1160,7 @@ public class SvnPatchTarget extends SvnTargetContent {
         }
 
         SVNEvent event = SVNEventFactory.createSVNEvent(getAbsPath() != null ? getAbsPath() : getRelPath(), SVNNodeKind.UNKNOWN, null, -1, action, action, null, null);
-        event.setHunkOriginalStart(hunkInfo.getHunk().getDirectedOriginalStart());
-        event.setHunkOriginalLength(hunkInfo.getHunk().getDirectedOriginalLength());
-        event.setHunkModifiedStart(hunkInfo.getHunk().getDirectedModifiedStart());
-        event.setHunkMatchedLine(hunkInfo.getHunk().getDirectedModifiedLength());
-        event.setHunkMatchedLine(hunkInfo.getMatchedLine());
-        event.setHunkFuzz(hunkInfo.getFuzz());
+        event.setInfo(hunkInfo);
         event.setPropertyName(propName);
 
         ISVNEventHandler eventHandler = context.getEventHandler();
