@@ -54,8 +54,9 @@ public class SVNPatchCommand extends SVNCommand {
         }
 
         final SVNDiffClient client = getSVNEnvironment().getClientManager().getDiffClient();
+        SVNNotifyPrinter printer = new SVNNotifyPrinter(getSVNEnvironment());
         if (!getSVNEnvironment().isQuiet()) {
-            client.setEventHandler(new SVNNotifyPrinter(getSVNEnvironment()));
+            client.setEventHandler(printer);
         }
 
         final File patchPath = new File((String) targets.get(0));
@@ -67,6 +68,12 @@ public class SVNPatchCommand extends SVNCommand {
             getSVNEnvironment().handleWarning(e.getErrorMessage(), new SVNErrorCode[] {
                     SVNErrorCode.ENTRY_EXISTS, SVNErrorCode.WC_PATH_NOT_FOUND
             }, getSVNEnvironment().isQuiet());
+        } finally {
+            if (!getSVNEnvironment().isQuiet()) {
+                StringBuffer status = new StringBuffer();
+                printer.printConflictStatus(status);
+                getSVNEnvironment().getOut().print(status);
+            }
         }
     }
 
