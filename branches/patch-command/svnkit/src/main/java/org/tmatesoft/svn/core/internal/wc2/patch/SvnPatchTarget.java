@@ -465,7 +465,7 @@ public class SvnPatchTarget extends SvnTargetContent {
     private static void copyLinesToTarget(SvnTargetContent target, int line) throws SVNException {
         while ((target.getCurrentLine() < line || line == 0) && !target.isEof()) {
             String targetLine = target.readLine();
-            if (target.isEof()) {
+            if (!target.isEof()) {
                 targetLine = targetLine + target.getEolStr();
             }
             target.getWriteCallback().write(target.getWriteBaton(), targetLine);
@@ -1409,7 +1409,7 @@ public class SvnPatchTarget extends SvnTargetContent {
                     eof[0] = isEof;
                 }
                 if (eolStr != null) {
-                    eolStr[0] = eolStrBuffer.toString();
+                    eolStr[0] = eolStrBuffer.length() == 0 ? null : eolStrBuffer.toString();
                 }
 
                 return lineBuffer.toString();

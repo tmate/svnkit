@@ -207,10 +207,12 @@ public class SvnPatch {
                     String s = buffer.toString();
                     StringBuffer eolStrBuffer = new StringBuffer();
                     eof = patchStream.readLineWithEol(lineBuffer, eolStrBuffer);
-                    String eolStr = eolStrBuffer.toString();
+                    String eolStr = eolStrBuffer.length() == 0 ? null : eolStrBuffer.toString();
                     long hunkTextEnd;
 
-                    if (eolStr.charAt(0) == '\r' && eolStr.charAt(1) == '\n') {
+                    if (eolStr == null) {
+                        hunkTextEnd = lastLine;
+                    } else if (eolStr.charAt(0) == '\r' && eolStr.charAt(1) == '\n') {
                         hunkTextEnd = lastLine - 2;
                     } else if (eolStr.charAt(0) == '\n' || eolStr.charAt(0) == '\r') {
                         hunkTextEnd = lastLine - 1;

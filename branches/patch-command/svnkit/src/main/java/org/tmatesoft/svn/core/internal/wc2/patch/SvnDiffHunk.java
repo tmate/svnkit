@@ -182,6 +182,11 @@ public class SvnDiffHunk implements Comparable<SvnDiffHunk> {
 
             do {
                 maxLen = range.end - range.current;
+                String oldEol = null;
+                if (maxLen < 0) {
+                    oldEol = eolStr[0];
+                }
+
                 str = readLine(patchFileStream, eolStr, eof);
 
                 //here we apply "maxLen" restriction; suppose str="abcd\n", maxLen=3: we should cut str to "abc" and forget about finding EOL
@@ -193,6 +198,8 @@ public class SvnDiffHunk implements Comparable<SvnDiffHunk> {
                     if (eof != null) {
                         eof[0] = maxLen == 0;
                     }
+                } else if (maxLen < 0) {
+                    eolStr[0] = oldEol;
                 }
 
                 range.current = patchFileStream.getSeekPosition();
@@ -224,7 +231,7 @@ public class SvnDiffHunk implements Comparable<SvnDiffHunk> {
             eof[0] = patchFileStream.readLineWithEol(lineBuffer, eolStrBuffer);
         }
         if (eolStr != null) {
-            eolStr[0] = eolStrBuffer.toString();
+            eolStr[0] = eolStrBuffer.length() == 0 ? null : eolStrBuffer.toString();
         }
         return lineBuffer.toString();
 //
