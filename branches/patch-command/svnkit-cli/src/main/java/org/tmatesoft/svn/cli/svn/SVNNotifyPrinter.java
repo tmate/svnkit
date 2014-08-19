@@ -395,8 +395,11 @@ public class SVNNotifyPrinter implements ISVNEventHandler {
             }
 
             if (buffer.length() > 0) {
-                buffer.append(' ');
+                while (buffer.length() < 10) {
+                    buffer.append(' ');
+                }
                 buffer.append(path);
+                buffer.append('\n');
             }
 
         } else if (event.getAction() == SVNEventAction.PATCH_APPLIED_HUNK) {

@@ -405,7 +405,7 @@ public abstract class AbstractSVNCommandEnvironment implements ISVNCanceller {
         String inPath = file.getAbsolutePath().replace(File.separatorChar, '/');
         String basePath = new File("").getAbsolutePath().replace(File.separatorChar, '/');
         String commonRoot = getCommonAncestor(inPath, basePath);
-        if (commonRoot != null) {
+        if (commonRoot != null && commonRoot.length() > 0) {
             if (equals(inPath , commonRoot)) {
                 return "";
             } else if (startsWith(inPath, commonRoot + "/") && !"/".equals(inPath)) {

@@ -286,6 +286,12 @@ public class SvnPatchTarget extends SvnTargetContent {
                     }
                 }
             } while (!eof[0]);
+
+            if (propName != null) {
+                target.setHadPropRejects(true);
+            } else {
+                target.setHadRejects(true);
+            }
         } catch (IOException e) {
             SVNErrorMessage errorMessage = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, e);
             SVNErrorManager.error(errorMessage, SVNLogType.WC);
@@ -1112,7 +1118,7 @@ public class SvnPatchTarget extends SvnTargetContent {
 
             if (hadPropRejects()) {
                 propState = SVNStatusType.CONFLICTED;
-            } else {
+            } else if (hasPropChanges()) {
                 propState = SVNStatusType.CHANGED;
             }
         }
@@ -1176,8 +1182,16 @@ public class SvnPatchTarget extends SvnTargetContent {
         return hadRejects;
     }
 
+    public void setHadRejects(boolean hadRejects) {
+        this.hadRejects = hadRejects;
+    }
+
     private boolean hadPropRejects() {
         return hadPropRejects;
+    }
+
+    public void setHadPropRejects(boolean hadPropRejects) {
+        this.hadPropRejects = hadPropRejects;
     }
 
     public void setSkipped(boolean skipped) {
