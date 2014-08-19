@@ -17,6 +17,7 @@ import org.tmatesoft.svn.core.internal.util.SVNFormatUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 import org.tmatesoft.svn.core.internal.wc.patch.SVNPatchHunk;
 import org.tmatesoft.svn.core.internal.wc.patch.SVNPatchHunkInfo;
+import org.tmatesoft.svn.core.internal.wc2.patch.SvnHunkInfo;
 import org.tmatesoft.svn.core.wc.*;
 import org.tmatesoft.svn.util.SVNDebugLog;
 import org.tmatesoft.svn.util.SVNLogType;
@@ -408,56 +409,81 @@ public class SVNNotifyPrinter implements ISVNEventHandler {
 
             final Object info = event.getInfo();
 
-            if (info == null || !(info instanceof SVNPatchHunkInfo)) {
+            if (info == null || (!(info instanceof SVNPatchHunkInfo) && !(info instanceof SvnHunkInfo))) {
                 return;
             }
 
-            final SVNPatchHunkInfo hi = (SVNPatchHunkInfo) info;
-            final SVNPatchHunk hunk = hi.getHunk();
+            final int hunkOriginalStart;
+            final int hunkOriginalLength;
+            final int hunkModifiedStart;
+            final int hunkModifiedLength;
+            final int hunkMatchedLine;
+            final int hunkFuzz;
 
-            if (hunk.getOriginal().getStart() != hi.getMatchedLine()) {
+            if (info instanceof SVNPatchHunkInfo) {
+                final SVNPatchHunkInfo hi = (SVNPatchHunkInfo) info;
+                final SVNPatchHunk hunk = hi.getHunk();
+
+                hunkOriginalStart = hunk.getOriginal().getStart();
+                hunkOriginalLength = hunk.getOriginal().getLength();
+                hunkModifiedStart = hunk.getModified().getStart();
+                hunkModifiedLength = hunk.getModified().getLength();
+                hunkMatchedLine = hi.getMatchedLine();
+                hunkFuzz = hi.getFuzz();
+            } else {
+                assert info instanceof SvnHunkInfo;
+                final SvnHunkInfo hunkInfo = (SvnHunkInfo) info;
+                hunkOriginalStart = hunkInfo.getHunk().getDirectedOriginalStart();
+                hunkOriginalLength = hunkInfo.getHunk().getDirectedOriginalLength();
+                hunkModifiedStart = hunkInfo.getHunk().getDirectedModifiedStart();
+                hunkModifiedLength = hunkInfo.getHunk().getDirectedModifiedLength();
+                hunkMatchedLine = hunkInfo.getMatchedLine();
+                hunkFuzz = hunkInfo.getFuzz();
+            }
+
+            if (hunkOriginalStart != hunkMatchedLine) {
                 long off;
                 String minus;
 
-                if (hi.getMatchedLine() > hunk.getOriginal().getStart()) {
-                    off = hi.getMatchedLine() - hunk.getOriginal().getStart();
+                if (hunkMatchedLine > hunkOriginalStart) {
+                    off = hunkMatchedLine - hunkOriginalStart;
                     minus = null;
                 } else {
-                    off = hunk.getOriginal().getStart() - hi.getMatchedLine();
+                    off = hunkOriginalStart - hunkMatchedLine;
                     minus = "-";
                 }
 
                 buffer.append(">         applied hunk @@ -");
-                buffer.append(hunk.getOriginal().getStart());
+                buffer.append(hunkOriginalStart);
                 buffer.append(",");
-                buffer.append(hunk.getOriginal().getLength());
+                buffer.append(hunkOriginalLength);
                 buffer.append(" +");
-                buffer.append(hunk.getModified().getStart());
+                buffer.append(hunkModifiedStart);
                 buffer.append(",");
-                buffer.append(hunk.getModified().getLength());
+                buffer.append(hunkModifiedLength);
                 buffer.append(" @@ with offset ");
                 if (null != minus) {
                     buffer.append(minus);
                 }
                 buffer.append(off);
-                if (hi.getFuzz() > 0) {
+                if (hunkFuzz > 0) {
                     buffer.append(" and fuzz ");
-                    buffer.append(hi.getFuzz());
+                    buffer.append(hunkFuzz);
                 }
                 buffer.append("\n");
 
-            } else if (hi.getFuzz() > 0) {
+            } else if (hunkFuzz > 0) {
 
                 buffer.append(">         applied hunk @@ -");
-                buffer.append(hunk.getOriginal().getStart());
+                buffer.append(hunkOriginalStart);
                 buffer.append(",");
-                buffer.append(hunk.getOriginal().getLength());
+                buffer.append(hunkOriginalLength);
                 buffer.append(" +");
-                buffer.append(hunk.getModified().getStart());
+                buffer.append(hunkModifiedStart);
                 buffer.append(",");
-                buffer.append(hunk.getModified().getLength());
+                buffer.append(hunkModifiedLength);
                 buffer.append(" @@ with fuzz ");
-                buffer.append(hi.getFuzz());
+                buffer.append(hunkFuzz);
                 buffer.append("\n");
 
             }
@@ -468,21 +494,46 @@ public class SVNNotifyPrinter implements ISVNEventHandler {
 
             final Object info = event.getInfo();
 
-            if (info == null || !(info instanceof SVNPatchHunkInfo)) {
+            if (info == null || (!(info instanceof SVNPatchHunkInfo) && !(info instanceof SvnHunkInfo))) {
                 return;
             }
 
-            final SVNPatchHunkInfo hi = (SVNPatchHunkInfo) info;
-            final SVNPatchHunk hunk = hi.getHunk();
+            final int hunkOriginalStart;
+            final int hunkOriginalLength;
+            final int hunkModifiedStart;
+            final int hunkModifiedLength;
+            final int hunkMatchedLine;
+            final int hunkFuzz;
+
+            if (info instanceof SVNPatchHunkInfo) {
+                final SVNPatchHunkInfo hi = (SVNPatchHunkInfo) info;
+                final SVNPatchHunk hunk = hi.getHunk();
+
+                hunkOriginalStart = hunk.getOriginal().getStart();
+                hunkOriginalLength = hunk.getOriginal().getLength();
+                hunkModifiedStart = hunk.getModified().getStart();
+                hunkModifiedLength = hunk.getModified().getLength();
+                hunkMatchedLine = hi.getMatchedLine();
+                hunkFuzz = hi.getFuzz();
+            } else {
+                assert info instanceof SvnHunkInfo;
+                final SvnHunkInfo hunkInfo = (SvnHunkInfo) info;
+                hunkOriginalStart = hunkInfo.getHunk().getDirectedOriginalStart();
+                hunkOriginalLength = hunkInfo.getHunk().getDirectedOriginalLength();
+                hunkModifiedStart = hunkInfo.getHunk().getDirectedModifiedStart();
+                hunkModifiedLength = hunkInfo.getHunk().getDirectedModifiedLength();
+                hunkMatchedLine = hunkInfo.getMatchedLine();
+                hunkFuzz = hunkInfo.getFuzz();
+            }
 
             buffer.append(">         rejected hunk @@ -");
-            buffer.append(hunk.getOriginal().getStart());
+            buffer.append(hunkOriginalStart);
             buffer.append(",");
-            buffer.append(hunk.getOriginal().getLength());
+            buffer.append(hunkOriginalLength);
             buffer.append(" +");
-            buffer.append(hunk.getModified().getStart());
+            buffer.append(hunkModifiedStart);
             buffer.append(",");
-            buffer.append(hunk.getModified().getLength());
+            buffer.append(hunkModifiedLength);
             buffer.append(" @@\n");
 
         } else if (event.getAction() == SVNEventAction.UPGRADED_PATH) {
