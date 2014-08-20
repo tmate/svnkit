@@ -41,6 +41,7 @@ public class SVNPatchCommand extends SVNCommand {
         options.add(SVNOption.DIFF3_CMD); // is it opt_merge_cmd ?
         options.add(SVNOption.STRIP);
         options.add(SVNOption.REVERSE_DIFF);
+        options.add(SVNOption.IGNORE_WHITESPACE);
         return options;
     }
 
@@ -64,7 +65,7 @@ public class SVNPatchCommand extends SVNCommand {
         final File targetPath = new File(targetsCount != 2 ? "." : (String) targets.get(1));
 
         try {
-            client.doPatch(patchPath.getAbsoluteFile(), targetPath.getAbsoluteFile(), getSVNEnvironment().isDryRun(), getSVNEnvironment().getStripCount(), false, true, getSVNEnvironment().isReverseDiff());
+            client.doPatch(patchPath.getAbsoluteFile(), targetPath.getAbsoluteFile(), getSVNEnvironment().isDryRun(), getSVNEnvironment().getStripCount(), getSVNEnvironment().isIgnoreWhitespace(), true, getSVNEnvironment().isReverseDiff());
         } catch (SVNException e) {
             getSVNEnvironment().handleWarning(e.getErrorMessage(), new SVNErrorCode[] {
                     SVNErrorCode.ENTRY_EXISTS, SVNErrorCode.WC_PATH_NOT_FOUND

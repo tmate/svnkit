@@ -105,6 +105,7 @@ public class SVNOption extends AbstractSVNOption {
     public static final SVNOption INCLUDE_EXTERNALS = new SVNOption("include-externals");
     public static final SVNOption PROPERTIES_ONLY = new SVNOption("properties-only");
     public static final SVNOption REVERSE_DIFF = new SVNOption("reverse-diff");
+    public static final SVNOption IGNORE_WHITESPACE = new SVNOption("ignore-whitespace");
 
     public static Collection addLogMessageOptions(Collection target) {
         if (target != null) {
