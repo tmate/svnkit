@@ -318,7 +318,7 @@ public class SvnPatchTarget extends SvnTargetContent {
             String hunkLine = hunkInfo.getHunk().readLineModifiedText(eolStr, eof);
             linesRead++;
             if (linesRead > hunkInfo.getFuzz() &&
-                    linesRead <= hunkInfo.getHunk().getDirectedModifiedLength()) {
+                    linesRead <= hunkInfo.getHunk().getDirectedModifiedLength() - hunkInfo.getFuzz()) {
                 if (hunkLine.length() >= 1) {
                     target.getWriteCallback().write(target.getWriteBaton(), hunkLine);
                 }
