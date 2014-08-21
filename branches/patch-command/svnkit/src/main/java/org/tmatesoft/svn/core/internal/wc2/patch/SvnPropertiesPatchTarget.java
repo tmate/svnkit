@@ -31,10 +31,18 @@ public class SvnPropertiesPatchTarget extends SvnTargetContent {
                 throw e;
             }
         }
+        propPatchTarget.setExisted(value != null);
         propPatchTarget.setValue(value);
         propPatchTarget.setPatchedValue(SVNPropertyValue.create(""));
 
-        propPatchTarget.setRealLineCallback(new PropReadCallbacks(propPatchTarget, value, 0));
+        PropReadCallbacks propCallbacks = new PropReadCallbacks(propPatchTarget, value, 0);
+        propPatchTarget.setReadBaton(propCallbacks);
+        propPatchTarget.setReadLineCallback(propCallbacks);
+        propPatchTarget.setTellCallback(propCallbacks);
+        propPatchTarget.setSeekCallback(propCallbacks);
+        propPatchTarget.setWriteCallback(propCallbacks);
+        propPatchTarget.setWriteBaton(propPatchTarget.getPatchedValue());
+
         return propPatchTarget;
     }
 
@@ -42,11 +50,6 @@ public class SvnPropertiesPatchTarget extends SvnTargetContent {
     private SVNPropertyValue value;
     private SVNPropertyValue patchedValue;
     private SvnDiffCallback.OperationKind operation;
-
-    private IRealLineCallback realLineCallback;
-    private ITellCallback tellCallback;
-    private ISeekCallback seekCallback;
-    private IWriteCallback writeCallback;
 
     public String getName() {
         return name;
@@ -78,38 +81,6 @@ public class SvnPropertiesPatchTarget extends SvnTargetContent {
 
     public void setOperation(SvnDiffCallback.OperationKind operation) {
         this.operation = operation;
-    }
-
-    public IRealLineCallback getRealLineCallback() {
-        return realLineCallback;
-    }
-
-    public void setRealLineCallback(IRealLineCallback realLineCallback) {
-        this.realLineCallback = realLineCallback;
-    }
-
-    public ITellCallback getTellCallback() {
-        return tellCallback;
-    }
-
-    public void setTellCallback(ITellCallback tellCallback) {
-        this.tellCallback = tellCallback;
-    }
-
-    public ISeekCallback getSeekCallback() {
-        return seekCallback;
-    }
-
-    public void setSeekCallback(ISeekCallback seekCallback) {
-        this.seekCallback = seekCallback;
-    }
-
-    public IWriteCallback getWriteCallback() {
-        return writeCallback;
-    }
-
-    public void setWriteCallback(IWriteCallback writeCallback) {
-        this.writeCallback = writeCallback;
     }
 
     private static class PropReadCallbacks implements ITellCallback, IRealLineCallback, ISeekCallback, IWriteCallback {
@@ -153,7 +124,7 @@ public class SvnPropertiesPatchTarget extends SvnTargetContent {
                             offset++;
                         }
                     } else {
-                        byteArrayOutputStream.write(valueBytes);
+                        byteArrayOutputStream.write(valueBytes[pos]);
                     }
 
                     if (eolStr[0] != null) {

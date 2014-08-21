@@ -143,7 +143,7 @@ public class SvnPatchTarget extends SvnTargetContent {
             SvnHunkInfo hunkInfo;
             int fuzz = 0;
             do {
-                hunkInfo = target.getHunkInfo(hunk, fuzz, ignoreWhitespace, false);
+                hunkInfo = target.getHunkInfo(hunk, target, fuzz, ignoreWhitespace, false);
                 fuzz++;
             } while (hunkInfo.isRejected() && fuzz <= MAX_FUZZ && !hunkInfo.isAlreadyApplied());
 
@@ -183,7 +183,7 @@ public class SvnPatchTarget extends SvnTargetContent {
                 SvnHunkInfo hunkInfo;
                 int fuzz = 0;
                 do {
-                    hunkInfo = target.getHunkInfo(hunk, fuzz, ignoreWhitespace, true);
+                    hunkInfo = target.getHunkInfo(hunk, propTarget, fuzz, ignoreWhitespace, true);
                     fuzz++;
                 } while (hunkInfo.isRejected() && fuzz <= MAX_FUZZ && !hunkInfo.isAlreadyApplied());
 
@@ -338,7 +338,7 @@ public class SvnPatchTarget extends SvnTargetContent {
         }
     }
 
-    private SvnHunkInfo getHunkInfo(SvnDiffHunk hunk, int fuzz, boolean ignoreWhitespace, boolean isPropHunk) throws SVNException {
+    private SvnHunkInfo getHunkInfo(SvnDiffHunk hunk, SvnTargetContent targetContent, int fuzz, boolean ignoreWhitespace, boolean isPropHunk) throws SVNException {
         int originalStart = hunk.getDirectedOriginalStart();
         boolean alreadyApplied = false;
         int matchedLine;
@@ -355,7 +355,7 @@ public class SvnPatchTarget extends SvnTargetContent {
                     matchedLine = 1;
                 } else {
                     if (getDbKind() == SVNNodeKind.FILE) {
-                        boolean fileMatches = matchExistingTarget(hunk);
+                        boolean fileMatches = targetContent.matchExistingTarget(hunk);
                         if (fileMatches) {
                             matchedLine = 1;
                             alreadyApplied = false;
@@ -371,8 +371,8 @@ public class SvnPatchTarget extends SvnTargetContent {
                 matchedLine = 1;
             }
         } else if (originalStart == 0 && isPropHunk) {
-            if (isExisted()) {
-                boolean propMatches = matchExistingTarget(hunk);
+            if (targetContent.isExisted()) {
+                boolean propMatches = targetContent.matchExistingTarget(hunk);
                 if (propMatches) {
                     matchedLine = 1;
                     alreadyApplied = true;
@@ -382,13 +382,13 @@ public class SvnPatchTarget extends SvnTargetContent {
             } else {
                 matchedLine = 1;
             }
-        } else if (originalStart > 0 && isExisted()) {
-            int savedLine = getCurrentLine();
-            seekToLine(originalStart);
-            if (getCurrentLine() != originalStart) {
+        } else if (originalStart > 0 && targetContent.isExisted()) {
+            int savedLine = targetContent.getCurrentLine();
+            targetContent.seekToLine(originalStart);
+            if (targetContent.getCurrentLine() != originalStart) {
                 matchedLine = 0;
             } else {
-                matchedLine = scanForMatch(hunk, true, originalStart + 1, fuzz, ignoreWhitespace, false, null);
+                matchedLine = targetContent.scanForMatch(hunk, true, originalStart + 1, fuzz, ignoreWhitespace, false, null);
             }
 
             if (matchedLine != originalStart) {
@@ -397,8 +397,8 @@ public class SvnPatchTarget extends SvnTargetContent {
                     if (modifiedStart == 0) {
                         alreadyApplied = isLocallyDeleted();
                     } else {
-                        seekToLine(modifiedStart);
-                        matchedLine = scanForMatch(hunk, true, modifiedStart + 1, fuzz, ignoreWhitespace, true, null);
+                        targetContent.seekToLine(modifiedStart);
+                        matchedLine = targetContent.scanForMatch(hunk, true, modifiedStart + 1, fuzz, ignoreWhitespace, true, null);
                         alreadyApplied = (matchedLine == modifiedStart);
                     }
                 } else {
@@ -406,60 +406,19 @@ public class SvnPatchTarget extends SvnTargetContent {
                 }
 
                 if (!alreadyApplied) {
-                    seekToLine(1);
-                    matchedLine = scanForMatch(hunk, false, originalStart, fuzz, ignoreWhitespace, false, null);
+                    targetContent.seekToLine(1);
+                    matchedLine = targetContent.scanForMatch(hunk, false, originalStart, fuzz, ignoreWhitespace, false, null);
                     if (matchedLine == 0) {
-                        matchedLine = scanForMatch(hunk, true, 0, fuzz, ignoreWhitespace, false, null);
+                        matchedLine = targetContent.scanForMatch(hunk, true, 0, fuzz, ignoreWhitespace, false, null);
                     }
                 }
 
             }
-            seekToLine(savedLine);
+            targetContent.seekToLine(savedLine);
         } else {
             matchedLine = 0;
         }
         return new SvnHunkInfo(hunk, matchedLine, matchedLine == 0, alreadyApplied, fuzz);
-    }
-
-    private int scanForMatch(SvnDiffHunk hunk, boolean matchFirst, int upperLine, int fuzz, boolean ignoreWhitespace, boolean matchModified, ISVNCanceller canceller) throws SVNException {
-        int matchedLine = 0;
-        while ((getCurrentLine() < upperLine || upperLine == 0) && !isEof()) {
-            if (canceller != null) {
-                canceller.checkCancelled();
-            }
-
-            boolean matched = matchHunk(hunk, fuzz, ignoreWhitespace, matchModified);
-            if (matched) {
-                boolean taken = false;
-                int length;
-
-                List<SvnHunkInfo> hunks = getHunkInfos();
-                for (SvnHunkInfo hunkInfo : hunks) {
-                    if (matchModified) {
-                        length = hunkInfo.getHunk().getDirectedModifiedLength();
-                    } else {
-                        length = hunkInfo.getHunk().getDirectedOriginalLength();
-                    }
-                    taken = (!hunkInfo.isRejected() &&
-                            getCurrentLine() >= hunkInfo.getMatchedLine() &&
-                            getCurrentLine() < (hunkInfo.getMatchedLine() + length));
-                    if (taken) {
-                        break;
-                    }
-                }
-
-                if (!taken) {
-                    matchedLine = getCurrentLine();
-                    if (matchFirst) {
-                        break;
-                    }
-                }
-            }
-            if (!isEof()) {
-                seekToLine(getCurrentLine() + 1);
-            }
-        }
-        return matchedLine;
     }
 
     private static void copyLinesToTarget(SvnTargetContent target, int line) throws SVNException {
@@ -469,118 +428,6 @@ public class SvnPatchTarget extends SvnTargetContent {
                 targetLine = targetLine + target.getEolStr();
             }
             target.getWriteCallback().write(target.getWriteBaton(), targetLine);
-        }
-    }
-
-    private boolean matchHunk(SvnDiffHunk hunk, int fuzz, boolean ignoreWhitespace, boolean matchModified) throws SVNException {
-        boolean matched = false;
-
-        if (isEof()) {
-            return matched;
-        }
-
-        int savedLine = getCurrentLine();
-        int linesRead = 0;
-        boolean linesMatched = false;
-        int leadingContext = hunk.getLeadingContext();
-        int trailingContext = hunk.getTrailingContext();
-        int hunkLength;
-        if (matchModified) {
-            hunk.resetModifiedText();
-            hunkLength = hunk.getDirectedModifiedLength();
-        } else {
-            hunk.resetOriginalText();
-            hunkLength = hunk.getDirectedOriginalLength();
-        }
-
-        boolean[] hunkEof;
-        String hunkLine;
-        do {
-            String hunkLineTranslated;
-
-            hunkEof = new boolean[1];
-            if (matchModified) {
-                hunkLine = hunk.readLineModifiedText(null, hunkEof);
-            } else {
-                hunkLine = hunk.readLineOriginalText(null, hunkEof);
-            }
-
-            hunkLineTranslated = SVNTranslator.translateString(hunkLine, null, getKeywords(), false, false);
-            String targetLine = readLine();
-            linesRead++;
-            if ((hunkEof[0] && hunkLine.length() == 0) || (isEof() && targetLine.length() == 0)) {
-                break;
-            }
-
-            if ((linesRead <= fuzz && leadingContext > fuzz) ||
-                    linesRead > hunkLength - fuzz && trailingContext > fuzz) {
-                linesMatched = true;
-            } else {
-                if (ignoreWhitespace) {
-                    String hunkLineTrimmed = hunkLineTranslated;
-                    String targetLineTrimmed = targetLine;
-                    hunkLineTrimmed = SVNFormatUtil.collapseSpaces(hunkLineTrimmed);
-                    targetLineTrimmed = SVNFormatUtil.collapseSpaces(targetLineTrimmed);
-                    linesMatched = hunkLineTrimmed.equals(targetLineTrimmed);
-                } else {
-                    linesMatched = hunkLineTranslated.equals(targetLine);
-                }
-            }
-
-        } while (linesMatched);
-
-        boolean ret = linesMatched && hunkEof[0] && hunkLine.length() == 0;
-        seekToLine(savedLine);
-        return ret;
-    }
-
-    private boolean matchExistingTarget(SvnDiffHunk hunk) throws SVNException {
-        hunk.resetModifiedText();
-        boolean[] hunkEof = {false};
-        boolean linesMatched;
-        int savedLine = getCurrentLine();
-
-        do {
-            String line = readLine();
-            String hunkLine = hunk.readLineModifiedText(null, hunkEof);
-
-            String lineTranslated = SVNTranslator.translateString(line, null, getKeywords(), false, false);
-            String hunkLineTranslated = SVNTranslator.translateString(hunkLine, null, getKeywords(), false, false);
-
-            linesMatched = lineTranslated.equals(hunkLineTranslated);
-
-            if (isEof() != hunkEof[0]) {
-                return false;
-            }
-        } while (linesMatched && !isEof() && !hunkEof[0]);
-
-        boolean result = linesMatched && isEof() == hunkEof[0];
-        seekToLine(savedLine);
-        return result;
-    }
-
-    private void seekToLine(int line) throws SVNException {
-        assert line > 0;
-
-        if (line == getCurrentLine()) {
-            return;
-        }
-
-        int savedLine = getCurrentLine();
-        boolean savedEof = isEof();
-
-        if (line <= getLines().size()) {
-            long offset = (long) getLines().get(line - 1);
-            getSeekCallback().seek(getReadBaton(), offset);
-            setCurrentLine(line);
-        } else {
-            while (!isEof() && getCurrentLine() < line) {
-                readLine();
-            }
-        }
-
-        if (savedEof && savedLine > getCurrentLine()) {
-            setEof(false);
         }
     }
 
@@ -1096,8 +943,8 @@ public class SvnPatchTarget extends SvnTargetContent {
             eventPath = getAbsPath() != null ? getAbsPath() : getRelPath();
         }
 
-        SVNStatusType contentState = null;
-        SVNStatusType propState = null;
+        SVNStatusType contentState = SVNStatusType.UNKNOWN;
+        SVNStatusType propState = SVNStatusType.UNKNOWN;
 
         if (action == SVNEventAction.SKIP) {
             if (getDbKind() == SVNNodeKind.NONE || getDbKind() == SVNNodeKind.UNKNOWN) {
