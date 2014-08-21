@@ -357,7 +357,7 @@ public class SvnPatchTarget extends SvnTargetContent {
                         boolean fileMatches = targetContent.matchExistingTarget(hunk);
                         if (fileMatches) {
                             matchedLine = 1;
-                            alreadyApplied = false;
+                            alreadyApplied = true;
                         } else {
                             matchedLine = 0;
                         }
