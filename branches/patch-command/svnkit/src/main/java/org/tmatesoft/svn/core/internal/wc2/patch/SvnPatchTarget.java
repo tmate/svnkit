@@ -2,7 +2,6 @@ package org.tmatesoft.svn.core.internal.wc2.patch;
 
 import org.tmatesoft.svn.core.*;
 import org.tmatesoft.svn.core.internal.util.SVNDate;
-import org.tmatesoft.svn.core.internal.util.SVNFormatUtil;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
 import org.tmatesoft.svn.core.internal.wc.*;
 import org.tmatesoft.svn.core.internal.wc.admin.SVNTranslator;
@@ -156,7 +155,7 @@ public class SvnPatchTarget extends SvnTargetContent {
             } else if (hunkInfo.isRejected()) {
                 rejectHunk(target, hunkInfo.getHunk(), null);
             } else {
-                applyHunk(target, hunkInfo, null);
+                applyHunk(target, target, hunkInfo, null);
             }
         }
 
@@ -203,7 +202,7 @@ public class SvnPatchTarget extends SvnTargetContent {
                 } else if (hunkInfo.isRejected()) {
                     rejectHunk(target, hunkInfo.getHunk(), propTarget.getName());
                 } else {
-                    applyHunk(target, hunkInfo, propTarget.getName());
+                    applyHunk(target, propTarget, hunkInfo, propTarget.getName());
                 }
             }
 
@@ -298,12 +297,12 @@ public class SvnPatchTarget extends SvnTargetContent {
         }
     }
 
-    private static void applyHunk(SvnPatchTarget target, SvnHunkInfo hunkInfo, String propName) throws SVNException {
+    private static void applyHunk(SvnPatchTarget target, SvnTargetContent targetContent, SvnHunkInfo hunkInfo, String propName) throws SVNException {
         if (target.getKindOnDisk() == SVNNodeKind.FILE || propName != null) {
-            copyLinesToTarget(target, hunkInfo.getMatchedLine() + hunkInfo.getFuzz());
-            int line = target.getCurrentLine() + hunkInfo.getHunk().getDirectedOriginalLength() - (2 * hunkInfo.getFuzz());
-            target.seekToLine(line);
-            if (target.getCurrentLine() != line && !target.isEof()) {
+            copyLinesToTarget(targetContent, hunkInfo.getMatchedLine() + hunkInfo.getFuzz());
+            int line = targetContent.getCurrentLine() + hunkInfo.getHunk().getDirectedOriginalLength() - (2 * hunkInfo.getFuzz());
+            targetContent.seekToLine(line);
+            if (targetContent.getCurrentLine() != line && !targetContent.isEof()) {
                 hunkInfo.setRejected(true);
                 rejectHunk(target, hunkInfo.getHunk(), propName);
                 return;
@@ -320,13 +319,13 @@ public class SvnPatchTarget extends SvnTargetContent {
             if (linesRead > hunkInfo.getFuzz() &&
                     linesRead <= hunkInfo.getHunk().getDirectedModifiedLength() - hunkInfo.getFuzz()) {
                 if (hunkLine.length() >= 1) {
-                    target.getWriteCallback().write(target.getWriteBaton(), hunkLine);
+                    targetContent.getWriteCallback().write(target.getWriteBaton(), hunkLine);
                 }
                 if (eolStr[0] != null) {
-                    if (target.getEolStyle() != SVNWCContext.SVNEolStyle.None) {
-                        eolStr[0] = target.getEolStr();
+                    if (targetContent.getEolStyle() != SVNWCContext.SVNEolStyle.None) {
+                        eolStr[0] = targetContent.getEolStr();
                     }
-                    target.getWriteCallback().write(target.getWriteBaton(), eolStr[0]);
+                    targetContent.getWriteCallback().write(target.getWriteBaton(), eolStr[0]);
                 }
             }
         } while (!eof[0]);
