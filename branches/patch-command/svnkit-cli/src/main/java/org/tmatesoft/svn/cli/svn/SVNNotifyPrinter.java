@@ -545,6 +545,66 @@ public class SVNNotifyPrinter implements ISVNEventHandler {
             buffer.append(hunkModifiedLength);
             buffer.append(" @@\n");
 
+        } else if (event.getAction() == SVNEventAction.PATCH_HUNK_ALREADY_APPLIED) {
+            myIsChangesReceived = true;
+
+            Object info = event.getInfo();
+
+            if (info == null || (!(info instanceof SVNPatchHunkInfo) && !(info instanceof SvnHunkInfo))) {
+                return;
+            }
+
+            final int hunkOriginalStart;
+            final int hunkOriginalLength;
+            final int hunkModifiedStart;
+            final int hunkModifiedLength;
+            final int hunkMatchedLine;
+            final int hunkFuzz;
+
+            if (info instanceof SVNPatchHunkInfo) {
+                final SVNPatchHunkInfo hi = (SVNPatchHunkInfo) info;
+                final SVNPatchHunk hunk = hi.getHunk();
+
+                hunkOriginalStart = hunk.getOriginal().getStart();
+                hunkOriginalLength = hunk.getOriginal().getLength();
+                hunkModifiedStart = hunk.getModified().getStart();
+                hunkModifiedLength = hunk.getModified().getLength();
+                hunkMatchedLine = hi.getMatchedLine();
+                hunkFuzz = hi.getFuzz();
+            } else {
+                assert info instanceof SvnHunkInfo;
+                final SvnHunkInfo hunkInfo = (SvnHunkInfo) info;
+                hunkOriginalStart = hunkInfo.getHunk().getDirectedOriginalStart();
+                hunkOriginalLength = hunkInfo.getHunk().getDirectedOriginalLength();
+                hunkModifiedStart = hunkInfo.getHunk().getDirectedModifiedStart();
+                hunkModifiedLength = hunkInfo.getHunk().getDirectedModifiedLength();
+                hunkMatchedLine = hunkInfo.getMatchedLine();
+                hunkFuzz = hunkInfo.getFuzz();
+            }
+
+            if (event.getPropertyName() != null) {
+                buffer.append(">         hunk ## -");
+                buffer.append(hunkOriginalStart);
+                buffer.append(",");
+                buffer.append(hunkOriginalLength);
+                buffer.append(" +");
+                buffer.append(hunkModifiedStart);
+                buffer.append(",");
+                buffer.append(hunkMatchedLine);
+                buffer.append(" ## already applied (");
+                buffer.append(event.getPropertyName());
+                buffer.append(")\n");
+            } else {
+                buffer.append(">         hunk @@ -");
+                buffer.append(hunkOriginalStart);
+                buffer.append(",");
+                buffer.append(hunkOriginalLength);
+                buffer.append(" +");
+                buffer.append(hunkModifiedStart);
+                buffer.append(",");
+                buffer.append(hunkModifiedLength);
+                buffer.append(" @@ already applied\n");
+            }
         } else if (event.getAction() == SVNEventAction.UPGRADED_PATH) {
         	myIsChangesReceived = true;
             buffer.append("Upgraded '" + path + "'\n");
