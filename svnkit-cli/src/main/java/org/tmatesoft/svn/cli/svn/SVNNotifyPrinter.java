@@ -387,6 +387,10 @@ public class SVNNotifyPrinter implements ISVNEventHandler {
                     buffer.append('U');
                 }
             }
+            if (buffer.length() < 1) {
+                buffer.append(' ');
+            }
+            //buffer size is 1 now
 
             if (event.getPropertiesStatus() == SVNStatusType.CONFLICTED) {
                 getConflictStats().storePropConflict(file.getAbsolutePath());
@@ -395,7 +399,12 @@ public class SVNNotifyPrinter implements ISVNEventHandler {
                 buffer.append('U');
             }
 
-            if (buffer.length() > 0) {
+            if (buffer.length() < 2) {
+                buffer.append(' ');
+            }
+            //buffer size is 2 now
+
+            if (buffer.charAt(0) != ' ' || buffer.charAt(1) != ' ') {
                 while (buffer.length() < 10) {
                     buffer.append(' ');
                 }
