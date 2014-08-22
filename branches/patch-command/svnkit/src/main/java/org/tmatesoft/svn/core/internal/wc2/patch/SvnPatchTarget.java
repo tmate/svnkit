@@ -995,8 +995,8 @@ public class SvnPatchTarget extends SvnTargetContent {
 
                 List<SvnHunkInfo> hunks = propTarget.getHunkInfos();
                 for (SvnHunkInfo hunkInfo : hunks) {
-                    if (propTarget.getOperation() == SvnDiffCallback.OperationKind.Added &&
-                            propTarget.getOperation() == SvnDiffCallback.OperationKind.Deleted) {
+                    if (propTarget.getOperation() != SvnDiffCallback.OperationKind.Added &&
+                            propTarget.getOperation() != SvnDiffCallback.OperationKind.Deleted) {
                         sendHunkNotification(hunkInfo, propTarget.getName(), context);
                     }
                 }
