@@ -170,7 +170,7 @@ public class SvnPatchTarget extends SvnTargetContent {
             final String propName = entry.getKey();
             final SvnPropertiesPatch propPatch = entry.getValue();
 
-            if (!SVNProperty.SPECIAL.equals(propName)) {
+            if (SVNProperty.SPECIAL.equals(propName)) {
                 target.setSpecial(true);
             }
 
