@@ -909,7 +909,7 @@ public class SvnPatchTarget extends SvnTargetContent {
                         e.getErrorMessage().getErrorCode() == SVNErrorCode.IO_UNKNOWN_EOL ||
                         e.getErrorMessage().getErrorCode() == SVNErrorCode.BAD_MIME_TYPE ||
                         e.getErrorMessage().getErrorCode() == SVNErrorCode.CLIENT_INVALID_EXTERNALS_DESCRIPTION) {
-                    for (SvnHunkInfo hunkInfo : getHunkInfos()) {
+                    for (SvnHunkInfo hunkInfo : propTarget.getHunkInfos()) {
                         hunkInfo.setRejected(true);
                         rejectHunk(this, hunkInfo.getHunk(), propTarget.getName());
                     }
