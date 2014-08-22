@@ -455,46 +455,111 @@ public class SVNNotifyPrinter implements ISVNEventHandler {
                 String minus;
 
                 if (hunkMatchedLine > hunkOriginalStart) {
-                    off = hunkMatchedLine - hunkOriginalStart;
-                    minus = null;
+                    if (hunkOriginalStart == 0 && hunkMatchedLine == 1) {
+                        off = 0;
+                    } else {
+                        off = hunkMatchedLine - hunkOriginalStart;
+                    }
+                    minus = "";
                 } else {
                     off = hunkOriginalStart - hunkMatchedLine;
                     minus = "-";
                 }
 
-                buffer.append(">         applied hunk @@ -");
-                buffer.append(hunkOriginalStart);
-                buffer.append(",");
-                buffer.append(hunkOriginalLength);
-                buffer.append(" +");
-                buffer.append(hunkModifiedStart);
-                buffer.append(",");
-                buffer.append(hunkModifiedLength);
-                buffer.append(" @@ with offset ");
-                if (null != minus) {
-                    buffer.append(minus);
+                if (hunkFuzz != 0) {
+                    if (event.getPropertyName() != null) {
+                        buffer.append(">         applied hunk ## -");
+                        buffer.append(hunkOriginalStart);
+                        buffer.append(",");
+                        buffer.append(hunkOriginalLength);
+                        buffer.append(" +");
+                        buffer.append(hunkModifiedStart);
+                        buffer.append(",");
+                        buffer.append(hunkModifiedLength);
+                        buffer.append(" ## with offset ");
+                        buffer.append(minus);
+                        buffer.append(off);
+                        buffer.append(" and fuzz ");
+                        buffer.append(hunkFuzz);
+                        buffer.append(" (");
+                        buffer.append(event.getPropertyName());
+                        buffer.append(")\n");
+                    } else {
+                        buffer.append(">         applied hunk @@ -");
+                        buffer.append(hunkOriginalStart);
+                        buffer.append(",");
+                        buffer.append(hunkOriginalLength);
+                        buffer.append(" +");
+                        buffer.append(hunkModifiedStart);
+                        buffer.append(",");
+                        buffer.append(hunkModifiedLength);
+                        buffer.append(" @@ with offset ");
+                        buffer.append(minus);
+                        buffer.append(off);
+                        buffer.append(" and fuzz ");
+                        buffer.append(hunkFuzz);
+                        buffer.append('\n');
+                    }
+                } else {
+                    if (event.getPropertyName() != null) {
+                        buffer.append(">         applied hunk ## -");
+                        buffer.append(hunkOriginalStart);
+                        buffer.append(",");
+                        buffer.append(hunkOriginalLength);
+                        buffer.append(" +");
+                        buffer.append(hunkModifiedStart);
+                        buffer.append(",");
+                        buffer.append(hunkModifiedLength);
+                        buffer.append(" ## with offset ");
+                        buffer.append(minus);
+                        buffer.append(off);
+                        buffer.append(" (");
+                        buffer.append(event.getPropertyName());
+                        buffer.append(")\n");
+                    } else {
+                        buffer.append(">         applied hunk @@ -");
+                        buffer.append(hunkOriginalStart);
+                        buffer.append(",");
+                        buffer.append(hunkOriginalLength);
+                        buffer.append(" +");
+                        buffer.append(hunkModifiedStart);
+                        buffer.append(",");
+                        buffer.append(hunkModifiedLength);
+                        buffer.append(" @@ with offset ");
+                        buffer.append(minus);
+                        buffer.append(off);
+                        buffer.append('\n');
+                    }
                 }
-                buffer.append(off);
-                if (hunkFuzz > 0) {
-                    buffer.append(" and fuzz ");
-                    buffer.append(hunkFuzz);
-                }
-                buffer.append("\n");
-
             } else if (hunkFuzz > 0) {
 
-                buffer.append(">         applied hunk @@ -");
-                buffer.append(hunkOriginalStart);
-                buffer.append(",");
-                buffer.append(hunkOriginalLength);
-                buffer.append(" +");
-                buffer.append(hunkModifiedStart);
-                buffer.append(",");
-                buffer.append(hunkModifiedLength);
-                buffer.append(" @@ with fuzz ");
-                buffer.append(hunkFuzz);
-                buffer.append("\n");
-
+                if (event.getPropertyName() != null) {
+                    buffer.append(">         applied hunk ## -");
+                    buffer.append(hunkOriginalStart);
+                    buffer.append(",");
+                    buffer.append(hunkOriginalLength);
+                    buffer.append(" +");
+                    buffer.append(hunkModifiedStart);
+                    buffer.append(",");
+                    buffer.append(hunkModifiedLength);
+                    buffer.append(" ## with fuzz ");
+                    buffer.append(hunkFuzz);
+                    buffer.append(" (");
+                    buffer.append(event.getPropertyName());
+                    buffer.append(")\n");
+                } else {
+                    buffer.append(">         applied hunk @@ -");
+                    buffer.append(hunkOriginalStart);
+                    buffer.append(",");
+                    buffer.append(hunkOriginalLength);
+                    buffer.append(" +");
+                    buffer.append(hunkModifiedStart);
+                    buffer.append(",");
+                    buffer.append(hunkModifiedLength);
+                    buffer.append(" @@ with fuzz ");
+                    buffer.append(hunkFuzz);
+                    buffer.append('\n');
+                }
             }
 
         } else if (event.getAction() == SVNEventAction.PATCH_REJECTED_HUNK) {
