@@ -436,7 +436,7 @@ public class SvnPatchTarget extends SvnTargetContent {
 
         for (Map.Entry<String, SvnPropertiesPatch> entry : patch.getPropPatches().entrySet()) {
             final SvnPropertiesPatch propPatch = entry.getValue();
-            if (hasPropChanges) {
+            if (!hasPropChanges) {
                 hasPropChanges = propPatch.getHunks().size() > 0;
             } else {
                 break;
@@ -516,7 +516,7 @@ public class SvnPatchTarget extends SvnTargetContent {
                     moveTargetRelPath = moveTargetPath;
                 }
 
-                boolean underRoot = SVNPatchTarget.isChildPath(workingCopyDirectory, moveTargetRelPath);
+                boolean underRoot = isUnderRoot(workingCopyDirectory, moveTargetRelPath);
                 if (!underRoot) {
                     target.setSkipped(true);
                     target.setAbsPath(null);
@@ -633,7 +633,7 @@ public class SvnPatchTarget extends SvnTargetContent {
             setRelPath(strippedPath);
         }
 
-        boolean isUnderRoot = SVNPatchTarget.isChildPath(workingCopyDirectory, getRelPath());
+        boolean isUnderRoot = isUnderRoot(workingCopyDirectory, getRelPath());
 
         if (!isUnderRoot) {
             setSkipped(true);
@@ -694,6 +694,19 @@ public class SvnPatchTarget extends SvnTargetContent {
                 return;
             }
         }
+    }
+
+    private static boolean isUnderRoot(File workingCopyDirectory, File relPath) throws SVNException {
+        File fullPath = SVNFileUtil.createFilePath(workingCopyDirectory, relPath);
+        try {
+            String workingCopyDirectoryPath = SVNFileUtil.getFilePath(workingCopyDirectory.getCanonicalFile());
+            String canonicalFullPath = fullPath.getCanonicalPath();
+            return canonicalFullPath.equals(workingCopyDirectoryPath) || SVNPathUtil.isAncestor(workingCopyDirectoryPath, canonicalFullPath);
+        } catch (IOException e) {
+            SVNErrorMessage errorMessage = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, e);
+            SVNErrorManager.error(errorMessage, SVNLogType.WC);
+        }
+        return false;
     }
 
     private static File chooseTargetFilename(SvnPatch patch) {
