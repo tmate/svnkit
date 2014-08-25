@@ -775,7 +775,17 @@ public class SvnPatchTarget extends SvnTargetContent {
             if (!dryRun && !isSkipped()) {
                 if (isSpecial()) {
                     //setPatchedStream(SVNFileUtil.openFileForReading(getPatchedAbsPath()));
-                    SVNFileUtil.createSymlink(getAbsPath(), SVNFileUtil.readFile(getPatchedAbsPath()));
+                    String linkName = SVNFileUtil.readFile(getPatchedAbsPath());
+                    if (linkName.startsWith("link ")) {
+                        linkName = linkName.substring("link ".length());
+                    }
+                    if (linkName.endsWith("\n")) {
+                        linkName = linkName.substring(0, linkName.length() - "\n".length());
+                    }
+                    if (linkName.endsWith("\r")) {
+                        linkName = linkName.substring(0, linkName.length() - "\r".length());
+                    }
+                    SVNFileUtil.createSymlink(getAbsPath(), linkName);
                 } else {
                     boolean repairEol = getEolStyle() == SVNWCContext.SVNEolStyle.Fixed || getEolStyle() == SVNWCContext.SVNEolStyle.Native;
                     SVNTranslator.translate(getPatchedAbsPath(), getMoveTargetAbsPath() != null ? getMoveTargetAbsPath() : getAbsPath(), null, getEolStr() == null ? null : getEolStr().getBytes(), getKeywords(), false, true);
