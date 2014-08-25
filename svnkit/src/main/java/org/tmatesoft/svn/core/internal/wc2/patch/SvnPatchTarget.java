@@ -901,7 +901,8 @@ public class SvnPatchTarget extends SvnTargetContent {
             }
 
             SVNPropertyValue propVal;
-            if (propTarget.getValue() != null && SVNPropertyValue.getPropertyAsString(propTarget.getValue()).length() == 0) {
+            if (propTarget.getValue() != null && SVNPropertyValue.getPropertyAsBytes(propTarget.getValue()).length != 0 &&
+                    propTarget.getPatchedValue() != null && SVNPropertyValue.getPropertyAsBytes(propTarget.getPatchedValue()).length == 0) {
                 propVal = null;
             } else {
                 propVal = propTarget.getPatchedValue();
