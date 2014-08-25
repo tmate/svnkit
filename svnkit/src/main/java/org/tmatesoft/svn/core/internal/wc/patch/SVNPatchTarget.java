@@ -488,7 +488,7 @@ public class SVNPatchTarget {
         if (path != null && stripCount > 0) {
             final String[] components = decomposePath(path);
             final StringBuffer buf = new StringBuffer();
-            if (stripCount < components.length) {
+            if (stripCount <= components.length) {
                 for (int i = stripCount; i < components.length; i++) {
                     if (i > stripCount) {
                         buf.append(File.separatorChar);
