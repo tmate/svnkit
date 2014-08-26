@@ -256,7 +256,7 @@ public class SVNPatchFileStream {
             input.append(line);
         }
 
-        return input.length() == 0 && isEOF();
+        return input.length() == 0 && c == -1 && isEOF();
     }
 
 }
