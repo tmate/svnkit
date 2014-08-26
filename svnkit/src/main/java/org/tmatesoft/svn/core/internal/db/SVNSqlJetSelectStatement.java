@@ -67,16 +67,7 @@ public class SVNSqlJetSelectStatement extends SVNSqlJetTableStatement {
 
     private boolean isPathScoped() throws SVNException {
         Object[] where = getWhere();
-        if (getPathScope() != null && getIndexName() == null && SVNWCDbSchema.NODES.toString().equals(getTableName()) && where.length == 1) {
-            return true;
-        }
-        if (getPathScope() != null && getIndexName() == SVNWCDbSchema.NODES__Indices.I_NODES_PARENT.name() && SVNWCDbSchema.NODES.toString().equals(getTableName()) && where.length == 1) {
-            return true;
-        }
-        if (getPathScope() != null && getIndexName() == SVNWCDbSchema.NODES__Indices.I_NODES_MOVED.name() && SVNWCDbSchema.NODES.toString().equals(getTableName()) && where.length == 1) {
-            return true;
-        }
-        return false;
+        return getPathScope() != null && SVNWCDbSchema.NODES.toString().equals(getTableName()) && where.length == 1;
     }
     
     protected String getPathScope() {
@@ -152,22 +143,11 @@ public class SVNSqlJetSelectStatement extends SVNSqlJetTableStatement {
         return true;
     }
 
-    protected Enum<?> getRowPathField() throws SVNException {
-        if (SVNWCDbSchema.NODES__Indices.I_NODES_PARENT.toString().equals(getIndexName())) {
-            return SVNWCDbSchema.NODES__Fields.parent_relpath;
-        }
-        if (SVNWCDbSchema.NODES__Indices.I_NODES_MOVED.toString().equals(getIndexName())) {
-            return SVNWCDbSchema.NODES__Fields.moved_to;
-        }
-        return SVNWCDbSchema.NODES__Fields.local_relpath;
-    }
-
     protected String getRowPath() throws SVNException {
-        final Enum<?> rowPathField = getRowPathField();
-        if (rowPathField == null) {
-            return null;
+        if (SVNWCDbSchema.NODES__Indices.I_NODES_PARENT.toString().equals(getIndexName())) {
+            return (String) rowValues.get(SVNWCDbSchema.NODES__Fields.parent_relpath.toString());
         }
-        return (String) rowValues.get(rowPathField.name());
+        return (String) rowValues.get(SVNWCDbSchema.NODES__Fields.local_relpath.toString());
     }
 
     protected boolean isFilterPassed() throws SVNException {
