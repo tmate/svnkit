@@ -183,7 +183,7 @@ public class SvnDiffHunk implements Comparable<SvnDiffHunk> {
             do {
                 maxLen = range.end - range.current;
                 String oldEol = null;
-                if (maxLen < 0) {
+                if (maxLen < 0 && eolStr != null) {
                     oldEol = eolStr[0];
                 }
 
@@ -198,7 +198,7 @@ public class SvnDiffHunk implements Comparable<SvnDiffHunk> {
                     if (eof != null) {
                         eof[0] = maxLen == 0;
                     }
-                } else if (maxLen < 0) {
+                } else if (maxLen < 0 && eolStr != null) {
                     eolStr[0] = oldEol;
                 }
 
