@@ -582,7 +582,7 @@ public class SvnNgWcToWcCopy extends SvnNgOperationRunner<Void, SvnCopy> {
         return status2[0];
     }
 
-    protected void move(SVNWCContext context, File source, File dst, boolean metadataOnly) throws SVNException {
+    public void move(SVNWCContext context, File source, File dst, boolean metadataOnly) throws SVNException {
         boolean moveDegradedToCopy = copy(context, source, dst, true);
         if (!metadataOnly) {
             SVNFileUtil.rename(source, dst);

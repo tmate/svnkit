@@ -452,7 +452,7 @@ public class SVNPatchTarget {
         return;
     }
 
-    private boolean isChildPath(final File baseFile, final File file) throws IOException {
+    public static boolean isChildPath(final File baseFile, final File file) throws IOException {
         if (null != file && baseFile != null) {
             final String basePath = baseFile.getCanonicalPath();
             final File childFile = new File(basePath, file.getPath());
@@ -484,14 +484,14 @@ public class SVNPatchTarget {
         return null;
     }
 
-    private File stripPath(File path, int stripCount) {
+    public static File stripPath(File path, int stripCount) {
         if (path != null && stripCount > 0) {
             final String[] components = decomposePath(path);
             final StringBuffer buf = new StringBuffer();
-            if (stripCount > components.length) {
+            if (stripCount <= components.length) {
                 for (int i = stripCount; i < components.length; i++) {
                     if (i > stripCount) {
-                        buf.append(File.pathSeparator);
+                        buf.append(File.separatorChar);
                     }
                     buf.append(components[i]);
                 }
@@ -814,7 +814,12 @@ public class SVNPatchTarget {
     }
 
     public static String[] decomposePath(File path) {
-        return SVNAdminArea.fromString(path.getPath(), File.pathSeparator);
+        String pathString = SVNFileUtil.getFilePath(path);
+        if (pathString.endsWith("/")) {
+            pathString = pathString.substring(0, pathString.length() - 1);
+        }
+
+        return pathString.split(String.valueOf(File.separatorChar));
     }
 
     /**
@@ -1209,7 +1214,6 @@ public class SVNPatchTarget {
                     action = SVNEventAction.PATCH_APPLIED_HUNK;
                 }
 
-                //TODO: propertyName should be set in notify2
                 final SVNEvent notify2 = SVNEventFactory.createSVNEvent(target.absPath != null ? target.absPath : target.relPath, target.kind, null, 0, action, null, null, null);
                 notify2.setInfo(hi);
 

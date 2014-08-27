@@ -100,10 +100,12 @@ public class SVNOption extends AbstractSVNOption {
     public static final SVNOption FORCE_INTERACTIVE = new SVNOption("force-interactive");
     public static final SVNOption TRUST_SERVER_CERT = new SVNOption("trust-server-cert");
 
-    public static final SVNOption STRIP = new SVNOption("strip", "p");
+    public static final SVNOption STRIP = new SVNOption("strip", "p", false);
     public static final SVNOption ALLOW_MIXED_REVISIONS = new SVNOption("allow-mixed-revisions");
     public static final SVNOption INCLUDE_EXTERNALS = new SVNOption("include-externals");
     public static final SVNOption PROPERTIES_ONLY = new SVNOption("properties-only");
+    public static final SVNOption REVERSE_DIFF = new SVNOption("reverse-diff");
+    public static final SVNOption IGNORE_WHITESPACE = new SVNOption("ignore-whitespace");
 
     public static Collection addLogMessageOptions(Collection target) {
         if (target != null) {

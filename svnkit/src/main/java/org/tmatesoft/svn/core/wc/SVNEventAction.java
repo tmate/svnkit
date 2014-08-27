@@ -394,6 +394,11 @@ public class SVNEventAction {
     /**
      * @since 1.4, SVN 1.7
      */
+    public static final SVNEventAction PATCH_HUNK_ALREADY_APPLIED = createEventAction(56, "patch_hunk_already_applied");
+
+    /**
+     * @since 1.4, SVN 1.7
+     */
     public static final SVNEventAction UPDATE_SKIP_OBSTRUCTION = createEventAction(42, "update_skip_obstruction");
     
     /**

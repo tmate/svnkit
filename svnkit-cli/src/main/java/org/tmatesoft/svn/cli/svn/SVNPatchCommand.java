@@ -40,6 +40,8 @@ public class SVNPatchCommand extends SVNCommand {
         options.add(SVNOption.ACCEPT);
         options.add(SVNOption.DIFF3_CMD); // is it opt_merge_cmd ?
         options.add(SVNOption.STRIP);
+        options.add(SVNOption.REVERSE_DIFF);
+        options.add(SVNOption.IGNORE_WHITESPACE);
         return options;
     }
 
@@ -54,19 +56,26 @@ public class SVNPatchCommand extends SVNCommand {
         }
 
         final SVNDiffClient client = getSVNEnvironment().getClientManager().getDiffClient();
+        SVNNotifyPrinter printer = new SVNNotifyPrinter(getSVNEnvironment());
         if (!getSVNEnvironment().isQuiet()) {
-            client.setEventHandler(new SVNNotifyPrinter(getSVNEnvironment()));
+            client.setEventHandler(printer);
         }
 
         final File patchPath = new File((String) targets.get(0));
         final File targetPath = new File(targetsCount != 2 ? "." : (String) targets.get(1));
 
         try {
-            client.doPatch(patchPath.getAbsoluteFile(), targetPath.getAbsoluteFile(), getSVNEnvironment().isDryRun(), getSVNEnvironment().getStripCount());
+            client.doPatch(patchPath.getAbsoluteFile(), targetPath.getAbsoluteFile(), getSVNEnvironment().isDryRun(), getSVNEnvironment().getStripCount(), getSVNEnvironment().isIgnoreWhitespace(), true, getSVNEnvironment().isReverseDiff());
         } catch (SVNException e) {
             getSVNEnvironment().handleWarning(e.getErrorMessage(), new SVNErrorCode[] {
                     SVNErrorCode.ENTRY_EXISTS, SVNErrorCode.WC_PATH_NOT_FOUND
             }, getSVNEnvironment().isQuiet());
+        } finally {
+            if (!getSVNEnvironment().isQuiet()) {
+                StringBuffer status = new StringBuffer();
+                printer.printConflictStatus(status);
+                getSVNEnvironment().getOut().print(status);
+            }
         }
     }
 
