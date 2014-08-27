@@ -57,8 +57,14 @@ public abstract class SvnOperationRunner<V, T extends SvnOperation<V>> implement
     }
     
     public void handleEvent(SVNEvent event, double progress) throws SVNException {
-        if (getOperation() != null && getOperation().getEventHandler() != null) {
-            getOperation().getEventHandler().handleEvent(event, progress);
+        ISVNEventHandler eventHandler = null;
+        if (getOperation() != null) {
+            eventHandler = getOperation().getEventHandler();
+        } else if (getWcContext() != null) {
+            eventHandler = getWcContext().getEventHandler();
+        }
+        if (eventHandler != null) {
+            eventHandler.handleEvent(event, progress);
         }
     }
     

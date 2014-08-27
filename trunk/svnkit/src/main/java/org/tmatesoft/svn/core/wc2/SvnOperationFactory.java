@@ -81,41 +81,7 @@ import org.tmatesoft.svn.core.internal.wc2.admin.SvnRepositorySyncInfoImpl;
 import org.tmatesoft.svn.core.internal.wc2.admin.SvnRepositorySynchronizeImpl;
 import org.tmatesoft.svn.core.internal.wc2.admin.SvnRepositoryUpgradeImpl;
 import org.tmatesoft.svn.core.internal.wc2.admin.SvnRepositoryVerifyImpl;
-import org.tmatesoft.svn.core.internal.wc2.ng.SvnNgAdd;
-import org.tmatesoft.svn.core.internal.wc2.ng.SvnNgCanonicalizeUrls;
-import org.tmatesoft.svn.core.internal.wc2.ng.SvnNgCat;
-import org.tmatesoft.svn.core.internal.wc2.ng.SvnNgCheckout;
-import org.tmatesoft.svn.core.internal.wc2.ng.SvnNgCleanup;
-import org.tmatesoft.svn.core.internal.wc2.ng.SvnNgCommit;
-import org.tmatesoft.svn.core.internal.wc2.ng.SvnNgDiff;
-import org.tmatesoft.svn.core.internal.wc2.ng.SvnNgDiffSummarize;
-import org.tmatesoft.svn.core.internal.wc2.ng.SvnNgExport;
-import org.tmatesoft.svn.core.internal.wc2.ng.SvnNgGetChangelistPaths;
-import org.tmatesoft.svn.core.internal.wc2.ng.SvnNgGetInfo;
-import org.tmatesoft.svn.core.internal.wc2.ng.SvnNgGetMergeInfo;
-import org.tmatesoft.svn.core.internal.wc2.ng.SvnNgGetProperties;
-import org.tmatesoft.svn.core.internal.wc2.ng.SvnNgGetStatus;
-import org.tmatesoft.svn.core.internal.wc2.ng.SvnNgGetStatusSummary;
-import org.tmatesoft.svn.core.internal.wc2.ng.SvnNgLogMergeInfo;
-import org.tmatesoft.svn.core.internal.wc2.ng.SvnNgMarkReplaced;
-import org.tmatesoft.svn.core.internal.wc2.ng.SvnNgMerge;
-import org.tmatesoft.svn.core.internal.wc2.ng.SvnNgMergePegged;
-import org.tmatesoft.svn.core.internal.wc2.ng.SvnNgMergeReintegrate;
-import org.tmatesoft.svn.core.internal.wc2.ng.SvnNgRelocate;
-import org.tmatesoft.svn.core.internal.wc2.ng.SvnNgRemove;
-import org.tmatesoft.svn.core.internal.wc2.ng.SvnNgReposToWcCopy;
-import org.tmatesoft.svn.core.internal.wc2.ng.SvnNgResolve;
-import org.tmatesoft.svn.core.internal.wc2.ng.SvnNgRevert;
-import org.tmatesoft.svn.core.internal.wc2.ng.SvnNgSetChangelist;
-import org.tmatesoft.svn.core.internal.wc2.ng.SvnNgSetLock;
-import org.tmatesoft.svn.core.internal.wc2.ng.SvnNgSetProperty;
-import org.tmatesoft.svn.core.internal.wc2.ng.SvnNgSuggestMergeSources;
-import org.tmatesoft.svn.core.internal.wc2.ng.SvnNgSwitch;
-import org.tmatesoft.svn.core.internal.wc2.ng.SvnNgUnlock;
-import org.tmatesoft.svn.core.internal.wc2.ng.SvnNgUpdate;
-import org.tmatesoft.svn.core.internal.wc2.ng.SvnNgUpgrade;
-import org.tmatesoft.svn.core.internal.wc2.ng.SvnNgWcToReposCopy;
-import org.tmatesoft.svn.core.internal.wc2.ng.SvnNgWcToWcCopy;
+import org.tmatesoft.svn.core.internal.wc2.ng.*;
 import org.tmatesoft.svn.core.internal.wc2.old.SvnOldAdd;
 import org.tmatesoft.svn.core.internal.wc2.old.SvnOldAnnotate;
 import org.tmatesoft.svn.core.internal.wc2.old.SvnOldCanonicalizeUrls;
@@ -373,6 +339,8 @@ public class SvnOperationFactory implements ISvnOperationOptionsProvider {
         registerOperationRunner(SvnDiff.class, new SvnOldDiff());
         registerOperationRunner(SvnDiff.class, new SvnNgDiff());
         registerOperationRunner(SvnDiff.class, new SvnRemoteDiff());
+
+        registerOperationRunner(SvnPatch.class, new SvnNgPatch());
 
         registerOperationRunner(SvnCleanup.class, new SvnOldCleanup());
         registerOperationRunner(SvnCleanup.class, new SvnNgCleanup());
@@ -867,6 +835,14 @@ public class SvnOperationFactory implements ISvnOperationOptionsProvider {
      */
     public SvnDiff createDiff() {
         return new SvnDiff(this);
+    }
+
+    /**
+     * Creates patch operation.
+     * @return new <code>SvnPatch</code> object
+     */
+    public SvnPatch createPatch() {
+        return new SvnPatch(this);
     }
     
     /**

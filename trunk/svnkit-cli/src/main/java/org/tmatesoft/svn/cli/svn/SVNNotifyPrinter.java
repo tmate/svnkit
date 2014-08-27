@@ -17,6 +17,7 @@ import org.tmatesoft.svn.core.internal.util.SVNFormatUtil;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 import org.tmatesoft.svn.core.internal.wc.patch.SVNPatchHunk;
 import org.tmatesoft.svn.core.internal.wc.patch.SVNPatchHunkInfo;
+import org.tmatesoft.svn.core.internal.wc2.patch.SvnHunkInfo;
 import org.tmatesoft.svn.core.wc.*;
 import org.tmatesoft.svn.util.SVNDebugLog;
 import org.tmatesoft.svn.util.SVNLogType;
@@ -386,6 +387,10 @@ public class SVNNotifyPrinter implements ISVNEventHandler {
                     buffer.append('U');
                 }
             }
+            if (buffer.length() < 1) {
+                buffer.append(' ');
+            }
+            //buffer size is 1 now
 
             if (event.getPropertiesStatus() == SVNStatusType.CONFLICTED) {
                 getConflictStats().storePropConflict(file.getAbsolutePath());
@@ -394,9 +399,17 @@ public class SVNNotifyPrinter implements ISVNEventHandler {
                 buffer.append('U');
             }
 
-            if (buffer.length() > 0) {
+            if (buffer.length() < 2) {
                 buffer.append(' ');
+            }
+            //buffer size is 2 now
+
+            if (buffer.charAt(0) != ' ' || buffer.charAt(1) != ' ') {
+                while (buffer.length() < 10) {
+                    buffer.append(' ');
+                }
                 buffer.append(path);
+                buffer.append('\n');
             }
 
         } else if (event.getAction() == SVNEventAction.PATCH_APPLIED_HUNK) {
@@ -405,58 +418,148 @@ public class SVNNotifyPrinter implements ISVNEventHandler {
 
             final Object info = event.getInfo();
 
-            if (info == null || !(info instanceof SVNPatchHunkInfo)) {
+            if (info == null || (!(info instanceof SVNPatchHunkInfo) && !(info instanceof SvnHunkInfo))) {
                 return;
             }
 
-            final SVNPatchHunkInfo hi = (SVNPatchHunkInfo) info;
-            final SVNPatchHunk hunk = hi.getHunk();
+            final int hunkOriginalStart;
+            final int hunkOriginalLength;
+            final int hunkModifiedStart;
+            final int hunkModifiedLength;
+            final int hunkMatchedLine;
+            final int hunkFuzz;
 
-            if (hunk.getOriginal().getStart() != hi.getMatchedLine()) {
+            if (info instanceof SVNPatchHunkInfo) {
+                final SVNPatchHunkInfo hi = (SVNPatchHunkInfo) info;
+                final SVNPatchHunk hunk = hi.getHunk();
+
+                hunkOriginalStart = hunk.getOriginal().getStart();
+                hunkOriginalLength = hunk.getOriginal().getLength();
+                hunkModifiedStart = hunk.getModified().getStart();
+                hunkModifiedLength = hunk.getModified().getLength();
+                hunkMatchedLine = hi.getMatchedLine();
+                hunkFuzz = hi.getFuzz();
+            } else {
+                assert info instanceof SvnHunkInfo;
+                final SvnHunkInfo hunkInfo = (SvnHunkInfo) info;
+                hunkOriginalStart = hunkInfo.getHunk().getDirectedOriginalStart();
+                hunkOriginalLength = hunkInfo.getHunk().getDirectedOriginalLength();
+                hunkModifiedStart = hunkInfo.getHunk().getDirectedModifiedStart();
+                hunkModifiedLength = hunkInfo.getHunk().getDirectedModifiedLength();
+                hunkMatchedLine = hunkInfo.getMatchedLine();
+                hunkFuzz = hunkInfo.getFuzz();
+            }
+
+            if (hunkOriginalStart != hunkMatchedLine) {
                 long off;
                 String minus;
 
-                if (hi.getMatchedLine() > hunk.getOriginal().getStart()) {
-                    off = hi.getMatchedLine() - hunk.getOriginal().getStart();
-                    minus = null;
+                if (hunkMatchedLine > hunkOriginalStart) {
+                    if (hunkOriginalStart == 0 && hunkMatchedLine == 1) {
+                        off = 0;
+                    } else {
+                        off = hunkMatchedLine - hunkOriginalStart;
+                    }
+                    minus = "";
                 } else {
-                    off = hunk.getOriginal().getStart() - hi.getMatchedLine();
+                    off = hunkOriginalStart - hunkMatchedLine;
                     minus = "-";
                 }
 
-                buffer.append(">         applied hunk @@ -");
-                buffer.append(hunk.getOriginal().getStart());
-                buffer.append(",");
-                buffer.append(hunk.getOriginal().getLength());
-                buffer.append(" +");
-                buffer.append(hunk.getModified().getStart());
-                buffer.append(",");
-                buffer.append(hunk.getModified().getLength());
-                buffer.append(" @@ with offset ");
-                if (null != minus) {
-                    buffer.append(minus);
+                if (hunkFuzz != 0) {
+                    if (event.getPropertyName() != null) {
+                        buffer.append(">         applied hunk ## -");
+                        buffer.append(hunkOriginalStart);
+                        buffer.append(",");
+                        buffer.append(hunkOriginalLength);
+                        buffer.append(" +");
+                        buffer.append(hunkModifiedStart);
+                        buffer.append(",");
+                        buffer.append(hunkModifiedLength);
+                        buffer.append(" ## with offset ");
+                        buffer.append(minus);
+                        buffer.append(off);
+                        buffer.append(" and fuzz ");
+                        buffer.append(hunkFuzz);
+                        buffer.append(" (");
+                        buffer.append(event.getPropertyName());
+                        buffer.append(")\n");
+                    } else {
+                        buffer.append(">         applied hunk @@ -");
+                        buffer.append(hunkOriginalStart);
+                        buffer.append(",");
+                        buffer.append(hunkOriginalLength);
+                        buffer.append(" +");
+                        buffer.append(hunkModifiedStart);
+                        buffer.append(",");
+                        buffer.append(hunkModifiedLength);
+                        buffer.append(" @@ with offset ");
+                        buffer.append(minus);
+                        buffer.append(off);
+                        buffer.append(" and fuzz ");
+                        buffer.append(hunkFuzz);
+                        buffer.append('\n');
+                    }
+                } else {
+                    if (event.getPropertyName() != null) {
+                        buffer.append(">         applied hunk ## -");
+                        buffer.append(hunkOriginalStart);
+                        buffer.append(",");
+                        buffer.append(hunkOriginalLength);
+                        buffer.append(" +");
+                        buffer.append(hunkModifiedStart);
+                        buffer.append(",");
+                        buffer.append(hunkModifiedLength);
+                        buffer.append(" ## with offset ");
+                        buffer.append(minus);
+                        buffer.append(off);
+                        buffer.append(" (");
+                        buffer.append(event.getPropertyName());
+                        buffer.append(")\n");
+                    } else {
+                        buffer.append(">         applied hunk @@ -");
+                        buffer.append(hunkOriginalStart);
+                        buffer.append(",");
+                        buffer.append(hunkOriginalLength);
+                        buffer.append(" +");
+                        buffer.append(hunkModifiedStart);
+                        buffer.append(",");
+                        buffer.append(hunkModifiedLength);
+                        buffer.append(" @@ with offset ");
+                        buffer.append(minus);
+                        buffer.append(off);
+                        buffer.append('\n');
+                    }
                 }
-                buffer.append(off);
-                if (hi.getFuzz() > 0) {
-                    buffer.append(" and fuzz ");
-                    buffer.append(hi.getFuzz());
+            } else if (hunkFuzz > 0) {
+
+                if (event.getPropertyName() != null) {
+                    buffer.append(">         applied hunk ## -");
+                    buffer.append(hunkOriginalStart);
+                    buffer.append(",");
+                    buffer.append(hunkOriginalLength);
+                    buffer.append(" +");
+                    buffer.append(hunkModifiedStart);
+                    buffer.append(",");
+                    buffer.append(hunkModifiedLength);
+                    buffer.append(" ## with fuzz ");
+                    buffer.append(hunkFuzz);
+                    buffer.append(" (");
+                    buffer.append(event.getPropertyName());
+                    buffer.append(")\n");
+                } else {
+                    buffer.append(">         applied hunk @@ -");
+                    buffer.append(hunkOriginalStart);
+                    buffer.append(",");
+                    buffer.append(hunkOriginalLength);
+                    buffer.append(" +");
+                    buffer.append(hunkModifiedStart);
+                    buffer.append(",");
+                    buffer.append(hunkModifiedLength);
+                    buffer.append(" @@ with fuzz ");
+                    buffer.append(hunkFuzz);
+                    buffer.append('\n');
                 }
-                buffer.append("\n");
-
-            } else if (hi.getFuzz() > 0) {
-
-                buffer.append(">         applied hunk @@ -");
-                buffer.append(hunk.getOriginal().getStart());
-                buffer.append(",");
-                buffer.append(hunk.getOriginal().getLength());
-                buffer.append(" +");
-                buffer.append(hunk.getModified().getStart());
-                buffer.append(",");
-                buffer.append(hunk.getModified().getLength());
-                buffer.append(" @@ with fuzz ");
-                buffer.append(hi.getFuzz());
-                buffer.append("\n");
-
             }
 
         } else if (event.getAction() == SVNEventAction.PATCH_REJECTED_HUNK) {
@@ -465,23 +568,108 @@ public class SVNNotifyPrinter implements ISVNEventHandler {
 
             final Object info = event.getInfo();
 
-            if (info == null || !(info instanceof SVNPatchHunkInfo)) {
+            if (info == null || (!(info instanceof SVNPatchHunkInfo) && !(info instanceof SvnHunkInfo))) {
                 return;
             }
 
-            final SVNPatchHunkInfo hi = (SVNPatchHunkInfo) info;
-            final SVNPatchHunk hunk = hi.getHunk();
+            final int hunkOriginalStart;
+            final int hunkOriginalLength;
+            final int hunkModifiedStart;
+            final int hunkModifiedLength;
+            final int hunkMatchedLine;
+            final int hunkFuzz;
+
+            if (info instanceof SVNPatchHunkInfo) {
+                final SVNPatchHunkInfo hi = (SVNPatchHunkInfo) info;
+                final SVNPatchHunk hunk = hi.getHunk();
+
+                hunkOriginalStart = hunk.getOriginal().getStart();
+                hunkOriginalLength = hunk.getOriginal().getLength();
+                hunkModifiedStart = hunk.getModified().getStart();
+                hunkModifiedLength = hunk.getModified().getLength();
+                hunkMatchedLine = hi.getMatchedLine();
+                hunkFuzz = hi.getFuzz();
+            } else {
+                assert info instanceof SvnHunkInfo;
+                final SvnHunkInfo hunkInfo = (SvnHunkInfo) info;
+                hunkOriginalStart = hunkInfo.getHunk().getDirectedOriginalStart();
+                hunkOriginalLength = hunkInfo.getHunk().getDirectedOriginalLength();
+                hunkModifiedStart = hunkInfo.getHunk().getDirectedModifiedStart();
+                hunkModifiedLength = hunkInfo.getHunk().getDirectedModifiedLength();
+                hunkMatchedLine = hunkInfo.getMatchedLine();
+                hunkFuzz = hunkInfo.getFuzz();
+            }
 
             buffer.append(">         rejected hunk @@ -");
-            buffer.append(hunk.getOriginal().getStart());
+            buffer.append(hunkOriginalStart);
             buffer.append(",");
-            buffer.append(hunk.getOriginal().getLength());
+            buffer.append(hunkOriginalLength);
             buffer.append(" +");
-            buffer.append(hunk.getModified().getStart());
+            buffer.append(hunkModifiedStart);
             buffer.append(",");
-            buffer.append(hunk.getModified().getLength());
+            buffer.append(hunkModifiedLength);
             buffer.append(" @@\n");
 
+        } else if (event.getAction() == SVNEventAction.PATCH_HUNK_ALREADY_APPLIED) {
+            myIsChangesReceived = true;
+
+            Object info = event.getInfo();
+
+            if (info == null || (!(info instanceof SVNPatchHunkInfo) && !(info instanceof SvnHunkInfo))) {
+                return;
+            }
+
+            final int hunkOriginalStart;
+            final int hunkOriginalLength;
+            final int hunkModifiedStart;
+            final int hunkModifiedLength;
+            final int hunkMatchedLine;
+            final int hunkFuzz;
+
+            if (info instanceof SVNPatchHunkInfo) {
+                final SVNPatchHunkInfo hi = (SVNPatchHunkInfo) info;
+                final SVNPatchHunk hunk = hi.getHunk();
+
+                hunkOriginalStart = hunk.getOriginal().getStart();
+                hunkOriginalLength = hunk.getOriginal().getLength();
+                hunkModifiedStart = hunk.getModified().getStart();
+                hunkModifiedLength = hunk.getModified().getLength();
+                hunkMatchedLine = hi.getMatchedLine();
+                hunkFuzz = hi.getFuzz();
+            } else {
+                assert info instanceof SvnHunkInfo;
+                final SvnHunkInfo hunkInfo = (SvnHunkInfo) info;
+                hunkOriginalStart = hunkInfo.getHunk().getDirectedOriginalStart();
+                hunkOriginalLength = hunkInfo.getHunk().getDirectedOriginalLength();
+                hunkModifiedStart = hunkInfo.getHunk().getDirectedModifiedStart();
+                hunkModifiedLength = hunkInfo.getHunk().getDirectedModifiedLength();
+                hunkMatchedLine = hunkInfo.getMatchedLine();
+                hunkFuzz = hunkInfo.getFuzz();
+            }
+
+            if (event.getPropertyName() != null) {
+                buffer.append(">         hunk ## -");
+                buffer.append(hunkOriginalStart);
+                buffer.append(",");
+                buffer.append(hunkOriginalLength);
+                buffer.append(" +");
+                buffer.append(hunkModifiedStart);
+                buffer.append(",");
+                buffer.append(hunkMatchedLine);
+                buffer.append(" ## already applied (");
+                buffer.append(event.getPropertyName());
+                buffer.append(")\n");
+            } else {
+                buffer.append(">         hunk @@ -");
+                buffer.append(hunkOriginalStart);
+                buffer.append(",");
+                buffer.append(hunkOriginalLength);
+                buffer.append(" +");
+                buffer.append(hunkModifiedStart);
+                buffer.append(",");
+                buffer.append(hunkModifiedLength);
+                buffer.append(" @@ already applied\n");
+            }
         } else if (event.getAction() == SVNEventAction.UPGRADED_PATH) {
         	myIsChangesReceived = true;
             buffer.append("Upgraded '" + path + "'\n");

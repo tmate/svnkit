@@ -1433,11 +1433,11 @@ public class UpdateTest {
         return "UpdateTest";
     }
 
-    private static class EventsHandler implements ISVNEventHandler {
+    public static class EventsHandler implements ISVNEventHandler {
 
         private final List<SVNEvent> events;
 
-        private EventsHandler() {
+        protected EventsHandler() {
             this.events = new ArrayList<SVNEvent>();
         }
 
