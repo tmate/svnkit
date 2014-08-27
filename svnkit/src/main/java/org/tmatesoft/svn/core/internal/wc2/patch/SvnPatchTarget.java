@@ -14,6 +14,7 @@ import org.tmatesoft.svn.core.wc.ISVNEventHandler;
 import org.tmatesoft.svn.core.wc.SVNEvent;
 import org.tmatesoft.svn.core.wc.SVNEventAction;
 import org.tmatesoft.svn.core.wc.SVNStatusType;
+import org.tmatesoft.svn.core.wc2.SvnScheduleForAddition;
 import org.tmatesoft.svn.core.wc2.SvnStatus;
 import org.tmatesoft.svn.util.SVNLogType;
 
@@ -865,7 +866,7 @@ public class SvnPatchTarget extends SvnTargetContent {
                 if (dryRun) {
                     ISVNEventHandler eventHandler = context.getEventHandler();
                     if (eventHandler != null) {
-                        SVNEvent event = SVNEventFactory.createSVNEvent(getAbsPath(), SVNNodeKind.DIR, null, -1, SVNEventAction.ADD, SVNEventAction.ADD, null, null);
+                        SVNEvent event = SVNEventFactory.createSVNEvent(localAbsPath, SVNNodeKind.DIR, null, -1, SVNEventAction.ADD, SVNEventAction.ADD, null, null);
                         eventHandler.handleEvent(event, ISVNEventHandler.UNKNOWN);
                     }
                 } else {
@@ -875,7 +876,7 @@ public class SvnPatchTarget extends SvnTargetContent {
                     }
                     SvnNgAdd add = new SvnNgAdd();
                     add.setWcContext(context);
-                    add.addFromDisk(getAbsPath(), null, true);
+                    add.addFromDisk(localAbsPath, null, true);
                 }
             }
         }
