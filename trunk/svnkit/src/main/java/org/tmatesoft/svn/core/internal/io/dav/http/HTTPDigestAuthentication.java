@@ -37,8 +37,11 @@ class HTTPDigestAuthentication extends HTTPAuthentication {
     private String myLastNonce;
     private int myNC;
 
-    protected HTTPDigestAuthentication () {
+	private String myCharset;
+
+    protected HTTPDigestAuthentication (String charset) {
         myNC = 0;
+        myCharset = charset;
     }
 
     public void init() throws SVNException {
@@ -73,7 +76,7 @@ class HTTPDigestAuthentication extends HTTPAuthentication {
         } 
         myNC++;
         myLastNonce = nonce;
-        String digest = createDigest(uname, getPassword(), "US-ASCII");
+        String digest = createDigest(uname, getPassword(), myCharset);
 
         String uri = getParameter("uri");
         String realm = getParameter("realm");
@@ -145,7 +148,7 @@ class HTTPDigestAuthentication extends HTTPAuthentication {
 
         String md5a1 = encode(md5Helper.digest(HTTPAuthentication.getBytes(a1, charset)));
         String a2 = method + ":" + uri;
-        String md5a2 = encode(md5Helper.digest(HTTPAuthentication.getASCIIBytes(a2)));
+        String md5a2 = encode(md5Helper.digest(HTTPAuthentication.getBytes(a2, charset)));
 
         StringBuffer tmp2;
         if (myQop == null) {
@@ -173,7 +176,7 @@ class HTTPDigestAuthentication extends HTTPAuthentication {
             tmp2.append(md5a2);
         }
 
-        return encode(md5Helper.digest(HTTPAuthentication.getASCIIBytes(tmp2.toString())));
+        return encode(md5Helper.digest(HTTPAuthentication.getBytes(tmp2.toString(), charset)));
     }
 
     private String getParameter(String name) {
@@ -188,7 +191,7 @@ class HTTPDigestAuthentication extends HTTPAuthentication {
         return value;
     }
 
-    private static String createCnonce() {
+    private String createCnonce() {
         String cnonce;
         final String digAlg = "MD5";
         MessageDigest md5Helper;
@@ -199,7 +202,7 @@ class HTTPDigestAuthentication extends HTTPAuthentication {
             return null;
         }
         cnonce = Long.toString(System.currentTimeMillis());
-        cnonce = encode(md5Helper.digest(HTTPAuthentication.getASCIIBytes(cnonce)));
+        cnonce = encode(md5Helper.digest(HTTPAuthentication.getBytes(cnonce, myCharset)));
         return cnonce;
     }
 
