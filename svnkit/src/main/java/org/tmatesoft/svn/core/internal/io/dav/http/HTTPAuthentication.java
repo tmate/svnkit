@@ -149,7 +149,7 @@ abstract class HTTPAuthentication {
                 }
                 break;
             } else if ("Digest".equalsIgnoreCase(method)) {
-                auth = new HTTPDigestAuthentication();
+                auth = new HTTPDigestAuthentication(charset);
                 
                 char[] chars = (source + " ").toCharArray();
                 int tokenIndex = 0;
