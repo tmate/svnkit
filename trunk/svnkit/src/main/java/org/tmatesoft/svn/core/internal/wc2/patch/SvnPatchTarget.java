@@ -588,7 +588,7 @@ public class SvnPatchTarget extends SvnTargetContent {
             SVNURL reposRootUrl = nodeReposInfo.reposRootUrl;
 
             if (keywords != null) {
-                keywords.putAll(SVNTranslator.computeKeywords(SVNPropertyValue.getPropertyAsString(keywordsVal), url.toString(), changedAuthor, changedDate.format(), String.valueOf(changedRev), null));
+                keywords.putAll(SVNTranslator.computeKeywords(SVNPropertyValue.getPropertyAsString(keywordsVal), url == null ? null : url.toString(), reposRootUrl  == null ? null : reposRootUrl.toString(), changedAuthor, changedDate.format(), String.valueOf(changedRev), null));
             }
         }
         SVNPropertyValue eolStyleVal = actualProps.getSVNPropertyValue(SVNProperty.EOL_STYLE);

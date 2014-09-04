@@ -575,7 +575,7 @@ public class SVNTranslator {
         boolean expandCustomKeywords = expand; //if we want to prevent custom keywords from expanding, change this
         Map<String, byte[]> map = new HashMap<String, byte[]>();
         try {
-            SVNKeywordFormatter keywordFormatter = new SVNKeywordFormatter(expand, expandCustomKeywords, SVNURL.parseURIEncoded(locationUrl), SVNURL.parseURIEncoded(repositoryRoot), a, d, r, options);
+            SVNKeywordFormatter keywordFormatter = new SVNKeywordFormatter(expand, expandCustomKeywords, locationUrl == null ? null : SVNURL.parseURIEncoded(locationUrl), repositoryRoot == null ? null : SVNURL.parseURIEncoded(repositoryRoot), a, d, r, options);
 
             for (StringTokenizer tokens = new StringTokenizer(keywords, " \t\n\b\r\f"); tokens.hasMoreTokens();) {
                 String token = tokens.nextToken();
@@ -783,7 +783,7 @@ public class SVNTranslator {
                                 }
                                 break;
                             case 'b':
-                                byte[] baseUrl = getBaseUrl();
+                                byte[] baseUrl = getName();
                                 if (baseUrl != null) {
                                     byteArrayOutputStream.write(baseUrl);
                                 }
