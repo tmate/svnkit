@@ -121,7 +121,7 @@ public class SvnRemoteAnnotate extends SvnRemoteOperationRunner<SvnAnnotateItem,
                     try {
                         source = SVNFileUtil.openFileForReading(target);
                         Map<?,?> keywordsMap = keywords != null ?  
-                                SVNTranslator.computeKeywords(keywords, null, null, null, null, getOperation().getOptions()) : null;
+                                SVNTranslator.computeKeywords(keywords, null, null, null, null, null, getOperation().getOptions()) : null;
                         source = new SVNTranslatorInputStream(source, new byte[] {'\n'}, false, keywordsMap, false);
 
                         SVNFileRevision localRevision = new SVNFileRevision(path, -1, new SVNProperties(), new SVNProperties());

@@ -1010,8 +1010,8 @@ public class SVNWCContext {
             list = forceList;
 
         final SVNURL url = getNodeUrl(localAbsPath);
-        final WCDbInfo readInfo = db.readInfo(localAbsPath, InfoField.changedRev, InfoField.changedDate, InfoField.changedAuthor);
-        return SVNTranslator.computeKeywords(list, url.toString(), readInfo.changedAuthor, readInfo.changedDate.format(), Long.toString(readInfo.changedRev), getOptions());
+        final WCDbInfo readInfo = db.readInfo(localAbsPath, InfoField.changedRev, InfoField.changedDate, InfoField.changedAuthor, InfoField.reposRootUrl);
+        return SVNTranslator.computeKeywords(list, url.toString(), readInfo.reposRootUrl == null ? null: readInfo.reposRootUrl.toString(), readInfo.changedAuthor, readInfo.changedDate.format(), Long.toString(readInfo.changedRev), getOptions());
     }
 
     public static class TranslateInfo {
@@ -1052,6 +1052,7 @@ public class SVNWCContext {
     
     private Map<String, byte[]> expandKeywords(File localAbsPath, File wriAbspath, String keywordsList, boolean forNormalization) throws SVNException {
         String url = null;
+        String repositoryRoot = null;
         SVNDate changedDate = null;
         long changedRev;
         String changedAuthor = null;
@@ -1061,6 +1062,7 @@ public class SVNWCContext {
             changedAuthor = info.changedAuthor;
             changedRev = info.changedRev;
             changedDate = info.changedDate;
+            repositoryRoot = info.reposRootUrl.toString();
             
             if (info.reposRelPath != null) {
                 url = info.reposRootUrl.appendPath(SVNFileUtil.getFilePath(info.reposRelPath), false).toString();
@@ -1072,11 +1074,12 @@ public class SVNWCContext {
             }
         } else {
             url = "";
+            repositoryRoot = null;
             changedRev = INVALID_REVNUM;
             changedDate = SVNDate.NULL;
             changedAuthor = "";
         }
-        return SVNTranslator.computeKeywords(keywordsList, url, changedAuthor, changedDate.format(), Long.toString(changedRev), getOptions());
+        return SVNTranslator.computeKeywords(keywordsList, url, repositoryRoot, changedAuthor, changedDate.format(), Long.toString(changedRev), getOptions());
     }
 
     public boolean isFileExternal(File path) throws SVNException {

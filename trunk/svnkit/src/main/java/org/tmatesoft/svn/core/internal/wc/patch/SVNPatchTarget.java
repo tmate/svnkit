@@ -239,8 +239,9 @@ public class SVNPatchTarget {
                     String author = entry.getAuthor();
                     String changed_date = entry.getCommittedDate();
                     String url = entry.getURL();
+                    String repositoryRoot = entry.getRepositoryRoot();
                     String rev_str = Long.toString(changed_rev);
-                    new_target.keywords = SVNTranslator.computeKeywords(keywords_val, url, author, changed_date, rev_str, wc.getWCAccess().getOptions());
+                    new_target.keywords = SVNTranslator.computeKeywords(keywords_val, url, repositoryRoot, author, changed_date, rev_str, wc.getWCAccess().getOptions());
                 }
 
                 String eol_style_val = props.getStringPropertyValue(SVNProperty.EOL_STYLE);
