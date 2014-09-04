@@ -1062,7 +1062,7 @@ public class SVNWCContext {
             changedAuthor = info.changedAuthor;
             changedRev = info.changedRev;
             changedDate = info.changedDate;
-            repositoryRoot = info.reposRootUrl.toString();
+            repositoryRoot = info.reposRootUrl == null ? null : info.reposRootUrl.toString();
             
             if (info.reposRelPath != null) {
                 url = info.reposRootUrl.appendPath(SVNFileUtil.getFilePath(info.reposRelPath), false).toString();
