@@ -1,8 +1,10 @@
 package org.tmatesoft.svn.test;
 
 import org.junit.Assert;
+import org.junit.Assume;
 import org.junit.Test;
 import org.tmatesoft.svn.core.SVNException;
+import org.tmatesoft.svn.core.SVNProperties;
 import org.tmatesoft.svn.core.SVNPropertyValue;
 import org.tmatesoft.svn.core.SVNURL;
 import org.tmatesoft.svn.core.internal.io.fs.FSFS;
@@ -12,7 +14,14 @@ import org.tmatesoft.svn.core.internal.wc.SVNConfigFile;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 import org.tmatesoft.svn.core.io.SVNRepository;
 import org.tmatesoft.svn.core.io.SVNRepositoryFactory;
+import org.tmatesoft.svn.core.wc.SVNClientManager;
+import org.tmatesoft.svn.core.wc.SVNRevision;
+import org.tmatesoft.svn.core.wc.admin.ISVNChangeEntryHandler;
+import org.tmatesoft.svn.core.wc.admin.SVNChangeEntry;
+import org.tmatesoft.svn.core.wc.admin.SVNLookClient;
+import org.tmatesoft.svn.core.wc2.SvnGetProperties;
 import org.tmatesoft.svn.core.wc2.SvnOperationFactory;
+import org.tmatesoft.svn.core.wc2.SvnTarget;
 
 import java.io.File;
 
@@ -96,6 +105,51 @@ public class PackedRevPropsTest {
             }
 
         } finally {
+            sandbox.dispose();
+        }
+    }
+
+    @Test
+    public void testDeltaRepresentationHeader() throws Exception {
+        //SVNKIT-504
+        final TestOptions options = TestOptions.getInstance();
+        Assume.assumeNotNull(options.getSvnCommand());
+
+        final SvnOperationFactory svnOperationFactory = new SvnOperationFactory();
+        final Sandbox sandbox = Sandbox.createWithCleanup(getTestName() + ".testDeltaRepresentationHeader", options);
+        try {
+            final SVNURL url = sandbox.createSvnRepository();
+
+            final String enableDirDeltification = "enable-dir-deltification";
+            final String enablePropsDeltification = "enable-props-deltification";
+
+            final File repositoryRoot = new File(url.getPath());
+            final File dbDirectory = new File(repositoryRoot, FSFS.DB_DIR);
+            final File fsfsConfigFile = new File(dbDirectory, FSFS.PATH_CONFIG);
+
+            final SVNConfigFile fsfsConfig = new SVNConfigFile(fsfsConfigFile);
+            fsfsConfig.setPropertyValue("deltification", enableDirDeltification, "true", false);
+            fsfsConfig.setPropertyValue("deltification", enablePropsDeltification, "true", false);
+            fsfsConfig.save();
+
+            final String svnCommand = options.getSvnCommand();
+            SVNFileUtil.execCommand(new String[] {svnCommand, "mkdir", url.appendPath("trunk", false).toString(), "-m", "m"});
+
+            final File workingCopyDirectory = sandbox.createDirectory("wc");
+
+            SVNFileUtil.execCommand(new String[] {svnCommand, "checkout", url.toString(), workingCopyDirectory.getAbsolutePath()});
+            SVNFileUtil.execCommand(new String[] {svnCommand, "propset", "propertyName", "propertyValue", new File(workingCopyDirectory, "trunk").getAbsolutePath()});
+            SVNFileUtil.execCommand(new String[] {svnCommand, "commit", "-m", "m", workingCopyDirectory.getAbsolutePath()});
+
+            final SvnGetProperties getProperties = svnOperationFactory.createGetProperties();
+            getProperties.setSingleTarget(SvnTarget.fromURL(url.appendPath("trunk", false)));
+            final SVNProperties properties = getProperties.run();
+
+            Assert.assertNotNull(properties);
+            Assert.assertEquals(SVNPropertyValue.create("propertyValue"), properties.getSVNPropertyValue("propertyName"));
+
+        } finally {
+            svnOperationFactory.dispose();
             sandbox.dispose();
         }
     }
