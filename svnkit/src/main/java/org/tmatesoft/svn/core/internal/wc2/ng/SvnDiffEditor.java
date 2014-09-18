@@ -10,7 +10,6 @@ import org.tmatesoft.svn.core.internal.db.SVNSqlJetDb;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
 import org.tmatesoft.svn.core.internal.wc.ISVNUpdateEditor;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
-import org.tmatesoft.svn.core.internal.wc.SVNFileType;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
 import org.tmatesoft.svn.core.internal.wc17.SVNWCContext;
 import org.tmatesoft.svn.core.internal.wc17.db.*;
@@ -18,7 +17,6 @@ import org.tmatesoft.svn.core.io.ISVNEditor;
 import org.tmatesoft.svn.core.io.SVNRepository;
 import org.tmatesoft.svn.core.io.diff.SVNDeltaProcessor;
 import org.tmatesoft.svn.core.io.diff.SVNDiffWindow;
-import org.tmatesoft.svn.core.wc.SVNRevision;
 import org.tmatesoft.svn.core.wc2.SvnChecksum;
 import org.tmatesoft.svn.util.SVNLogType;
 
@@ -250,7 +248,7 @@ public class SvnDiffEditor implements ISVNEditor, ISVNUpdateEditor {
 
         if (currentEntry.skip) {
 
-        } else if (currentEntry.propChanges.size() > 0 || currentEntry.reposOnly) {
+        } else if (currentEntry.propChanges.size() > 0 || currentEntry.reposOnly || currentEntry.changePropertyCalled) {
             SVNProperties reposProps;
             if (currentEntry.added) {
                 reposProps = new SVNProperties();
@@ -258,7 +256,7 @@ public class SvnDiffEditor implements ISVNEditor, ISVNUpdateEditor {
                 reposProps = db.getBaseProps(currentEntry.localAbspath);
             }
 
-            if (currentEntry.propChanges.size() > 0) {
+            if (currentEntry.propChanges.size() > 0 || currentEntry.changePropertyCalled) {
                 reposProps.putAll(currentEntry.propChanges);
                 reposProps.removeNullValues();
             }
@@ -506,6 +504,7 @@ public class SvnDiffEditor implements ISVNEditor, ISVNUpdateEditor {
             }
             currentEntry.propChanges.put(name, value);
         }
+        currentEntry.changePropertyCalled = true;
     }
 
     public void changeFileProperty(String path, String propertyName, SVNPropertyValue propertyValue) throws SVNException {
@@ -867,6 +866,7 @@ public class SvnDiffEditor implements ISVNEditor, ISVNUpdateEditor {
         private Map<String, ISVNWCDb.SVNWCDbInfo> localInfo;
         private SVNProperties baseProps;
         private boolean hasPropChange;
+        private boolean changePropertyCalled;
 
         public Entry(boolean file, String path, Entry parent, boolean added, SVNDepth depth, File localAbspath) {
             this.isFile = file;
