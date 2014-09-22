@@ -29,7 +29,7 @@ public class SvnCopyAsChangedDiffCallback implements ISvnDiffCallback2 {
 
     public void fileAdded(SvnDiffCallbackResult result, File relPath, SvnDiffSource copyFromSource, SvnDiffSource rightSource, File copyFromFile, File rightFile, SVNProperties copyFromProps, SVNProperties rightProps) throws SVNException {
         if (copyFromSource != null) {
-            SVNProperties propChanges = rightProps.compareTo(copyFromProps);
+            SVNProperties propChanges = copyFromProps.compareTo(rightProps);
 
             boolean same;
             if (copyFromFile != null && rightFile != null) {
@@ -71,7 +71,7 @@ public class SvnCopyAsChangedDiffCallback implements ISvnDiffCallback2 {
 
     public void dirAdded(SvnDiffCallbackResult result, File relPath, SvnDiffSource copyFromSource, SvnDiffSource rightSource, SVNProperties copyFromProps, SVNProperties rightProps, Object dirBaton) throws SVNException {
         if (copyFromSource != null) {
-            SVNProperties propChanges = rightProps.compareTo(copyFromProps);
+            SVNProperties propChanges = copyFromProps.compareTo(rightProps);
             delegate.dirChanged(result, relPath, copyFromSource, rightSource, copyFromProps, rightProps, propChanges, dirBaton);
         } else {
             delegate.dirAdded(result, relPath, copyFromSource, rightSource, copyFromProps, rightProps, dirBaton);
