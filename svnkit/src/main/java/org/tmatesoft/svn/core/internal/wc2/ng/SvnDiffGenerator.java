@@ -481,6 +481,7 @@ public class SvnDiffGenerator implements ISvnDiffGenerator {
             } catch (IOException e) {
                 wrapException(e);
             }
+            visitedPaths.add(displayPath);
             return;
         }
         if (file1 == null && !isDiffAdded()) {
@@ -489,6 +490,7 @@ public class SvnDiffGenerator implements ISvnDiffGenerator {
             } catch (IOException e) {
                 wrapException(e);
             }
+            visitedPaths.add(displayPath);
             return;
         }
         String headerFields = getHeaderFieldsString(target, displayPath, label1, label2, revision1, revision2, operation, copyFromPath);
