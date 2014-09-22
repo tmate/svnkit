@@ -218,6 +218,9 @@ public class SvnDiffGenerator implements ISvnDiffGenerator {
         if (isIgnoreProperties()) {
             return;
         }
+        if (dirWasAdded && !isDiffAdded()) {
+            return;
+        }
         ensureEncodingAndEOLSet();
         String displayPath = getDisplayPath(target);
 
