@@ -22,6 +22,8 @@ import org.tmatesoft.svn.util.SVNLogType;
 
 public class SvnDiffCallback implements ISvnDiffCallback {
 
+    private static final long NON_EXSTENT_REVISION = -100;
+
     private ISvnDiffGenerator generator;
     private OutputStream outputStream;
     private long revision2;
@@ -76,31 +78,31 @@ public class SvnDiffCallback implements ISvnDiffCallback {
         //TODO: no diff added?
 
         if (rightFile != null && copyFromPath != null) {
-            displayContentChanged(path, leftFile, rightFile, rev1, rev2, mimeType1, mimeType2, propChanges, originalProperties, OperationKind.Copied, copyFromPath);
+            displayContentChanged(path, leftFile, rightFile, NON_EXSTENT_REVISION, rev2, mimeType1, mimeType2, propChanges, originalProperties, OperationKind.Copied, copyFromPath);
         } else if (rightFile != null) {
-            displayContentChanged(path, leftFile, rightFile, rev1, rev2, mimeType1, mimeType2, propChanges, originalProperties, OperationKind.Added, null);
+            displayContentChanged(path, leftFile, rightFile, NON_EXSTENT_REVISION, rev2, mimeType1, mimeType2, propChanges, originalProperties, OperationKind.Added, null);
         }
 
         if (propChanges != null && !propChanges.isEmpty()) {
             //we do not rev1 and rev2 here because SVN doesn't
-            propertiesChanged(path, rev1, rev2, false, propChanges, originalProperties);
+            propertiesChanged(path, NON_EXSTENT_REVISION, rev2, false, propChanges, originalProperties);
         }
         generator.setForceEmpty(false);
     }
 
     public void fileDeleted(SvnDiffCallbackResult result, File path, File leftFile, File rightFile, String mimeType1, String mimeType2, SVNProperties originalProperties) throws SVNException {
-        displayContentChanged(path, leftFile, null, revision1, revision2, mimeType1, mimeType2, null, originalProperties, OperationKind.Deleted, null);
+        displayContentChanged(path, leftFile, null, revision1, NON_EXSTENT_REVISION, mimeType1, mimeType2, null, originalProperties, OperationKind.Deleted, null);
     }
 
     public void dirDeleted(SvnDiffCallbackResult result, File path) throws SVNException {
-        generator.displayDeletedDirectory(getTarget(path), getRevisionString(revision1), getRevisionString(revision2), outputStream);
+        generator.displayDeletedDirectory(getTarget(path), getRevisionString(revision1), getRevisionString(NON_EXSTENT_REVISION), outputStream);
     }
 
     public void dirOpened(SvnDiffCallbackResult result, File path, long revision) throws SVNException {
     }
 
     public void dirAdded(SvnDiffCallbackResult result, File path, long revision, String copyFromPath, long copyFromRevision) throws SVNException {
-        generator.displayAddedDirectory(getTarget(path), getRevisionString(revision1), getRevisionString(revision), outputStream);
+        generator.displayAddedDirectory(getTarget(path), getRevisionString(NON_EXSTENT_REVISION), getRevisionString(revision), outputStream);
     }
 
     public void dirPropsChanged(SvnDiffCallbackResult result, File path, boolean dirWasAdded, SVNProperties propChanges, SVNProperties originalProperties) throws SVNException {
@@ -110,7 +112,7 @@ public class SvnDiffCallback implements ISvnDiffCallback {
         if (regularDiff == null || regularDiff.isEmpty()) {
             return;
         }
-        generator.displayPropsChanged(getTarget(path), dirWasAdded ? getRevisionString(0) : getRevisionString(revision1), getRevisionString(revision2), dirWasAdded, originalProperties, regularDiff, outputStream);
+        generator.displayPropsChanged(getTarget(path), dirWasAdded ? getRevisionString(NON_EXSTENT_REVISION) : getRevisionString(revision1), getRevisionString(revision2), dirWasAdded, originalProperties, regularDiff, outputStream);
     }
 
     public void dirClosed(SvnDiffCallbackResult result, File path, boolean dirWasAdded) throws SVNException {
@@ -119,6 +121,8 @@ public class SvnDiffCallback implements ISvnDiffCallback {
     private String getRevisionString(long revision) {
         if (revision >= 0) {
             return "(revision " + revision + ")";
+        } else if (revision == NON_EXSTENT_REVISION) {
+            return "(nonexistent)";
         }
         return "(working copy)";
     }
