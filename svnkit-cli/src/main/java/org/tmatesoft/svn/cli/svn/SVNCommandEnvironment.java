@@ -142,6 +142,7 @@ public class SVNCommandEnvironment extends AbstractSVNCommandEnvironment impleme
     private boolean myIsGitDiffFormat;
     private boolean myIsShowDiff;
     private boolean myIsPropertiesOnly;
+    private boolean myIsIgnoreProperties;
     private boolean myIsReverseDiff;
     private boolean myIsIgnoreWhitespace;
 
@@ -551,6 +552,8 @@ public class SVNCommandEnvironment extends AbstractSVNCommandEnvironment impleme
             myIsGitDiffFormat = true;
         } else if (option == SVNOption.PROPERTIES_ONLY) {
             myIsPropertiesOnly = true;
+        } else if (option == SVNOption.IGNORE_PROPERTIES) {
+            myIsIgnoreProperties = true;
         } else if (option == SVNOption.REVERSE_DIFF) {
             myIsReverseDiff = true;
         } else if (option == SVNOption.IGNORE_WHITESPACE) {
@@ -872,6 +875,10 @@ public class SVNCommandEnvironment extends AbstractSVNCommandEnvironment impleme
 
     public boolean isPropertiesOnly() {
         return myIsPropertiesOnly;
+    }
+
+    public boolean isIgnoreProperties() {
+        return myIsIgnoreProperties;
     }
 
     public boolean isReverseDiff() {
