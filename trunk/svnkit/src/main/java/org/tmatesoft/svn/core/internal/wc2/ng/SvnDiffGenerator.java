@@ -231,50 +231,48 @@ public class SvnDiffGenerator implements ISvnDiffGenerator {
             displayPath = ".";
         }
 
+        if (useGitFormat) {
+            targetString1 = adjustRelativeToReposRoot(targetString1);
+            targetString2 = adjustRelativeToReposRoot(targetString2);
+        }
+
+        String newTargetString = displayPath;
+        String newTargetString1 = targetString1;
+        String newTargetString2 = targetString2;
+
+        String commonAncestor = SVNPathUtil.getCommonPathAncestor(newTargetString1, newTargetString2);
+        int commonLength = commonAncestor == null ? 0 : commonAncestor.length();
+
+        newTargetString1 = newTargetString1.substring(commonLength);
+        newTargetString2 = newTargetString2.substring(commonLength);
+
+        newTargetString1 = computeLabel(newTargetString, newTargetString1);
+        newTargetString2 = computeLabel(newTargetString, newTargetString2);
+
+        if (relativeToTarget != null) {
+            String relativeToPath = relativeToTarget.getPathOrUrlDecodedString();
+            String absolutePath = target.getPathOrUrlDecodedString();
+
+            String childPath = getChildPath(absolutePath, relativeToPath);
+            if (childPath == null) {
+                throwBadRelativePathException(absolutePath, relativeToPath);
+            }
+            String childPath1 = getChildPath(newTargetString1, relativeToPath);
+            if (childPath1 == null) {
+                throwBadRelativePathException(newTargetString1, relativeToPath);
+            }
+            String childPath2 = getChildPath(newTargetString2, relativeToPath);
+            if (childPath2 == null) {
+                throwBadRelativePathException(newTargetString2, relativeToPath);
+            }
+
+            displayPath = childPath;
+            newTargetString1 = childPath1;
+            newTargetString2 = childPath2;
+        }
+
         boolean showDiffHeader = !visitedPaths.contains(displayPath);
         if (showDiffHeader) {
-
-
-            if (useGitFormat) {
-                targetString1 = adjustRelativeToReposRoot(targetString1);
-                targetString2 = adjustRelativeToReposRoot(targetString2);
-            }
-
-            String newTargetString = displayPath;
-            String newTargetString1 = targetString1;
-            String newTargetString2 = targetString2;
-
-            String commonAncestor = SVNPathUtil.getCommonPathAncestor(newTargetString1, newTargetString2);
-            int commonLength = commonAncestor == null ? 0 : commonAncestor.length();
-
-            newTargetString1 = newTargetString1.substring(commonLength);
-            newTargetString2 = newTargetString2.substring(commonLength);
-
-            newTargetString1 = computeLabel(newTargetString, newTargetString1);
-            newTargetString2 = computeLabel(newTargetString, newTargetString2);
-
-            if (relativeToTarget != null) {
-                String relativeToPath = relativeToTarget.getPathOrUrlDecodedString();
-                String absolutePath = target.getPathOrUrlDecodedString();
-
-                String childPath = getChildPath(absolutePath, relativeToPath);
-                if (childPath == null) {
-                    throwBadRelativePathException(absolutePath, relativeToPath);
-                }
-                String childPath1 = getChildPath(newTargetString1, relativeToPath);
-                if (childPath1 == null) {
-                    throwBadRelativePathException(newTargetString1, relativeToPath);
-                }
-                String childPath2 = getChildPath(newTargetString2, relativeToPath);
-                if (childPath2 == null) {
-                    throwBadRelativePathException(newTargetString2, relativeToPath);
-                }
-
-                displayPath = childPath;
-                newTargetString1 = childPath1;
-                newTargetString2 = childPath2;
-            }
-
             String label1 = getLabel(newTargetString1, revision1);
             String label2 = getLabel(newTargetString2, revision2);
 
