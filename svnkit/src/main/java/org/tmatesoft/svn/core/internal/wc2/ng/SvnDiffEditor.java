@@ -286,7 +286,7 @@ public class SvnDiffEditor implements ISVNEditor, ISVNUpdateEditor {
             result.reset();
             callback.dirClosed(result, new File(currentEntry.path), currentEntry.leftSource, currentEntry.rightSource, null);
         }
-        if (pb != null && localBeforeRemote && !currentEntry.reposOnly && !currentEntry.ignoringAncestry) {
+        if (pb != null && !localBeforeRemote && !currentEntry.reposOnly && !currentEntry.ignoringAncestry) {
             handleLocalOnly(pb, currentEntry.name);
         }
         } finally {
