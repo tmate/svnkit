@@ -161,7 +161,7 @@ public class SvnDiffCallback implements ISvnDiffCallback {
             }
         }
         try {
-            generator.displayContentChanged(getTarget(path), leftFile, rightFile, getRevisionString(rev1), getRevisionString(rev2), mimeType1, mimeType2, operation, copyFromPath, result);
+            generator.displayContentChanged(getTarget(path), leftFile, rightFile, getRevisionString(rev1), getRevisionString(rev2), mimeType1, mimeType2, operation, copyFromPath, originalProperties, propChanges, result);
         } finally {
             if (resetEncoding) {
                 generator.setEncoding(null);

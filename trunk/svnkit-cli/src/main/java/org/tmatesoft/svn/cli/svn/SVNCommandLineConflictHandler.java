@@ -25,6 +25,7 @@ import org.tmatesoft.svn.core.internal.wc.FSMergerBySequence;
 import org.tmatesoft.svn.core.internal.wc.SVNDiffConflictChoiceStyle;
 import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
 import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
+import org.tmatesoft.svn.core.internal.wc2.ng.ISvnPropertiesDiffHandler;
 import org.tmatesoft.svn.core.wc.*;
 import org.tmatesoft.svn.util.SVNLogType;
 
@@ -315,6 +316,9 @@ public class SVNCommandLineConflictHandler implements ISVNConflictHandler {
 
                     DefaultSVNCommandLineDiffGenerator diffGenerator = new DefaultSVNCommandLineDiffGenerator(path1, path2);
                     diffGenerator.setDiffOptions(new SVNDiffOptions(false, false, true));
+                    if (diffGenerator instanceof ISvnPropertiesDiffHandler) {
+                        ((ISvnPropertiesDiffHandler) diffGenerator).handlePropertiesDiff(null, null);
+                    }
                     diffGenerator.displayFileDiff("", path1, path2, null, null, null, null, System.out);
                     knowsSmth = true;
                 } else if ("e".equals(answer)) {
