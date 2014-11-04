@@ -3676,7 +3676,7 @@ public class SVNWCDb implements ISVNWCDb {
                     info.reposRelPath = opDepth != 0 ? null : SVNFileUtil.createFilePath(getColumnText(stmtInfo, SVNWCDbSchema.NODES__Fields.repos_path));
                 }
                 if (f.contains(InfoField.changedDate)) {
-                    info.changedDate = SVNWCUtils.readDate(getColumnInt64(stmtInfo, SVNWCDbSchema.NODES__Fields.changed_date));
+                    info.changedDate = isColumnNull(stmtInfo, SVNWCDbSchema.NODES__Fields.changed_date) ? null : SVNWCUtils.readDate(getColumnInt64(stmtInfo, SVNWCDbSchema.NODES__Fields.changed_date));
                 }
                 if (f.contains(InfoField.changedRev)) {
                     info.changedRev = getColumnRevNum(stmtInfo, SVNWCDbSchema.NODES__Fields.changed_revision);
