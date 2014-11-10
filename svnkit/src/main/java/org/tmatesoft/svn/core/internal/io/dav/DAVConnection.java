@@ -663,7 +663,7 @@ public class DAVConnection {
     				myCapabilities.put(SVNCapability.PARTIAL_REPLAY, DAV_CAPABILITY_YES);
     			} else if (DAVElement.ATOMIC_REVPROPS_OPTION.equalsIgnoreCase(value)) {
                     myCapabilities.put(SVNCapability.ATOMIC_REVPROPS, DAV_CAPABILITY_YES);
-                } else if (DAVElement.ATOMIC_REVPROPS_OPTION.equalsIgnoreCase(value)) {
+                } else if (DAVElement.INHERITED_PROPS_OPTION.equalsIgnoreCase(value)) {
                     myCapabilities.put(SVNCapability.INHERITED_PROPS, DAV_CAPABILITY_YES);
                 }
 			}
