@@ -35,6 +35,7 @@ public class DAVInheritedPropertiesHandler extends BasicDAVHandler {
                 SVNXMLUtil.PREFIX_MAP, xmlBuffer);
         SVNXMLUtil.openCDataTag(SVNXMLUtil.SVN_NAMESPACE_PREFIX, "revision", String.valueOf(revision), xmlBuffer);
         SVNXMLUtil.openCDataTag(SVNXMLUtil.SVN_NAMESPACE_PREFIX, "path", path, xmlBuffer);
+        SVNXMLUtil.closeXMLTag(SVNXMLUtil.SVN_NAMESPACE_PREFIX, "inherited-props-report", xmlBuffer);
         return xmlBuffer;
     }
     
@@ -58,6 +59,10 @@ public class DAVInheritedPropertiesHandler extends BasicDAVHandler {
     protected void startElement(DAVElement parent, DAVElement element, Attributes attrs) throws SVNException {
         if (element == IPROPVALUE) {
             currentValueEncoding = attrs.getValue("encoding");
+        } else if (element == IPROPITEM) {
+            currentProperties = new SVNProperties();
+            currentPropertyName = null;
+            currentPropertyValue = null;
         }
     }
     
@@ -68,9 +73,6 @@ public class DAVInheritedPropertiesHandler extends BasicDAVHandler {
             currentPropertyValue = createPropertyValue(element, currentPropertyName, cdata, currentValueEncoding);
             currentValueEncoding = null;
         } else if (element == IPROPITEM) {
-            if (currentProperties == null) {
-                currentProperties = new SVNProperties();
-            }
             currentProperties.put(currentPropertyName, currentPropertyValue);
             currentPropertyName = null;
             currentPropertyValue = null;
@@ -80,7 +82,6 @@ public class DAVInheritedPropertiesHandler extends BasicDAVHandler {
                 repositoryPath = "/" + repositoryPath;
             }
             inhertiedProperties.put(repositoryPath, currentProperties);
-            currentProperties = null;
         }
     }
 
