@@ -1369,7 +1369,7 @@ public class DAVRepository extends SVNRepository {
             
             final DAVBaselineInfo info = DAVUtil.getBaselineInfo(connection, this, thisSessionPath, revision, false, false, null);
             final String finalBCPath = SVNPathUtil.append(info.baselineBase, info.baselinePath);
-            final StringBuffer requestBody = DAVInheritedPropertiesHandler.generateReport(null, finalBCPath, revision);
+            final StringBuffer requestBody = DAVInheritedPropertiesHandler.generateReport(null, path, revision);
             final DAVInheritedPropertiesHandler davHandler = new DAVInheritedPropertiesHandler();
             HTTPStatus status = connection.doReport(finalBCPath, requestBody, davHandler);
             if (status.getCode() == 501) {
