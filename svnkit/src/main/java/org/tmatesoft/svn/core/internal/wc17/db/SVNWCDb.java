@@ -1800,8 +1800,7 @@ public class SVNWCDb implements ISVNWCDb {
                 c = c.reverse();
                 if (!c.eof()) {
                     final Map<String, Object> updateValues = new HashMap<String, Object>();
-
-
+                    updateValues.put(SVNWCDbSchema.NODES__Fields.translated_size.toString(), translatedSize);
                     updateValues.put(SVNWCDbSchema.NODES__Fields.last_mod_time.toString(), lastModTime.getTimeInMicros());
                     c.updateByFieldNames(updateValues);
                 }
