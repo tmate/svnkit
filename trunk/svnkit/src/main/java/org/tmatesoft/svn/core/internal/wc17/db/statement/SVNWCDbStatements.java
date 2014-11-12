@@ -122,7 +122,6 @@ public enum SVNWCDbStatements {
     UPDATE_NODE_BASE_PRESENCE(SVNWCDbUpdateNodeBasePresence.class),
     UPDATE_NODE_PROPS(SVNWCDbUpdateNodeProperties.class),
     UPDATE_NODE_WORKING_DEPTH(SVNWCDbUpdateNodeWorkingDepth.class),
-    UPDATE_NODE_FILEINFO(SVNWCDbUpdateNodeFileinfo.class),
     SELECT_LOWEST_WORKING_NODE(SVNWCDbSelectLowestWorkingNode.class),
     CLEAR_TEXT_CONFLICT(SVNWCDbClearTextConflict.class),
     CLEAR_PROPS_CONFLICT(SVNWCDbClearPropsConflict.class),
