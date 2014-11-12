@@ -238,6 +238,40 @@ public class InfoTest {
         }
     }
 
+    @Test
+    public void testWorkingCopyFileSize() throws Exception {
+        final TestOptions options = TestOptions.getInstance();
+
+        final SvnOperationFactory svnOperationFactory = new SvnOperationFactory();
+        final Sandbox sandbox = Sandbox.createWithCleanup(getTestName() + ".testWorkingCopyFileSize", options);
+        try {
+            final SVNURL url = sandbox.createSvnRepository();
+
+            final CommitBuilder commitBuilder = new CommitBuilder(url);
+            commitBuilder.addFile("file");
+            commitBuilder.commit();
+
+            final WorkingCopy workingCopy = sandbox.checkoutNewWorkingCopy(url);
+            final File file = workingCopy.getFile("file");
+
+            final SvnGetInfo getInfo1 = svnOperationFactory.createGetInfo();
+            getInfo1.setSingleTarget(SvnTarget.fromFile(file));
+            final SvnInfo info1 = getInfo1.run();
+
+            TestUtil.writeFileContentsString(file, "content");
+
+            final SvnGetInfo getInfo2 = svnOperationFactory.createGetInfo();
+            getInfo2.setSingleTarget(SvnTarget.fromFile(file));
+            final SvnInfo info2 = getInfo2.run();
+
+            Assert.assertEquals(ISVNWCDb.INVALID_FILESIZE, info1.getSize());
+            Assert.assertEquals(ISVNWCDb.INVALID_FILESIZE, info2.getSize());
+        } finally {
+            svnOperationFactory.dispose();
+            sandbox.dispose();
+        }
+    }
+
     private String getTestName() {
         return "InfoTest";
     }
