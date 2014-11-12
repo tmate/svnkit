@@ -1543,6 +1543,8 @@ public interface ISVNWCDb {
      * and WORK_ITEM to NULL.
      */
     WCDbWorkQueueInfo fetchWorkQueue(File wcRootAbsPath) throws SVNException;
+    
+    boolean hasWorkQueue() throws SVNException;
 
     class WCDbWorkQueueInfo {
 

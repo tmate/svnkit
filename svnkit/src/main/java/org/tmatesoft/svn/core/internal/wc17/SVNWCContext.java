@@ -36,6 +36,7 @@ import java.util.Set;
 import java.util.Stack;
 import java.util.logging.Level;
 
+import org.tmatesoft.sqljet.core.SqlJetTransactionMode;
 import org.tmatesoft.sqljet.core.internal.SqlJetPagerJournalMode;
 import org.tmatesoft.svn.core.ISVNCanceller;
 import org.tmatesoft.svn.core.SVNCancelException;
@@ -49,6 +50,7 @@ import org.tmatesoft.svn.core.SVNProperties;
 import org.tmatesoft.svn.core.SVNProperty;
 import org.tmatesoft.svn.core.SVNPropertyValue;
 import org.tmatesoft.svn.core.SVNURL;
+import org.tmatesoft.svn.core.internal.db.SVNSqlJetDb;
 import org.tmatesoft.svn.core.internal.db.SVNSqlJetDb.Mode;
 import org.tmatesoft.svn.core.internal.util.SVNDate;
 import org.tmatesoft.svn.core.internal.util.SVNHashMap;
@@ -1736,6 +1738,9 @@ public class SVNWCContext {
     }
 
     public void releaseWriteLock(File localAbspath) throws SVNException {
+        if (db.hasWorkQueue()) {
+            return;
+        }
         WCDbWorkQueueInfo wqInfo = db.fetchWorkQueue(localAbspath);
         if (wqInfo.workItem != null) {
             return;
@@ -3923,18 +3928,22 @@ public class SVNWCContext {
     }
 
     public void wqRun(File dirAbspath) throws SVNException {
-        // SVNDebugLog.getDefaultLog().log(SVNLogType.WC,
-        // String.format("work queue run: wcroot='%s'", wcRootAbspath),
-        // Level.INFO);
-        File wcRootAbspath = getDb().getWCRoot(dirAbspath);
-        while (true) {
-            checkCancelled();
-            WCDbWorkQueueInfo fetchWorkQueue = db.fetchWorkQueue(dirAbspath);
-            if (fetchWorkQueue.workItem == null) {
-                break;
+        final File wcRootAbspath = getDb().getWCRoot(dirAbspath);
+        final SVNSqlJetDb sDb = db.getSDb(dirAbspath);
+        sDb.beginTransaction(SqlJetTransactionMode.WRITE);
+        try {
+            while (true) {
+                checkCancelled();
+                WCDbWorkQueueInfo fetchWorkQueue = db.fetchWorkQueue(dirAbspath);
+                if (fetchWorkQueue.workItem == null) {
+                    break;
+                }
+                dispatchWorkItem(wcRootAbspath, fetchWorkQueue.workItem);
             }
-            dispatchWorkItem(wcRootAbspath, fetchWorkQueue.workItem);
-            db.completedWorkQueue(dirAbspath, fetchWorkQueue.id);
+            sDb.commit();
+        } catch(SVNException e) {
+            sDb.rollback();
+            throw e;
         }
     }
 
