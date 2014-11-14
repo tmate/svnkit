@@ -22,7 +22,6 @@ import org.tmatesoft.svn.core.internal.wc17.db.statement17.*;
  */
 public enum SVNWCDbStatements {
 
-    CREATE_SCHEMA(SVNWCDbCreateSchema.class),
     DELETE_ACTUAL_EMPTY(SVNWCDbDeleteActualEmpty.class),
     DELETE_ACTUAL_NODE(SVNWCDbDeleteActualNode.class),
     DELETE_BASE_NODE(SVNWCDbDeleteBaseNode.class),

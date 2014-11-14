@@ -17,7 +17,6 @@ import org.tmatesoft.sqljet.core.table.SqlJetDb;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.internal.db.SVNSqlJetDb;
 import org.tmatesoft.svn.core.internal.db.SVNSqlJetStatement;
-import org.tmatesoft.svn.core.internal.wc17.db.ISVNWCDb;
 
 /**
  * @version 1.4
@@ -52,7 +51,7 @@ public class SVNWCDbCreateSchema extends SVNSqlJetStatement {
                     + "  dav_cache  BLOB, file_external INTEGER, inherited_props  BLOB, PRIMARY KEY (wc_id, local_relpath, op_depth) ); "),
                     
             //  this index is now created after update operation for performance reasons.
-            //  new Statement(Type.INDEX, "I_NODES_MOVED", "CREATE UNIQUE INDEX I_NODES_MOVED ON NODES (wc_id, moved_to, op_depth);"),
+            new Statement(Type.INDEX, "I_NODES_MOVED", "CREATE UNIQUE INDEX I_NODES_MOVED ON NODES (wc_id, moved_to, op_depth);", false, false, true),
                     
             new Statement(Type.INDEX, "I_NODES_PARENT", "CREATE UNIQUE INDEX I_NODES_PARENT ON NODES (wc_id, parent_relpath, local_relpath, op_depth); "),
             new Statement(Type.INDEX, "I_PRISTINE_MD5", "CREATE INDEX IF NOT EXISTS I_PRISTINE_MD5 ON PRISTINE (md5_checksum);"),
@@ -87,8 +86,8 @@ public class SVNWCDbCreateSchema extends SVNSqlJetStatement {
     };
     
     public static final Statement[] DROP_TARGETS_LIST = new Statement[] {
-        new Statement(Type.INDEX, "targets_list_kind", "targets_list_kind", true, true),
-        new Statement(Type.TABLE, "TARGETS_LIST", "TARGETS_LIST", true, true),
+        new Statement(Type.INDEX, "targets_list_kind", "targets_list_kind", true, true, false),
+        new Statement(Type.TABLE, "TARGETS_LIST", "TARGETS_LIST", true, true, false),
     };
     
     public static final Statement[] NODE_PROPS_CACHE = new Statement[] {
@@ -96,7 +95,7 @@ public class SVNWCDbCreateSchema extends SVNSqlJetStatement {
     };
     
     public static final Statement[] DROP_NODE_PROPS_CACHE = new Statement[] {
-        new Statement(Type.TABLE, "NODE_PROPS_CACHE", "NODE_PROPS_CACHE", true, true),
+        new Statement(Type.TABLE, "NODE_PROPS_CACHE", "NODE_PROPS_CACHE", true, true, false),
     };
     
     public static final Statement[] DELETE_LIST = new Statement[] {
@@ -104,7 +103,7 @@ public class SVNWCDbCreateSchema extends SVNSqlJetStatement {
     };
     
     public static final Statement[] DROP_DELETE_LIST = new Statement[] {
-        new Statement(Type.TABLE, "DELETE_LIST", "DELETE_LIST", true, true),
+        new Statement(Type.TABLE, "DELETE_LIST", "DELETE_LIST", true, true, false),
     };
     
     public static final Statement[] REVERT_LIST = new Statement[] {
@@ -120,7 +119,7 @@ public class SVNWCDbCreateSchema extends SVNSqlJetStatement {
     };
     
     public static final Statement[] DROP_REVERT_LIST = new Statement[] {
-        new Statement(Type.TABLE, "REVERT_LIST", "REVERT_LIST", true, true),
+        new Statement(Type.TABLE, "REVERT_LIST", "REVERT_LIST", true, true, false),
     };
     
     public static final Statement[] CHANGELIST_LIST = new Statement[] {
@@ -134,10 +133,10 @@ public class SVNWCDbCreateSchema extends SVNSqlJetStatement {
     };
     
     public static final Statement[] DROP_CHANGELIST_LIST = new Statement[] {
-        new Statement(Type.TABLE, "CHANGELIST_LIST", "CHANGELIST_LIST", true, true),
+        new Statement(Type.TABLE, "CHANGELIST_LIST", "CHANGELIST_LIST", true, true, false),
         //new Statement(Type.INDEX, "changelist_list_index", "changelist_list_index", true, true),
-        new Statement(Type.TABLE, "TARGETS_LIST", "TARGETS_LIST", true, true),
-        new Statement(Type.INDEX, "targets_list_kind", "targets_list_kind", true, true)
+        new Statement(Type.TABLE, "TARGETS_LIST", "TARGETS_LIST", true, true, false),
+        new Statement(Type.INDEX, "targets_list_kind", "targets_list_kind", true, true, false)
     };
     
     public static final Statement[] CREATE_UPDATE_MOVE_LIST = new Statement[] {
@@ -151,7 +150,7 @@ public class SVNWCDbCreateSchema extends SVNSqlJetStatement {
     };
 
     public static final Statement[] FINALIZE_UPDATE_MOVE = new Statement[] {
-        new Statement(Type.TABLE, "UPDATE_MOVE_LIST", "UPDATE_MOVE_LIST", true, true)
+        new Statement(Type.TABLE, "UPDATE_MOVE_LIST", "UPDATE_MOVE_LIST", true, true, false)
     };
 
     private enum Type {
@@ -165,21 +164,23 @@ public class SVNWCDbCreateSchema extends SVNSqlJetStatement {
         private boolean isDrop;
         private String name;
         private boolean isDropBeforeCreate;
+        private boolean isRunOnUpgrade;
         
         public Statement(Type type, String name, String sql) {
-            this(type, name, sql, false, false);
+            this(type, name, sql, false, false, false);
         }
 
         public Statement(Type type, String name, String sql, boolean dropBeforeCreate) {
-            this(type, name, sql, dropBeforeCreate, false);
+            this(type, name, sql, dropBeforeCreate, false, false);
         }
 
-        public Statement(Type type, String name, String sql, boolean dropBeforeCreate, boolean isDrop) {
+        public Statement(Type type, String name, String sql, boolean dropBeforeCreate, boolean isDrop, boolean upgradeOnly) {
             this.type = type;
             this.sql = sql;
             this.name = name;
             this.isDrop = isDrop;
             this.isDropBeforeCreate = dropBeforeCreate;
+            this.isRunOnUpgrade = upgradeOnly;
         }
         
         public boolean isDrop() {
@@ -201,19 +202,22 @@ public class SVNWCDbCreateSchema extends SVNSqlJetStatement {
         public boolean isDropBeforeCreate() {
             return isDropBeforeCreate;
         }
+        
+        private boolean isRunOnUpgradeOnly() {
+            return isRunOnUpgrade;
+        }
     }
 
     private Statement[] statements;
     private int userVersion;
-    
-    public SVNWCDbCreateSchema(SVNSqlJetDb sDb) {
-        this(sDb, MAIN_DB_STATEMENTS, ISVNWCDb.WC_FORMAT_18);
-    }
 
-    public SVNWCDbCreateSchema(SVNSqlJetDb sDb, Statement[] statements, int userVersion) {        
+    private boolean isUpgrade;
+
+    public SVNWCDbCreateSchema(SVNSqlJetDb sDb, Statement[] statements, int userVersion, boolean isUpgrade) {        
         super(sDb);
         this.statements = statements;
         this.userVersion = userVersion;
+        this.isUpgrade = isUpgrade;
     }
 
     public long exec() throws SVNException {
@@ -248,7 +252,13 @@ public class SVNWCDbCreateSchema extends SVNSqlJetStatement {
                                             db.dropIndex(stmt.getName());
                                         }
                                     }
-                                    db.createIndex(stmt.getSql()); 
+                                    if (stmt.isRunOnUpgradeOnly()) {
+                                        if (isUpgrade) {
+                                            db.createIndex(stmt.getSql()); 
+                                        }
+                                    } else {
+                                        db.createIndex(stmt.getSql()); 
+                                    }
                                 }
                                 break;
                             case VIEW:

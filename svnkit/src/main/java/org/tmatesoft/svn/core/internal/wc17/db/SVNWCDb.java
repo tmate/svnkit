@@ -243,7 +243,7 @@ public class SVNWCDb implements ISVNWCDb {
         /* ### REPOS_ROOT_URL and REPOS_UUID may be NULL. ... more doc: tbd */
 
         /* Create the SDB and insert the basic rows. */
-        CreateDbInfo createDb = createDb(localAbsPath, reposRootUrl, reposUuid, SDB_FILE, workingCopyFormat);
+        CreateDbInfo createDb = createDb(localAbsPath, reposRootUrl, reposUuid, SDB_FILE, workingCopyFormat, false);
 
         /* Begin construction of the PDH. */
         SVNWCDbDir pdh = new SVNWCDbDir(localAbsPath);
@@ -286,14 +286,15 @@ public class SVNWCDb implements ISVNWCDb {
         public long wcId;
     }
 
-    private CreateDbInfo createDb(File dirAbsPath, SVNURL reposRootUrl, String reposUuid, String sdbFileName, int workingCopyFormat) throws SVNException {
+    private CreateDbInfo createDb(File dirAbsPath, SVNURL reposRootUrl, String reposUuid, String sdbFileName, int workingCopyFormat,
+            boolean isUpgrade) throws SVNException {
 
         CreateDbInfo info = new CreateDbInfo();
 
         info.sDb = openDb(dirAbsPath, sdbFileName, SVNSqlJetDb.Mode.RWCreate, journalMode);
 
         /* Create the database's schema. */
-        SVNWCDbCreateSchema createSchema = new SVNWCDbCreateSchema(info.sDb, SVNWCDbCreateSchema.MAIN_DB_STATEMENTS, workingCopyFormat);
+        SVNWCDbCreateSchema createSchema = new SVNWCDbCreateSchema(info.sDb, SVNWCDbCreateSchema.MAIN_DB_STATEMENTS, workingCopyFormat, isUpgrade);
         try {
             createSchema.exec();
         } finally {
@@ -692,7 +693,7 @@ public class SVNWCDb implements ISVNWCDb {
                     }
                 }
 
-                stmt = new SVNWCDbCreateSchema(root.getSDb().getTemporaryDb(), SVNWCDbCreateSchema.DELETE_LIST, -1);
+                stmt = new SVNWCDbCreateSchema(root.getSDb().getTemporaryDb(), SVNWCDbCreateSchema.DELETE_LIST, -1, false);
                 try {
                     stmt.done();
                 } finally {
@@ -2403,7 +2404,7 @@ public class SVNWCDb implements ISVNWCDb {
                 } finally {
                     selectDeleteList.reset();
                 }
-                SVNSqlJetStatement dropList = new SVNWCDbCreateSchema(pdh.getWCRoot().getSDb().getTemporaryDb(), SVNWCDbCreateSchema.DROP_DELETE_LIST, -1);
+                SVNSqlJetStatement dropList = new SVNWCDbCreateSchema(pdh.getWCRoot().getSDb().getTemporaryDb(), SVNWCDbCreateSchema.DROP_DELETE_LIST, -1, false);
                 try {
                     dropList.done();
                 } finally {
@@ -2856,7 +2857,7 @@ public class SVNWCDb implements ISVNWCDb {
         sdb.beginTransaction(SqlJetTransactionMode.WRITE);
             
         try {
-            SVNSqlJetStatement stmt = new SVNWCDbCreateSchema(sdb.getTemporaryDb(), SVNWCDbCreateSchema.REVERT_LIST, -1);
+            SVNSqlJetStatement stmt = new SVNWCDbCreateSchema(sdb.getTemporaryDb(), SVNWCDbCreateSchema.REVERT_LIST, -1, false);
             try {
                 stmt.done();
             } finally {
@@ -5203,7 +5204,7 @@ public class SVNWCDb implements ISVNWCDb {
         }
 
         private void bumpMovedAway(SVNWCDbRoot wcRoot, File localRelPath, SVNDepth depth, SVNWCDb db) throws SVNException {
-            SVNSqlJetStatement createUpdateMoveList = new SVNWCDbCreateSchema(wcRoot.getSDb().getTemporaryDb(), SVNWCDbCreateSchema.CREATE_UPDATE_MOVE_LIST, -1);
+            SVNSqlJetStatement createUpdateMoveList = new SVNWCDbCreateSchema(wcRoot.getSDb().getTemporaryDb(), SVNWCDbCreateSchema.CREATE_UPDATE_MOVE_LIST, -1, false);
             try {
                 createUpdateMoveList.done();
             } finally {
@@ -6332,7 +6333,7 @@ public class SVNWCDb implements ISVNWCDb {
     }
     
     public void upgradeBegin(File localAbspath, SVNWCDbUpgradeData upgradeData, SVNURL repositoryRootUrl, String repositoryUUID, int targetWorkingCopyFormat) throws SVNException {
-    	CreateDbInfo dbInfo =  createDb(localAbspath, repositoryRootUrl, repositoryUUID, SDB_FILE, targetWorkingCopyFormat);
+    	CreateDbInfo dbInfo =  createDb(localAbspath, repositoryRootUrl, repositoryUUID, SDB_FILE, targetWorkingCopyFormat, true);
     	upgradeData.repositoryId = dbInfo.reposId;
     	upgradeData.workingCopyId = dbInfo.wcId;
     	    	
@@ -6726,7 +6727,7 @@ public class SVNWCDb implements ISVNWCDb {
 
             SVNSqlJetStatement stmt;
 
-            stmt = new SVNWCDbCreateSchema(db.getTemporaryDb(), SVNWCDbCreateSchema.CREATE_UPDATE_MOVE_LIST, -1);
+            stmt = new SVNWCDbCreateSchema(db.getTemporaryDb(), SVNWCDbCreateSchema.CREATE_UPDATE_MOVE_LIST, -1, false);
             try {
                 stmt.done();
             } finally {
@@ -6887,7 +6888,7 @@ public class SVNWCDb implements ISVNWCDb {
         }
 
         if (wcRoot.getSDb().getTemporaryDb().hasTable(SVNWCDbSchema.UPDATE_MOVE_LIST.name())) {
-            stmt = new SVNWCDbCreateSchema(wcRoot.getSDb().getTemporaryDb(), SVNWCDbCreateSchema.FINALIZE_UPDATE_MOVE, -1);
+            stmt = new SVNWCDbCreateSchema(wcRoot.getSDb().getTemporaryDb(), SVNWCDbCreateSchema.FINALIZE_UPDATE_MOVE, -1, false);
             try {
                 stmt.done();
             } finally {
@@ -7036,7 +7037,7 @@ public class SVNWCDb implements ISVNWCDb {
                 suitableForMove(wcRoot, victimRelPath);
             }
 
-            stmt = new SVNWCDbCreateSchema(db.getTemporaryDb(), SVNWCDbCreateSchema.CREATE_UPDATE_MOVE_LIST, -1);
+            stmt = new SVNWCDbCreateSchema(db.getTemporaryDb(), SVNWCDbCreateSchema.CREATE_UPDATE_MOVE_LIST, -1, false);
             try {
                 stmt.done();
             } finally {
