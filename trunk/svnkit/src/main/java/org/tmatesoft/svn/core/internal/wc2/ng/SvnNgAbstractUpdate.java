@@ -1,26 +1,65 @@
 package org.tmatesoft.svn.core.internal.wc2.ng;
 
-import org.tmatesoft.svn.core.*;
+import java.io.File;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.tmatesoft.sqljet.core.SqlJetException;
+import org.tmatesoft.sqljet.core.SqlJetTransactionMode;
+import org.tmatesoft.svn.core.ISVNDirEntryHandler;
+import org.tmatesoft.svn.core.SVNCancelException;
+import org.tmatesoft.svn.core.SVNDepth;
+import org.tmatesoft.svn.core.SVNDirEntry;
+import org.tmatesoft.svn.core.SVNErrorCode;
+import org.tmatesoft.svn.core.SVNErrorMessage;
+import org.tmatesoft.svn.core.SVNException;
+import org.tmatesoft.svn.core.SVNNodeKind;
+import org.tmatesoft.svn.core.SVNProperties;
+import org.tmatesoft.svn.core.SVNURL;
 import org.tmatesoft.svn.core.internal.db.SVNSqlJetDb;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
 import org.tmatesoft.svn.core.internal.util.SVNURLUtil;
-import org.tmatesoft.svn.core.internal.wc.*;
-import org.tmatesoft.svn.core.internal.wc17.*;
+import org.tmatesoft.svn.core.internal.wc.ISVNUpdateEditor;
+import org.tmatesoft.svn.core.internal.wc.SVNErrorManager;
+import org.tmatesoft.svn.core.internal.wc.SVNEventFactory;
+import org.tmatesoft.svn.core.internal.wc.SVNExternal;
+import org.tmatesoft.svn.core.internal.wc.SVNFileListUtil;
+import org.tmatesoft.svn.core.internal.wc.SVNFileType;
+import org.tmatesoft.svn.core.internal.wc.SVNFileUtil;
+import org.tmatesoft.svn.core.internal.wc17.ISVNDirFetcher;
+import org.tmatesoft.svn.core.internal.wc17.SVNExternalsStore;
+import org.tmatesoft.svn.core.internal.wc17.SVNReporter17;
+import org.tmatesoft.svn.core.internal.wc17.SVNUpdateEditor17;
+import org.tmatesoft.svn.core.internal.wc17.SVNWCContext;
 import org.tmatesoft.svn.core.internal.wc17.SVNWCContext.SVNWCNodeReposInfo;
-import org.tmatesoft.svn.core.internal.wc17.db.*;
+import org.tmatesoft.svn.core.internal.wc17.SVNWCUtils;
+import org.tmatesoft.svn.core.internal.wc17.db.ISVNWCDb;
+import org.tmatesoft.svn.core.internal.wc17.db.SVNWCDb;
+import org.tmatesoft.svn.core.internal.wc17.db.Structure;
 import org.tmatesoft.svn.core.internal.wc17.db.StructureFields.ExternalNodeInfo;
 import org.tmatesoft.svn.core.internal.wc17.db.StructureFields.NodeInfo;
-import org.tmatesoft.svn.core.internal.wc2.SvnRepositoryAccess;
+import org.tmatesoft.svn.core.internal.wc17.db.SvnExternalFileReporter;
+import org.tmatesoft.svn.core.internal.wc17.db.SvnExternalUpdateEditor;
+import org.tmatesoft.svn.core.internal.wc17.db.SvnWcDbExternals;
 import org.tmatesoft.svn.core.internal.wc2.SvnRepositoryAccess.RepositoryInfo;
 import org.tmatesoft.svn.core.io.SVNCapability;
 import org.tmatesoft.svn.core.io.SVNLocationSegment;
 import org.tmatesoft.svn.core.io.SVNRepository;
-import org.tmatesoft.svn.core.wc.*;
-import org.tmatesoft.svn.core.wc2.*;
+import org.tmatesoft.svn.core.wc.ISVNConflictHandler;
+import org.tmatesoft.svn.core.wc.ISVNEventHandler;
+import org.tmatesoft.svn.core.wc.SVNConflictChoice;
+import org.tmatesoft.svn.core.wc.SVNConflictDescription;
+import org.tmatesoft.svn.core.wc.SVNConflictResult;
+import org.tmatesoft.svn.core.wc.SVNEvent;
+import org.tmatesoft.svn.core.wc.SVNEventAction;
+import org.tmatesoft.svn.core.wc.SVNRevision;
+import org.tmatesoft.svn.core.wc2.AbstractSvnUpdate;
+import org.tmatesoft.svn.core.wc2.SvnOperationFactory;
+import org.tmatesoft.svn.core.wc2.SvnRelocate;
+import org.tmatesoft.svn.core.wc2.SvnTarget;
 import org.tmatesoft.svn.util.SVNLogType;
-
-import java.io.File;
-import java.util.*;
 
 public abstract class SvnNgAbstractUpdate<V, T extends AbstractSvnUpdate<V>> extends SvnNgOperationRunner<V, T> {
 
@@ -100,7 +139,6 @@ public abstract class SvnNgAbstractUpdate<V, T extends AbstractSvnUpdate<V>> ext
         ISVNWCDb.WCDbBaseInfo nodeBaseInfo = wcContext.getNodeBase(anchorAbspath, true, false);
         File reposRelPath = nodeBaseInfo.reposRelPath;
         SVNURL reposRootUrl = nodeBaseInfo.reposRootUrl;
-        String reposUuid = nodeBaseInfo.reposUuid;
 
         boolean targetConflicted = false;
 
@@ -211,6 +249,7 @@ public abstract class SvnNgAbstractUpdate<V, T extends AbstractSvnUpdate<V>> ext
             sleepForTimestamp();
             throw e;
         } finally {
+            ensureNodesMovedToIndex(wcContext.getDb().getSDb(anchorAbspath));
             if (repos2[0] != null) {
                 repos2[0].closeSession();
             }
@@ -232,6 +271,20 @@ public abstract class SvnNgAbstractUpdate<V, T extends AbstractSvnUpdate<V>> ext
             }
         }
         return targetRevision;
+    }
+
+    private void ensureNodesMovedToIndex(SVNSqlJetDb sDb) throws SVNException {
+        try {
+            sDb.beginTransaction(SqlJetTransactionMode.WRITE);
+            if (sDb.getDb().getSchema().getIndex("I_NODES_MOVED") == null) {
+                sDb.getDb().createIndex("CREATE UNIQUE INDEX I_NODES_MOVED ON NODES (wc_id, moved_to, op_depth);");
+            }
+            sDb.commit();
+        } catch (SqlJetException e) {
+            sDb.rollback();
+            SVNSqlJetDb.createSqlJetError(e);
+        }
+        
     }
 
     protected void handleExternals(Map<File, String> newExternals, Map<File, SVNDepth> ambientDepths, SVNURL anchorUrl, File targetAbspath, SVNURL reposRoot, SVNDepth requestedDepth, boolean sleepForTimestamp) throws SVNException {
