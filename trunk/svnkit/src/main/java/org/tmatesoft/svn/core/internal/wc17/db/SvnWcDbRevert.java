@@ -487,7 +487,7 @@ public class SvnWcDbRevert extends SvnWcDbShared {
         DirParsedInfo dirInfo = db.obtainWcRoot(localAbsPath);
         SVNWCDbRoot root = dirInfo.wcDbDir.getWCRoot();
         
-        SVNSqlJetStatement stmt = new SVNWCDbCreateSchema(root.getSDb().getTemporaryDb(), SVNWCDbCreateSchema.DROP_REVERT_LIST, -1);
+        SVNSqlJetStatement stmt = new SVNWCDbCreateSchema(root.getSDb().getTemporaryDb(), SVNWCDbCreateSchema.DROP_REVERT_LIST, -1, false);
         try {
             stmt.done();
         } finally {
