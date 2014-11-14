@@ -367,8 +367,7 @@ public class SvnWcDbCopy extends SvnWcDbShared {
                 }
             } else {
                 if (copyFromRelpath == null) {
-                    final SVNWCDb wcDb = dstPdh.getWCRoot().getDb();
-                    wcDb.addWorkItems(dstPdh.getWCRoot().getSDb(), workItems);
+                    SVNWCDb.addWorkItems(dstPdh.getWCRoot().getSDb(), workItems);
                     return;
                 }
             }

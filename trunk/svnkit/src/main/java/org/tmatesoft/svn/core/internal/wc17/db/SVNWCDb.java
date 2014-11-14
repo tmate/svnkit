@@ -57,8 +57,6 @@ import java.util.logging.Level;
 import org.tmatesoft.sqljet.core.SqlJetException;
 import org.tmatesoft.sqljet.core.SqlJetTransactionMode;
 import org.tmatesoft.sqljet.core.internal.SqlJetPagerJournalMode;
-import org.tmatesoft.sqljet.core.table.ISqlJetCursor;
-import org.tmatesoft.sqljet.core.table.ISqlJetTable;
 import org.tmatesoft.svn.core.SVNDepth;
 import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
@@ -102,21 +100,13 @@ import org.tmatesoft.svn.core.internal.wc17.db.StructureFields.RepositoryInfo;
 import org.tmatesoft.svn.core.internal.wc17.db.SvnWcDbConflicts.ConflictInfo;
 import org.tmatesoft.svn.core.internal.wc17.db.SvnWcDbConflicts.TextConflictInfo;
 import org.tmatesoft.svn.core.internal.wc17.db.SvnWcDbConflicts.TreeConflictInfo;
-import org.tmatesoft.svn.core.internal.wc17.db.statement.SVNWCDbCreateSchema;
-import org.tmatesoft.svn.core.internal.wc17.db.statement.SVNWCDbSchema;
+import org.tmatesoft.svn.core.internal.wc17.db.statement.*;
 import org.tmatesoft.svn.core.internal.wc17.db.statement.SVNWCDbSchema.ACTUAL_NODE__Fields;
 import org.tmatesoft.svn.core.internal.wc17.db.statement.SVNWCDbSchema.DELETE_LIST__Fields;
 import org.tmatesoft.svn.core.internal.wc17.db.statement.SVNWCDbSchema.NODES__Fields;
 import org.tmatesoft.svn.core.internal.wc17.db.statement.SVNWCDbSchema.PRISTINE__Fields;
 import org.tmatesoft.svn.core.internal.wc17.db.statement.SVNWCDbSchema.REPOSITORY__Fields;
 import org.tmatesoft.svn.core.internal.wc17.db.statement.SVNWCDbSchema.WC_LOCK__Fields;
-import org.tmatesoft.svn.core.internal.wc17.db.statement.SVNWCDbSelectCommittableExternalsImmediatelyBelow;
-import org.tmatesoft.svn.core.internal.wc17.db.statement.SVNWCDbSelectDeletionInfo;
-import org.tmatesoft.svn.core.internal.wc17.db.statement.SVNWCDbSelectMinMaxRevisions;
-import org.tmatesoft.svn.core.internal.wc17.db.statement.SVNWCDbSelectMovedForDelete;
-import org.tmatesoft.svn.core.internal.wc17.db.statement.SVNWCDbSelectMovedFromForDelete;
-import org.tmatesoft.svn.core.internal.wc17.db.statement.SVNWCDbSelectOpDepthMovedPair;
-import org.tmatesoft.svn.core.internal.wc17.db.statement.SVNWCDbStatements;
 import org.tmatesoft.svn.core.io.SVNRepository;
 import org.tmatesoft.svn.core.wc.ISVNEventHandler;
 import org.tmatesoft.svn.core.wc.ISVNOptions;
@@ -352,7 +342,7 @@ public class SVNWCDb implements ISVNWCDb {
         }
     }
 
-    public void addWorkItems(SVNSqlJetDb sDb, SVNSkel skel) throws SVNException {
+    public static void addWorkItems(SVNSqlJetDb sDb, SVNSkel skel) throws SVNException {
         /* Maybe there are no work items to insert. */
         if (skel == null) {
             return;
@@ -369,17 +359,16 @@ public class SVNWCDb implements ISVNWCDb {
         }
 
     }
-    
-    private void addSingleWorkItem(SVNSqlJetDb sDb, SVNSkel workItem) throws SVNException {
-        workItems.add(workItem);
-        /*
+
+    private static void addSingleWorkItem(SVNSqlJetDb sDb, SVNSkel workItem) throws SVNException {
+        final byte[] serialized = workItem.unparse();
         final SVNSqlJetStatement stmt = sDb.getStatement(SVNWCDbStatements.INSERT_WORK_ITEM);
         try {
             stmt.bindBlob(1, serialized);
             stmt.done();
         } finally {
             stmt.reset();
-        }*/
+        }
     }
     
     public Map<File, File> getExternalsDefinedBelow(File localAbsPath) throws SVNException {
@@ -879,8 +868,8 @@ public class SVNWCDb implements ISVNWCDb {
         public boolean updateActualProps;
         public SVNProperties actualProps;
         
-        public boolean insertBaseDeleted;
-        public boolean keepRecordedInfo;
+       public boolean insertBaseDeleted;
+       public boolean keepRecordedInfo;
         public boolean deleteWorking;
        
         public SVNSkel workItems;
@@ -1429,24 +1418,10 @@ public class SVNWCDb implements ISVNWCDb {
             stmt.reset();
         }
     }
-    
-    private ArrayList<SVNSkel> workItems = new ArrayList<SVNSkel>();
-    
-    public boolean hasWorkQueue() {
-        return !this.workItems.isEmpty();
-    }
 
     public WCDbWorkQueueInfo fetchWorkQueue(File wcRootAbsPath) throws SVNException {
-        final WCDbWorkQueueInfo info = new WCDbWorkQueueInfo();
-        if (workItems.isEmpty()) {
-            return info;
-        }
-        info.workItem = workItems.get(0);
-        workItems.remove(0);
-        return info;
-        /*
-//        assert (SVNFileUtil.isAbsolute(wcRootAbsPath));
-//        WCDbWorkQueueInfo info = new WCDbWorkQueueInfo();
+        assert (SVNFileUtil.isAbsolute(wcRootAbsPath));
+        WCDbWorkQueueInfo info = new WCDbWorkQueueInfo();
         DirParsedInfo parseDir = parseDir(wcRootAbsPath, Mode.ReadOnly);
         SVNWCDbDir pdh = parseDir.wcDbDir;
         verifyDirUsable(pdh);
@@ -1463,7 +1438,7 @@ public class SVNWCDb implements ISVNWCDb {
             return info;
         } finally {
             stmt.reset();
-        }*/
+        }
     }
 
     public File fromRelPath(File wriAbsPath, File localRelPath) throws SVNException {
@@ -1784,35 +1759,16 @@ public class SVNWCDb implements ISVNWCDb {
         public long translatedSize;
         public File localRelpath;
         public SVNWCDbRoot wcRoot;
-        
-        /**
-         * UPDATE nodes SET translated_size = ?3, last_mod_time = ?4 WHERE wc_id = ?1
-         * AND local_relpath = ?2 AND op_depth = (SELECT MAX(op_depth) FROM nodes WHERE
-         * wc_id = ?1 AND local_relpath = ?2);
-         */
+
         public void transaction(SVNSqlJetDb db) throws SqlJetException, SVNException {
-            
+            SVNSqlJetStatement stmt = db.getStatement(SVNWCDbStatements.UPDATE_NODE_FILEINFO);
             try {
-                db.beginTransaction(SqlJetTransactionMode.WRITE);
-                
-                final ISqlJetTable table = db.getDb().getTable(SVNWCDbSchema.NODES.name());
-                ISqlJetCursor c = table.lookup(null, wcRoot.getWcId(), SVNFileUtil.getFilePath(localRelpath));
-                c = c.reverse();
-                if (!c.eof()) {
-                    final Map<String, Object> updateValues = new HashMap<String, Object>();
-                    updateValues.put(SVNWCDbSchema.NODES__Fields.translated_size.toString(), translatedSize);
-                    updateValues.put(SVNWCDbSchema.NODES__Fields.last_mod_time.toString(), lastModTime.getTimeInMicros());
-                    c.updateByFieldNames(updateValues);
-                }
-                c.close();
-                db.commit();
-            } catch (SqlJetException e) {
-                db.rollback();
-                throw e;
-            } catch (SVNException e) {
-                db.rollback();
-                throw e;
-            }  
+                stmt.bindf("isii", wcRoot.getWcId(), localRelpath, translatedSize, lastModTime);
+                long affectedRows = stmt.done();
+                assert (affectedRows == 1);
+            } finally {
+                stmt.reset();
+            }
         }
     }
 
@@ -5664,7 +5620,8 @@ public class SVNWCDb implements ISVNWCDb {
                 }
             }
             
-            if (hasWorkQueue()) {
+            WCDbWorkQueueInfo wq = fetchWorkQueue(pdh.getWCRoot().getAbsPath());
+            if (wq.workItem != null) {
                 SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.WC_LOCKED, "There are unfinished work items in ''{0}''; run ''svn cleanup'' first.", pdh.getWCRoot().getAbsPath());
                 SVNErrorManager.error(err, SVNLogType.WC);
             }
@@ -7337,11 +7294,11 @@ public class SVNWCDb implements ISVNWCDb {
             return;
         }
 
-//        DirParsedInfo parsed = parseDir(wriAbsPath, Mode.ReadWrite);
-//        SVNWCDbDir pdh = parsed.wcDbDir;
-//        verifyDirUsable(pdh);
+        DirParsedInfo parsed = parseDir(wriAbsPath, Mode.ReadWrite);
+        SVNWCDbDir pdh = parsed.wcDbDir;
+        verifyDirUsable(pdh);
 
-        addWorkItems(null, workItem);
+        addWorkItems(pdh.getWCRoot().getSDb(), workItem);
     }
 
     public Map<String, SVNWCDbKind> getChildrenOpDepth(SVNWCDbRoot wcRoot, File localRelPath, int opDepth) throws SVNException {
@@ -7647,7 +7604,7 @@ public class SVNWCDb implements ISVNWCDb {
         return handleMoveBack.movedBack;
     }
 
-    private class HandleMoveBack implements SVNSqlJetTransaction {
+    private static class HandleMoveBack implements SVNSqlJetTransaction {
         public SVNWCDbRoot wcRoot;
         public File localRelPath;
         public File movedFromRelPath;
