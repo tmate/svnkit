@@ -57,6 +57,8 @@ import java.util.logging.Level;
 import org.tmatesoft.sqljet.core.SqlJetException;
 import org.tmatesoft.sqljet.core.SqlJetTransactionMode;
 import org.tmatesoft.sqljet.core.internal.SqlJetPagerJournalMode;
+import org.tmatesoft.sqljet.core.table.ISqlJetCursor;
+import org.tmatesoft.sqljet.core.table.ISqlJetTable;
 import org.tmatesoft.svn.core.SVNDepth;
 import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
@@ -100,13 +102,21 @@ import org.tmatesoft.svn.core.internal.wc17.db.StructureFields.RepositoryInfo;
 import org.tmatesoft.svn.core.internal.wc17.db.SvnWcDbConflicts.ConflictInfo;
 import org.tmatesoft.svn.core.internal.wc17.db.SvnWcDbConflicts.TextConflictInfo;
 import org.tmatesoft.svn.core.internal.wc17.db.SvnWcDbConflicts.TreeConflictInfo;
-import org.tmatesoft.svn.core.internal.wc17.db.statement.*;
+import org.tmatesoft.svn.core.internal.wc17.db.statement.SVNWCDbCreateSchema;
+import org.tmatesoft.svn.core.internal.wc17.db.statement.SVNWCDbSchema;
 import org.tmatesoft.svn.core.internal.wc17.db.statement.SVNWCDbSchema.ACTUAL_NODE__Fields;
 import org.tmatesoft.svn.core.internal.wc17.db.statement.SVNWCDbSchema.DELETE_LIST__Fields;
 import org.tmatesoft.svn.core.internal.wc17.db.statement.SVNWCDbSchema.NODES__Fields;
 import org.tmatesoft.svn.core.internal.wc17.db.statement.SVNWCDbSchema.PRISTINE__Fields;
 import org.tmatesoft.svn.core.internal.wc17.db.statement.SVNWCDbSchema.REPOSITORY__Fields;
 import org.tmatesoft.svn.core.internal.wc17.db.statement.SVNWCDbSchema.WC_LOCK__Fields;
+import org.tmatesoft.svn.core.internal.wc17.db.statement.SVNWCDbSelectCommittableExternalsImmediatelyBelow;
+import org.tmatesoft.svn.core.internal.wc17.db.statement.SVNWCDbSelectDeletionInfo;
+import org.tmatesoft.svn.core.internal.wc17.db.statement.SVNWCDbSelectMinMaxRevisions;
+import org.tmatesoft.svn.core.internal.wc17.db.statement.SVNWCDbSelectMovedForDelete;
+import org.tmatesoft.svn.core.internal.wc17.db.statement.SVNWCDbSelectMovedFromForDelete;
+import org.tmatesoft.svn.core.internal.wc17.db.statement.SVNWCDbSelectOpDepthMovedPair;
+import org.tmatesoft.svn.core.internal.wc17.db.statement.SVNWCDbStatements;
 import org.tmatesoft.svn.core.io.SVNRepository;
 import org.tmatesoft.svn.core.wc.ISVNEventHandler;
 import org.tmatesoft.svn.core.wc.ISVNOptions;
@@ -1761,14 +1771,27 @@ public class SVNWCDb implements ISVNWCDb {
         public SVNWCDbRoot wcRoot;
 
         public void transaction(SVNSqlJetDb db) throws SqlJetException, SVNException {
-            SVNSqlJetStatement stmt = db.getStatement(SVNWCDbStatements.UPDATE_NODE_FILEINFO);
             try {
-                stmt.bindf("isii", wcRoot.getWcId(), localRelpath, translatedSize, lastModTime);
-                long affectedRows = stmt.done();
-                assert (affectedRows == 1);
-            } finally {
-                stmt.reset();
-            }
+                db.beginTransaction(SqlJetTransactionMode.WRITE);
+                
+                final ISqlJetTable table = db.getDb().getTable(SVNWCDbSchema.NODES.name());
+                ISqlJetCursor c = table.lookup(null, wcRoot.getWcId(), SVNFileUtil.getFilePath(localRelpath));
+                c = c.reverse();
+                if (!c.eof()) {
+                    final Map<String, Object> updateValues = new HashMap<String, Object>();
+                    updateValues.put(SVNWCDbSchema.NODES__Fields.translated_size.toString(), translatedSize);
+                    updateValues.put(SVNWCDbSchema.NODES__Fields.last_mod_time.toString(), lastModTime.getTimeInMicros());
+                    c.updateByFieldNames(updateValues);
+                }
+                c.close();
+                db.commit();
+            } catch (SqlJetException e) {
+                db.rollback();
+                throw e;
+            } catch (SVNException e) {
+                db.rollback();
+                throw e;
+            }  
         }
     }
 
