@@ -110,7 +110,7 @@ public class PackedRevPropsTest {
     }
 
     @Test
-    public void testDeltaRepresentationHeader() throws Exception {
+    public void testDeltaSelfRepresentationHeader() throws Exception {
         //SVNKIT-504
         final TestOptions options = TestOptions.getInstance();
         Assume.assumeNotNull(options.getSvnCommand());
@@ -139,6 +139,55 @@ public class PackedRevPropsTest {
 
             SVNFileUtil.execCommand(new String[] {svnCommand, "checkout", url.toString(), workingCopyDirectory.getAbsolutePath()});
             SVNFileUtil.execCommand(new String[] {svnCommand, "propset", "propertyName", "propertyValue", new File(workingCopyDirectory, "trunk").getAbsolutePath()});
+            SVNFileUtil.execCommand(new String[] {svnCommand, "commit", "-m", "m", workingCopyDirectory.getAbsolutePath()});
+
+            final SvnGetProperties getProperties = svnOperationFactory.createGetProperties();
+            getProperties.setSingleTarget(SvnTarget.fromURL(url.appendPath("trunk", false)));
+            final SVNProperties properties = getProperties.run();
+
+            Assert.assertNotNull(properties);
+            Assert.assertEquals(SVNPropertyValue.create("propertyValue"), properties.getSVNPropertyValue("propertyName"));
+
+        } finally {
+            svnOperationFactory.dispose();
+            sandbox.dispose();
+        }
+    }
+
+    @Test
+    public void testDeltaRepresentationHeader() throws Exception {
+        //SVNKIT-504
+        final TestOptions options = TestOptions.getInstance();
+        Assume.assumeNotNull(options.getSvnCommand());
+
+        final SvnOperationFactory svnOperationFactory = new SvnOperationFactory();
+        final Sandbox sandbox = Sandbox.createWithCleanup(getTestName() + ".testDeltaRepresentationHeader", options);
+        try {
+            final SVNURL url = sandbox.createSvnRepository();
+
+            final String enableDirDeltification = "enable-dir-deltification";
+            final String enablePropsDeltification = "enable-props-deltification";
+
+            final File repositoryRoot = new File(url.getPath());
+            final File dbDirectory = new File(repositoryRoot, FSFS.DB_DIR);
+            final File fsfsConfigFile = new File(dbDirectory, FSFS.PATH_CONFIG);
+
+            final SVNConfigFile fsfsConfig = new SVNConfigFile(fsfsConfigFile);
+            fsfsConfig.setPropertyValue("deltification", enableDirDeltification, "true", false);
+            fsfsConfig.setPropertyValue("deltification", enablePropsDeltification, "true", false);
+            fsfsConfig.save();
+
+            final String svnCommand = options.getSvnCommand();
+            SVNFileUtil.execCommand(new String[] {svnCommand, "mkdir", url.appendPath("trunk", false).toString(), "-m", "m"});
+
+            final File workingCopyDirectory = sandbox.createDirectory("wc");
+
+            SVNFileUtil.execCommand(new String[] {svnCommand, "checkout", url.toString(), workingCopyDirectory.getAbsolutePath()});
+            SVNFileUtil.execCommand(new String[] {svnCommand, "propset", "propertyName",
+                    "just long incompressible value asljfsiodfnaidubfasdifbasdkfsdkfasdbfakubfdakkysbfsdyfbsadfbasydbfuasydf", new File(workingCopyDirectory, "trunk").getAbsolutePath()});
+            SVNFileUtil.execCommand(new String[] {svnCommand, "commit", "-m", "m", workingCopyDirectory.getAbsolutePath()});
+            SVNFileUtil.execCommand(new String[] {svnCommand, "propset", "propertyName2",
+                    "another long incompressible value aopdsfjadsfdashfuihasdflusdhfuisahdfilsadfuhsldaufhsahufihaufihwbefubweuf", new File(workingCopyDirectory, "trunk").getAbsolutePath()});
             SVNFileUtil.execCommand(new String[] {svnCommand, "commit", "-m", "m", workingCopyDirectory.getAbsolutePath()});
 
             final SvnGetProperties getProperties = svnOperationFactory.createGetProperties();
