@@ -12,10 +12,10 @@ import java.util.List;
 
 public class SshHost {
     
-    private static final long CONNECTION_INACTIVITY_TIMEOUT = 60*1000*10; // 10 minutes
-    private static final long MAX_CONCURRENT_OPENERS = 3;
-    private static final int MAX_SESSIONS_PER_CONNECTION = 8;
-    
+    private static final int CONNECTION_INACTIVITY_TIMEOUT = Integer.parseInt(System.getProperty("svnkit.ssh.connection.inactivity.timeout.secs", "600")) * 1000; // 10 minutes
+    private static final int MAX_CONCURRENT_OPENERS = Integer.parseInt(System.getProperty("svnkit.ssh.max.concurrent.connection.openers", "3"));
+    private static final int MAX_SESSIONS_PER_CONNECTION = Integer.parseInt(System.getProperty("svnkit.ssh.max.sessions.per.connection", "8"));
+
     private String myHost;
     private int myPort;
     private ServerHostKeyVerifier myHostVerifier;
