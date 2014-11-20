@@ -182,12 +182,15 @@ public class PackedRevPropsTest {
 
             final File workingCopyDirectory = sandbox.createDirectory("wc");
 
+            final String longIncompressibleValue1 = "just long incompressible value asljfsiodfnaidubfasdifbasdkfsdkfasdbfakubfdakkysbfsdyfbsadfbasydbfuasydf";
+            final String longIncompressibleValue2 = "another long incompressible value aopdsfjadsfdashfuihasdflusdhfuisahdfilsadfuhsldaufhsahufihaufihwbefubweuf";
+
             SVNFileUtil.execCommand(new String[] {svnCommand, "checkout", url.toString(), workingCopyDirectory.getAbsolutePath()});
-            SVNFileUtil.execCommand(new String[] {svnCommand, "propset", "propertyName",
-                    "just long incompressible value asljfsiodfnaidubfasdifbasdkfsdkfasdbfakubfdakkysbfsdyfbsadfbasydbfuasydf", new File(workingCopyDirectory, "trunk").getAbsolutePath()});
+            SVNFileUtil.execCommand(new String[] {svnCommand, "propset", "propertyName1",
+                    longIncompressibleValue1, new File(workingCopyDirectory, "trunk").getAbsolutePath()});
             SVNFileUtil.execCommand(new String[] {svnCommand, "commit", "-m", "m", workingCopyDirectory.getAbsolutePath()});
             SVNFileUtil.execCommand(new String[] {svnCommand, "propset", "propertyName2",
-                    "another long incompressible value aopdsfjadsfdashfuihasdflusdhfuisahdfilsadfuhsldaufhsahufihaufihwbefubweuf", new File(workingCopyDirectory, "trunk").getAbsolutePath()});
+                    longIncompressibleValue2, new File(workingCopyDirectory, "trunk").getAbsolutePath()});
             SVNFileUtil.execCommand(new String[] {svnCommand, "commit", "-m", "m", workingCopyDirectory.getAbsolutePath()});
 
             final SvnGetProperties getProperties = svnOperationFactory.createGetProperties();
@@ -195,8 +198,8 @@ public class PackedRevPropsTest {
             final SVNProperties properties = getProperties.run();
 
             Assert.assertNotNull(properties);
-            Assert.assertEquals(SVNPropertyValue.create("propertyValue"), properties.getSVNPropertyValue("propertyName"));
-
+            Assert.assertEquals(SVNPropertyValue.create(longIncompressibleValue1), properties.getSVNPropertyValue("propertyName1"));
+            Assert.assertEquals(SVNPropertyValue.create(longIncompressibleValue2), properties.getSVNPropertyValue("propertyName2"));
         } finally {
             svnOperationFactory.dispose();
             sandbox.dispose();

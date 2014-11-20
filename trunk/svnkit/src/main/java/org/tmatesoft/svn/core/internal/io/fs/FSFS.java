@@ -23,8 +23,6 @@ import java.io.OutputStream;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.*;
-import java.util.zip.GZIPInputStream;
-import java.util.zip.InflaterInputStream;
 
 import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNErrorMessage;
@@ -849,6 +847,101 @@ public class FSFS {
         return new SVNHashMap();// returns an empty map, must not be null!!
     }
 
+    private byte[] parseRawDeltaProperties(FSRepresentation txtRep, StringBuilder outputChecksum) throws SVNException {
+        FSFile revisionFile = null;
+        revisionFile = openAndSeekRepresentation(txtRep);
+        String repHeader = revisionFile.readLine(160);
+
+        byte[] rawPropertiesBytes = null;
+        String checksum = null;
+
+        try {
+            if ("PLAIN".equals(repHeader)) {
+                revisionFile.resetDigest();
+                rawPropertiesBytes = new byte[(int) txtRep.getSize()];
+                revisionFile.read(rawPropertiesBytes, 0, rawPropertiesBytes.length);
+                checksum = revisionFile.digest();
+                if (checksum != null && outputChecksum != null) {
+                    outputChecksum.append(checksum);
+                }
+            } else if ("DELTA".equals(repHeader)) {
+                InputStream baseStream = SVNFileUtil.DUMMY_IN;
+                rawPropertiesBytes = applyDeltaFromFSFile(revisionFile, (int) txtRep.getSize(), baseStream, outputChecksum);
+            } else if (repHeader.startsWith("DELTA ")) {
+                long baseRevision;
+                long baseItemIndex;
+                long baseLength;
+                final String[] repHeaderArray = repHeader.split(" ");
+                try {
+                    baseRevision = Long.parseLong(repHeaderArray[1]);
+                    baseItemIndex = Long.parseLong(repHeaderArray[2]);
+                    baseLength = Long.parseLong(repHeaderArray[3]);
+
+                    final FSRepresentation baseRepresentation = new FSRepresentation();
+                    baseRepresentation.setRevision(baseRevision);
+                    baseRepresentation.setOffset(baseItemIndex);
+                    baseRepresentation.setSize(baseLength);
+
+                    final byte[] baseBuffer = parseRawDeltaProperties(baseRepresentation, null);
+                    final ByteArrayInputStream inputStream = new ByteArrayInputStream(baseBuffer);
+
+                    rawPropertiesBytes = applyDeltaFromFSFile(revisionFile, (int) txtRep.getSize(), inputStream, outputChecksum);
+                } catch (NumberFormatException e) {
+                    SVNErrorMessage errr = SVNErrorMessage.create(SVNErrorCode.FS_CORRUPT, "Malformed representation header ''{0}''", repHeader);
+                    SVNErrorManager.error(errr, SVNLogType.FSFS);
+                }
+            }
+            return rawPropertiesBytes;
+        } catch (IOException e) {
+            SVNErrorMessage errorMessage = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, e);
+            SVNErrorManager.error(errorMessage, SVNLogType.FSFS);
+        } finally {
+            if (revisionFile != null) {
+                revisionFile.close();
+            }
+        }
+        return null;
+    }
+
+    private byte[] applyDeltaFromFSFile(FSFile revisionFile, int deltaSize, InputStream baseStream, StringBuilder outputChecksum) throws IOException, SVNException {
+        final byte[] rawPropertiesBytes;SVNDeltaReader deltaReader = new SVNDeltaReader();
+        byte[] buffer = new byte[2048];
+        int readCount = -1;
+
+        final SVNDeltaProcessor deltaProcessor = new SVNDeltaProcessor();
+        final ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+
+        deltaProcessor.applyTextDelta(baseStream, byteArrayOutputStream, true);
+
+        while ((readCount = revisionFile.read(buffer, 0, deltaSize)) != -1) {
+            if (readCount == 0) {
+                continue;
+            }
+            deltaReader.nextWindow(buffer, 0, readCount, "", new ISVNDeltaConsumer() {
+                public void applyTextDelta(String path, String baseChecksum) throws SVNException {
+                }
+
+                public OutputStream textDeltaChunk(String path, SVNDiffWindow diffWindow) throws SVNException {
+                    return deltaProcessor.textDeltaChunk(diffWindow);
+                }
+
+                public void textDeltaEnd(String path) throws SVNException {
+                }
+            });
+            deltaSize -= readCount;
+            if (deltaSize == 0) {
+                break;
+            }
+        }
+
+        String checksum = deltaProcessor.textDeltaEnd();
+        if (checksum != null && outputChecksum != null) {
+            outputChecksum.append(checksum);
+        }
+        rawPropertiesBytes = byteArrayOutputStream.toByteArray();
+        return rawPropertiesBytes;
+    }
+
     private SVNProperties parseProperties(FSRepresentation txtRep) throws SVNException {
         FSFile revisionFile = null;
 
@@ -864,44 +957,14 @@ public class FSFS {
                 rawEntries = revisionFile.readProperties(false, false);
                 checksum = revisionFile.digest();
             } else if ("DELTA".equals(repHeader)) {
-                SVNDeltaReader deltaReader = new SVNDeltaReader();
-                byte[] buffer = new byte[2048];
-                int readCount = -1;
-                int length = (int) txtRep.getSize();
-
-                final SVNDeltaProcessor deltaProcessor = new SVNDeltaProcessor();
-                final ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-
-                //TODO if repHeader is "DELTA source length", deltaProcessor should be applied to that source
-                deltaProcessor.applyTextDelta(SVNFileUtil.DUMMY_IN, byteArrayOutputStream, true);
-
-                while ((readCount = revisionFile.read(buffer, 0, length)) != -1) {
-                    if (readCount == 0) {
-                        continue;
-                    }
-                    deltaReader.nextWindow(buffer, 0, readCount, "", new ISVNDeltaConsumer() {
-                        public void applyTextDelta(String path, String baseChecksum) throws SVNException {
-                        }
-
-                        public OutputStream textDeltaChunk(String path, SVNDiffWindow diffWindow) throws SVNException {
-                            return deltaProcessor.textDeltaChunk(diffWindow);
-                        }
-
-                        public void textDeltaEnd(String path) throws SVNException {
-                        }
-                    });
-                    length -= readCount;
-                    if (length == 0) {
-                        break;
-                    }
-                }
-
-                checksum = deltaProcessor.textDeltaEnd();
-                rawEntries = readProperties(byteArrayOutputStream.toByteArray());
-            } else {
-                //if this happens, see "TODO" above
-                SVNErrorMessage err = SVNErrorMessage.create(SVNErrorCode.FS_CORRUPT, "Malformed representation header ''{0}''", repHeader);
-                SVNErrorManager.error(err, SVNLogType.FSFS);
+                StringBuilder outputChecksum = new StringBuilder();
+                rawEntries = readProperties(parseRawDeltaProperties(txtRep, outputChecksum));
+                checksum = outputChecksum.toString();
+            } else if (repHeader.startsWith("DELTA ")) {
+                StringBuilder outputChecksum = new StringBuilder();
+                byte[] rawPropetiesBytes = parseRawDeltaProperties(txtRep, outputChecksum);
+                checksum = outputChecksum.toString();
+                rawEntries = readProperties(rawPropetiesBytes);
             }
 
             SVNErrorManager.assertionFailure(checksum != null, "Checksum should be computed", SVNLogType.FSFS);
@@ -912,17 +975,12 @@ public class FSFS {
                         new Object[] { checksum, txtRep.getMD5HexDigest() });
                 SVNErrorManager.error(err, SVNLogType.FSFS);
             }
-
             return rawEntries;
-        } catch (IOException e) {
-            SVNErrorMessage errorMessage = SVNErrorMessage.create(SVNErrorCode.IO_ERROR, e);
-            SVNErrorManager.error(errorMessage, SVNLogType.FSFS);
         } finally {
             if(revisionFile != null){
                 revisionFile.close();
             }
         }
-        return null;
     }
 
     public SVNProperties getProperties(FSRevisionNode revNode) throws SVNException {
