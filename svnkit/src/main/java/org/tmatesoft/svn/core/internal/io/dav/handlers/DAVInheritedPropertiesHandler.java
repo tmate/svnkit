@@ -71,9 +71,11 @@ public class DAVInheritedPropertiesHandler extends BasicDAVHandler {
             currentPropertyName = cdata.toString();
         } else if (element == IPROPVALUE) {
             currentPropertyValue = createPropertyValue(element, currentPropertyName, cdata, currentValueEncoding);
-            currentValueEncoding = null;
-        } else if (element == IPROPITEM) {
             currentProperties.put(currentPropertyName, currentPropertyValue);
+            currentValueEncoding = null;
+            currentPropertyName = null;
+            currentPropertyValue = null;
+        } else if (element == IPROPITEM) {
             currentPropertyName = null;
             currentPropertyValue = null;
         } else if (element == IPROPPATH) {
