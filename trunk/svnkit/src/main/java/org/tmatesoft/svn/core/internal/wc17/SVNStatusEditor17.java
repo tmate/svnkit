@@ -547,6 +547,8 @@ public class SVNStatusEditor17 {
         } catch (SVNException e) {
             if (e.getErrorMessage().getErrorCode() == SVNErrorCode.WC_PATH_UNEXPECTED_STATUS) {
                 return patterns;
+            } else {
+                throw e;
             }
         }
         for (Structure<InheritedProperties> element : inheritedProps) {
