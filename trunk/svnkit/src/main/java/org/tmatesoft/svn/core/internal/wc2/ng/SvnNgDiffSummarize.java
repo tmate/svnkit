@@ -368,7 +368,10 @@ public class SvnNgDiffSummarize extends SvnNgOperationRunner<SvnDiffStatus, SvnD
         return new ISVNDiffStatusHandler() {
             public void handleDiffStatus(SVNDiffStatus diffStatus) throws SVNException {
                 if (receiver != null) {
-                    receiver.receive(null, SvnCodec.diffStatus(diffStatus));
+                    final SvnTarget target = diffStatus.getURL() != null ?
+                            SvnTarget.fromURL(diffStatus.getURL()) :
+                            SvnTarget.fromFile(diffStatus.getFile());
+                    receiver.receive(target, SvnCodec.diffStatus(diffStatus));
                 }
             }
         };
