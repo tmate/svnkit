@@ -121,6 +121,10 @@ public class SVNSkel {
             if (cur == ')') {
                 break;
             }
+            if (!buffer.hasRemaining()) {
+                //cur is not ')' and the buffer has no more character, SVNSkel has incorrect format
+                return null;
+            }
             buffer = unread(buffer, 1);
             SVNSkel element = parse(buffer);
             if (element == null) {
