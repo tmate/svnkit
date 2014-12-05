@@ -872,6 +872,10 @@ public class FSFS {
                 long baseItemIndex;
                 long baseLength;
                 final String[] repHeaderArray = repHeader.split(" ");
+                if (repHeaderArray.length < 4) {
+                    SVNErrorMessage errr = SVNErrorMessage.create(SVNErrorCode.FS_CORRUPT, "Malformed representation header ''{0}''", repHeader);
+                    SVNErrorManager.error(errr, SVNLogType.FSFS);
+                }
                 try {
                     baseRevision = Long.parseLong(repHeaderArray[1]);
                     baseItemIndex = Long.parseLong(repHeaderArray[2]);
