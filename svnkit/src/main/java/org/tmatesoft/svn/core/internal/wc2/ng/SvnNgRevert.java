@@ -166,7 +166,7 @@ public class SvnNgRevert extends SvnNgOperationRunner<Void, SvnRevert> {
                 if (wcDbInfo.originalRootUrl != null && wcDbInfo.checksum != null) {
                     //now we are sure that the file is copied
                     long fileSize = SVNFileUtil.getFileLength(localAbsPath);
-                    long fileTime = SVNFileUtil.getFileLastModified(localAbsPath);
+                    long fileTime = SVNFileUtil.getFileLastModifiedMicros(localAbsPath);
 
                     if (wcDbInfo.translatedSize != -1 && wcDbInfo.lastModTime != 0 &&
                             wcDbInfo.translatedSize == fileSize && wcDbInfo.lastModTime == fileTime) {
@@ -286,12 +286,12 @@ public class SvnNgRevert extends SvnNgOperationRunner<Void, SvnRevert> {
                     SVNFileUtil.deleteFile(localAbsPath);
                     onDisk = SVNNodeKind.NONE;                    
                 } else {
-                    long lastModified = SVNFileUtil.getFileLastModified(localAbsPath);
+                    long lastModified = SVNFileUtil.getFileLastModifiedMicros(localAbsPath);
                     long size = SVNFileUtil.getFileLength(localAbsPath);
                     if (recordedSize != -1
                             && recordedTime != 0
                             && recordedSize == size 
-                            && recordedTime/1000 == lastModified) {
+                            && recordedTime == lastModified) {
                         modified = false;
                     } else {
                         modified = context.isTextModified(localAbsPath, true);

@@ -1750,7 +1750,7 @@ public class SVNWCDb implements ISVNWCDb {
         return SvnWcDbPristines.getPristineTempDir(pdh.getWCRoot(), wcRootAbsPath);
     }
 
-    public void globalRecordFileinfo(File localAbspath, long translatedSize, SVNDate lastModTime) throws SVNException {
+    public void globalRecordFileinfo(File localAbspath, long translatedSize, long lastModTime) throws SVNException {
         assert (SVNFileUtil.isAbsolute(localAbspath));
         final DirParsedInfo parsed = parseDir(localAbspath, Mode.ReadWrite);
         SVNWCDbDir pdh = parsed.wcDbDir;
@@ -1766,7 +1766,7 @@ public class SVNWCDb implements ISVNWCDb {
 
     private class RecordFileinfo implements SVNSqlJetTransaction {
 
-        public SVNDate lastModTime;
+        public long lastModTime;
         public long translatedSize;
         public File localRelpath;
         public SVNWCDbRoot wcRoot;
@@ -1781,7 +1781,7 @@ public class SVNWCDb implements ISVNWCDb {
                 if (!c.eof()) {
                     final Map<String, Object> updateValues = new HashMap<String, Object>();
                     updateValues.put(SVNWCDbSchema.NODES__Fields.translated_size.toString(), translatedSize);
-                    updateValues.put(SVNWCDbSchema.NODES__Fields.last_mod_time.toString(), lastModTime.getTimeInMicros());
+                    updateValues.put(SVNWCDbSchema.NODES__Fields.last_mod_time.toString(), lastModTime);
                     c.updateByFieldNames(updateValues);
                 }
                 c.close();
@@ -2926,7 +2926,7 @@ public class SVNWCDb implements ISVNWCDb {
             setActualProperties(db, pdh.getWCRoot().getWcId(), localRelpath, props);
             if (clearRecordedInfo) {
                 RecordFileinfo rfi = new RecordFileinfo();
-                rfi.lastModTime = SVNDate.NULL;
+                rfi.lastModTime = 0;
                 rfi.translatedSize = -1;
                 rfi.localRelpath = localRelpath;
                 rfi.wcRoot = pdh.getWCRoot();

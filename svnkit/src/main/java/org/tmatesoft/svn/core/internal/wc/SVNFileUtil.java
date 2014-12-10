@@ -11,19 +11,24 @@
  */
 package org.tmatesoft.svn.core.internal.wc;
 
-import org.tmatesoft.svn.core.*;
-import org.tmatesoft.svn.core.internal.util.SVNFormatUtil;
-import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
-import org.tmatesoft.svn.core.internal.util.SVNUUIDGenerator;
-import org.tmatesoft.svn.core.internal.util.jna.SVNJNAUtil;
-import org.tmatesoft.svn.core.internal.util.jna.SVNOS2Util;
-import org.tmatesoft.svn.core.internal.wc.admin.SVNTranslator;
-import org.tmatesoft.svn.core.wc.ISVNEventHandler;
-import org.tmatesoft.svn.core.wc.ISVNOptions;
-import org.tmatesoft.svn.util.SVNDebugLog;
-import org.tmatesoft.svn.util.SVNLogType;
-
-import java.io.*;
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
+import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.io.RandomAccessFile;
+import java.io.Reader;
+import java.io.UnsupportedEncodingException;
+import java.io.Writer;
+import java.lang.reflect.Array;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
@@ -35,7 +40,24 @@ import java.security.NoSuchAlgorithmException;
 import java.util.Map;
 import java.util.Properties;
 import java.util.StringTokenizer;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
+
+import org.tmatesoft.svn.core.ISVNCanceller;
+import org.tmatesoft.svn.core.SVNErrorCode;
+import org.tmatesoft.svn.core.SVNErrorMessage;
+import org.tmatesoft.svn.core.SVNException;
+import org.tmatesoft.svn.core.SVNNodeKind;
+import org.tmatesoft.svn.core.internal.util.SVNFormatUtil;
+import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
+import org.tmatesoft.svn.core.internal.util.SVNUUIDGenerator;
+import org.tmatesoft.svn.core.internal.util.jna.SVNJNAUtil;
+import org.tmatesoft.svn.core.internal.util.jna.SVNOS2Util;
+import org.tmatesoft.svn.core.internal.wc.admin.SVNTranslator;
+import org.tmatesoft.svn.core.wc.ISVNEventHandler;
+import org.tmatesoft.svn.core.wc.ISVNOptions;
+import org.tmatesoft.svn.util.SVNDebugLog;
+import org.tmatesoft.svn.util.SVNLogType;
 
 /**
  * @version 1.3
@@ -2288,5 +2310,94 @@ public class SVNFileUtil {
             }
         }
         return file.lastModified();
+    }
+    
+    private static Method java7readAttributesMethod = null;
+    private static Method java7toPathMethod = null;
+    private static Method java7lastModifiedTimeMethod = null;
+    private static Method java7setLastModifiedTimeMethod = null;
+    private static Method java7toTimeMethod = null;
+    private static Method java7fromTimeMethod = null;
+    private static Class<?> java7BasciFileAttributesClazz = null;
+    private static Class<?> java7FileTimeClazz = null;
+    private static Object java7noFollowLinksParam= null;
+    
+    static {
+        final ClassLoader loader = SVNFileUtil.class.getClassLoader();
+        try {
+            final Class<?> filesClazz = loader.loadClass("java.nio.file.Files");
+            final Class<?> pathClazz = loader.loadClass("java.nio.file.Path");
+            java7BasciFileAttributesClazz = loader.loadClass("java.nio.file.attribute.BasicFileAttributes");
+            final Class<?> linkOption = loader.loadClass("java.nio.file.LinkOption");
+            java7FileTimeClazz = loader.loadClass("java.nio.file.attribute.FileTime");
+            java7noFollowLinksParam = Array.newInstance(linkOption, 1);
+            if (linkOption.getEnumConstants() != null && linkOption.getEnumConstants().length >= 1) {
+                Array.set(java7noFollowLinksParam, 0, linkOption.getEnumConstants()[0]);
+            } else {
+                java7noFollowLinksParam = Array.newInstance(linkOption, 0);
+            }
+            java7readAttributesMethod = filesClazz.getMethod("readAttributes", 
+                    pathClazz, Class.class, java7noFollowLinksParam.getClass());
+            java7toPathMethod = File.class.getMethod("toPath");
+            java7lastModifiedTimeMethod = java7BasciFileAttributesClazz.getMethod("lastModifiedTime");
+            java7setLastModifiedTimeMethod = filesClazz.getMethod("setLastModifiedTime", pathClazz, java7FileTimeClazz);
+            java7toTimeMethod = java7FileTimeClazz.getMethod("to", TimeUnit.class);
+            java7fromTimeMethod = java7FileTimeClazz.getMethod("from", Long.TYPE, TimeUnit.class);
+        } catch (ClassNotFoundException e) {
+            java7BasciFileAttributesClazz = null;
+        } catch (NoSuchMethodException e) {
+            java7BasciFileAttributesClazz = null;
+        } catch (SecurityException e) {
+            java7BasciFileAttributesClazz = null;
+        }
+    }
+
+    public static void setFileLastModifiedMicros(File file, long timeInMicros) {
+        if (java7BasciFileAttributesClazz != null && timeInMicros >=0 && file != null) {
+            try {
+                final Object path = java7toPathMethod.invoke(file);
+                if (path != null) {
+                    final Object fileTime = java7fromTimeMethod.invoke(null, timeInMicros, TimeUnit.MICROSECONDS);
+                    if (fileTime != null) {
+                        java7setLastModifiedTimeMethod.invoke(null, path, fileTime);
+                        return;
+                    }
+                }
+            } catch (SecurityException e) {
+            } catch (IllegalAccessException e) {
+            } catch (IllegalArgumentException e) {
+            } catch (InvocationTargetException e) {
+            }
+        }
+        setLastModified(file, timeInMicros / 1000);
+    }
+    
+    public static long getFileLastModifiedMicros(File file) {
+        if (java7BasciFileAttributesClazz != null) {
+            try {
+                final Object path = java7toPathMethod.invoke(file);
+                if (path != null) {
+                    final Object attrs = java7readAttributesMethod.invoke(null, 
+                            path, 
+                            java7BasciFileAttributesClazz, 
+                            java7noFollowLinksParam);
+                    
+                    if (attrs != null) {
+                        final Object time = java7lastModifiedTimeMethod.invoke(attrs);
+                        if (time != null) {
+                            final Object result = java7toTimeMethod.invoke(time, TimeUnit.MICROSECONDS);
+                            if (result instanceof Long) {
+                                return (Long) result;
+                            }
+                        }
+                    }
+                }
+            } catch (SecurityException e) {
+            } catch (IllegalAccessException e) {
+            } catch (IllegalArgumentException e) {
+            } catch (InvocationTargetException e) {
+            }
+        }
+        return getFileLastModified(file) * 1000;
     }
 }
