@@ -729,7 +729,7 @@ public class SVNWCContext {
             if (recordedSize != -1 && SVNFileUtil.getFileLength(localAbsPath) != recordedSize) {
                 compare = true;
             }
-            if (!compare && (nodeInfo.lng(NodeInfo.recordedTime)/1000) != SVNFileUtil.getFileLastModified(localAbsPath)) {
+            if (!compare && nodeInfo.lng(NodeInfo.recordedTime) != SVNFileUtil.getFileLastModifiedMicros(localAbsPath)) {
                 compare = true;
             }
             if (!compare) {
@@ -744,7 +744,7 @@ public class SVNWCContext {
         
         if (!modified) {
             if (getDb().isWCLockOwns(localAbsPath, false)) {
-                db.globalRecordFileinfo(localAbsPath, SVNFileUtil.getFileLength(localAbsPath), new SVNDate(SVNFileUtil.getFileLastModified(localAbsPath), 0));
+                db.globalRecordFileinfo(localAbsPath, SVNFileUtil.getFileLength(localAbsPath), SVNFileUtil.getFileLastModifiedMicros(localAbsPath));
             }
         }
         return modified;
@@ -4046,7 +4046,7 @@ public class SVNWCContext {
             if (useCommitTimes) {
                 final SVNDate changedDate = installInfo.get(InstallInfo.changedDate);
                 if (changedDate != null) {
-                    SVNFileUtil.setLastModified(localAbspath, changedDate.getTime());
+                    SVNFileUtil.setFileLastModifiedMicros(localAbspath, changedDate.getTimeInMicros());
                 }
             }
             if (recordFileInfo) {
@@ -4210,7 +4210,7 @@ public class SVNWCContext {
             }
             if (setTime != null) {
                 if (SVNFileType.getType(localAbspath).isFile()) {
-                    SVNFileUtil.setLastModified(localAbspath, setTime.getTime());
+                    SVNFileUtil.setFileLastModifiedMicros(localAbspath, setTime.getTimeInMicros());
                 }
             }
             ctx.getAndRecordFileInfo(localAbspath, true);
@@ -4373,9 +4373,9 @@ public class SVNWCContext {
 
     public void getAndRecordFileInfo(File localAbspath, boolean ignoreError) throws SVNException {
         if (localAbspath.exists()) {
-            SVNDate lastModified = new SVNDate(SVNFileUtil.getFileLastModified(localAbspath), 0);
-            long length = SVNFileUtil.getFileLength(localAbspath);
-            db.globalRecordFileinfo(localAbspath, length, lastModified);
+            final long timeInMicros = SVNFileUtil.getFileLastModifiedMicros(localAbspath);
+            final long length = SVNFileUtil.getFileLength(localAbspath);
+            db.globalRecordFileinfo(localAbspath, length, timeInMicros);
         }
     }
 

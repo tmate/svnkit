@@ -315,7 +315,7 @@ public class SVNStatusEditor17 {
         if (info.kind != SVNWCDbKind.Dir && node_status == SVNStatusType.STATUS_NORMAL) {
             boolean text_modified_p = false;
             long fileSize = SVNFileUtil.getFileLength(localAbsPath);
-            long fileTime = SVNFileUtil.getFileLastModified(localAbsPath);
+            long fileTime = SVNFileUtil.getFileLastModifiedMicros(localAbsPath);
             
             if ((info.kind == SVNWCDbKind.File || info.kind == SVNWCDbKind.Symlink) && (!SVNFileUtil.symlinksSupported() || info.special == pathSpecial)) {
                 if (!info.hasChecksum) {
@@ -324,7 +324,7 @@ public class SVNStatusEditor17 {
                     (pathKind != null && 
                             info.recordedSize != -1 &&
                             info.recordedModTime != 0 &&
-                            (info.recordedModTime / 1000) == fileTime &&
+                            info.recordedModTime == fileTime &&
                             info.recordedSize == fileSize)) {
                     text_modified_p = false;
                 } else {

@@ -467,7 +467,7 @@ public class SvnWcDbReader extends SvnWcDbShared {
                                 if (size != SVNFileUtil.getFileLength(localFile)) {
                                     return true;
                                 }
-                                if (date/1000 == SVNFileUtil.getFileLastModified(localFile)) {
+                                if (date == SVNFileUtil.getFileLastModifiedMicros(localFile)) {
                                     cursor.next();
                                     continue;
                                 }

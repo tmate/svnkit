@@ -668,7 +668,7 @@ public class SvnNgDiffUtil {
         } else {
             SVNNodeKind kind = SVNFileType.getNodeKind(SVNFileType.getType(localAbsPath));
 
-            if (kind != SVNNodeKind.FILE || (kind == SVNNodeKind.FILE && SVNFileUtil.getFileLength(localAbsPath) == recordedSize && SVNFileUtil.getFileLastModified(localAbsPath) == recordedTime)) {
+            if (kind != SVNNodeKind.FILE || (kind == SVNNodeKind.FILE && SVNFileUtil.getFileLength(localAbsPath) == recordedSize && SVNFileUtil.getFileLastModifiedMicros(localAbsPath) == recordedTime)) {
                 filesSame = true;
             }
         }

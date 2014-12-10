@@ -1276,7 +1276,7 @@ public interface ISVNWCDb {
      * LAST_MOD_TIME may be 0, which will be recorded as such, implying
      * "unknown last mod time".
      */
-    void globalRecordFileinfo(File local_abspath, long translated_size, SVNDate last_mod_time) throws SVNException;
+    void globalRecordFileinfo(File local_abspath, long translated_size, long last_mod_time) throws SVNException;
 
     /** Add or replace LOCK for LOCAL_ABSPATH to DB. */
     void addLock(File localAbsPath, SVNWCDbLock lock) throws SVNException;
